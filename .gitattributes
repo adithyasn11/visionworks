@@ -1,0 +1,51 @@
+# .gitattributes — Normalize line endings for cross-platform consistency.
+# This ensures all text files are stored as LF in the repo (Unix style),
+# and Git on Windows checks them out as CRLF automatically.
+
+# Default: auto-detect text files and normalize to LF in the repo
+* text=auto eol=lf
+
+# Explicitly force LF for all source code
+*.py        text eol=lf
+*.js        text eol=lf
+*.jsx       text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.mjs       text eol=lf
+*.cjs       text eol=lf
+*.json      text eol=lf
+*.css       text eol=lf
+*.html      text eol=lf
+*.md        text eol=lf
+*.txt       text eol=lf
+*.sql       text eol=lf
+*.env*      text eol=lf
+*.example   text eol=lf
+*.toml      text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+*.sh        text eol=lf
+Makefile    text eol=lf
+
+# Windows-specific scripts can use CRLF
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# True binary files — never touch line endings
+*.pt        binary
+*.onnx      binary
+*.engine    binary
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.mp4       binary
+*.avi       binary
+*.mov       binary
+*.mkv       binary
+*.db        binary
+*.sqlite    binary
+*.zip       binary
+*.tar.gz    binary
