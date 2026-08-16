@@ -75,6 +75,9 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
   const imgRef      = useRef(null);
   const captureIntervalRef = useRef(null);
   const localStreamRef = useRef(null);
+  // Holds startBackendDirectWebcam, which is declared further down but needs to
+  // be callable from startLiveWebcam's error/catch paths above it.
+  const startBackendDirectWebcamRef = useRef(null);
 
   const [phase, setPhase] = useState('idle'); // idle | uploading | processing | webcam | done | error
   const [fileName, setFileName] = useState('');
@@ -149,6 +152,49 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
     };
   }, [handleFrame]);
 
+  // Stop Webcam Stream cleanly.
+  // Declared before handleFileChange / startLiveWebcam because both call it;
+  // `const` bindings are not hoisted, so defining it later threw a ReferenceError.
+  const stopWebcamStream = useCallback(() => {
+    if (captureIntervalRef.current) {
+      clearInterval(captureIntervalRef.current);
+      captureIntervalRef.current = null;
+    }
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+    }
+    if (wsRef.current) {
+      try {
+        if (wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ action: 'stop' }));
+        }
+        wsRef.current.close();
+      } catch (_) {}
+      wsRef.current = null;
+    }
+    setIsWebcamActive(false);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    stopWebcamStream();
+    setPhase('idle');
+    setFileName('');
+    setSessionId('');
+    setProgress(0);
+    setCurrentTimeSec(0);
+    setDurationSec(0);
+    setIsPaused(false);
+    setStatusMsg('');
+    setStats({ detected: 0, sitting: 0, standing: 0, walking: 0 });
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#090D16';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  }, [stopWebcamStream]);
+
   // Upload Video File
   const handleFileChange = useCallback(async (e) => {
     stopWebcamStream();
@@ -192,28 +238,6 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
       setStatusMsg(`Upload error: ${err.message}`);
     }
   }, [connectProcessingWS]);
-
-  // Stop Webcam Stream cleanly
-  const stopWebcamStream = useCallback(() => {
-    if (captureIntervalRef.current) {
-      clearInterval(captureIntervalRef.current);
-      captureIntervalRef.current = null;
-    }
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
-      localStreamRef.current = null;
-    }
-    if (wsRef.current) {
-      try {
-        if (wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ action: 'stop' }));
-        }
-        wsRef.current.close();
-      } catch (_) {}
-      wsRef.current = null;
-    }
-    setIsWebcamActive(false);
-  }, []);
 
   // Start Live Webcam Stream
   const startLiveWebcam = useCallback(async () => {
@@ -293,25 +317,29 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
 
       ws.onerror = () => {
         setStatusMsg('WebSocket connection error — using backend camera stream fallback...');
-        startBackendDirectWebcam();
+        startBackendDirectWebcamRef.current?.();
       };
 
       ws.onclose = () => {
-        if (isWebcamActive) {
-          setIsWebcamActive(false);
-          setPhase('idle');
-        }
+        // Uses the updater form: `isWebcamActive` captured here would be the
+        // value from the render that opened the socket, which is always false.
+        setIsWebcamActive((active) => {
+          if (active) setPhase('idle');
+          return false;
+        });
       };
 
     } catch (err) {
       console.warn("Browser camera access error or declined:", err);
       // Fallback: connect directly to backend /live_webcam
-      startBackendDirectWebcam();
+      startBackendDirectWebcamRef.current?.();
     }
-  }, [handleFrame, stopWebcamStream]);
+  }, [handleFrame, handleReset]);
 
-  // Fallback: backend direct camera capture
-  const startBackendDirectWebcam = () => {
+  // Fallback: backend direct camera capture.
+  // Reached from startLiveWebcam through startBackendDirectWebcamRef, so the
+  // call sites above do not depend on this declaration order.
+  const startBackendDirectWebcam = useCallback(() => {
     if (wsRef.current) wsRef.current.close();
 
     const ws = new WebSocket(`${BACKEND_WS}/api/v1/video/live_webcam`);
@@ -340,7 +368,13 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
       setPhase('error');
       setStatusMsg('Failed to open camera on backend or browser.');
     };
-  };
+  }, [handleFrame]);
+
+  // Keep the ref pointing at the latest implementation so callers declared
+  // earlier in the component can reach it.
+  useEffect(() => {
+    startBackendDirectWebcamRef.current = startBackendDirectWebcam;
+  }, [startBackendDirectWebcam]);
 
   // Playback Control Actions
   const togglePlayPause = () => {
@@ -367,25 +401,6 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
     setProgress(targetPct);
     setCurrentTimeSec(targetTime);
     wsRef.current.send(JSON.stringify({ action: 'seek', pct: targetPct }));
-  };
-
-  const handleReset = () => {
-    stopWebcamStream();
-    setPhase('idle');
-    setFileName('');
-    setSessionId('');
-    setProgress(0);
-    setCurrentTimeSec(0);
-    setDurationSec(0);
-    setIsPaused(false);
-    setStatusMsg('');
-    setStats({ detected: 0, sitting: 0, standing: 0, walking: 0 });
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#090D16';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
   };
 
   const toggleFullScreen = () => {

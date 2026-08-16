@@ -20,6 +20,7 @@ import asyncio
 import uuid
 import json
 import logging
+import re
 import time
 import torch
 import numpy as np
@@ -33,6 +34,34 @@ os.makedirs(SAMPLE_VIDEOS_DIR, exist_ok=True)
 
 # Global state: map session_id -> {"path": ..., "status": ..., "cancel": False}
 _active_sessions: dict = {}
+
+# Uploaded files are named "<8-hex-session-id>_<original name>". Only files
+# matching that shape are ever auto-deleted, so videos a user placed in
+# sample_videos/ by hand are left untouched.
+_UPLOAD_NAME_RE = re.compile(r'^[0-9a-f]{8}_')
+ORPHAN_UPLOAD_MAX_AGE_SECONDS = 6 * 3600
+
+
+def _purge_orphaned_uploads(max_age_seconds: int = ORPHAN_UPLOAD_MAX_AGE_SECONDS):
+    """
+    Deletes uploaded videos that are older than max_age_seconds and are not
+    referenced by any live session. Without this, an upload whose WebSocket is
+    never opened stays on disk forever.
+    """
+    live_paths = {s.get("path") for s in _active_sessions.values()}
+    now = time.time()
+    for name in os.listdir(SAMPLE_VIDEOS_DIR):
+        if not _UPLOAD_NAME_RE.match(name):
+            continue
+        path = os.path.join(SAMPLE_VIDEOS_DIR, name)
+        if path in live_paths or not os.path.isfile(path):
+            continue
+        try:
+            if (now - os.path.getmtime(path)) > max_age_seconds:
+                os.remove(path)
+                logger.info(f"Purged orphaned upload: {name}")
+        except OSError as e:
+            logger.warning(f"Could not purge orphaned upload {name}: {e}")
 
 
 @router.get("/samples")
@@ -58,11 +87,18 @@ async def upload_video_file(file: UploadFile = File(...)):
     The frontend then connects via WS /api/v1/video/process/{session_id} to receive frames.
     """
     allowed_exts = ('.mp4', '.avi', '.webm', '.mov', '.mkv')
-    if not file.filename.lower().endswith(allowed_exts):
+    if not file.filename or not file.filename.lower().endswith(allowed_exts):
+        raise HTTPException(status_code=400, detail=f"Invalid format. Supported: {allowed_exts}")
+
+    # Strip any directory components: a filename like "../../x.mp4" must never
+    # be able to escape SAMPLE_VIDEOS_DIR and write elsewhere on disk.
+    safe_name = os.path.basename(file.filename.replace("\\", "/"))
+    safe_name = re.sub(r'[^A-Za-z0-9._-]', '_', safe_name).lstrip('.')
+    if not safe_name.lower().endswith(allowed_exts):
         raise HTTPException(status_code=400, detail=f"Invalid format. Supported: {allowed_exts}")
 
     session_id = str(uuid.uuid4())[:8]
-    save_path = os.path.join(SAMPLE_VIDEOS_DIR, f"{session_id}_{file.filename}")
+    save_path = os.path.join(SAMPLE_VIDEOS_DIR, f"{session_id}_{safe_name}")
 
     try:
         with open(save_path, "wb") as buffer:
@@ -71,17 +107,22 @@ async def upload_video_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Failed to save video: {e}")
 
     _active_sessions[session_id] = {
-        "filename": file.filename,
+        "filename": safe_name,
         "path": save_path,
         "status": "READY",
-        "cancel": False
+        "cancel": False,
+        "created_at": time.time()
     }
 
-    logger.info(f"Video uploaded: {file.filename} -> session {session_id}")
+    # Reclaim uploads that were never processed (client never opened the
+    # WebSocket, or the server restarted mid-session) so they don't accumulate.
+    _purge_orphaned_uploads()
+
+    logger.info(f"Video uploaded: {safe_name} -> session {session_id}")
     return {
         "status": "SUCCESS",
         "session_id": session_id,
-        "filename": file.filename,
+        "filename": safe_name,
         "message": "Video ready. Connect WebSocket at /api/v1/video/process/{session_id}"
     }
 

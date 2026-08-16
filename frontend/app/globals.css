@@ -2,18 +2,253 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme tokens ──────────────────────────────────────────────────────────
+   Light is the base. Dark is redefined under .dark (stamped on <html> by
+   ThemeToggle). Neutrals carry a slight warm/red bias rather than being pure
+   grey, so the red accent sits naturally on both grounds.                   */
+:root {
+  --ground:        #FFFFFF;
+  --surface:       #FAFAFA;
+  --surface-alt:   #F4F4F5;
+  --ink:           #0B0A0C;
+  --ink-muted:     #57545C;
+  --ink-faint:     #6B6772; /* AA (5.5:1) on both ground and surface */
+  --line:          #E7E5E9;
+  /* Form borders need real presence — --line is a divider weight and reads as
+     a smudge around an input. These are the 3:1 non-text contrast minimum. */
+  --field:         #918D98; /* 3.25:1 on white — passes non-text minimum */
+  --field-hover:   #807C88; /* 4.07:1 */
+  --accent:        #DC2626; /* accent text/icons on the page ground */
+  --accent-fill:   #DC2626; /* solid red panels that carry white text */
+  --accent-soft:   rgba(220, 38, 38, 0.10);
+  --inverse:       #0B0A0C;
+  --inverse-ink:   #FFFFFF;
+}
+
+.dark {
+  --ground:        #0B0A0C;
+  --surface:       #141316;
+  --surface-alt:   #1C1A1F;
+  --ink:           #F7F6F8;
+  --ink-muted:     #A5A1AB;
+  --ink-faint:     #8B8792; /* AA (5.6:1) on both ground and surface */
+  --line:          #2A272E;
+  --field:         #6A6673; /* 3.54:1 on the dark ground */
+  --field-hover:   #7A7684; /* 4.47:1 */
+  /* Two reds, because one cannot serve both roles on a dark ground:
+     --accent is lifted so red text/icons stay legible on #0B0A0C (5.7:1),
+     --accent-fill is deeper so white text on a solid red panel passes AA (5.0:1). */
+  --accent:        #F05252;
+  --accent-fill:   #D42B2B;
+  --accent-soft:   rgba(240, 82, 82, 0.14);
+  --inverse:       #F7F6F8;
+  --inverse-ink:   #0B0A0C;
+}
+
 @layer base {
   body {
-    @apply bg-white text-black antialiased font-sans min-h-screen selection:bg-red-600 selection:text-white;
+    background-color: var(--ground);
+    color: var(--ink);
+    @apply antialiased font-sans min-h-screen selection:bg-red-600 selection:text-white;
+  }
+
+  /* Theme changes shouldn't flash; page content shouldn't animate on toggle. */
+  html.theme-ready body,
+  html.theme-ready .themed {
+    transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
   }
 }
 
+/* ── Hero sizing ───────────────────────────────────────────────────────────
+   The hero owns the first screen: full viewport minus the 4rem sticky navbar,
+   with its content optically centred. Without this the following section peeks
+   above the fold and reads as a half-cut box.
+   `svh` (small viewport height) keeps mobile browser chrome from overshooting. */
+.hero-screen {
+  min-height: calc(100svh - 4rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 3rem;
+  padding-bottom: 3.5rem;
+}
+
+/* Card-based heroes fill the screen with the cards themselves rather than
+   leaving a dead band beneath them. The cards grow to the available height and
+   centre their own content, so the hero reads as one full-bleed composition.
+   Capped so the cards never become absurdly tall on very large displays. */
+.hero-screen.hero-cards {
+  justify-content: center;
+}
+.hero-screen.hero-cards > * {
+  max-height: 56rem;
+}
+
+/* Short/landscape windows: let the hero size to its content instead of
+   squashing it, so nothing overlaps when height is scarce. */
+@media (max-height: 640px) {
+  .hero-screen {
+    min-height: 0;
+    padding-top: 3.5rem;
+    padding-bottom: 3.5rem;
+  }
+}
+
+/* ── Theme switch animation ────────────────────────────────────────────────
+   The new theme is revealed with a circle that expands from the toggle button.
+   The outgoing snapshot is held still underneath while the incoming one is
+   clipped open on top, so the whole page appears to be "wiped" into the new
+   theme rather than flickering between two flat colours.                     */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Old snapshot stays put; the new one is clipped over it. */
+html.theme-switching::view-transition-old(root) {
+  z-index: 1;
+}
+html.theme-switching::view-transition-new(root) {
+  z-index: 2;
+  animation: theme-reveal 520ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes theme-reveal {
+  from {
+    clip-path: circle(0 at var(--reveal-x, 50%) var(--reveal-y, 50%));
+  }
+  to {
+    clip-path: circle(var(--reveal-r, 150vmax) at var(--reveal-x, 50%) var(--reveal-y, 50%));
+  }
+}
+
+/* The View Transition snapshot already animates the colour change; leaving the
+   per-element transitions on as well makes the reveal look muddy. */
+html.theme-switching .themed,
+html.theme-switching body {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.theme-switching::view-transition-new(root) {
+    animation: none;
+  }
+}
+
+/* ── Auth screens ──────────────────────────────────────────────────────────
+   Sign-in / sign-up must fit one screen with no scrollbar. The column is sized
+   with clamp()-based spacing so it compresses on short laptops (768–800px tall)
+   instead of overflowing, and relaxes again on tall displays.                */
+.auth-screen {
+  height: 100svh;
+  overflow: hidden;
+}
+
+.auth-pane {
+  height: 100%;
+  min-height: 0;          /* let the grid child actually shrink */
+  overflow: hidden;
+  padding-block: clamp(0.75rem, 2.2vh, 2rem);
+  padding-inline: clamp(1.25rem, 4vw, 2.5rem);
+}
+
+/* Vertical rhythm inside the form column, tied to viewport height. */
+.auth-col {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.85rem, 2.4vh, 1.75rem);
+}
+
+.auth-col form {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.7rem, 1.9vh, 1.25rem);
+}
+
+/* Inputs and buttons give back a few pixels each when height is tight. */
+@media (max-height: 860px) {
+  .auth-col input,
+  .auth-col button {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+}
+
+/* The left panel's own stack compresses the same way. */
+.auth-aside-stack {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1rem, 3vh, 2rem);
+  min-height: 0;
+}
+
+/* Token-backed utilities so markup never hardcodes a theme-specific color. */
+/* Permanently dark feature cards — a fixed design accent, not a theme
+   inversion. In dark mode they lift slightly so they stay distinct from the
+   page ground instead of disappearing into it. */
+.card-dark {
+  background-color: #111013;
+  color: #F7F6F8;
+}
+.dark .card-dark {
+  background-color: #1C1A1F;
+}
+.card-dark .text-ink        { color: #F7F6F8; }
+.card-dark .text-ink-muted  { color: #A5A1AB; }
+
+.bg-ground      { background-color: var(--ground); }
+.bg-surface     { background-color: var(--surface); }
+.bg-surface-alt { background-color: var(--surface-alt); }
+.bg-inverse     { background-color: var(--inverse); }
+.text-ink       { color: var(--ink); }
+.text-ink-muted { color: var(--ink-muted); }
+.text-ink-faint { color: var(--ink-faint); }
+.text-inverse   { color: var(--inverse-ink); }
+.text-accent    { color: var(--accent); }
+/* Solid red panels use the deeper fill so their white text passes AA. */
+.bg-accent      { background-color: var(--accent-fill); }
+.bg-accent-soft { background-color: var(--accent-soft); }
+.border-line         { border-color: var(--line); }
+.border-accent       { border-color: var(--accent-fill); }
+.border-field        { border-color: var(--field); }
+.hover\:border-field-hover:hover { border-color: var(--field-hover); }
+
+/* Dashboard surfaces.
+   The dashboard's own markup uses light-on-dark slate text throughout (it was
+   designed as a dark control room), so these panels stay dark in BOTH themes.
+   They were hardcoded `bg-white`, which put that light text on a white panel —
+   invisible in light mode and a glaring white slab in dark mode. */
 .glass-panel {
-  @apply bg-white border border-slate-200 rounded-2xl shadow-sm;
+  background-color: #141316;
+  border: 1px solid #2A272E;
+  color: #F7F6F8;
+  @apply rounded-2xl shadow-sm;
 }
 
 .glass-card {
-  @apply bg-white border border-slate-200 rounded-xl p-5 hover:border-red-600 transition-all duration-200 shadow-sm;
+  background-color: #1C1A1F;
+  border: 1px solid #2A272E;
+  color: #F7F6F8;
+  @apply rounded-xl p-5 transition-all duration-200 shadow-sm;
+}
+
+.glass-card:hover {
+  border-color: var(--accent-fill);
+}
+
+/* The dashboard is a dark control room in both themes; its panels and text are
+   built for a dark ground, so the shell paints one regardless of theme. */
+.dashboard-shell {
+  background-color: #0B0A0C;
+  color: #F7F6F8;
+  min-height: 100vh;
 }
 
 @keyframes marquee {
@@ -32,9 +267,22 @@
   100% { opacity: 1; transform: translateY(0); }
 }
 
+/* `backwards` holds the 0% state during animation-delay, so elements no longer
+   need an inline `opacity: 0` to avoid a pre-animation flash. Keeping that
+   inline style was what left cards invisible or stranded mid-slide whenever the
+   animation did not run to completion. */
 .animate-fade-in-up {
-  animation: fade-in-up 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  opacity: 0;
+  animation: fade-in-up 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Respect users who ask for reduced motion: show content immediately, fully
+   opaque and in its final position, instead of animating it in. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .delay-100 { animation-delay: 100ms; }

@@ -9,10 +9,26 @@ export const metadata = {
   description: 'Real-time CCTV AI analytics, posture detection, and zone occupancy metrics dashboard.',
 };
 
+// Runs before first paint so the correct theme is already applied and the page
+// never flashes light-then-dark. Kept inline and dependency-free on purpose.
+const themeInit = `
+(function(){
+  try {
+    var stored = localStorage.getItem('theme');
+    var dark = stored ? stored === 'dark'
+      : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (dark) document.documentElement.classList.add('dark');
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} bg-white text-black min-h-screen`}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+      </head>
+      <body className={`${inter.className} min-h-screen`}>
         {children}
       </body>
     </html>

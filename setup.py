@@ -130,10 +130,11 @@ def download_models():
     
     venv_python = get_venv_python()
     
-    # Models needed: yolov8s.pt for detection, yolov8s-pose.pt for pose
+    # Must match the weights the code actually loads: the CV pipeline requests
+    # the Medium variants (see app/cv/pose_estimator.py and stream_processor.py).
     models = [
-        ("yolov8s.pt", "Object Detection"),
-        ("yolov8s-pose.pt", "Pose Estimation"),
+        ("yolov8m.pt", "Object Detection"),
+        ("yolov8m-pose.pt", "Pose Estimation"),
     ]
     
     for model_file, description in models:

@@ -79,6 +79,11 @@ class PostureEstimator:
         has_kpts = results.keypoints is not None and len(results.keypoints) > 0
         if has_kpts:
             keypoints_data = results.keypoints.data.cpu().numpy() # Shape: (N, 17, 3)
+            # Some model variants emit (N, 17, 2) with no confidence channel.
+            # Downstream code indexes [:, 2], so pad a full-confidence column.
+            if keypoints_data.ndim == 3 and keypoints_data.shape[2] == 2:
+                pad = np.ones((*keypoints_data.shape[:2], 1), dtype=keypoints_data.dtype)
+                keypoints_data = np.concatenate([keypoints_data, pad], axis=2)
         else:
             keypoints_data = [np.zeros((17, 3)) for _ in boxes]
 
@@ -151,12 +156,6 @@ class PostureEstimator:
 
         l_knee_angle = self.calculate_angle(keypoints[11][:2], keypoints[13][:2], keypoints[15][:2]) if (k_conf[11]>0.15 and k_conf[13]>0.15 and k_conf[15]>0.15) else None
         r_knee_angle = self.calculate_angle(keypoints[12][:2], keypoints[14][:2], keypoints[16][:2]) if (k_conf[12]>0.15 and k_conf[14]>0.15 and k_conf[16]>0.15) else None
-
-        # Averaged midpoint joints as fallback
-        sh_mid, has_sh = get_joint(5, 6)
-        hip_mid, has_hip = get_joint(11, 12)
-        knee_mid, has_knee = get_joint(13, 14)
-        ank_mid, has_ank = get_joint(15, 16)
 
         mid_hip_angle = self.calculate_angle(sh_mid, hip_mid, knee_mid) if (has_sh and has_hip and has_knee) else None
         mid_knee_angle = self.calculate_angle(hip_mid, knee_mid, ank_mid) if (has_hip and has_knee and has_ank) else None
@@ -238,12 +237,11 @@ class PostureEstimator:
         elif has_knee and k_conf[13] > 0.15 and k_conf[14] > 0.15:
             stride_width = abs(keypoints[13][0] - keypoints[14][0])
 
-        normalized_stride = shoulder_w and (stride_width / shoulder_w) or 0.0
+        # shoulder_w is clamped to >= 10.0 above, so this division is always safe.
+        normalized_stride = stride_width / shoulder_w
 
         knee_asymmetry = 0.0
-        if has_hip and has_knee and has_ank and k_conf[11] > 0.15 and k_conf[12] > 0.15 and k_conf[13] > 0.15 and k_conf[14] > 0.15 and k_conf[15] > 0.15 and k_conf[16] > 0.15:
-            l_knee_angle = self.calculate_angle(keypoints[11][:2], keypoints[13][:2], keypoints[15][:2])
-            r_knee_angle = self.calculate_angle(keypoints[12][:2], keypoints[14][:2], keypoints[16][:2])
+        if l_knee_angle is not None and r_knee_angle is not None:
             knee_asymmetry = abs(l_knee_angle - r_knee_angle)
 
         is_moving_fast = motion_speed >= 4.5
@@ -258,6 +256,37 @@ class PostureEstimator:
     def classify_posture(self, keypoints: np.ndarray, bbox: list) -> str:
         return self.classify_posture_raw(keypoints, bbox)
 
-    def extract_keypoints_for_bboxes(self, frame: np.ndarray, bboxes: list) -> list:
+    @staticmethod
+    def _bbox_iou(a: list, b: list) -> float:
+        """Intersection-over-union of two [x1, y1, x2, y2] boxes."""
+        ix1, iy1 = max(a[0], b[0]), max(a[1], b[1])
+        ix2, iy2 = min(a[2], b[2]), min(a[3], b[3])
+        inter = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
+        if inter <= 0.0:
+            return 0.0
+        area_a = max(0.0, a[2] - a[0]) * max(0.0, a[3] - a[1])
+        area_b = max(0.0, b[2] - b[0]) * max(0.0, b[3] - b[1])
+        union = area_a + area_b - inter
+        return inter / union if union > 0 else 0.0
+
+    def extract_keypoints_for_bboxes(self, frame: np.ndarray, detections: list) -> list:
+        """
+        Returns keypoints aligned 1:1 with the supplied detections.
+
+        This runs its own pose pass, so its detection order does NOT match the
+        caller's list. Results are matched back by best bounding-box overlap,
+        and any detection without a match gets a zero-filled placeholder rather
+        than borrowing another person's keypoints (or raising IndexError).
+        """
         outputs = self.process_frame_single_pass(frame)
-        return [out["keypoints"] for out in outputs]
+
+        aligned = []
+        for det in detections:
+            bbox = det["bbox"] if isinstance(det, dict) else det
+            best_kpts, best_iou = None, 0.0
+            for out in outputs:
+                iou = self._bbox_iou(bbox, out["bbox"])
+                if iou > best_iou:
+                    best_iou, best_kpts = iou, out["keypoints"]
+            aligned.append(best_kpts if best_iou >= 0.3 else np.zeros((17, 3)))
+        return aligned

@@ -5,141 +5,214 @@ import Link from 'next/link';
 import { ArrowRight, Shield, Lock, EyeOff, Server, Database, CheckCircle2, Video } from 'lucide-react';
 import LandingNavbar from '../components/LandingNavbar';
 import LandingFooter from '../components/LandingFooter';
+import { StatsBand, HowItWorks, FAQ } from '../components/LandingSections';
+
+const STATS = [
+  { value: '0',        label: 'Frames stored', note: 'Video is discarded after inference' },
+  { value: 'On-site',  label: 'Processing',    note: 'Inference runs on your hardware' },
+  { value: 'TLS 1.3',  label: 'In transit',    note: 'Encrypted metadata, nothing else' },
+  { value: 'Row-level',label: 'Isolation',     note: 'Tenants can only read their own data' },
+];
+
+const STEPS = [
+  {
+    title: 'Frame enters memory',
+    body: 'A frame is pulled from the camera and handed straight to the local model. It is never written to disk.',
+  },
+  {
+    title: 'Only numbers come out',
+    body: 'The model returns coordinates, a posture label and a track ID. The image itself is dropped immediately.',
+  },
+  {
+    title: 'Metadata syncs',
+    body: 'Those numbers travel to your dashboard over TLS 1.3 and land in a database partitioned per organisation.',
+  },
+];
+
+const FAQ_ITEMS = [
+  {
+    q: 'Is any video saved or uploaded?',
+    a: 'No. Frames are analysed in memory and released as soon as the model has read them. What leaves the machine is numerical telemetry — coordinates, posture labels, dwell times — never imagery.',
+  },
+  {
+    q: 'Can VisionWorks identify specific people?',
+    a: 'No. There is no face recognition and no biometric matching. Each person gets a temporary track ID that lets the system follow them across frames in a single session; it carries no identity and is not reused later.',
+  },
+  {
+    q: 'Who can see our data?',
+    a: 'Only your organisation. Row Level Security policies are enforced in the database itself, so a query from one tenant cannot return another tenant’s rows even if the application layer were compromised.',
+  },
+  {
+    q: 'Do we need to tell staff they are being analysed?',
+    a: 'Requirements vary by jurisdiction, so treat this as a prompt rather than legal advice — check with your own counsel. Most workplace privacy regimes expect clear notice of monitoring, and the fact that no footage is retained is usually central to that conversation.',
+  },
+];
 
 export default function SecurityPage() {
   const [mounted, setMounted] = useState(false);
-  
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted) return <div className="min-h-screen bg-white flex flex-col"></div>;
+  if (!mounted) return <div className="min-h-screen bg-ground flex flex-col"></div>;
 
   return (
-    <div className="min-h-screen bg-white text-black font-sans selection:bg-red-600 selection:text-white flex flex-col overflow-x-hidden">
+    <div className="themed min-h-screen bg-ground text-ink font-sans selection:bg-red-600 selection:text-white flex flex-col overflow-x-hidden">
       <LandingNavbar />
 
-      <main className="flex-1 w-full max-w-7xl mx-auto px-8">
-        
-        {/* HERO SECTION */}
-        <section className="pt-20 pb-16 text-center max-w-4xl mx-auto animate-fade-in-up" style={{ animationDelay: '100ms', opacity: 0 }}>
-          <div className="w-20 h-20 bg-red-600 text-white rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-red-600/40">
-            <Shield className="w-10 h-10" />
+      <main className="flex-1 w-full max-w-6xl mx-auto px-6 sm:px-8 flex flex-col gap-16 sm:gap-20 pb-20">
+
+        {/* HERO — owns the full first screen so the next section can't peek above the fold. */}
+        <section className="hero-screen text-center max-w-3xl mx-auto animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+          <div className="w-16 h-16 bg-accent text-white rounded-2xl flex items-center justify-center mx-auto mb-7 shadow-lg shadow-red-600/30 shrink-0">
+            <Shield className="w-8 h-8" />
           </div>
-          <h1 className="text-5xl lg:text-[4rem] font-black tracking-tighter text-gray-900 mb-6 leading-[1.05]">
-            Enterprise privacy.<br/>
-            <span className="text-red-600">Built in.</span>
+          {/* leading-[1.15] + pb-1 keeps descenders from clipping. */}
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-ink mb-6 leading-[1.15] pb-1 text-balance">
+            Enterprise privacy.{' '}
+            <span className="text-accent">Built in.</span>
           </h1>
-          <p className="text-xl text-gray-600 font-medium leading-relaxed max-w-2xl mx-auto mb-10">
-            We believe that analyzing workspace activity should never compromise employee privacy. Our edge-computing architecture ensures raw video never leaves your facility.
+          <p className="text-lg sm:text-xl text-ink-muted font-medium leading-relaxed max-w-2xl mx-auto text-balance">
+            Understanding how a workspace is used shouldn&apos;t cost your team their privacy. Everything is processed on site, and the raw video never leaves the building.
           </p>
+
+          <div className="mt-9 flex flex-col sm:flex-row gap-3.5 justify-center">
+            <Link
+              href="/dashboard"
+              className="bg-inverse text-inverse px-7 py-3.5 rounded-2xl font-bold text-[15px] hover:bg-accent hover:text-white transition-all duration-300 shadow-lg flex items-center justify-center gap-2.5 group/btn"
+            >
+              Open the dashboard <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+            </Link>
+            <Link
+              href="/features"
+              className="bg-surface text-ink border border-line px-7 py-3.5 rounded-2xl font-bold text-[15px] hover:border-[color:var(--accent)] hover:text-accent transition-all duration-300 flex items-center justify-center gap-2.5"
+            >
+              Explore the platform
+            </Link>
+          </div>
         </section>
 
-        {/* SECURITY GRID 1: EDGE PROCESSING */}
-        <section className="pb-16">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            
-            {/* Edge Processing Architecture */}
-            <div 
-              className="bg-black text-white shadow-xl shadow-black/20 rounded-[2.5rem] p-12 flex flex-col justify-between animate-fade-in-up relative overflow-hidden group hover:-translate-y-2 hover:shadow-2xl hover:shadow-red-900/30 transition-all duration-500"
-              style={{ animationDelay: '200ms', opacity: 0 }}
-            >
-              <div className="relative z-10">
-                <div className="w-14 h-14 bg-red-600 text-white rounded-xl flex items-center justify-center mb-8 shadow-lg shadow-red-600/30 group-hover:scale-110 transition-transform duration-300">
-                  <Server className="w-7 h-7" />
-                </div>
-                <h3 className="text-4xl font-black tracking-tight mb-4 text-white group-hover:text-red-500 transition-colors">Local Edge Processing</h3>
-                <p className="text-gray-400 font-medium text-lg leading-relaxed mb-8 group-hover:text-gray-200 transition-colors">
-                  Cameras process video frames directly on local hardware. The AI extracts metadata (like bounding boxes and coordinates) and immediately drops the raw image frames from memory.
-                </p>
-              </div>
-              <div className="relative z-10 bg-gray-900 p-6 rounded-2xl border border-gray-800 flex items-center justify-between group-hover:border-red-500/30 transition-colors">
-                <div className="flex flex-col items-center">
-                  <Video className="w-6 h-6 text-gray-500 mb-2" />
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Raw Video</span>
-                </div>
-                <ArrowRight className="w-5 h-5 text-red-500 line-through" />
-                <div className="flex flex-col items-center">
-                  <Database className="w-6 h-6 text-gray-500 mb-2" />
-                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Cloud Storage</span>
-                </div>
-              </div>
-            </div>
+        {/* STATS */}
+        <StatsBand stats={STATS} delay={150} />
 
-            {/* Zero Retention */}
-            <div 
-              className="bg-white border border-gray-100 shadow-xl shadow-gray-200/40 rounded-[2.5rem] p-12 flex flex-col justify-between relative overflow-hidden animate-fade-in-up group hover:-translate-y-2 hover:shadow-2xl hover:border-gray-200 transition-all duration-500"
-              style={{ animationDelay: '300ms', opacity: 0 }}
-            >
-              <div className="relative z-10">
-                <div className="w-14 h-14 bg-gray-100 text-black rounded-xl flex items-center justify-center mb-8 group-hover:bg-black group-hover:text-white transition-colors duration-300">
-                  <EyeOff className="w-7 h-7" />
-                </div>
-                <h3 className="text-4xl font-black text-gray-900 tracking-tight mb-4 group-hover:translate-x-2 transition-transform duration-300">Zero Video Retention</h3>
-                <p className="text-gray-600 font-medium text-lg leading-relaxed mb-8">
-                  No video is ever saved to disk. No footage is ever transmitted over the network. We store nothing but encrypted numerical telemetry.
-                </p>
+        {/* SECURITY GRID 1: EDGE PROCESSING */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+          {/* Edge Processing Architecture */}
+          <div
+            className="card-dark rounded-3xl p-8 sm:p-10 flex flex-col justify-between animate-fade-in-up relative overflow-hidden group hover:-translate-y-1 transition-all duration-500"
+            style={{ animationDelay: '200ms' }}
+          >
+            <div className="relative z-10">
+              <div className="w-11 h-11 bg-accent text-white rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-red-600/30 group-hover:scale-110 transition-transform duration-300">
+                <Server className="w-5 h-5" />
               </div>
-              <ul className="space-y-4">
-                {['No cloud video storage', 'No face recognition', 'No personally identifiable info'].map((item, i) => (
-                  <li key={i} className="flex items-center gap-3 font-bold text-sm text-gray-400 group-hover:translate-x-2 transition-transform" style={{ transitionDelay: `${i * 100}ms` }}>
-                    <CheckCircle2 className="w-5 h-5 text-red-500" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
+              <h3 className="text-xl sm:text-2xl font-black tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors">Local edge processing</h3>
+              <p className="opacity-70 font-medium text-[15px] leading-relaxed mb-6">
+                Frames are analysed on your own hardware. The model extracts coordinates and posture labels, then drops the image from memory before the next frame arrives.
+              </p>
             </div>
-            
+            <div className="relative z-10 bg-white/5 p-5 rounded-2xl border border-white/10 flex items-center justify-between gap-4 group-hover:border-[color:var(--accent)] transition-colors">
+              <div className="flex flex-col items-center gap-1.5">
+                <Video className="w-5 h-5 opacity-70" />
+                <span className="text-[10px] font-bold opacity-80 uppercase tracking-[0.12em]">Raw video</span>
+              </div>
+              {/* The slash is the point: this path is deliberately severed. */}
+              <div className="flex-1 flex items-center justify-center relative" aria-hidden="true">
+                <div className="h-px w-full bg-white/20"></div>
+                <span className="absolute w-6 h-0.5 bg-accent rotate-45 rounded-full"></span>
+              </div>
+              <div className="flex flex-col items-center gap-1.5">
+                <Database className="w-5 h-5 opacity-70" />
+                <span className="text-[10px] font-bold opacity-80 uppercase tracking-[0.12em]">Cloud storage</span>
+              </div>
+            </div>
+            <p className="sr-only">Raw video is never sent to cloud storage.</p>
           </div>
+
+          {/* Zero Retention */}
+          <div
+            className="bg-surface border border-line rounded-3xl p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden animate-fade-in-up group hover:-translate-y-1 hover:border-[color:var(--accent)] transition-all duration-500"
+            style={{ animationDelay: '300ms' }}
+          >
+            <div className="relative z-10">
+              <div className="w-11 h-11 bg-surface-alt text-ink rounded-xl flex items-center justify-center mb-6 group-hover:bg-accent group-hover:text-white transition-colors duration-300">
+                <EyeOff className="w-5 h-5" />
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-ink tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors duration-300">Zero video retention</h3>
+              <p className="text-ink-muted font-medium text-[15px] leading-relaxed mb-6">
+                Nothing is written to disk and nothing is streamed off-site. What persists is encrypted numerical telemetry — and only that.
+              </p>
+            </div>
+            <ul className="flex flex-col gap-3">
+              {['No cloud video storage', 'No face recognition', 'No personally identifiable data'].map((item, i) => (
+                <li key={i} className="flex items-center gap-3 font-bold text-[13px] text-ink-faint group-hover:translate-x-1 transition-transform" style={{ transitionDelay: `${i * 100}ms` }}>
+                  <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+
         </section>
 
         {/* SECURITY GRID 2: DB SECURITY */}
-        <section className="pb-16 flex flex-col lg:flex-row gap-8 items-stretch">
-          
-          <div 
-            className="flex-1 bg-red-600 text-white shadow-xl shadow-red-600/30 rounded-[2.5rem] p-12 flex flex-col justify-center animate-fade-in-up group hover:-translate-y-2 hover:shadow-2xl hover:shadow-red-600/50 transition-all duration-500 relative overflow-hidden"
-            style={{ animationDelay: '400ms', opacity: 0 }}
+        <section className="flex flex-col lg:flex-row gap-5 items-stretch">
+
+          <div
+            className="flex-1 bg-accent text-white rounded-3xl p-8 sm:p-10 flex flex-col justify-center animate-fade-in-up group hover:-translate-y-1 hover:shadow-xl hover:shadow-red-600/40 transition-all duration-500 relative overflow-hidden shadow-lg shadow-red-600/20"
+            style={{ animationDelay: '400ms' }}
           >
-            <div className="absolute right-[-10%] top-[-20%] opacity-10 group-hover:rotate-45 group-hover:scale-125 transition-all duration-1000">
-               <Lock className="w-[30rem] h-[30rem]" />
+            <div className="absolute right-[-8%] top-[-15%] opacity-10 group-hover:rotate-45 group-hover:scale-125 transition-all duration-1000 pointer-events-none" aria-hidden="true">
+               <Lock className="w-72 h-72" />
             </div>
             <div className="relative z-10">
-              <h3 className="text-4xl font-black tracking-tight mb-4 group-hover:text-black transition-colors">Bank-Level Encryption</h3>
-              <p className="text-red-100 font-medium text-lg leading-relaxed mb-8 group-hover:text-white transition-colors">
-                All metadata transmitted from the local inference engine to the cloud dashboard is secured using strict TLS 1.3 encryption.
+              <h3 className="text-xl sm:text-2xl font-black tracking-tight mb-3 leading-[1.15] pb-1">Bank-level encryption</h3>
+              <p className="text-red-50 font-medium text-[15px] leading-relaxed">
+                Every measurement sent from the local inference engine to your dashboard travels over TLS 1.3. Nothing moves in the clear.
               </p>
             </div>
           </div>
-          
-          <div 
-            className="flex-1 bg-white border border-gray-100 shadow-xl shadow-gray-200/40 rounded-[2.5rem] p-12 flex flex-col justify-center animate-fade-in-up group hover:-translate-y-2 hover:shadow-2xl hover:border-gray-200 transition-all duration-500"
-            style={{ animationDelay: '500ms', opacity: 0 }}
+
+          <div
+            className="flex-1 bg-surface border border-line rounded-3xl p-8 sm:p-10 flex flex-col justify-center animate-fade-in-up group hover:-translate-y-1 hover:border-[color:var(--accent)] transition-all duration-500"
+            style={{ animationDelay: '500ms' }}
           >
-            <Database className="w-12 h-12 text-black mb-6 group-hover:scale-110 group-hover:text-red-600 transition-colors duration-300" />
-            <h3 className="text-3xl font-black text-gray-900 tracking-tight mb-4 group-hover:translate-x-2 transition-transform duration-300">Row Level Security</h3>
-            <p className="text-gray-600 font-medium text-base leading-relaxed">
-              Our Supabase-powered backend ensures complete data isolation. Row Level Security (RLS) policies mathematically guarantee that organizations can only access their own telemetry data, protecting against cross-tenant data leaks.
+            <Database className="w-10 h-10 text-ink mb-5 group-hover:scale-110 group-hover:text-accent transition-all duration-300" />
+            <h3 className="text-lg sm:text-xl font-black text-ink tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors duration-300">Row level security</h3>
+            <p className="text-ink-muted font-medium text-[15px] leading-relaxed">
+              Isolation is enforced by the database, not just the app. Row Level Security policies mean one organisation&apos;s query can never return another&apos;s rows — even if the application layer were compromised.
             </p>
           </div>
-          
+
         </section>
 
+        {/* HOW IT WORKS */}
+        <HowItWorks
+          steps={STEPS}
+          heading="What happens to a single frame"
+          intro="The privacy guarantee isn't a policy sitting on top of the system — it's how the pipeline is built."
+          delay={550}
+        />
+
+        {/* FAQ */}
+        <FAQ items={FAQ_ITEMS} heading="Privacy questions, answered" delay={600} />
+
         {/* BOTTOM CTA */}
-        <section 
-          className="my-12 bg-white border border-gray-100 shadow-xl shadow-gray-200/40 rounded-[3rem] p-16 text-center animate-fade-in-up flex flex-col items-center justify-center group hover:-translate-y-2 hover:shadow-2xl hover:border-gray-200 transition-all duration-500 relative overflow-hidden"
-          style={{ animationDelay: '600ms', opacity: 0 }}
+        <section
+          className="bg-surface border border-line rounded-3xl p-10 sm:p-14 text-center animate-fade-in-up flex flex-col items-center justify-center group hover:-translate-y-1 hover:border-[color:var(--accent)] transition-all duration-500 relative overflow-hidden"
+          style={{ animationDelay: '650ms' }}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-red-50 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-          
-          <h2 className="text-5xl font-black text-gray-900 tracking-tighter mb-4 relative z-10 group-hover:scale-105 transition-transform duration-500">Secure your workspace.</h2>
-          <p className="text-gray-500 font-medium text-lg max-w-xl mx-auto mb-8 relative z-10 group-hover:text-gray-900 transition-colors duration-300">
-            Deploy advanced activity analytics without compromising privacy or compliance.
+          <h2 className="text-2xl sm:text-3xl font-black text-ink tracking-tight mb-3 relative z-10 leading-[1.15] pb-1">Secure your workspace.</h2>
+          <p className="text-ink-muted font-medium text-[15px] max-w-md mx-auto mb-7 relative z-10">
+            Run activity analytics without giving up privacy or compliance.
           </p>
-          <Link 
+          <Link
             href="/dashboard"
-            className="bg-black text-white px-10 py-5 rounded-2xl font-bold text-base hover:bg-red-600 transition-all duration-300 shadow-xl shadow-black/10 hover:shadow-red-600/30 flex items-center gap-3 relative z-10 group/btn"
+            className="bg-inverse text-inverse px-7 py-3.5 rounded-2xl font-bold text-[15px] hover:bg-accent hover:text-white transition-all duration-300 shadow-lg flex items-center gap-2.5 relative z-10 group/btn"
           >
-            Create an account <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 group-hover/btn:scale-110 transition-transform" />
+            Open the dashboard <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
           </Link>
         </section>
 

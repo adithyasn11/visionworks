@@ -66,8 +66,10 @@ export default function Dashboard() {
     return () => ws.close();
   }, []);
 
+  // dashboard-shell paints the dark control-room ground its panels expect.
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6 min-h-screen flex flex-col gap-6">
+    <div className="dashboard-shell">
+      <div className="max-w-7xl mx-auto p-4 md:p-6 min-h-screen flex flex-col gap-6">
       <Header
         isConnected={isConnected}
         onOpenSupabaseModal={() => setSupabaseModal(true)}
@@ -96,9 +98,10 @@ export default function Dashboard() {
         onSave={handleConnectSupabase}
       />
 
-      <footer className="mt-4 text-center text-xs text-slate-500 py-4 border-t border-slate-200">
-        Vision-Based Workplace Activity Analytics System • Next.js + FastAPI + Supabase • Major Project
-      </footer>
+        <footer className="mt-4 text-center text-xs text-slate-400 py-4 border-t border-slate-700">
+          Vision-Based Workplace Activity Analytics System • Next.js + FastAPI + Supabase • Major Project
+        </footer>
+      </div>
     </div>
   );
 }

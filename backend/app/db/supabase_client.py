@@ -5,9 +5,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
-
 _supabase_client: Client | None = None
 
 def get_supabase_client() -> Client | None:
@@ -19,9 +16,14 @@ def get_supabase_client() -> Client | None:
     if _supabase_client is not None:
         return _supabase_client
 
-    if SUPABASE_URL and SUPABASE_KEY:
+    # Read at call time, not import time: this module may be imported before
+    # load_dotenv() has run, which would permanently capture empty values.
+    supabase_url = os.environ.get("SUPABASE_URL", "")
+    supabase_key = os.environ.get("SUPABASE_KEY", "")
+
+    if supabase_url and supabase_key:
         try:
-            _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            _supabase_client = create_client(supabase_url, supabase_key)
             logger.info("Supabase client initialized successfully.")
             return _supabase_client
         except Exception as e:

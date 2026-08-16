@@ -5,8 +5,9 @@ from dotenv import load_dotenv
 import sys
 import os
 
-# Load environment variables from backend/.env
-load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
+# Load environment variables from backend/.env (this file is backend/app/main.py,
+# so backend/ is one level up — setup.py creates the .env there).
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -48,4 +49,5 @@ def read_root():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    # Port 8001 matches run_system.py, setup.py, README and the frontend clients.
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8001, reload=True)
