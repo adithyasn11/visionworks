@@ -1,29 +1,17 @@
 // frontend/app/lib/supabaseClient.js
-import { createClient } from '@supabase/supabase-js';
+//
+// DEPRECATED SHIM — kept so existing imports keep working.
+//
+// This module used to build a client with `createClient` from supabase-js, which
+// stores the session in localStorage. That made server-side route protection
+// impossible: middleware and Server Components only receive cookies, so any
+// guard had to run in the browser after the page was already sent.
+//
+// The session now lives in httpOnly cookies via @supabase/ssr. Everything is
+// re-exported from lib/supabase/browser so no call site had to change and the
+// two clients can never both be live at once (which would fight over the
+// session and log users out unpredictably).
+//
+// New code should import from './supabase/browser' directly.
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-/**
- * True when both env vars are present and are not the placeholder values from
- * .env.local.example. The auth screens check this so they can show a clear
- * "not configured" message instead of failing with an opaque network error.
- */
-export const isSupabaseConfigured = Boolean(
-  supabaseUrl &&
-  supabaseAnonKey &&
-  !supabaseUrl.includes('your-supabase') &&
-  !supabaseAnonKey.includes('your-supabase')
-);
-
-// Null rather than a client built from placeholders — a half-configured client
-// throws deep inside the SDK, which is much harder to diagnose.
-export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    })
-  : null;
+export { supabase, isSupabaseConfigured, createClient } from './supabase/browser';

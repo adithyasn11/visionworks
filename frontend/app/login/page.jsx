@@ -1,9 +1,9 @@
 'use client';
 
 // frontend/app/login/page.jsx
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -34,8 +34,33 @@ function describeAuthError(err) {
   return msg || 'Something went wrong. Please try again.';
 }
 
-export default function LoginPage() {
+/**
+ * Where to send someone after a successful sign-in.
+ *
+ * Platform operators go to the founder console; everyone else to the customer
+ * dashboard. The role check is a database call (is_platform_admin()), not a
+ * hardcoded list, so revoking access in platform_admins takes effect on the
+ * next sign-in with nothing to redeploy.
+ *
+ * `next` is honoured only when it is a same-origin absolute path — an
+ * attacker-supplied `?next=https://evil.example` would otherwise turn the login
+ * page into an open redirect.
+ */
+async function resolveLandingPath(client, next) {
+  if (next && next.startsWith('/') && !next.startsWith('//')) return next;
+  try {
+    const { data, error } = await client.rpc('is_platform_admin');
+    if (!error && data === true) return '/platform';
+  } catch {
+    // Fall through to the dashboard: a failed role probe should not block a
+    // successful sign-in.
+  }
+  return '/dashboard';
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,15 +71,33 @@ export default function LoginPage() {
 
   useEffect(() => setMounted(true), []);
 
-  // Already signed in? Go straight to the dashboard.
+  // The OAuth callback redirects back here with ?authError=... when the provider
+  // or the code exchange failed. Surfacing it beats a silent bounce to a blank
+  // login form — "provider is not enabled" is a config fix the reader can act on.
+  useEffect(() => {
+    const authError = searchParams.get('authError');
+    if (!authError) return;
+    setBanner({
+      kind: 'error',
+      text: /provider is not enabled/i.test(authError)
+        ? 'Google sign-in is not enabled on this project yet. Enable the Google provider in Supabase → Authentication → Providers.'
+        : describeAuthError({ message: authError }),
+    });
+  }, [searchParams]);
+
+  // Already signed in? Route by role rather than always to /dashboard, so a
+  // returning operator lands in the console. Middleware does the same check
+  // server-side; this is the belt-and-braces client path for a soft navigation.
   useEffect(() => {
     if (!supabase) return;
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (active && data?.session) router.replace('/dashboard');
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (!active || !data?.session) return;
+      const target = await resolveLandingPath(supabase, searchParams.get('next'));
+      if (active) router.replace(target);
     });
     return () => { active = false; };
-  }, [router]);
+  }, [router, searchParams]);
 
   const validate = () => {
     const next = {};
@@ -98,7 +141,12 @@ export default function LoginPage() {
         });
         return;
       }
-      router.replace('/dashboard');
+      const target = await resolveLandingPath(supabase, searchParams.get('next'));
+      router.replace(target);
+      // The session now lives in cookies, so the server needs to re-render with
+      // the new auth state. Without refresh(), a cached Server Component payload
+      // for the target route can still show the signed-out view.
+      router.refresh();
     } catch (err) {
       setBanner({ kind: 'error', text: describeAuthError(err) });
     } finally {
@@ -116,7 +164,11 @@ export default function LoginPage() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/dashboard` },
+        options: {
+          // Must land on the server callback, not a page: the PKCE code has to
+          // be exchanged server-side to set httpOnly session cookies.
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
       if (error) {
         setBanner({ kind: 'error', text: describeAuthError(error) });
@@ -219,5 +271,19 @@ export default function LoginPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+/**
+ * useSearchParams() opts a route out of static prerendering unless it sits
+ * inside a Suspense boundary — the build fails with "should be wrapped in a
+ * suspense boundary" otherwise. The fallback matches the pre-mount shell the
+ * form itself renders, so there is no visible flash between the two.
+ */
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-ground" />}>
+      <LoginForm />
+    </Suspense>
   );
 }

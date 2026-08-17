@@ -43,6 +43,11 @@ sample_videos/*.mov
 # ─── Frontend (Next.js / Node) ───────────────────────────────────────────────
 frontend/node_modules/
 frontend/.next/
+
+# ─── Prisma ──────────────────────────────────────────────────────────────────
+# The client is generated from schema.prisma by `prisma generate`, which runs
+# on install. Committing it would mean a stale client outliving a schema change.
+frontend/app/generated/
 frontend/dist/
 frontend/build/
 frontend/out/

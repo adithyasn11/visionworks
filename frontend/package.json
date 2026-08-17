@@ -9,6 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.39.8",
     "clsx": "^2.1.0",
     "heatmap.js": "^2.0.5",
@@ -19,8 +22,13 @@
     "recharts": "^2.12.3"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "autoprefixer": "^10.4.19",
+    "dotenv": "^17.4.2",
     "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.1"
+    "prisma": "^7.9.1",
+    "tailwindcss": "^3.4.1",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
   }
 }

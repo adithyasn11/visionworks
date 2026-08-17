@@ -135,7 +135,11 @@ export default function SignupPage() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/dashboard` },
+        options: {
+          // Must land on the server callback, not a page: the PKCE code has to
+          // be exchanged server-side to set httpOnly session cookies.
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
       if (error) {
         setBanner({ kind: 'error', text: describeAuthError(error) });

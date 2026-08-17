@@ -1,0 +1,934 @@
+// VisionWorks — database schema
+// ---------------------------------------------------------------------------
+// Prisma 7 · PostgreSQL (Supabase)
+//
+// READ THIS FIRST — three rules the whole schema obeys:
+//
+//  1. TENANCY. Every table that holds customer data carries `orgId`, even when
+//     it could be reached by walking relations (Zone -> Camera -> Site -> Org).
+//     The denormalisation is deliberate: Postgres Row Level Security policies
+//     are written per-table and must decide access from that row alone,
+//     without a join. It is also what makes the composite indexes below work.
+//
+//  2. ANONYMITY IS STRUCTURAL. `ZoneMinuteStat` is the only analytics table,
+//     and it holds counts per zone per minute — no track id, no coordinates,
+//     no person reference. Once a minute closes, individual movement is
+//     mathematically unrecoverable. The database physically cannot answer
+//     "what did this person do today", because no row refers to a person.
+//     This is a schema guarantee, not a policy promise.
+//
+//  3. AUTH LIVES IN SUPABASE. Passwords, sessions and OAuth identities are
+//     owned by `auth.users`, which Prisma does not manage. `Profile.id` holds
+//     that same UUID, so the two halves join on it. Never mirror a password
+//     or a session here.
+//
+// Naming: Prisma models are PascalCase for idiomatic client code; `@@map`
+// gives every table a snake_case name so hand-written SQL, RLS policies and
+// the Python backend read naturally.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+// Prisma 7 removed `url`/`directUrl` from the schema. The CLI now reads its
+// connection string from ../prisma.config.ts, which points at DIRECT_URL
+// (port 5432) — migrations take advisory locks that PgBouncer in transaction
+// mode cannot hold. The running app uses DATABASE_URL (pooled, port 6543)
+// via the PrismaClient constructor instead.
+datasource db {
+  provider = "postgresql"
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ENUMS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Three roles, matching the permission matrix in DOCUMENTATION.md §9.
+/// VIEWER reads. MANAGER configures the space. ADMIN governs the account.
+/// Deliberately no "EMPLOYEE" role — nobody is a subject of this system,
+/// only an operator of it.
+enum Role {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+enum MembershipStatus {
+  INVITED /// row exists, user has not accepted — no access yet
+  ACTIVE
+  SUSPENDED /// access revoked but history and audit attribution preserved
+}
+
+enum SourceType {
+  UPLOAD /// a video file processed once
+  RTSP /// networked IP camera
+  WEBCAM /// machine-local camera
+}
+
+enum CameraStatus {
+  ACTIVE
+  INACTIVE /// configured but intentionally not running
+  ERROR /// last connection attempt failed; see Camera.lastErrorMessage
+}
+
+enum ZoneType {
+  WORKSTATION
+  MEETING
+  BREAK
+  CORRIDOR
+  RECEPTION
+  OTHER
+}
+
+enum Posture {
+  SITTING
+  STANDING
+  WALKING
+  AWAY
+}
+
+enum SessionStatus {
+  QUEUED
+  PROCESSING
+  DONE
+  ERROR
+  CANCELLED
+}
+
+enum SessionKind {
+  VIDEO_UPLOAD
+  LIVE_WEBCAM
+  LIVE_RTSP
+}
+
+enum AlertType {
+  SEDENTARY /// seated occupancy sustained beyond a threshold
+  OVERCROWDING /// occupancy above Zone.capacity
+  UNDERUTILISATION /// zone below a utilisation floor across a window
+  ZONE_EMPTY /// booked-but-empty; the real-estate insight
+  CAMERA_OFFLINE /// operational, not occupancy-derived
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertState {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED /// condition no longer true
+  MUTED /// deliberately silenced by an operator
+}
+
+enum ReportKind {
+  UTILISATION_SUMMARY
+  ZONE_COMPARISON
+  POSTURE_BREAKDOWN
+  RAW_BUCKETS
+}
+
+enum ReportFormat {
+  CSV
+  PDF
+}
+
+enum ReportStatus {
+  QUEUED
+  GENERATING
+  READY
+  FAILED
+  EXPIRED /// file cleaned up by the retention job; row kept for history
+}
+
+enum ThemePreference {
+  SYSTEM
+  LIGHT
+  DARK
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  TENANCY & IDENTITY
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// The tenant boundary. Every other customer-data row belongs to exactly one.
+model Organisation {
+  id   String @id @default(uuid()) @db.Uuid
+  name String @db.VarChar(160)
+  /// URL-safe handle, e.g. "acme-facilities". Unique across the platform.
+  slug String @unique @db.VarChar(80)
+
+  /// IANA zone (e.g. "Asia/Kolkata"). Buckets are stored in UTC and rendered
+  /// in this zone, so "peak hour" means peak local hour — the only reading a
+  /// facility manager cares about.
+  timezone String @default("UTC") @db.VarChar(64)
+
+  // ── Privacy & retention controls, surfaced on /settings/organisation ──
+  /// ZoneMinuteStat rows older than this are deleted by the retention job.
+  dataRetentionDays Int @default(90)
+  /// Delete the uploaded video file as soon as processing finishes. Default
+  /// on: the frames are the sensitive artefact, the buckets are not.
+  purgeVideoAfterProcessing Boolean @default(true)
+
+  // ── Defaults inherited by new zones, so a manager sets policy once ──
+  /// Minutes of sustained seated occupancy before a SEDENTARY alert.
+  defaultSedentaryThresholdMinutes Int @default(60)
+  /// A zone below this utilisation across the window is flagged underused.
+  defaultUtilisationFloorPct Float @default(30)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  /// Soft delete. Kept so the "danger zone" action is reversible for a grace
+  /// period and so audit history is never orphaned.
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  memberships Membership[]
+  sites       Site[]
+  cameras     Camera[]
+  zones       Zone[]
+  minuteStats ZoneMinuteStat[]
+  sessions    AnalysisSession[]
+  alertRules  AlertRule[]
+  alerts      Alert[]
+  reports     Report[]
+  auditLogs   AuditLog[]
+  profiles    Profile[]
+
+  @@index([deletedAt])
+  @@map("organisations")
+}
+
+/// Application-side mirror of a Supabase auth user.
+///
+/// `id` IS the `auth.users.uuid` — not a foreign key Prisma can express,
+/// because `auth` is Supabase's schema. A Postgres trigger on `auth.users`
+/// inserts the row (see prisma/sql/002_triggers.sql), which is why every
+/// field here is either defaulted or nullable: the trigger only knows what
+/// the signup form sent.
+///
+/// `currentOrgId` exists because a user may belong to several organisations
+/// (a consultant managing two clients) and the app needs to know which one
+/// they are currently looking at.
+model Profile {
+  id String @id @db.Uuid
+
+  /// Denormalised from auth.users for display and invite matching. Not the
+  /// source of truth for login — Supabase owns that.
+  email       String  @unique @db.VarChar(320)
+  fullName    String? @db.VarChar(160)
+  avatarUrl   String? @db.VarChar(1024)
+  jobTitle    String? @db.VarChar(120)
+
+  themePreference ThemePreference @default(SYSTEM)
+  /// Overrides the org timezone for this user's own rendering, if set.
+  timezone        String?         @db.VarChar(64)
+
+  /// Which org this user is currently acting within. Null until onboarding
+  /// completes — the app uses exactly this to decide "send them to
+  /// /onboarding", so no extra flag is needed.
+  currentOrgId String?       @db.Uuid
+  currentOrg   Organisation? @relation(fields: [currentOrgId], references: [id], onDelete: SetNull)
+
+  /// Null until the user finishes /onboarding. Distinct from createdAt so you
+  /// can measure signup-to-activated drop-off.
+  onboardedAt DateTime? @db.Timestamptz(6)
+  lastSeenAt  DateTime? @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  memberships       Membership[]
+  invitesSent       Membership[]      @relation("MembershipInviter")
+  sessionsStarted   AnalysisSession[]
+  alertsAcked       Alert[]           @relation("AlertAcknowledgedBy")
+  alertsResolved    Alert[]           @relation("AlertResolvedBy")
+  alertRulesCreated AlertRule[]
+  reportsRequested  Report[]
+  auditLogs         AuditLog[]
+  zonesCreated      Zone[]
+  platformAdmin     PlatformAdmin?
+  platformGrants    PlatformAdmin[]   @relation("PlatformAdminGrantedBy")
+
+  @@index([currentOrgId])
+  @@map("profiles")
+}
+
+/// Platform operators — the people who run VisionWorks itself, not a customer.
+///
+/// WHY A TABLE AND NOT A FOURTH ROLE
+///
+/// `Role` is per-membership: it answers "what may this person do *inside this
+/// organisation*". A SUPER_ADMIN value there would need a membership row in
+/// every org to be useful, and one sloppy policy would leak platform access
+/// into an ordinary tenant check. Keeping platform authority in its own table
+/// means the two systems cannot be confused — the same reason Supabase keeps
+/// `auth` in a separate schema.
+///
+/// WHAT A PLATFORM ADMIN CAN SEE — AND CANNOT
+///
+/// Can:    that an organisation exists, its name, member count, camera count,
+///         storage used, whether its pipeline is running, its error messages.
+/// Cannot: occupancy data. No zone_minute_stats, no zone_day_stats, no alerts.
+///
+/// That boundary is deliberate and load-bearing. /security tells customers
+/// their data is isolated per organisation; if the vendor could read everyone's
+/// occupancy numbers, that claim would be false. A platform admin can answer
+/// "is their processing broken?" without ever seeing how busy their office is.
+///
+/// Organisations are still created by customers signing up — see
+/// create_organisation(). This table is a support console, not an org factory;
+/// making the vendor a manual step in every signup would be a bottleneck, not
+/// a feature.
+model PlatformAdmin {
+  /// One row per operator; the profile id is the key, so a person cannot hold
+  /// platform access twice.
+  profileId String @id @db.Uuid
+
+  /// Free text: "founder", "on-call support". Display only — there are no
+  /// sub-levels of platform access, deliberately.
+  note String? @db.VarChar(200)
+
+  /// Who granted it. Null for the first operator, who is bootstrapped by hand
+  /// through the SQL in 005 (there is nobody to grant it).
+  grantedById String? @db.Uuid
+  grantedAt   DateTime @default(now()) @db.Timestamptz(6)
+
+  /// Soft revoke. Kept rather than deleted so audit entries attributed to this
+  /// operator still resolve to a real row.
+  revokedAt DateTime? @db.Timestamptz(6)
+
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  grantedBy Profile? @relation("PlatformAdminGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  @@index([revokedAt])
+  @@index([grantedById])
+  @@map("platform_admins")
+}
+
+/// Joins a user to an organisation with a role. This — not Profile — is the
+/// authorisation record: RLS policies resolve `auth.uid()` to a Membership
+/// row and read `orgId` and `role` from it.
+///
+/// Invitations live here too, in INVITED status with `profileId` null, so a
+/// pending invite and an active member are one concept with one lifecycle
+/// rather than two tables to keep in sync.
+model Membership {
+  id    String @id @default(uuid()) @db.Uuid
+  orgId String @db.Uuid
+
+  /// Null while the invite is outstanding — the invitee may have no account
+  /// yet. Set when they accept, matching on `invitedEmail`.
+  profileId String? @db.Uuid
+
+  role   Role
+  status MembershipStatus @default(INVITED)
+
+  /// Lower-cased at write time so invite matching is case-insensitive
+  /// without needing a functional index.
+  invitedEmail String  @db.VarChar(320)
+  /// Single-use, cryptographically random. Hashed, never stored raw — the
+  /// token is a bearer credential and a leaked table must not grant access.
+  inviteTokenHash String? @unique @db.VarChar(64)
+  inviteExpiresAt DateTime? @db.Timestamptz(6)
+  invitedById     String?   @db.Uuid
+
+  acceptedAt DateTime? @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @db.Timestamptz(6)
+
+  org       Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  profile   Profile?     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  invitedBy Profile?     @relation("MembershipInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  /// A user holds at most one membership per organisation.
+  @@unique([orgId, profileId])
+  /// And an email can only have one outstanding invite per organisation.
+  @@unique([orgId, invitedEmail])
+  @@index([profileId, status])
+  @@index([orgId, role])
+  /// FK index so removing an inviter does not scan the table.
+  @@index([invitedById])
+  @@map("memberships")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  PHYSICAL SPACE
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// A building or floor. Exists so a company can compare locations — "Floor 3
+/// runs at 71%, Floor 4 at 22%, consolidate" is the whole product pitch.
+model Site {
+  id    String @id @default(uuid()) @db.Uuid
+  orgId String @db.Uuid
+
+  name     String  @db.VarChar(160)
+  /// Free text: "Level 4, North Wing".
+  location String? @db.VarChar(255)
+  /// Overrides the org timezone for sites in another region.
+  timezone String? @db.VarChar(64)
+
+  /// Declared desk count. Utilisation is measured against this, so it is the
+  /// denominator in every percentage the product reports.
+  totalCapacity Int? @db.SmallInt
+
+  /// Local time-of-day defining "working hours", as minutes from midnight.
+  /// Analytics excludes out-of-hours buckets by default — a cleaner walking
+  /// through at 03:00 should not depress the utilisation figure.
+  workdayStartMinute Int @default(540) /// 09:00
+  workdayEndMinute   Int @default(1080) /// 18:00
+  /// ISO-8601 weekdays counted as working days (1 = Monday … 7 = Sunday).
+  workdays           Int[] @default([1, 2, 3, 4, 5])
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  org         Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  cameras     Camera[]
+  zones       Zone[]
+  minuteStats ZoneMinuteStat[]
+
+  @@unique([orgId, name])
+  @@index([orgId, deletedAt])
+  @@map("sites")
+}
+
+/// A video source. Also the anchor for the zone editor: zones are polygons in
+/// this camera's pixel space, so `frameWidth`/`frameHeight` must be recorded
+/// or the coordinates are meaningless at a different resolution.
+model Camera {
+  id     String  @id @default(uuid()) @db.Uuid
+  orgId  String  @db.Uuid
+  siteId String? @db.Uuid
+
+  name        String  @db.VarChar(160)
+  description String? @db.VarChar(500)
+
+  sourceType SourceType
+  /// Connection string for RTSP sources. Contains credentials, so it is
+  /// column-encrypted in Postgres and never returned to the browser — the API
+  /// sends a redacted form. See prisma/sql/003_encryption.sql.
+  rtspUrl    String?    @db.VarChar(1024)
+  /// Device index for WEBCAM sources.
+  deviceIndex Int?      @db.SmallInt
+
+  /// Inference target. 8 is enough for occupancy analytics and leaves GPU
+  /// headroom; the live HUD renders faster than this.
+  fpsTarget Int @default(8)
+
+  /// Native frame size, captured on first successful connection. Zone
+  /// polygons are stored in these pixel coordinates.
+  frameWidth  Int? @db.SmallInt
+  frameHeight Int? @db.SmallInt
+
+  /// Maps image pixels to floor-plane coordinates for the top-down view.
+  /// A 3x3 row-major matrix as JSON. Lives on the camera, not the zone —
+  /// one camera has one ground plane.
+  homographyMatrix Json?
+  /// The four image/floor point pairs the matrix was solved from, so the
+  /// calibration can be reopened and adjusted rather than redone.
+  homographyPoints Json?
+
+  status           CameraStatus @default(INACTIVE)
+  lastSeenAt       DateTime?    @db.Timestamptz(6)
+  lastErrorMessage String?      @db.VarChar(500)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  org         Organisation      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  site        Site?             @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  zones       Zone[]
+  sessions    AnalysisSession[]
+  minuteStats ZoneMinuteStat[]
+  alertRules  AlertRule[]
+  alerts      Alert[]
+
+  @@unique([orgId, name])
+  @@index([orgId, status])
+  @@index([siteId])
+  @@map("cameras")
+}
+
+/// A named polygon on a camera's view — the object that turns a generic
+/// person-detector into a workspace analytics tool.
+model Zone {
+  id       String @id @default(uuid()) @db.Uuid
+  orgId    String @db.Uuid
+  cameraId String @db.Uuid
+  /// Denormalised from the camera so site-level analytics need no join.
+  siteId   String? @db.Uuid
+
+  name     String   @db.VarChar(160)
+  zoneType ZoneType @default(WORKSTATION)
+
+  /// Ordered vertices in camera pixel space: `[[x,y], [x,y], ...]`.
+  /// Minimum three points; validated in the API, and by a CHECK constraint
+  /// in prisma/sql/001_constraints.sql, since a two-point "polygon" would
+  /// silently break every point-in-polygon test downstream.
+  polygon Json
+
+  /// How many people the zone is designed for. The utilisation denominator:
+  /// occupancy 3 in a 4-seat zone is 75%. Null means "count only, no
+  /// percentage" — correct for corridors, where capacity is meaningless.
+  capacity Int? @db.SmallInt
+
+  /// Hex colour for the editor overlay. Defaults are assigned per zoneType
+  /// in the app; storing it lets a manager override.
+  colour String? @db.VarChar(9)
+
+  /// Per-zone overrides of the org defaults. Null = inherit, which keeps the
+  /// common case free of duplicated configuration.
+  sedentaryThresholdMinutes Int?   @db.SmallInt
+  utilisationFloorPct       Float?
+
+  /// Excluded from utilisation rollups. For zones you want counted on the
+  /// live HUD but not in real-estate maths — a doorway, say.
+  excludeFromUtilisation Boolean @default(false)
+
+  createdById String? @db.Uuid
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  org         Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  camera      Camera           @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  site        Site?            @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  createdBy   Profile?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  minuteStats ZoneMinuteStat[]
+  alertRules  AlertRule[]
+  alerts      Alert[]
+
+  @@unique([cameraId, name])
+  @@index([orgId, deletedAt])
+  @@index([cameraId])
+  /// Unindexed FKs stall the cascade when a site or a member is removed.
+  @@index([siteId])
+  @@index([createdById])
+  @@map("zones")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ANALYTICS  —  the anonymity boundary
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// One row per zone per minute. **The only place analytics data lives.**
+///
+/// Why minute buckets and not per-detection rows:
+///
+///   per-detection : 6 people x 8 fps x 8 h x 3600 = ~1.4M rows/camera/day
+///   minute buckets: 4 zones x 60 min x 8 h        = ~2K   rows/camera/day
+///
+/// The storage win is large, but the real reason is structural. There is no
+/// `trackId`, no bounding box, no coordinate, no person reference in this
+/// table. Once the minute closes, who was where is unrecoverable — not
+/// withheld, *absent*. That is what makes the privacy claim on /security an
+/// architectural fact rather than a promise about how the code behaves.
+///
+/// The writer aggregates in memory over a one-minute window and upserts on
+/// close, so reprocessing the same footage updates rather than duplicates.
+model ZoneMinuteStat {
+  id String @id @default(uuid()) @db.Uuid
+
+  orgId    String  @db.Uuid
+  siteId   String? @db.Uuid
+  cameraId String  @db.Uuid
+  zoneId   String  @db.Uuid
+
+  /// UTC, truncated to the minute. Enforced by a CHECK constraint so a
+  /// mis-rounded write cannot create a duplicate bucket.
+  bucketStart DateTime @db.Timestamptz(6)
+
+  // ── Occupancy ──
+  occupancyMax Int   @db.SmallInt
+  occupancyAvg Float
+  occupancyMin Int   @db.SmallInt
+
+  // ── Posture mix. Frame-counts, not people: a person seated for the whole
+  //    minute at 8 fps contributes 480 to sittingFrames. Ratios derived from
+  //    these are stable regardless of fps; raw counts are not comparable
+  //    across cameras with different fpsTarget, hence `sampleFrames`.
+  sittingFrames  Int @default(0)
+  standingFrames Int @default(0)
+  walkingFrames  Int @default(0)
+  /// Frames actually processed in this bucket. The denominator for every
+  /// ratio, and a data-quality signal: far below fpsTarget*60 means dropped
+  /// frames, so the bucket should be treated as low-confidence.
+  sampleFrames   Int @default(0)
+
+  // ── Derived measures ──
+  /// Mean activity index across the minute (0–100).
+  avgActivityScore Float @default(0)
+  /// Summed presence across all tracks. 2 people for the full minute = 120.
+  /// Divided by 60 this gives average concurrent occupancy; it is the
+  /// quantity that makes "person-hours" reportable without identity.
+  totalDwellSeconds Int @default(0)
+  /// Distinct tracks seen. A *count only* — the ids themselves are never
+  /// persisted. Distinguishes "one person for an hour" from "sixty people
+  /// for a minute each", which occupancyAvg alone cannot.
+  uniqueTrackCount Int @default(0) @db.SmallInt
+
+  /// Which run produced this bucket. Null for buckets from a live stream
+  /// that outlived its session record.
+  sessionId String? @db.Uuid
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  org     Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  site    Site?            @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  camera  Camera           @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  zone    Zone             @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  session AnalysisSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  /// Makes the writer idempotent — the upsert target.
+  @@unique([zoneId, bucketStart])
+  /// Serves the /analytics date-range queries, which always filter by org
+  /// then scan a time window.
+  @@index([orgId, bucketStart])
+  /// Serves the per-zone timeline chart.
+  @@index([zoneId, bucketStart])
+  /// Serves site-level rollups and the zone-comparison table.
+  @@index([siteId, bucketStart])
+  /// Serves the retention job's delete-by-age scan.
+  @@index([orgId, createdAt])
+  /// Postgres does not index foreign keys automatically, and an unindexed FK
+  /// makes `ON DELETE CASCADE` scan the whole table while holding a lock.
+  /// On 800k+ rows that turns "delete a camera" into a multi-second stall.
+  @@index([cameraId, bucketStart])
+  /// Also lets /sessions show the buckets a given run produced.
+  @@index([sessionId])
+  @@map("zone_minute_stats")
+}
+
+/// Pre-aggregated day rollups. Not premature optimisation: the hour x weekday
+/// heatmap over 30 days touches ~43,000 minute rows per zone, and the
+/// zone-comparison table does it for every zone at once. Written by the same
+/// job that runs retention, so day rollups survive the deletion of the minute
+/// rows they came from — which is how a 90-day retention policy can still
+/// support a year-over-year trend.
+model ZoneDayStat {
+  id String @id @default(uuid()) @db.Uuid
+
+  orgId    String  @db.Uuid
+  siteId   String? @db.Uuid
+  cameraId String  @db.Uuid
+  zoneId   String  @db.Uuid
+
+  /// Local calendar date in the site's timezone — deliberately not UTC, so
+  /// "Tuesday" means the customer's Tuesday.
+  statDate DateTime @db.Date
+
+  peakOccupancy    Int   @db.SmallInt
+  avgOccupancy     Float
+  /// Local hour (0–23) at which peakOccupancy occurred.
+  peakHour         Int?  @db.SmallInt
+  /// Minutes with occupancy >= 1, within working hours.
+  occupiedMinutes  Int
+  /// occupiedMinutes / available working minutes, as a percentage.
+  utilisationPct   Float
+  sittingRatio     Float @default(0)
+  standingRatio    Float @default(0)
+  walkingRatio     Float @default(0)
+  totalDwellSeconds Int  @default(0)
+  avgActivityScore Float @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@unique([zoneId, statDate])
+  @@index([orgId, statDate])
+  @@index([siteId, statDate])
+  @@map("zone_day_stats")
+}
+
+/// One processing run: an upload or a live stream. Exists so /sessions can
+/// show history and in-flight progress, and so a crashed run is visible as
+/// ERROR rather than vanishing.
+model AnalysisSession {
+  id       String  @id @default(uuid()) @db.Uuid
+  orgId    String  @db.Uuid
+  cameraId String? @db.Uuid
+
+  kind   SessionKind
+  status SessionStatus @default(QUEUED)
+
+  /// Original upload name, sanitised. Display only — never used to build a
+  /// filesystem path, which is how the path-traversal hole was closed.
+  sourceFilename String? @db.VarChar(255)
+  sourceSizeBytes BigInt?
+  /// Server-side path while processing. Nulled once the file is purged, so a
+  /// non-null value on a DONE session means the file is still on disk.
+  storagePath    String? @db.VarChar(1024)
+
+  totalFrames     Int?
+  processedFrames Int   @default(0)
+  fpsAchieved     Float?
+  durationSeconds Int?
+
+  /// Wall-clock window the footage represents. For an upload of yesterday's
+  /// recording this is yesterday, not the processing time — buckets must land
+  /// on the timeline where the events actually happened.
+  coverageStart DateTime? @db.Timestamptz(6)
+  coverageEnd   DateTime? @db.Timestamptz(6)
+
+  errorMessage String? @db.VarChar(1000)
+
+  startedById String?   @db.Uuid
+  queuedAt    DateTime  @default(now()) @db.Timestamptz(6)
+  startedAt   DateTime? @db.Timestamptz(6)
+  finishedAt  DateTime? @db.Timestamptz(6)
+
+  org         Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  camera      Camera?          @relation(fields: [cameraId], references: [id], onDelete: SetNull)
+  startedBy   Profile?         @relation(fields: [startedById], references: [id], onDelete: SetNull)
+  minuteStats ZoneMinuteStat[]
+
+  @@index([orgId, queuedAt])
+  @@index([orgId, status])
+  @@index([cameraId, queuedAt])
+  @@index([startedById])
+  @@map("analysis_sessions")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ALERTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// A condition to watch for. Scope widens as the optional targets are left
+/// null: a rule with no zone and no camera applies org-wide.
+model AlertRule {
+  id    String @id @default(uuid()) @db.Uuid
+  orgId String @db.Uuid
+
+  name     String        @db.VarChar(160)
+  type     AlertType
+  severity AlertSeverity @default(WARNING)
+  isEnabled Boolean      @default(true)
+
+  zoneId   String? @db.Uuid
+  cameraId String? @db.Uuid
+
+  /// Compared against the measure implied by `type`: minutes for SEDENTARY,
+  /// a person count for OVERCROWDING, a percentage for UNDERUTILISATION.
+  /// One nullable numeric beats five type-specific columns that are null
+  /// most of the time.
+  thresholdValue Float
+  /// The condition must hold this long before firing. Stops a rule flapping
+  /// on one noisy frame.
+  sustainedMinutes Int @default(5)
+
+  /// Suppression window: once fired, this rule stays quiet for this many
+  /// minutes. Without it, a crowded room emits an alert every minute and the
+  /// feed becomes unreadable — the failure mode that makes people mute
+  /// alerting entirely.
+  cooldownMinutes Int @default(30)
+
+  /// Only evaluate inside the site's working hours.
+  onlyDuringWorkHours Boolean @default(true)
+
+  notifyEmail Boolean @default(false)
+
+  createdById String? @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+  deletedAt   DateTime? @db.Timestamptz(6)
+
+  org       Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  zone      Zone?        @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  camera    Camera?      @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  createdBy Profile?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  alerts    Alert[]
+
+  @@index([orgId, isEnabled])
+  @@index([zoneId])
+  @@index([cameraId])
+  @@index([createdById])
+  @@map("alert_rules")
+}
+
+/// A fired instance of a rule.
+model Alert {
+  id     String @id @default(uuid()) @db.Uuid
+  orgId  String @db.Uuid
+  ruleId String @db.Uuid
+
+  zoneId   String? @db.Uuid
+  cameraId String? @db.Uuid
+
+  state    AlertState    @default(OPEN)
+  severity AlertSeverity
+
+  /// Measured value at trigger time, and the threshold it crossed. Both are
+  /// copied rather than read through the rule, so editing the rule later does
+  /// not rewrite history.
+  triggeredValue Float
+  thresholdValue Float
+
+  /// Human-readable summary, composed at trigger time.
+  message String @db.VarChar(500)
+
+  triggeredAt DateTime  @default(now()) @db.Timestamptz(6)
+  /// When the condition stopped holding. Null while still true.
+  clearedAt   DateTime? @db.Timestamptz(6)
+
+  acknowledgedAt   DateTime? @db.Timestamptz(6)
+  acknowledgedById String?   @db.Uuid
+  resolvedAt       DateTime? @db.Timestamptz(6)
+  resolvedById     String?   @db.Uuid
+  /// Operator note — "known issue, contractors on site".
+  resolutionNote   String?   @db.VarChar(1000)
+
+  org            Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  rule           AlertRule    @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  zone           Zone?        @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  camera         Camera?      @relation(fields: [cameraId], references: [id], onDelete: SetNull)
+  acknowledgedBy Profile?     @relation("AlertAcknowledgedBy", fields: [acknowledgedById], references: [id], onDelete: SetNull)
+  resolvedBy     Profile?     @relation("AlertResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  /// The alerts feed: newest first, scoped to the org.
+  @@index([orgId, triggeredAt])
+  /// The unacknowledged badge count.
+  @@index([orgId, state, triggeredAt])
+  /// Cooldown lookup: "when did this rule last fire?"
+  @@index([ruleId, triggeredAt])
+  /// Per-zone alert history, plus FK indexes for the cascades.
+  @@index([zoneId, triggeredAt])
+  @@index([cameraId])
+  @@index([acknowledgedById])
+  @@index([resolvedById])
+  @@map("alerts")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  REPORTS & ACCOUNTABILITY
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// A generated export. Rows persist after the file is cleaned up (status
+/// EXPIRED) so /reports can show what was produced and by whom — which is
+/// itself a privacy control: exports leave the system, so they are logged.
+model Report {
+  id    String @id @default(uuid()) @db.Uuid
+  orgId String @db.Uuid
+
+  kind   ReportKind
+  format ReportFormat
+  status ReportStatus @default(QUEUED)
+
+  title String @db.VarChar(200)
+
+  /// Reporting window, inclusive start / exclusive end.
+  rangeStart DateTime @db.Timestamptz(6)
+  rangeEnd   DateTime @db.Timestamptz(6)
+
+  /// Empty array means "all zones". Stored as ids rather than a join table
+  /// because this is an immutable record of what was asked for, not a
+  /// live relationship.
+  zoneIds String[] @db.Uuid
+  siteIds String[] @db.Uuid
+
+  filePath  String? @db.VarChar(1024)
+  fileSizeBytes BigInt?
+  /// Unguessable download token, hashed.
+  downloadTokenHash String? @unique @db.VarChar(64)
+  /// After this, the file is deleted and status becomes EXPIRED.
+  expiresAt DateTime? @db.Timestamptz(6)
+
+  errorMessage String? @db.VarChar(1000)
+
+  requestedById String?  @db.Uuid
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  completedAt   DateTime? @db.Timestamptz(6)
+
+  org         Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  requestedBy Profile?     @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt])
+  @@index([status, expiresAt])
+  @@index([requestedById])
+  @@map("reports")
+}
+
+/// Append-only record of privacy-sensitive and administrative actions:
+/// role changes, zone edits, exports, retention changes, member removal.
+///
+/// `actorEmail` and `actorId` are both stored because the profile may later
+/// be deleted, and an audit trail that loses its subject is not an audit
+/// trail. Nothing here is ever updated or deleted by the application.
+model AuditLog {
+  id    String @id @default(uuid()) @db.Uuid
+  orgId String @db.Uuid
+
+  actorId    String? @db.Uuid
+  actorEmail String? @db.VarChar(320)
+
+  /// Dotted verb: "zone.created", "member.role_changed", "report.downloaded".
+  action     String  @db.VarChar(80)
+  targetType String? @db.VarChar(60)
+  targetId   String? @db.VarChar(64)
+
+  /// Before/after values, request context. Must never contain frames,
+  /// keypoints or anything person-identifying.
+  metadata Json?
+
+  ipAddress String? @db.Inet
+  userAgent String? @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  org   Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  actor Profile?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, createdAt])
+  @@index([orgId, action, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
+}
+
+/// Append-only record of platform-operator actions.
+///
+/// Separate from `audit_logs` on purpose. That table requires an `orgId` —
+/// every row is scoped to one tenant, which is what lets its RLS policy be a
+/// simple org check and what makes an org admin's audit view complete. Platform
+/// actions either have no org ("listed all organisations") or cross several,
+/// so forcing them in would mean making `orgId` nullable and weakening the
+/// scoping guarantee on the table that needs it most.
+///
+/// Keeping the vendor's own actions logged matters more than usual here,
+/// because a platform admin is the one actor RLS does not constrain. The log is
+/// the accountability that replaces the missing enforcement.
+model PlatformAuditLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  actorId    String? @db.Uuid
+  actorEmail String? @db.VarChar(320)
+
+  /// Dotted verb: "platform.org_listed", "platform.org_suspended",
+  /// "platform.admin_granted".
+  action String @db.VarChar(80)
+
+  /// The organisation acted upon, when there is one. Not a foreign key: the
+  /// log must survive the org being deleted, which is exactly when you most
+  /// want to know who deleted it.
+  targetOrgId   String? @db.Uuid
+  targetOrgName String? @db.VarChar(160)
+
+  /// Request context and before/after values. Must never contain occupancy
+  /// figures — a platform admin is not permitted to see them, so they must not
+  /// leak in here either.
+  metadata Json?
+
+  ipAddress String? @db.Inet
+  userAgent String? @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([targetOrgId, createdAt])
+  @@map("platform_audit_logs")
+}
