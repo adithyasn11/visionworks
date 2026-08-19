@@ -617,3 +617,192 @@ function emptyHealth() {
     sectionErrors: { cameras: null, failed: null, running: null },
   };
 }
+
+/* ── Platform operators ─────────────────────────────────────────────────── */
+
+/**
+ * Everyone who holds — or has held — platform access.
+ *
+ * Revoked operators are included rather than filtered out. A page that only
+ * showed active access would answer "who can get in" but not "who used to",
+ * and the second question is the one asked after an incident.
+ *
+ * `grantedById` is resolved to an email through profiles. It is null for the
+ * first operator, who was bootstrapped from the SQL editor — there was nobody
+ * to grant it, and the UI says so rather than rendering a blank cell.
+ */
+export async function getPlatformOperators() {
+  const supabase = createClient();
+  if (!supabase) {
+    return { error: 'Supabase is not configured.', operators: [], currentUserId: null };
+  }
+
+  const { data: userData } = await supabase.auth.getUser();
+  const currentUserId = userData?.user?.id ?? null;
+
+  const { data: rows, error } = await supabase
+    .from('platform_admins')
+    .select('profileId, note, grantedById, grantedAt, revokedAt')
+    .order('grantedAt', { ascending: true });
+
+  if (error) return { error: error.message, operators: [], currentUserId };
+
+  // One lookup for both the operators themselves and whoever granted them.
+  const ids = [
+    ...new Set(
+      (rows ?? []).flatMap((r) => [r.profileId, r.grantedById]).filter(Boolean),
+    ),
+  ];
+
+  let profiles = new Map();
+  if (ids.length > 0) {
+    const { data: profileRows } = await supabase
+      .from('profiles')
+      .select('id, email, fullName, avatarUrl, lastSeenAt')
+      .in('id', ids);
+    profiles = new Map((profileRows ?? []).map((p) => [p.id, p]));
+  }
+
+  const operators = (rows ?? []).map((r) => {
+    const self = profiles.get(r.profileId) ?? null;
+    const granter = r.grantedById ? profiles.get(r.grantedById) ?? null : null;
+    return {
+      profileId: r.profileId,
+      email: self?.email ?? null,
+      fullName: self?.fullName ?? null,
+      avatarUrl: self?.avatarUrl ?? null,
+      lastSeenAt: self?.lastSeenAt ?? null,
+      note: r.note,
+      grantedAt: r.grantedAt,
+      revokedAt: r.revokedAt,
+      isActive: r.revokedAt == null,
+      // null granter = bootstrapped by hand in the SQL editor.
+      grantedByEmail: granter?.email ?? null,
+      grantedByName: granter?.fullName ?? null,
+      isBootstrap: r.grantedById == null,
+      isSelf: currentUserId != null && r.profileId === currentUserId,
+    };
+  });
+
+  // Active first, then most recently granted — the list is read top-down for
+  // "who can get in right now".
+  operators.sort((a, b) => {
+    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+    return new Date(b.grantedAt) - new Date(a.grantedAt);
+  });
+
+  return {
+    error: null,
+    operators,
+    currentUserId,
+    activeCount: operators.filter((o) => o.isActive).length,
+  };
+}
+
+/* ── Platform audit log ─────────────────────────────────────────────────── */
+
+/**
+ * Every action a platform operator has taken.
+ *
+ * The five actions the codebase can write. Listed explicitly rather than
+ * derived with a `select distinct action` so the filter shows every possible
+ * value even when none has occurred yet — a dropdown that grows as things go
+ * wrong is worse than one that is complete from day one.
+ */
+export const PLATFORM_ACTIONS = [
+  { key: 'platform.org_suspended',    label: 'Org suspended',    tone: 'danger' },
+  { key: 'platform.org_restored',     label: 'Org restored',     tone: 'good' },
+  { key: 'platform.retention_changed', label: 'Retention changed', tone: 'warn' },
+  { key: 'platform.admin_granted',    label: 'Operator granted', tone: 'danger' },
+  { key: 'platform.admin_revoked',    label: 'Operator revoked', tone: 'warn' },
+];
+
+const ACTION_KEYS = new Set(PLATFORM_ACTIONS.map((a) => a.key));
+
+/** Date-range presets. Values are day counts; null means everything. */
+export const AUDIT_RANGES = {
+  '24h': 1,
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+  all: null,
+};
+
+/**
+ * @param opts.action  one of PLATFORM_ACTIONS keys, or 'all'
+ * @param opts.actor   an actor email, or 'all'
+ * @param opts.range   one of AUDIT_RANGES keys
+ *
+ * Filtering is pushed into the query rather than done in JS: unlike the org
+ * list, this table only grows, and a support console that pulls every row to
+ * filter five of them client-side would degrade quietly over a year.
+ */
+export async function getPlatformAudit({ action = 'all', actor = 'all', range = '30d' } = {}) {
+  const supabase = createClient();
+  if (!supabase) {
+    return { error: 'Supabase is not configured.', entries: [], actors: [], counts: {}, total: 0 };
+  }
+
+  // The unfiltered set drives the actor dropdown and the per-action counts, so
+  // the filter UI always describes the whole log rather than the current view.
+  const { data: allRows, error: allError } = await supabase
+    .from('platform_audit_logs')
+    .select('actorId, actorEmail, action, createdAt')
+    .order('createdAt', { ascending: false })
+    .limit(2000);
+
+  if (allError) {
+    return { error: allError.message, entries: [], actors: [], counts: {}, total: 0 };
+  }
+
+  const counts = {};
+  for (const a of PLATFORM_ACTIONS) counts[a.key] = 0;
+  const actorSet = new Map();
+  for (const r of allRows ?? []) {
+    if (counts[r.action] != null) counts[r.action] += 1;
+    if (r.actorEmail) actorSet.set(r.actorEmail, (actorSet.get(r.actorEmail) ?? 0) + 1);
+  }
+
+  let query = supabase
+    .from('platform_audit_logs')
+    .select('id, actorId, actorEmail, action, targetOrgId, targetOrgName, metadata, ipAddress, createdAt')
+    .order('createdAt', { ascending: false })
+    .limit(200);
+
+  if (action !== 'all' && ACTION_KEYS.has(action)) query = query.eq('action', action);
+  if (actor !== 'all') query = query.eq('actorEmail', actor);
+
+  const days = AUDIT_RANGES[range];
+  if (days != null) {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    query = query.gte('createdAt', since.toISOString());
+  }
+
+  const { data: rows, error } = await query;
+  if (error) {
+    return { error: error.message, entries: [], actors: [], counts, total: allRows?.length ?? 0 };
+  }
+
+  return {
+    error: null,
+    entries: (rows ?? []).map((r) => ({
+      id: r.id,
+      actorId: r.actorId,
+      // Null actor means the entry was written from the SQL editor, where
+      // auth.uid() is null — the bootstrap grant is the canonical example.
+      actorEmail: r.actorEmail,
+      action: r.action,
+      targetOrgId: r.targetOrgId,
+      targetOrgName: r.targetOrgName,
+      metadata: r.metadata ?? null,
+      ipAddress: r.ipAddress ?? null,
+      createdAt: r.createdAt,
+    })),
+    actors: [...actorSet.entries()]
+      .map(([email, count]) => ({ email, count }))
+      .sort((a, b) => b.count - a.count),
+    counts,
+    total: allRows?.length ?? 0,
+  };
+}

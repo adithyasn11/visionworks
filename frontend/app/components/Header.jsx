@@ -2,10 +2,27 @@
 
 // frontend/app/components/Header.jsx
 import React, { useState, useEffect } from 'react';
-import { Activity, ShieldCheck, Clock, Database, Settings } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Activity, ShieldCheck, Clock, Database, LogOut, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase/browser';
 
 export const Header = ({ isConnected, onOpenSupabaseModal }) => {
+  const router = useRouter();
   const [time, setTime] = useState('');
+  const [signingOut, setSigningOut] = useState(false);
+
+  const signOut = async () => {
+    setSigningOut(true);
+    try {
+      if (supabase) await supabase.auth.signOut();
+      // replace(), not push(): signed-out users shouldn't reach this page with
+      // Back. refresh() clears cached Server Component payloads for /login.
+      router.replace('/login');
+      router.refresh();
+    } catch {
+      setSigningOut(false);
+    }
+  };
 
   useEffect(() => {
     setTime(new Date().toLocaleTimeString());
@@ -55,6 +72,15 @@ export const Header = ({ isConnected, onOpenSupabaseModal }) => {
           <Clock className="w-3.5 h-3.5" />
           <span>{time || '--:--:--'}</span>
         </div>
+
+        <button
+          onClick={signOut}
+          disabled={signingOut}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700/50 text-slate-300 text-xs font-semibold transition-all disabled:opacity-50"
+        >
+          {signingOut ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+          <span>Sign out</span>
+        </button>
       </div>
     </header>
   );

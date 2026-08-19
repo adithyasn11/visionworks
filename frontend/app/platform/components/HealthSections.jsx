@@ -279,7 +279,7 @@ export function RunningSessionsSection({ sessions, error }) {
                   <span
                     className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] font-bold ${
                       s.status === 'PROCESSING'
-                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                        ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
                         : 'bg-surface-alt text-ink-muted'
                     }`}
                   >

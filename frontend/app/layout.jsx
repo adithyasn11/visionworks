@@ -1,6 +1,8 @@
 // frontend/app/layout.jsx
+import { Suspense } from 'react';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import RouteProgress from './components/RouteProgress';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -29,6 +31,9 @@ export default function RootLayout({ children }) {
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body className={`${inter.className} min-h-screen`}>
+        <Suspense fallback={null}>
+          <RouteProgress />
+        </Suspense>
         {children}
       </body>
     </html>

@@ -72,7 +72,7 @@ const Chip = ({ tone = 'muted', children, dot = false }) => {
     muted:  'bg-surface-alt text-ink-muted',
     accent: 'bg-accent text-white',
     soft:   'bg-accent-soft text-accent',
-    good:   'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+    good:   'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
   };
   return (
     <span className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.1em] font-bold whitespace-nowrap ${tones[tone]}`}>

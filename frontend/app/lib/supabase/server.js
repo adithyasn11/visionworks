@@ -101,18 +101,21 @@ export async function getPlatformContext() {
     return { configured: false, user: null, isOperator: false, profile: null };
   }
 
-  const { data: userData } = await supabase.auth.getUser();
+  // is_platform_admin() reads auth.uid() from the request's own session, so it
+  // does not need the user object first — run it alongside getUser() instead of
+  // after it. The profiles query does need user.id, so it can't join this batch.
+  const [{ data: userData }, { data: isOp }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.rpc('is_platform_admin'),
+  ]);
   const user = userData?.user ?? null;
   if (!user) return { configured: true, user: null, isOperator: false, profile: null };
 
-  const [{ data: isOp }, { data: profile }] = await Promise.all([
-    supabase.rpc('is_platform_admin'),
-    supabase
-      .from('profiles')
-      .select('id, email, fullName, avatarUrl')
-      .eq('id', user.id)
-      .maybeSingle(),
-  ]);
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, email, fullName, avatarUrl')
+    .eq('id', user.id)
+    .maybeSingle();
 
   return {
     configured: true,

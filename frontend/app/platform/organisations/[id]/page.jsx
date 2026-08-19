@@ -38,8 +38,8 @@ const HEALTH_STYLE = {
   error:     'bg-accent text-white',
   warn:      'bg-accent-soft text-accent',
   suspended: 'bg-surface-alt text-ink-faint',
-  live:      'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
-  ok:        'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+  live:      'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  ok:        'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
 };
 
 export default async function OrganisationDetailPage({ params }) {
