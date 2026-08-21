@@ -38,6 +38,15 @@ export async function middleware(request) {
   // rotated auth cookie is attached to the response the browser actually gets.
   let response = NextResponse.next({ request });
 
+  // The auth routes must run untouched. /auth/signout is deleting the session
+  // cookies, and the token refresh below would race it — writing a freshly
+  // rotated cookie onto the very response that is trying to clear them, which
+  // leaves the user still signed in. /auth/callback is mid-PKCE-exchange and
+  // has no session to refresh yet.
+  if (pathname.startsWith('/auth/')) {
+    return response;
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

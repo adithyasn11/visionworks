@@ -11,11 +11,14 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.db.database import engine, Base
+from app.db.database import engine, Base, apply_lightweight_migrations
 from app.api.routers import cameras, zones, analytics, websocket, video_upload
 
-# Create database tables automatically on startup
+# Create database tables automatically on startup, then add any columns that
+# were introduced after an existing database was created (create_all does not
+# alter existing tables).
 Base.metadata.create_all(bind=engine)
+apply_lightweight_migrations()
 
 app = FastAPI(
     title="Vision-Based Workplace Activity Analytics System API",

@@ -25,6 +25,8 @@ import time
 import torch
 import numpy as np
 
+from app.db.activity_writer import ActivityLogWriter, persist_frame
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -40,6 +42,56 @@ _active_sessions: dict = {}
 # sample_videos/ by hand are left untouched.
 _UPLOAD_NAME_RE = re.compile(r'^[0-9a-f]{8}_')
 ORPHAN_UPLOAD_MAX_AGE_SECONDS = 6 * 3600
+
+
+# Used when a camera has no zones drawn yet, so a first-time user still sees
+# zone attribution working instead of everything falling into TRANSIT_ZONE.
+DEFAULT_ZONES = [
+    {
+        "zone_id": "workstation_01",
+        "zone_name": "Workstation 1",
+        "polygon": [[100, 60], [480, 60], [480, 480], [100, 480]],
+    },
+    {
+        "zone_id": "workstation_02",
+        "zone_name": "Workstation 2",
+        "polygon": [[500, 60], [900, 60], [900, 480], [500, 480]],
+    },
+]
+
+
+def load_zones_for_camera(camera_id: str) -> list:
+    """
+    Reads a camera's zones from the database, in the shape SpatialEngine wants.
+
+    Zones are drawn by the user against the displayed frame and stored in the
+    same pixel space the CV pipeline works in, so no rescaling is needed here.
+
+    Falls back to DEFAULT_ZONES when nothing has been drawn for this camera, and
+    also on a database error: losing zone attribution should degrade the
+    analytics, not take down a live video session.
+    """
+    from app.db.database import SessionLocal
+    from app.db.models import ZoneModel
+
+    session = SessionLocal()
+    try:
+        rows = session.query(ZoneModel).filter(ZoneModel.camera_id == camera_id).all()
+        zones = [
+            {
+                "zone_id": row.zone_id,
+                "zone_name": row.zone_name,
+                "polygon": row.polygon_coordinates,
+            }
+            for row in rows
+            if row.polygon_coordinates and len(row.polygon_coordinates) >= 3
+        ]
+        return zones or DEFAULT_ZONES
+    except Exception as e:
+        logger.warning(f"Could not load zones for '{camera_id}', using defaults: {e}")
+        return DEFAULT_ZONES
+    finally:
+        session.close()
 
 
 def _purge_orphaned_uploads(max_age_seconds: int = ORPHAN_UPLOAD_MAX_AGE_SECONDS):
@@ -154,20 +206,13 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         from app.cv.anonymizer import PrivacyAnonymizer
 
         pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
-        spatial_engine = SpatialEngine(zones_config=[
-            {
-                "zone_id": "workstation_01",
-                "zone_name": "Workstation 1",
-                "polygon": [[100, 60], [480, 60], [480, 480], [100, 480]]
-            },
-            {
-                "zone_id": "workstation_02",
-                "zone_name": "Workstation 2",
-                "polygon": [[500, 60], [900, 60], [900, 480], [500, 480]]
-            }
-        ])
+        zones_config = load_zones_for_camera(f"upload_{session_id}")
+        spatial_engine = SpatialEngine(zones_config=zones_config)
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
+        # Telemetry for this session is attributed to the uploaded file, so rows
+        # from different videos stay distinguishable in activity_logs.
+        activity_writer = ActivityLogWriter(camera_id=f"upload_{session_id}")
 
     except Exception as e:
         logger.error(f"AI init error: {e}")
@@ -200,6 +245,9 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         "paused": False,
         "seek_frame": None
     }
+    # Blur is ON unless a client turns it off, so the privacy-preserving path is
+    # the default rather than something you have to remember to enable.
+    privacy_state = {"blur": True}
 
     async def receive_controls():
         try:
@@ -212,6 +260,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                         control_state["paused"] = True
                     elif action in ("play", "resume"):
                         control_state["paused"] = False
+                    elif action == "set_privacy_blur":
+                        privacy_state["blur"] = bool(data.get("enabled", True))
                     elif action == "seek":
                         target_pct = data.get("pct")
                         if target_pct is not None:
@@ -261,7 +311,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
 
             tracked_entities = []
-            zone_summary = {"workstation_01": 0, "workstation_02": 0, "TRANSIT_ZONE": 0}
+            zone_summary = {z["zone_id"]: 0 for z in zones_config}
+            zone_summary["TRANSIT_ZONE"] = 0
 
             for det in detections:
                 track_id = det["track_id"]
@@ -280,7 +331,16 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                 activity_score = activity_aggregator.calculate_activity_score(track_id)
                 dwell_seconds = activity_aggregator.get_dwell_time_seconds(track_id)
 
-                # Face blur disabled for clear video stream
+                # Project the person's ground point onto the floorplan. This is
+                # what feeds the top-down heatmap.
+                floor_point = spatial_engine.project_to_floor(bbox, frame.shape)
+
+                # Privacy-by-design: blur the head region before the frame is
+                # encoded and sent. This is the claim the whole system rests on,
+                # so it runs by default and is only skipped when a viewer
+                # explicitly turns it off to inspect detection quality.
+                if privacy_state["blur"]:
+                    frame = anonymizer.blur_face_region(frame, bbox)
 
                 tracked_entities.append({
                     "track_id": track_id,
@@ -288,8 +348,14 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                     "posture": posture,
                     "activity_score": round(activity_score, 2),
                     "zone_id": zone_id,
-                    "dwell_duration_seconds": dwell_seconds
+                    "dwell_duration_seconds": dwell_seconds,
+                    "floor_point": [round(floor_point[0], 1), round(floor_point[1], 1)],
+                    "floor_size": [SpatialEngine.FLOOR_WIDTH, SpatialEngine.FLOOR_HEIGHT]
                 })
+
+            # Persist sampled telemetry. Runs off the event loop and swallows its
+            # own failures, so it cannot stall or break the video stream.
+            await persist_frame(activity_writer, tracked_entities)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
@@ -309,17 +375,23 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                 "tracked_entities": tracked_entities,
                 "total_detected": len(tracked_entities),
                 "zone_occupancy": zone_summary,
-                "is_paused": control_state["paused"]
+                "is_paused": control_state["paused"],
+                "privacy_blur": privacy_state["blur"]
             }
 
             await websocket.send_json(payload)
             await asyncio.sleep(0.001)
 
         session["status"] = "DONE"
+        logger.info(
+            f"Session {session_id}: {processed_count} frames processed, "
+            f"{activity_writer.rows_written} telemetry rows written."
+        )
         await websocket.send_json({
             "type": "COMPLETE",
             "message": f"Video analysis complete. Processed {processed_count} frames.",
-            "total_processed": processed_count
+            "total_processed": processed_count,
+            "telemetry_rows_written": activity_writer.rows_written
         })
 
     except WebSocketDisconnect:
@@ -359,20 +431,11 @@ async def live_webcam_websocket(websocket: WebSocket):
         from app.cv.anonymizer import PrivacyAnonymizer
 
         pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
-        spatial_engine = SpatialEngine(zones_config=[
-            {
-                "zone_id": "workstation_01",
-                "zone_name": "Workstation 1",
-                "polygon": [[100, 60], [480, 60], [480, 480], [100, 480]]
-            },
-            {
-                "zone_id": "workstation_02",
-                "zone_name": "Workstation 2",
-                "polygon": [[500, 60], [900, 60], [900, 480], [500, 480]]
-            }
-        ])
+        zones_config = load_zones_for_camera("live_webcam")
+        spatial_engine = SpatialEngine(zones_config=zones_config)
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
+        activity_writer = ActivityLogWriter(camera_id="live_webcam")
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
@@ -404,15 +467,19 @@ async def live_webcam_websocket(websocket: WebSocket):
     })
 
     control_state = {"stop": False}
+    privacy_state = {"blur": True}
 
     async def listen_control():
         try:
             while True:
                 msg = await websocket.receive_text()
                 data = json.loads(msg)
-                if data.get("action") == "stop":
+                action = data.get("action")
+                if action == "stop":
                     control_state["stop"] = True
                     break
+                if action == "set_privacy_blur":
+                    privacy_state["blur"] = bool(data.get("enabled", True))
         except Exception:
             pass
 
@@ -438,7 +505,8 @@ async def live_webcam_websocket(websocket: WebSocket):
             detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
 
             tracked_entities = []
-            zone_summary = {"workstation_01": 0, "workstation_02": 0, "TRANSIT_ZONE": 0}
+            zone_summary = {z["zone_id"]: 0 for z in zones_config}
+            zone_summary["TRANSIT_ZONE"] = 0
 
             for det in detections:
                 track_id = det["track_id"]
@@ -457,7 +525,16 @@ async def live_webcam_websocket(websocket: WebSocket):
                 activity_score = activity_aggregator.calculate_activity_score(track_id)
                 dwell_seconds = activity_aggregator.get_dwell_time_seconds(track_id)
 
-                # Face blur disabled for clear video stream
+                # Project the person's ground point onto the floorplan. This is
+                # what feeds the top-down heatmap.
+                floor_point = spatial_engine.project_to_floor(bbox, frame.shape)
+
+                # Privacy-by-design: blur the head region before the frame is
+                # encoded and sent. This is the claim the whole system rests on,
+                # so it runs by default and is only skipped when a viewer
+                # explicitly turns it off to inspect detection quality.
+                if privacy_state["blur"]:
+                    frame = anonymizer.blur_face_region(frame, bbox)
 
                 tracked_entities.append({
                     "track_id": track_id,
@@ -465,8 +542,12 @@ async def live_webcam_websocket(websocket: WebSocket):
                     "posture": posture,
                     "activity_score": round(activity_score, 2),
                     "zone_id": zone_id,
-                    "dwell_duration_seconds": dwell_seconds
+                    "dwell_duration_seconds": dwell_seconds,
+                    "floor_point": [round(floor_point[0], 1), round(floor_point[1], 1)],
+                    "floor_size": [SpatialEngine.FLOOR_WIDTH, SpatialEngine.FLOOR_HEIGHT]
                 })
+
+            await persist_frame(activity_writer, tracked_entities)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
@@ -481,7 +562,8 @@ async def live_webcam_websocket(websocket: WebSocket):
                 "tracked_entities": tracked_entities,
                 "total_detected": len(tracked_entities),
                 "zone_occupancy": zone_summary,
-                "is_live_cam": True
+                "is_live_cam": True,
+                "privacy_blur": privacy_state["blur"]
             }
 
             await websocket.send_json(payload)
@@ -512,20 +594,11 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
         from app.cv.anonymizer import PrivacyAnonymizer
 
         pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
-        spatial_engine = SpatialEngine(zones_config=[
-            {
-                "zone_id": "workstation_01",
-                "zone_name": "Workstation 1",
-                "polygon": [[100, 60], [480, 60], [480, 480], [100, 480]]
-            },
-            {
-                "zone_id": "workstation_02",
-                "zone_name": "Workstation 2",
-                "polygon": [[500, 60], [900, 60], [900, 480], [500, 480]]
-            }
-        ])
+        zones_config = load_zones_for_camera("browser_camera")
+        spatial_engine = SpatialEngine(zones_config=zones_config)
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
+        activity_writer = ActivityLogWriter(camera_id="browser_camera")
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
@@ -541,14 +614,19 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
 
     frame_idx = 0
     start_time = time.time()
+    privacy_state = {"blur": True}
 
     try:
         while True:
             msg_text = await websocket.receive_text()
             data = json.loads(msg_text)
 
-            if data.get("action") == "stop":
+            action = data.get("action")
+            if action == "stop":
                 break
+            if action == "set_privacy_blur":
+                privacy_state["blur"] = bool(data.get("enabled", True))
+                continue
 
             img_bytes_b64 = data.get("image_base64")
             if not img_bytes_b64:
@@ -574,7 +652,8 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
             detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
 
             tracked_entities = []
-            zone_summary = {"workstation_01": 0, "workstation_02": 0, "TRANSIT_ZONE": 0}
+            zone_summary = {z["zone_id"]: 0 for z in zones_config}
+            zone_summary["TRANSIT_ZONE"] = 0
 
             for det in detections:
                 track_id = det["track_id"]
@@ -593,7 +672,16 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
                 activity_score = activity_aggregator.calculate_activity_score(track_id)
                 dwell_seconds = activity_aggregator.get_dwell_time_seconds(track_id)
 
-                # Face blur disabled for clear video stream
+                # Project the person's ground point onto the floorplan. This is
+                # what feeds the top-down heatmap.
+                floor_point = spatial_engine.project_to_floor(bbox, frame.shape)
+
+                # Privacy-by-design: blur the head region before the frame is
+                # encoded and sent. This is the claim the whole system rests on,
+                # so it runs by default and is only skipped when a viewer
+                # explicitly turns it off to inspect detection quality.
+                if privacy_state["blur"]:
+                    frame = anonymizer.blur_face_region(frame, bbox)
 
                 tracked_entities.append({
                     "track_id": track_id,
@@ -601,8 +689,12 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
                     "posture": posture,
                     "activity_score": round(activity_score, 2),
                     "zone_id": zone_id,
-                    "dwell_duration_seconds": dwell_seconds
+                    "dwell_duration_seconds": dwell_seconds,
+                    "floor_point": [round(floor_point[0], 1), round(floor_point[1], 1)],
+                    "floor_size": [SpatialEngine.FLOOR_WIDTH, SpatialEngine.FLOOR_HEIGHT]
                 })
+
+            await persist_frame(activity_writer, tracked_entities)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
@@ -617,7 +709,8 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
                 "tracked_entities": tracked_entities,
                 "total_detected": len(tracked_entities),
                 "zone_occupancy": zone_summary,
-                "is_live_cam": True
+                "is_live_cam": True,
+                "privacy_blur": privacy_state["blur"]
             }
 
             await websocket.send_json(payload)

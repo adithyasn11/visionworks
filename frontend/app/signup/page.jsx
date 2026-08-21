@@ -58,8 +58,11 @@ export default function SignupPage() {
   useEffect(() => {
     if (!supabase) return;
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (active && data?.session) router.replace('/dashboard');
+    // getUser() rather than getSession(): a locally-cached token the server has
+    // already revoked would otherwise look valid and redirect away from the
+    // signup form.
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (active && !error && data?.user) router.replace('/dashboard');
     });
     return () => { active = false; };
   }, [router]);
@@ -139,6 +142,11 @@ export default function SignupPage() {
           // Must land on the server callback, not a page: the PKCE code has to
           // be exchanged server-side to set httpOnly session cookies.
           redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            // Force the account chooser rather than silently reusing whichever
+            // Google account the browser is already signed in to.
+            prompt: 'select_account',
+          },
         },
       });
       if (error) {

@@ -11,11 +11,15 @@ import {
 const BACKEND_HTTP = 'http://localhost:8001';
 const BACKEND_WS   = 'ws://localhost:8001';
 
+/* Detection-box colours, kept inside the red/black/white palette. The three
+   postures are separated by weight along one red ramp rather than by unrelated
+   hues, so the overlay belongs to the same product as everything under it.
+   UNKNOWN stays neutral so an unclassified box never looks like a state. */
 const POSTURE_COLORS = {
-  SITTING:  '#22C55E',
-  STANDING: '#38BDF8',
-  WALKING:  '#F59E0B',
-  UNKNOWN:  '#94A3B8',
+  SITTING:  '#DC2626',
+  STANDING: '#F0736F',
+  WALKING:  '#F7B4B0',
+  UNKNOWN:  '#8B8792',
 };
 
 function formatTime(seconds) {
@@ -50,7 +54,7 @@ function drawHUD(ctx, canvas, entities, zones, enableBlur) {
 
     // Tag banner (top)
     const bannerW = Math.max(180, w);
-    ctx.fillStyle = 'rgba(15,23,42,0.9)';
+    ctx.fillStyle = 'rgba(11,10,12,0.88)';
     ctx.fillRect(x1, y1 - 28, bannerW, 24);
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '600 11px Inter, sans-serif';
@@ -59,7 +63,7 @@ function drawHUD(ctx, canvas, entities, zones, enableBlur) {
     // Score pill
     ctx.fillStyle = color;
     ctx.fillRect(x1 + bannerW - 44, y1 - 24, 40, 16);
-    ctx.fillStyle = '#0F172A';
+    ctx.fillStyle = '#FFFFFF';
     ctx.font = '700 10px Inter, sans-serif';
     ctx.fillText(`${Math.round(entity.activity_score)}`, x1 + bannerW - 35, y1 - 12);
   });
@@ -442,14 +446,14 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
   }, [stopWebcamStream]);
 
   const PhaseIcon = phase === 'uploading' || phase === 'processing'
-    ? <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-400" />
+    ? <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
     : phase === 'webcam'
-    ? <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+    ? <span className="w-2.5 h-2.5 rounded-full bg-accent animate-ping" />
     : phase === 'done'
-    ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+    ? <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
     : phase === 'error'
-    ? <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
-    : <Video className="w-3.5 h-3.5 text-slate-400" />;
+    ? <AlertCircle className="w-3.5 h-3.5 text-accent" />
+    : <Video className="w-3.5 h-3.5 text-ink-muted" />;
 
   return (
     <div ref={containerRef} className="glass-panel p-4 flex flex-col gap-4 relative group">
@@ -458,10 +462,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
 
       {/* Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-slate-200 font-semibold text-sm">
-          <Eye className="w-4 h-4 text-sky-400" />
+        <div className="flex items-center gap-2 text-ink font-semibold text-sm">
+          <Eye className="w-4 h-4 text-accent" />
           <span>CCTV Video AI Analytics — HUD Feed</span>
-          <span className="ml-2 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-[10px] text-emerald-400 font-mono font-bold flex items-center gap-1">
+          <span className="ml-2 px-2 py-0.5 rounded bg-accent/10 border border-line text-[10px] text-accent font-mono font-bold flex items-center gap-1">
             <Cpu className="w-3 h-3" />
             <span>NVIDIA RTX 4060 (CUDA) • YOLOv8m Medium</span>
           </span>
@@ -472,7 +476,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
           {isWebcamActive ? (
             <button
               onClick={stopWebcamStream}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-400 text-xs font-bold transition-all hover:bg-rose-500/30"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/20 border border-[color:var(--accent)] text-accent text-xs font-bold transition-all hover:bg-accent/30"
             >
               <CameraOff className="w-3.5 h-3.5" />
               <span>Stop Camera</span>
@@ -480,7 +484,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
           ) : (
             <button
               onClick={startLiveWebcam}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs font-bold transition-all shadow-lg shadow-rose-500/10"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 border border-line text-accent text-xs font-bold transition-all shadow-lg shadow-red-600/10"
             >
               <Camera className="w-3.5 h-3.5 animate-pulse" />
               <span>Turn On Camera</span>
@@ -496,7 +500,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
           />
           <button
             onClick={handleReset}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 transition-all"
+            className="p-1.5 rounded-lg bg-surface-alt hover:bg-surface-alt text-ink-muted transition-all"
             title="Reset Player"
           >
             <RefreshCw className="w-4 h-4" />
@@ -504,7 +508,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={phase === 'uploading' || isWebcamActive}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 text-sky-400 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-accent-soft hover:bg-accent/20 border border-line text-accent text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Upload className="w-3.5 h-3.5" />
             <span>{phase === 'uploading' ? 'Uploading...' : 'Upload Video'}</span>
@@ -514,24 +518,24 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
 
       {/* Status Bar */}
       {(fileName || statusMsg || isWebcamActive) && (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs text-slate-300 font-mono">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-alt/80 border border-line/60 text-xs text-ink-muted font-mono">
           {PhaseIcon}
           <span className="truncate">
             {isWebcamActive ? `🔴 LIVE WEBCAM FEED — ${statusMsg}` : (statusMsg || fileName)}
           </span>
           {phase === 'processing' && !isWebcamActive && (
-            <span className="ml-auto text-sky-400 shrink-0 font-bold">{progress.toFixed(1)}%</span>
+            <span className="ml-auto text-accent shrink-0 font-bold">{progress.toFixed(1)}%</span>
           )}
         </div>
       )}
 
       {/* Main Canvas Player Display */}
-      <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl group/canvas">
+      <div className="relative rounded-xl overflow-hidden border border-line bg-ground shadow-2xl group/canvas">
         <canvas ref={canvasRef} width={960} height={540} className="w-full h-auto block" />
 
         {/* Live Camera Badge Overlay */}
         {isWebcamActive && (
-          <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-rose-500/90 text-slate-950 font-bold text-xs font-mono flex items-center gap-1.5 shadow-lg backdrop-blur-sm animate-pulse">
+          <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-accent/90 text-white font-bold text-xs font-mono flex items-center gap-1.5 shadow-lg backdrop-blur-sm animate-pulse">
             <span className="w-2 h-2 rounded-full bg-white animate-ping" />
             <span>LIVE WEBCAM AI</span>
           </div>
@@ -541,11 +545,11 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
         {phase === 'processing' && !isWebcamActive && (
           <div
             onClick={togglePlayPause}
-            className={`absolute inset-0 bg-slate-950/30 backdrop-blur-[2px] flex items-center justify-center cursor-pointer transition-opacity duration-200 ${
+            className={`absolute inset-0 bg-ground/30 backdrop-blur-[2px] flex items-center justify-center cursor-pointer transition-opacity duration-200 ${
               isPaused ? 'opacity-100' : 'opacity-0 hover:opacity-100'
             }`}
           >
-            <div className="p-4 rounded-full bg-slate-900/90 border border-sky-500/40 text-sky-400 shadow-2xl transform hover:scale-110 transition-transform">
+            <div className="p-4 rounded-full bg-surface/90 border border-[color:var(--accent)] text-accent shadow-2xl transform hover:scale-110 transition-transform">
               {isPaused ? <Play className="w-10 h-10 fill-current ml-1" /> : <Pause className="w-10 h-10 fill-current" />}
             </div>
           </div>
@@ -553,10 +557,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
       </div>
 
       {/* Movie-Style Video Playback Controls Bar */}
-      <div className="glass-card p-3 flex flex-col gap-2.5 bg-slate-900/90 border-slate-800">
+      <div className="glass-card p-3 flex flex-col gap-2.5 bg-surface/90 border-line">
         {/* Interactive Timeline Scrubber Slider (disabled during live webcam) */}
         <div className="flex items-center gap-3">
-          <span className="text-[11px] font-mono text-slate-400 shrink-0 w-12 text-right">
+          <span className="text-[11px] font-mono text-ink-muted shrink-0 w-12 text-right">
             {formatTime(currentTimeSec)}
           </span>
           <div className="relative flex-1 flex items-center">
@@ -568,10 +572,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
               value={progress}
               onChange={handleSeek}
               disabled={isWebcamActive || (phase !== 'processing' && phase !== 'done')}
-              className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-400 hover:accent-sky-300 transition-all disabled:cursor-not-allowed disabled:opacity-30"
+              className="w-full h-2 bg-surface-alt rounded-lg appearance-none cursor-pointer accent-[color:var(--accent)] hover:accent-[color:var(--accent)] transition-all disabled:cursor-not-allowed disabled:opacity-30"
             />
           </div>
-          <span className="text-[11px] font-mono text-slate-400 shrink-0 w-12">
+          <span className="text-[11px] font-mono text-ink-muted shrink-0 w-12">
             {isWebcamActive ? 'LIVE' : formatTime(durationSec)}
           </span>
         </div>
@@ -583,7 +587,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
             <button
               onClick={() => handleSkip(-5)}
               disabled={isWebcamActive || phase !== 'processing'}
-              className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 disabled:opacity-30 transition-all"
+              className="p-2 rounded-lg bg-surface-alt/80 hover:bg-surface-alt text-ink-muted disabled:opacity-30 transition-all"
               title="Rewind 5 Seconds"
             >
               <RotateCcw className="w-4 h-4" />
@@ -593,7 +597,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
             <button
               onClick={togglePlayPause}
               disabled={isWebcamActive || phase !== 'processing'}
-              className="p-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold disabled:opacity-30 shadow-lg shadow-sky-500/20 transition-all"
+              className="p-2.5 rounded-xl bg-accent hover:brightness-110 text-white font-bold disabled:opacity-30 shadow-lg shadow-red-600/20 transition-all"
               title={isPaused ? "Play" : "Pause"}
             >
               {isPaused ? <Play className="w-5 h-5 fill-current ml-0.5" /> : <Pause className="w-5 h-5 fill-current" />}
@@ -603,34 +607,34 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
             <button
               onClick={() => handleSkip(5)}
               disabled={isWebcamActive || phase !== 'processing'}
-              className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 disabled:opacity-30 transition-all"
+              className="p-2 rounded-lg bg-surface-alt/80 hover:bg-surface-alt text-ink-muted disabled:opacity-30 transition-all"
               title="Skip 5 Seconds Forward"
             >
               <RotateCw className="w-4 h-4" />
             </button>
 
-            <span className="text-xs text-slate-400 font-mono ml-2">
+            <span className="text-xs text-ink-muted font-mono ml-2">
               {isWebcamActive ? '🔴 WEBCAM LIVE (GPU AI)' : isPaused ? 'PAUSED' : phase === 'processing' ? 'PLAYING (GPU AI)' : 'IDLE'}
             </span>
           </div>
 
           <div className="flex items-center gap-3">
             {/* Privacy Anonymization Toggle */}
-            <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-300">
-              <Shield className={`w-4 h-4 ${enableBlur ? 'text-emerald-400' : 'text-slate-600'}`} />
+            <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-ink-muted">
+              <Shield className={`w-4 h-4 ${enableBlur ? 'text-accent' : 'text-ink-faint'}`} />
               <span>Face Anonymisation</span>
               <input
                 type="checkbox"
                 checked={enableBlur}
                 onChange={(e) => setEnableBlur(e.target.checked)}
-                className="accent-sky-500 cursor-pointer"
+                className="accent-[color:var(--accent)] cursor-pointer"
               />
             </label>
 
             {/* Fullscreen Button */}
             <button
               onClick={toggleFullScreen}
-              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all"
+              className="p-2 rounded-lg bg-surface-alt hover:bg-surface-alt text-ink-muted transition-all"
               title="Toggle Fullscreen"
             >
               <Maximize2 className="w-4 h-4" />
@@ -643,14 +647,14 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
       {(phase === 'processing' || isWebcamActive) && (
         <div className="grid grid-cols-4 gap-2">
           {[
-            { label: 'Detected', value: stats.detected, color: 'text-slate-200' },
-            { label: 'Sitting',  value: stats.sitting,  color: 'text-emerald-400' },
-            { label: 'Standing', value: stats.standing, color: 'text-sky-400' },
-            { label: 'Walking',  value: stats.walking,  color: 'text-amber-400' },
+            { label: 'Detected', value: stats.detected, color: 'text-ink' },
+            { label: 'Sitting',  value: stats.sitting,  color: 'text-accent' },
+            { label: 'Standing', value: stats.standing, color: 'text-accent' },
+            { label: 'Walking',  value: stats.walking,  color: 'text-accent' },
           ].map(({ label, value, color }) => (
             <div key={label} className="glass-card p-2.5 text-center">
               <p className={`text-xl font-bold ${color}`}>{value}</p>
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider">{label}</p>
+              <p className="text-[10px] text-ink-faint uppercase tracking-wider">{label}</p>
             </div>
           ))}
         </div>

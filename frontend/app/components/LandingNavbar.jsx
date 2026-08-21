@@ -4,6 +4,15 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
+/**
+ * Signed-out chrome only.
+ *
+ * This navbar never renders anything about the current viewer — no email, no
+ * role, no "open your console" affordance. A signed-in user is redirected away
+ * from the landing page before it renders (see app/page.jsx), so the only
+ * person who ever sees this header is signed out, and the markup carries no
+ * hint about who might be.
+ */
 export default function LandingNavbar() {
   return (
     <header className="themed sticky top-0 z-50 bg-ground/90 backdrop-blur-md border-b border-line animate-fade-in-up" style={{ animationDelay: '0ms' }}>
@@ -22,6 +31,7 @@ export default function LandingNavbar() {
 
           <div className="flex items-center gap-2.5">
             <ThemeToggle />
+
             <Link
               href="/login"
               className="bg-inverse text-inverse px-4 py-2 rounded-xl text-[13px] font-bold hover:bg-accent hover:text-white hover:shadow-lg hover:shadow-red-600/30 hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-1.5 group"

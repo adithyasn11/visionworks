@@ -34,3 +34,13 @@ class ActivityLogModel(Base):
     posture_state = Column(String(32), nullable=False) # SITTING, STANDING, WALKING, AWAY
     activity_score = Column(Float, nullable=False)
     dwell_duration_seconds = Column(Integer, nullable=False)
+
+    # Floorplan position, in normalised 0..1 coordinates.
+    #
+    # Stored normalised rather than in pixels so the heatmap is independent of
+    # the camera resolution and of the size the floorplan is rendered at: the
+    # frontend multiplies by whatever box it draws into. Nullable because rows
+    # written before this column existed have no position, and because a
+    # centroid that falls outside the frame is dropped rather than clamped.
+    floor_x = Column(Float, nullable=True)
+    floor_y = Column(Float, nullable=True)

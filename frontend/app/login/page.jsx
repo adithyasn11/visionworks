@@ -91,11 +91,19 @@ function LoginForm() {
   useEffect(() => {
     if (!supabase) return;
     let active = true;
-    supabase.auth.getSession().then(async ({ data }) => {
-      if (!active || !data?.session) return;
+
+    // getUser(), not getSession(): getSession() trusts whatever token is cached
+    // locally, so a session the server has already revoked still looks valid
+    // and bounces the user straight back off the login page — the exact
+    // "clicking login logs me in automatically" symptom. getUser() validates
+    // against the auth server, so a revoked session correctly resolves to null
+    // and the form is shown.
+    supabase.auth.getUser().then(async ({ data, error }) => {
+      if (!active || error || !data?.user) return;
       const target = await resolveLandingPath(supabase, searchParams.get('next'));
       if (active) router.replace(target);
     });
+
     return () => { active = false; };
   }, [router, searchParams]);
 
@@ -162,12 +170,28 @@ function LoginForm() {
     }
     setGoogleBusy(true);
     try {
+      const nextParam = searchParams.get('next');
+      const callback = new URL('/auth/callback', window.location.origin);
+      // Preserve where the user was heading, so the callback can send them
+      // there instead of dropping them on a default landing page.
+      if (nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')) {
+        callback.searchParams.set('next', nextParam);
+      }
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           // Must land on the server callback, not a page: the PKCE code has to
           // be exchanged server-side to set httpOnly session cookies.
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callback.toString(),
+          queryParams: {
+            // Without prompt=select_account Google silently reuses whichever
+            // account is already signed in to the browser and bounces straight
+            // back — so the user never sees a chooser and cannot switch
+            // accounts. Forcing the chooser is what makes "Continue with
+            // Google" behave the way people expect.
+            prompt: 'select_account',
+          },
         },
       });
       if (error) {

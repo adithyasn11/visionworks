@@ -65,6 +65,36 @@ export async function getServerUser() {
 }
 
 /**
+ * Where a signed-in visitor should be sent, or null when signed out.
+ *
+ * Used by the landing page to redirect a returning user straight to the home
+ * their role owns, so a live session never lands on the marketing page.
+ *
+ * Returns ONLY a path. No email, no role flag, no user object: the caller is a
+ * public page, and anything richer would end up either rendered into public
+ * markup or serialised across the server/client boundary. A destination is all
+ * a redirect needs.
+ *
+ * Returns null rather than throwing when auth is unreachable — a public page
+ * must still render for everyone if the auth service is down, and failing
+ * closed here would take the marketing site offline with it.
+ */
+export async function getViewerLanding() {
+  const supabase = createClient();
+  if (!supabase) return null;
+
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data?.user) return null;
+
+    const { data: isOperator } = await supabase.rpc('is_platform_admin');
+    return { href: isOperator === true ? '/platform' : '/dashboard' };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Is the caller an active platform operator?
  *
  * Asks the database via is_platform_admin() rather than checking a hardcoded

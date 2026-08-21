@@ -11,14 +11,20 @@ class SpatialEngine:
     Spatial Intelligence Engine managing polygon workstation ROIs
     and Homography perspective transformations for 2D floorplan mapping.
     """
-    def __init__(self, zones_config: list = None):
+    def __init__(self, zones_config: list = None, homography_matrix=None):
         """
         zones_config: List of dicts, e.g.:
         [
             {"zone_id": "desk_01", "zone_name": "Workstation 1", "polygon": [[100, 100], [300, 100], [300, 300], [100, 300]]}
         ]
+        homography_matrix: optional 3x3 camera->floorplan matrix. When absent,
+            project_to_floor() falls back to a proportional frame mapping.
         """
         self.zones = []
+        self.homography_matrix = (
+            np.array(homography_matrix, dtype=np.float32)
+            if homography_matrix is not None else None
+        )
         if zones_config:
             self.load_zones(zones_config)
 
@@ -45,6 +51,49 @@ class SpatialEngine:
             if zone["polygon"].contains(pt):
                 return zone["zone_id"]
         return "TRANSIT_ZONE"
+
+    # Default floorplan extent, in floorplan units. The identity fallback below
+    # maps a 640x480-ish frame into this box, and the heatmap normalises against
+    # it, so the exact numbers only matter for keeping the aspect ratio sane.
+    FLOOR_WIDTH = 1000.0
+    FLOOR_HEIGHT = 700.0
+
+    @staticmethod
+    def ground_point(bbox: list) -> list:
+        """
+        The point where a detected person meets the floor.
+
+        Uses the horizontal centre of the bounding box but its BOTTOM edge,
+        not its centre: a homography maps the ground plane, so projecting a
+        person's midriff would place them metres behind where they are standing.
+        The feet are the only part of the box that actually lies on the plane
+        the matrix was fitted to.
+        """
+        return [(bbox[0] + bbox[2]) / 2.0, float(bbox[3])]
+
+    def project_to_floor(self, bbox: list, frame_shape) -> list:
+        """
+        Projects a detection's ground point onto floorplan coordinates.
+
+        With a calibrated homography this is a true perspective correction. With
+        no matrix configured — the common case, since calibration needs four
+        surveyed point pairs — it falls back to a proportional mapping of the
+        frame into the floorplan box. The fallback is honest rather than exact:
+        it preserves where people are relative to the frame, which is what makes
+        the heatmap readable, without pretending to correct for camera tilt.
+        """
+        point = self.ground_point(bbox)
+
+        if self.homography_matrix is not None:
+            return self.transform_point_topdown(self.homography_matrix, point)
+
+        frame_h, frame_w = frame_shape[:2]
+        if not frame_w or not frame_h:
+            return point
+        return [
+            (point[0] / float(frame_w)) * self.FLOOR_WIDTH,
+            (point[1] / float(frame_h)) * self.FLOOR_HEIGHT,
+        ]
 
     @staticmethod
     def compute_homography_matrix(camera_points: list, floorplan_points: list) -> np.ndarray:

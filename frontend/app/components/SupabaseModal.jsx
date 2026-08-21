@@ -22,24 +22,24 @@ export const SupabaseModal = ({ isOpen, onClose, onSave }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
-      <div className="glass-panel w-full max-w-lg p-6 flex flex-col gap-5 border-slate-700/80 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ground/80 backdrop-blur-md p-4">
+      <div className="glass-panel w-full max-w-lg p-6 flex flex-col gap-5 border-line/80 shadow-2xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <div className="p-2 rounded-xl bg-accent/10 border border-line text-accent">
               <Database className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-100">Connect Your Supabase Project</h2>
-              <p className="text-xs text-slate-400">Enter your project credentials to store live activity logs</p>
+              <h2 className="text-base font-bold text-ink">Connect Your Supabase Project</h2>
+              <p className="text-xs text-ink-muted">Enter your project credentials to store live activity logs</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 text-sm">✕</button>
+          <button onClick={onClose} className="text-ink-muted hover:text-ink text-sm">✕</button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Supabase Project URL</label>
+            <label className="block text-xs font-semibold text-ink-muted mb-1">Supabase Project URL</label>
             <div className="relative">
               <input
                 type="url"
@@ -47,13 +47,13 @@ export const SupabaseModal = ({ isOpen, onClose, onSave }) => {
                 placeholder="https://xyzproject.supabase.co"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                className="w-full bg-ground border border-line rounded-lg px-3 py-2 text-xs text-ink placeholder:text-ink-faint focus:outline-none focus:border-[color:var(--accent)]"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Supabase Anon / API Key</label>
+            <label className="block text-xs font-semibold text-ink-muted mb-1">Supabase Anon / API Key</label>
             <div className="relative">
               <input
                 type="password"
@@ -61,13 +61,13 @@ export const SupabaseModal = ({ isOpen, onClose, onSave }) => {
                 placeholder="eyJhbGciOi..."
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                className="w-full bg-ground border border-line rounded-lg px-3 py-2 text-xs text-ink placeholder:text-ink-faint focus:outline-none focus:border-[color:var(--accent)]"
               />
             </div>
           </div>
 
-          <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <div className="p-3 rounded-lg bg-ground/60 border border-line text-[11px] text-ink-muted flex items-start gap-2">
+            <ShieldCheck className="w-4 h-4 text-accent shrink-0 mt-0.5" />
             <span>
               Your credentials are stored securely in local browser environment state and used to publish time-series CCTV metrics directly to your Supabase <b>activity_logs</b> table.
             </span>
@@ -78,7 +78,7 @@ export const SupabaseModal = ({ isOpen, onClose, onSave }) => {
               href="https://supabase.com/dashboard"
               target="_blank"
               rel="noreferrer"
-              className="text-xs text-sky-400 hover:underline flex items-center gap-1"
+              className="text-xs text-accent hover:underline flex items-center gap-1"
             >
               <span>Get API Keys from Supabase</span>
               <ExternalLink className="w-3 h-3" />
@@ -88,13 +88,13 @@ export const SupabaseModal = ({ isOpen, onClose, onSave }) => {
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition-all"
+                className="px-3 py-1.5 rounded-lg bg-surface-alt hover:bg-surface-alt text-xs text-ink-muted transition-all"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all"
+                className="px-4 py-1.5 rounded-lg bg-accent hover:brightness-110 text-white font-bold text-xs flex items-center gap-1.5 transition-all"
               >
                 {isSaved ? <Check className="w-4 h-4" /> : null}
                 <span>{isSaved ? 'Connected!' : 'Save & Connect'}</span>

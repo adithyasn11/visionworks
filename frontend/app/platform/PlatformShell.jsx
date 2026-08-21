@@ -67,14 +67,15 @@ export default function PlatformShell({ children, operator }) {
   const signOut = async () => {
     setSigningOut(true);
     try {
-      if (supabase) await supabase.auth.signOut();
-      // replace(), not push(): the console should not be reachable with Back
-      // after signing out. router.refresh() clears cached Server Component
-      // payloads so no customer data lingers in the client cache.
-      router.replace('/login');
-      router.refresh();
-    } catch {
-      setSigningOut(false);
+      // Clear the client session first, then hand off to the server route: only
+      // it can delete the httpOnly cookies middleware reads, and a client-only
+      // signOut leaves them intact so /login redirects straight back here.
+      if (supabase) await supabase.auth.signOut({ scope: 'global' }).catch(() => {});
+    } finally {
+      // A full navigation rather than router.replace(), so the Set-Cookie
+      // deletions are applied and no cached Server Component payload holding
+      // customer data survives in the client router cache.
+      window.location.href = '/auth/signout';
     }
   };
 

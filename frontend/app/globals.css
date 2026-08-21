@@ -221,33 +221,30 @@ html.theme-switching body {
 .hover\:border-field-hover:hover { border-color: var(--field-hover); }
 
 /* Dashboard surfaces.
-   The dashboard's own markup uses light-on-dark slate text throughout (it was
-   designed as a dark control room), so these panels stay dark in BOTH themes.
-   They were hardcoded `bg-white`, which put that light text on a white panel —
-   invisible in light mode and a glaring white slab in dark mode. */
+   Built from the same tokens as the founder console, so the dashboard is the
+   same product in the same palette — red / black / white — and follows the
+   theme toggle instead of being a hardcoded dark island. */
 .glass-panel {
-  background-color: #141316;
-  border: 1px solid #2A272E;
-  color: #F7F6F8;
+  background-color: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
   @apply rounded-2xl shadow-sm;
 }
 
 .glass-card {
-  background-color: #1C1A1F;
-  border: 1px solid #2A272E;
-  color: #F7F6F8;
+  background-color: var(--surface-alt);
+  border: 1px solid var(--line);
+  color: var(--ink);
   @apply rounded-xl p-5 transition-all duration-200 shadow-sm;
 }
 
 .glass-card:hover {
-  border-color: var(--accent-fill);
+  border-color: var(--accent);
 }
 
-/* The dashboard is a dark control room in both themes; its panels and text are
-   built for a dark ground, so the shell paints one regardless of theme. */
 .dashboard-shell {
-  background-color: #0B0A0C;
-  color: #F7F6F8;
+  background-color: var(--ground);
+  color: var(--ink);
   min-height: 100vh;
 }
 
@@ -312,4 +309,31 @@ html.theme-switching body {
     width: 100%;
     opacity: 0.55;
   }
+}
+
+/* ── Data-visualisation palette ────────────────────────────────────────────
+   The dashboard's charts are red/black/white like the rest of the product, so
+   a categorical scale cannot lean on unrelated hues. Instead the three posture
+   states are separated by WEIGHT along a single red ramp, which keeps the page
+   monochrome and still reads correctly for colour-blind viewers (the ordering
+   survives as a lightness ramp in greyscale).
+
+   `--chart-grid` and `--chart-axis` are deliberately quiet: on a data panel the
+   marks are the content and the scaffolding should recede.                  */
+:root {
+  --chart-1:    #DC2626; /* strongest — sitting, the dominant state */
+  --chart-2:    #F0736F; /* mid */
+  --chart-3:    #F7B4B0; /* lightest — walking, the rarest state */
+  --chart-grid: #E7E5E9;
+  --chart-axis: #6B6772;
+  --chart-tooltip-bg: #FFFFFF;
+}
+
+.dark {
+  --chart-1:    #F05252;
+  --chart-2:    #C13B3B;
+  --chart-3:    #7E2C2C;
+  --chart-grid: #2A272E;
+  --chart-axis: #8B8792;
+  --chart-tooltip-bg: #1C1A1F;
 }
