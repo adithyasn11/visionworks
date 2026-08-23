@@ -87,6 +87,11 @@ export async function getViewerLanding() {
     const { data, error } = await supabase.auth.getUser();
     if (error || !data?.user) return null;
 
+    // Customers go to /dashboard, matching login, signup and the OAuth
+    // callback. All four must agree: if one disagreed, a signed-in user who
+    // clicked the logo would be routed somewhere different from where signing
+    // in had just put them. A user without an organisation is forwarded on by
+    // the dashboard guard, so this is always a safe destination.
     const { data: isOperator } = await supabase.rpc('is_platform_admin');
     return { href: isOperator === true ? '/platform' : '/dashboard' };
   } catch {

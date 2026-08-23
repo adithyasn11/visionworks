@@ -80,6 +80,10 @@ export async function GET(request) {
     return NextResponse.redirect(new URL(next, origin));
   }
 
+  // Customers land on /dashboard — see the note on resolveLandingPath() in
+  // app/login/page.jsx. This is the OAuth arm of the same decision, and the two
+  // must agree or a Google sign-in and a password sign-in would end up on
+  // different pages.
   const { data: isOperator } = await supabase.rpc('is_platform_admin');
   return NextResponse.redirect(
     new URL(isOperator === true ? '/platform' : '/dashboard', origin),

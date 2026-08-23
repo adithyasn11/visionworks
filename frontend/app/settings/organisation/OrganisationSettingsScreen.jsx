@@ -21,14 +21,13 @@
 // the same split the members screen uses.
 
 import React, { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
 import {
-  ArrowLeft, Building2, Clock, ShieldAlert, Trash2, Loader2, AlertCircle, Info,
+  Building2, Clock, ShieldAlert, Trash2, Loader2, AlertCircle, Info,
 } from 'lucide-react';
 
-import { ThemeToggle } from '../../components/ThemeToggle';
 import { Field, Banner } from '../../components/AuthFormBits';
 import { can } from '../../lib/permissions';
+import DashboardShell from '../../dashboard/DashboardShell';
 import {
   getOrganisationSettings, updateOrganisationSettings,
   previewRetentionImpact, deleteOrganisation,
@@ -56,7 +55,7 @@ function Section({ icon: Icon, title, description, children, danger = false }) {
   );
 }
 
-export default function OrganisationSettingsScreen() {
+export default function OrganisationSettingsScreen({ role: viewerRole, viewer }) {
   const [state, setState] = useState({ status: 'loading', org: null, role: null });
   const [banner, setBanner] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -144,30 +143,54 @@ export default function OrganisationSettingsScreen() {
     }
   };
 
+  // Error BEFORE loading, and never `!form` on its own.
+  //
+  // The first version spun forever on failure: `getOrganisationSettings()`
+  // would return an error, `state.status` became 'error', but `form` was still
+  // null — so `state.status === 'loading' || !form` stayed true and the
+  // spinner never resolved. The user saw an infinite load with no explanation.
+  //
+  // That is exactly what happened after deleting an organisation: the profile
+  // still pointed at it, `org_select` hides deleted rows, the read returned
+  // nothing, and the page hung.
+  if (state.status === 'error') {
+    return (
+      <DashboardShell user={viewer} role={viewerRole}>
+        <div className="mx-auto max-w-lg py-16 text-center">
+          <AlertCircle className="w-6 h-6 mx-auto text-accent" />
+          <h1 className="text-[17px] font-black tracking-tight text-ink mt-3">
+            Could not load organisation settings
+          </h1>
+          <p className="text-[13px] text-ink-muted mt-2 leading-relaxed">
+            {banner?.text ?? 'Something went wrong.'}
+          </p>
+          <a
+            href="/dashboard"
+            className="inline-flex items-center gap-2 mt-5 rounded-lg bg-accent px-3.5 py-2 text-[13px] font-bold text-white hover:brightness-110 transition-[filter]"
+          >
+            Back to dashboard
+          </a>
+        </div>
+      </DashboardShell>
+    );
+  }
+
   if (state.status === 'loading' || !form) {
     return (
-      <div className="themed min-h-screen bg-ground flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-accent animate-spin" />
-      </div>
+      <DashboardShell user={viewer} role={viewerRole}>
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="w-6 h-6 text-accent animate-spin" />
+        </div>
+      </DashboardShell>
     );
   }
 
   const inputClass = `w-full rounded-lg bg-ground border-2 px-3.5 py-2.5 text-[14px] text-ink transition-colors duration-150 focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)] border-field hover:border-field-hover disabled:opacity-60 disabled:cursor-not-allowed`;
 
   return (
-    <div className="themed min-h-screen bg-ground text-ink font-sans selection:bg-red-600 selection:text-white">
-      <div className="mx-auto max-w-3xl px-[clamp(1.25rem,4vw,2rem)] py-[clamp(1.25rem,3vh,2.5rem)]">
-
-        <div className="flex items-center justify-between gap-4 mb-8">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 text-[13px] font-bold text-ink-muted hover:text-accent transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to dashboard
-          </Link>
-          <ThemeToggle />
-        </div>
+    /* Same shell as the dashboard — see MembersScreen for why. */
+    <DashboardShell user={viewer} role={viewerRole}>
+      <div className="mx-auto max-w-3xl">
 
         <header className="flex flex-col gap-2 mb-7">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">
@@ -363,6 +386,11 @@ export default function OrganisationSettingsScreen() {
             </button>
           )}
 
+          {/* Plan lives in the dashboard (Plan section), not here.
+              Two surfaces showing the same tier is two places to keep honest,
+              and the tier is read-only in both — there was nothing to configure
+              on this page. The sidebar's Plan entry is one click away. */}
+
           {/* ── Danger zone ── */}
           {canEdit && (
             <Section
@@ -395,6 +423,6 @@ export default function OrganisationSettingsScreen() {
           )}
         </div>
       </div>
-    </div>
+    </DashboardShell>
   );
 }

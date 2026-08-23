@@ -129,6 +129,10 @@ export async function getOrganisationSettings() {
   const [{ data: org }, { data: membership }] = await Promise.all([
     supabase
       .from('organisations')
+      // No `plan` column here. The tier is shown in the dashboard's Plan
+      // section, which reads it through getViewerRole() — one source, subject
+      // to the same ACTIVE-membership check as the role. Selecting it here too
+      // would be a second reader of the same value with different filtering.
       .select('id, name, slug, timezone, dataRetentionDays, purgeVideoAfterProcessing, defaultSedentaryThresholdMinutes, defaultUtilisationFloorPct, createdAt')
       .eq('id', orgId)
       .maybeSingle(),
@@ -292,7 +296,7 @@ export async function updateOrganisationSettings(formData) {
  * reflex; typing the name is not.
  */
 export async function deleteOrganisation(confirmationName) {
-  const { supabase, user, orgId, error } = await requireCapability('org.settings');
+  const { supabase, orgId, error } = await requireCapability('org.settings');
   if (error) return fail(error);
 
   const { data: org } = await supabase
@@ -303,24 +307,30 @@ export async function deleteOrganisation(confirmationName) {
     return fail('The name you typed does not match. Nothing was deleted.');
   }
 
-  const { data: updated, error: dbError } = await supabase
-    .from('organisations')
-    .update({ deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-    .eq('id', orgId)
-    .select('id');
-
-  if (dbError) return fail(describeDbError(dbError, 'Could not delete this organisation.'));
-  if (!updated || updated.length === 0) return fail('Only an administrator can do that.');
-
-  // Written BEFORE the org disappears from the caller's view: once `deletedAt`
-  // is set, `org_select` hides the row, and `audit_insert` requires the org to
-  // be in `user_org_ids()` — which reads memberships, so this still succeeds.
-  await writeAudit(supabase, {
-    orgId, user,
-    action: 'organisation.deleted',
-    metadata: { name: org.name, soft: true },
+  // Goes through a SECURITY DEFINER function rather than a direct UPDATE.
+  //
+  // A plain `update({ deletedAt })` is rejected by RLS — reproduced through a
+  // real signed-in client, and narrowed by elimination: updating `name` or
+  // `dataRetentionDays` succeeds, updating `deletedAt` alone does not. A row
+  // that makes itself invisible is fundamentally awkward for a symmetric
+  // USING/WITH CHECK, and widening the check did not fix it.
+  //
+  // So deletion takes the same shape organisation CREATION already does:
+  // `organisations` has no INSERT policy either, and `create_organisation()`
+  // is the only door. `soft_delete_organisation()` is the matching exit — it
+  // verifies an ACTIVE ADMIN membership itself before touching anything, and
+  // writes the audit row from inside the definer context, where it can still
+  // see the org the caller just made invisible to themselves.
+  const { data, error: dbError } = await supabase.rpc('soft_delete_organisation', {
+    p_org_id: orgId,
   });
 
+  if (dbError) return fail(describeDbError(dbError, 'Could not delete this organisation.'));
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.ok) return fail(row?.message ?? 'Could not delete this organisation.');
+
   revalidatePath('/dashboard', 'layout');
-  return { ok: true, message: `${org.name} has been deleted.` };
+  return { ok: true, message: row.message };
 }
+

@@ -39,6 +39,7 @@ import { ArrowRight, Check, Building2, MapPin, Video, Loader2 } from 'lucide-rea
 import AuthAside from '../components/AuthAside';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { Field, Banner, SubmitButton } from '../components/AuthFormBits';
+import { planName } from '../lib/plans';
 import { createOrganisation, updateSite, createCamera, finishOnboarding } from './actions';
 
 const ASIDE = {
@@ -148,7 +149,7 @@ function SkipButton({ onClick, disabled, children }) {
 
 /* ── Wizard ──────────────────────────────────────────────────────────────── */
 
-export default function OnboardingWizard({ firstName, email }) {
+export default function OnboardingWizard({ firstName, email, pendingPlan = null }) {
   const router = useRouter();
 
   const [step, setStep] = useState(1);
@@ -211,6 +212,28 @@ export default function OnboardingWizard({ firstName, email }) {
 
   /* ── Actions ───────────────────────────────────────────────────────────── */
 
+  /**
+   * Advance a step AND record it in the URL.
+   *
+   * The `?step=` marker is what stops the server guard ejecting the user: from
+   * step 2 onward the organisation exists, so a bare /onboarding would redirect
+   * to /dashboard on any re-render. `history.replaceState` rather than a router
+   * push — this is not a navigation, it is a note to the guard, and it must not
+   * add a back-stack entry or remount the wizard (which would lose the org and
+   * site ids held in state).
+   */
+  const advanceTo = (next) => {
+    setStep(next);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('step', String(next));
+      window.history.replaceState(null, '', url.toString());
+    } catch {
+      // A failed URL update only costs the guard's hint; the wizard still works
+      // until something re-renders the page.
+    }
+  };
+
   const goDashboard = () => {
     // router.replace, not push: onboarding must not sit in the back stack. The
     // server guard would bounce a Back press straight to /dashboard anyway, but
@@ -244,7 +267,7 @@ export default function OnboardingWizard({ firstName, email }) {
       if (!res.ok) { setBanner({ kind: 'error', text: res.message }); return; }
 
       setIds({ orgId: res.orgId, siteId: res.siteId });
-      setStep(2);
+      advanceTo(2);
     } catch {
       setBanner({ kind: 'error', text: 'Could not reach the server. Check your connection and try again.' });
     } finally {
@@ -288,7 +311,7 @@ export default function OnboardingWizard({ firstName, email }) {
 
       const res = await updateSite(fd);
       if (!res.ok) { setBanner({ kind: 'error', text: res.message }); return; }
-      setStep(3);
+      advanceTo(3);
     } catch {
       setBanner({ kind: 'error', text: 'Could not reach the server. Check your connection and try again.' });
     } finally {
@@ -390,6 +413,18 @@ export default function OnboardingWizard({ firstName, email }) {
                       Everything you measure lives inside an organisation. You’ll be its
                       administrator.
                     </p>
+
+                    {/* Carries the checkout choice forward, so the wizard is
+                        visibly the next step of the flow rather than an
+                        unrelated form. Absent when no plan was chosen — the
+                        organisation is still created, on the free tier (see the
+                        note in page.jsx). */}
+                    {pendingPlan && (
+                      <p className="inline-flex items-center gap-1.5 self-start bg-accent-soft text-accent px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-[0.1em]">
+                        <Check className="w-3 h-3" strokeWidth={3} aria-hidden="true" />
+                        {planName(pendingPlan)} plan
+                      </p>
+                    )}
                   </header>
 
                   {banner && <Banner kind={banner.kind}>{banner.text}</Banner>}
@@ -554,7 +589,7 @@ export default function OnboardingWizard({ firstName, email }) {
                   </form>
 
                   <div className="flex flex-col gap-2">
-                    <SkipButton onClick={() => { setBanner(null); setErrors({}); setStep(3); }} disabled={busy}>
+                    <SkipButton onClick={() => { setBanner(null); setErrors({}); advanceTo(3); }} disabled={busy}>
                       Skip — add a camera instead
                     </SkipButton>
                     <SkipButton onClick={skipToDashboard} disabled={busy}>

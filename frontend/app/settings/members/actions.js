@@ -134,6 +134,19 @@ function describeDbError(error, fallback) {
   if (/memberships_orgId_invitedEmail_key/i.test(msg) || /duplicate key/i.test(msg)) {
     return 'That address already has an invitation or membership in this organisation.';
   }
+  // Plan limits (015_plan_limits.sql). The trigger raises a message that is
+  // already written for a person and already carries the tier and the number,
+  // so it is passed through with a suffix rather than replaced by a vaguer
+  // sentence that would have to hardcode the limit a second time.
+  //
+  // The `plan_limit_` prefix is the contract between the trigger and this
+  // mapper; matching on it rather than on the prose means the wording can
+  // change in SQL without silently falling through to the raw error here.
+  const planLimit = msg.match(/plan_limit_(cameras|sites|seats):\s*(.+?)(?:\s*CONTEXT:|$)/is);
+  if (planLimit) {
+    return `${planLimit[2].trim()} Upgrade the plan to add more.`;
+  }
+
   if (/row-level security/i.test(msg)) {
     return 'You do not have permission to do that.';
   }

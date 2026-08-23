@@ -1,76 +1,120 @@
 'use client';
+
+// frontend/app/components/LandingFooter.jsx
+//
+// Shared footer: the public landing page, /home, and /home/checkout.
+//
+// `card-dark`, not `bg-inverse` — the footer is permanently dark in BOTH
+// themes. bg-inverse flips with the theme, which turned the footer white in
+// dark mode. The 8px accent top border is the page's full-width sign-off.
+//
+// WHY THE LINK LIST IS SHORT
+//
+// It used to carry eight `href="#"` placeholders across "Company" and "Legal".
+// A dead link is worse than a missing one: it looks finished, invites a click,
+// and does nothing — and in a demo that is the click someone will make. Every
+// entry here now goes somewhere real. When About/Careers/Privacy exist, they
+// get added back; until then their absence is honest.
+//
+// Because this renders on signed-in pages too, no link may assume the reader
+// has an organisation — /dashboard would bounce anyone without one straight to
+// /onboarding. /home is correct for every reader: signed out it passes through
+// the login gate, signed in it is their actual home.
+
 import React from 'react';
 import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 
-// card-dark, not bg-inverse: the footer is permanently dark in both themes.
-// bg-inverse flips with the theme, which turned the footer white in dark mode.
+const PRODUCT = [
+  { href: '/features', label: 'Features' },
+  { href: '/security', label: 'Security' },
+  { href: '/home#pricing', label: 'Plans' },
+  { href: '/home', label: 'Your workspace' },
+];
+
 export default function LandingFooter() {
   return (
-    <footer className="card-dark pt-16 pb-10 border-t-8 border-accent mt-auto w-full group/footer transition-colors duration-700">
-        <div className="max-w-6xl mx-auto px-6 sm:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 mb-12">
-            
-            {/* Brand Column */}
-            <div className="lg:col-span-2">
-              <Link href="/" className="flex items-center gap-3 mb-6 cursor-pointer group/logo w-max">
-                <div className="w-7 h-7 bg-accent flex items-center justify-center rounded-lg shadow-sm shadow-red-600/30 group-hover/logo:rotate-12 transition-transform duration-300">
-                  <div className="w-2 h-2 bg-white rounded-sm"></div>
-                </div>
-                <span className="font-extrabold text-xl tracking-tight group-hover/logo:text-red-500 transition-colors">VisionWorks</span>
-              </Link>
-              <p className="opacity-80 font-medium text-[14px] leading-relaxed max-w-sm mb-6">
-                Enterprise activity analytics built for modern workspaces. Track occupancy, monitor safety, and protect privacy seamlessly.
-              </p>
-              <div className="flex items-center gap-4">
-                <a href="#" className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center hover:bg-accent hover:-translate-y-1 hover:shadow-lg hover:shadow-red-600/50 transition-all duration-300 group/icon">
-                  <span className="font-bold text-xs tracking-widest group-hover/icon:scale-110 transition-transform">X</span>
-                </a>
-                <a href="#" className="w-9 h-9 bg-white/10 rounded-full flex items-center justify-center hover:bg-accent hover:-translate-y-1 hover:shadow-lg hover:shadow-red-600/50 transition-all duration-300 group/icon2">
-                  <span className="font-bold text-xs tracking-widest group-hover/icon2:scale-110 transition-transform">IN</span>
-                </a>
+    <footer className="card-dark pt-16 pb-10 border-t-8 border-accent mt-auto w-full transition-colors duration-700">
+      <div className="max-w-6xl mx-auto px-6 sm:px-8">
+
+        <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr_1.4fr] gap-10 lg:gap-12 mb-12">
+
+          {/* Brand */}
+          <div>
+            <Link href="/" className="flex items-center gap-3 mb-6 cursor-pointer group/logo w-max">
+              <div className="w-7 h-7 bg-accent flex items-center justify-center rounded-lg shadow-sm shadow-red-600/30 group-hover/logo:rotate-12 group-hover/logo:shadow-red-600/50 transition-all duration-300">
+                <div className="w-2 h-2 bg-white rounded-sm" />
               </div>
+              <span className="font-extrabold text-xl tracking-tight group-hover/logo:text-red-500 transition-colors">
+                VisionWorks
+              </span>
+            </Link>
+            <p className="opacity-70 font-medium text-[14px] leading-relaxed max-w-sm mb-6">
+              Workplace activity analytics that measures how a space is used — occupancy,
+              posture and dwell time per zone — without keeping the footage or identifying
+              anyone in it.
+            </p>
+            <div className="flex items-center gap-3">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse" aria-hidden="true" />
+              <span className="opacity-70 font-bold text-[10px] tracking-widest uppercase">
+                All systems operational
+              </span>
             </div>
-
-            {/* Links Columns */}
-            <div>
-              <h4 className="font-bold mb-4 uppercase tracking-[0.12em] text-[10px] opacity-100">Product</h4>
-              <ul className="space-y-3">
-                <li><Link href="/features" className="opacity-80 text-[13px] font-bold hover:opacity-100 hover:translate-x-1 inline-block transition-all duration-300">Overview</Link></li>
-                <li><Link href="/security" className="opacity-80 text-[13px] font-bold hover:opacity-100 hover:translate-x-1 inline-block transition-all duration-300">Security</Link></li>
-                <li><Link href="/dashboard" className="opacity-80 text-[13px] font-bold hover:opacity-100 hover:translate-x-1 inline-block transition-all duration-300">Dashboard</Link></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="font-bold mb-4 uppercase tracking-[0.12em] text-[10px] opacity-100">Company</h4>
-              <ul className="space-y-3">
-                <li><a href="#" className="opacity-80 text-[13px] font-bold hover:opacity-100 hover:translate-x-1 inline-block transition-all duration-300">About us</a></li>
-                <li><a href="#" className="opacity-80 text-[13px] font-bold hover:opacity-100 hover:translate-x-1 inline-block transition-all duration-300">Careers</a></li>
-                <li><a href="#" className="opacity-80 text-[13px] font-bold hover:opacity-100 hover:translate-x-1 inline-block transition-all duration-300">Contact</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-bold mb-4 uppercase tracking-[0.12em] text-[10px] opacity-100">Legal</h4>
-              <ul className="space-y-3">
-                <li><a href="#" className="opacity-80 text-[13px] font-bold hover:opacity-100 hover:translate-x-1 inline-block transition-all duration-300">Privacy Policy</a></li>
-                <li><a href="#" className="opacity-80 text-[13px] font-bold hover:opacity-100 hover:translate-x-1 inline-block transition-all duration-300">Terms of Service</a></li>
-                <li><a href="#" className="opacity-80 text-[13px] font-bold hover:opacity-100 hover:translate-x-1 inline-block transition-all duration-300">Cookie Policy</a></li>
-              </ul>
-            </div>
-
           </div>
 
-          <div className="pt-6 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-6">
-            <p className="opacity-75 font-bold text-[12px]">
-              &copy; {new Date().getFullYear()} VisionWorks Analytics. All rights reserved.
-            </p>
-            <div className="flex items-center gap-3 bg-white/10 px-3.5 py-1.5 rounded-full cursor-default hover:bg-white/20 transition-colors">
-              <span className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse"></span>
-              <span className="opacity-90 font-bold text-[10px] tracking-widest uppercase">Operational</span>
+          {/* Product links */}
+          <nav aria-label="Product">
+            <h4 className="font-black mb-5 uppercase tracking-[0.14em] text-[10px] text-red-500">
+              Product
+            </h4>
+            <ul className="space-y-3.5">
+              {PRODUCT.map(({ href, label }) => (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    className="opacity-70 text-[13.5px] font-bold hover:opacity-100 hover:text-red-500 hover:translate-x-1 inline-block transition-all duration-300"
+                  >
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {/* Closing CTA — the footer's own reason to exist on a marketing
+              page, rather than four columns of links nobody reads. */}
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-7 flex flex-col justify-between gap-5 group/cta hover:border-red-500/40 hover:bg-white/[0.07] transition-all duration-500">
+            <div>
+              <h4 className="text-xl font-black tracking-tight mb-2 group-hover/cta:text-red-500 transition-colors">
+                Measure your space
+              </h4>
+              <p className="opacity-65 font-medium text-[13.5px] leading-relaxed">
+                Point a camera at one room and see whether the numbers match what you
+                already believe.
+              </p>
             </div>
+            <Link
+              href="/home"
+              className="bg-accent text-white px-5 py-3 rounded-2xl font-bold text-[13.5px] hover:brightness-110 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-red-600/40 transition-all duration-300 flex items-center justify-center gap-2.5 w-max group/btn"
+            >
+              Get started
+              <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" aria-hidden="true" />
+            </Link>
           </div>
         </div>
-      </footer>
+
+        <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <p className="opacity-55 font-bold text-[12px]">
+            &copy; {new Date().getFullYear()} VisionWorks Analytics.
+          </p>
+          {/* Stated in the footer as well as on the pricing page: this is the
+              chrome that appears on every screen of the billing flow, and it is
+              where someone looks to check whether a product is real. */}
+          <p className="opacity-45 font-bold text-[11px] tracking-wide text-center sm:text-right">
+            Demonstration build · no payments processed
+          </p>
+        </div>
+      </div>
+    </footer>
   );
 }

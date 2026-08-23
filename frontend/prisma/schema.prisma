@@ -149,6 +149,37 @@ enum ThemePreference {
   DARK
 }
 
+/// DEMO BILLING. Subscription tier. No payment processor is connected to this
+/// build — see prisma/sql/014_plans.sql and app/lib/plans.js.
+///
+/// The tier gates REAL limits (see PlanLimit below): camera, site and seat
+/// counts are enforced by database triggers, and retention is capped on write.
+/// It is still NOT a security boundary — no RLS policy consults `plan`, so
+/// cross-tenant isolation is unaffected by it in either direction.
+enum PlanTier {
+  FREE
+  GROWTH
+  ENTERPRISE
+}
+
+/// ENFORCED plan allowances. The AUTHORITY for what each tier permits —
+/// BEFORE INSERT triggers on cameras, sites and memberships read this table and
+/// refuse the write, so a direct PostgREST call is blocked exactly like a click.
+///
+/// Mirrored for DISPLAY in app/lib/plans.js; `npm run check:plans` fails if the
+/// two drift. NULL means unlimited, never zero.
+///
+/// Managed entirely by prisma/sql/015_plan_limits.sql — Prisma never writes it.
+model PlanLimit {
+  plan             PlanTier @id
+  maxCameras       Int?     @map("max_cameras")
+  maxSites         Int?     @map("max_sites")
+  maxSeats         Int?     @map("max_seats")
+  maxRetentionDays Int      @map("max_retention_days")
+
+  @@map("plan_limits")
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  TENANCY & IDENTITY
 // ═══════════════════════════════════════════════════════════════════════════
@@ -164,6 +195,14 @@ model Organisation {
   /// in this zone, so "peak hour" means peak local hour — the only reading a
   /// facility manager cares about.
   timezone String @default("UTC") @db.VarChar(64)
+
+  // ── Demo billing (014_plans.sql). Not proof of payment — no processor. ──
+  /// Entitlement tier for this organisation. Copied from the creator's
+  /// profiles."selectedPlan" by create_organisation(), inside the same
+  /// transaction that creates the org, so an org can never exist without one.
+  plan           PlanTier  @default(FREE)
+  /// When the demo checkout was completed. Null on the free tier.
+  planSelectedAt DateTime? @db.Timestamptz(6)
 
   // ── Privacy & retention controls, surfaced on /settings/organisation ──
   /// ZoneMinuteStat rows older than this are deleted by the retention job.
@@ -230,6 +269,13 @@ model Profile {
   /// /onboarding", so no extra flag is needed.
   currentOrgId String?       @db.Uuid
   currentOrg   Organisation? @relation(fields: [currentOrgId], references: [id], onDelete: SetNull)
+
+  /// DEMO BILLING. The tier chosen on /home before any organisation exists —
+  /// which is why it lives here and not on Organisation. Consumed and cleared
+  /// by create_organisation(), so it is a pending choice, never an entitlement:
+  /// `profile_update_self` lets a user write this column themselves.
+  selectedPlan   PlanTier?
+  selectedPlanAt DateTime? @db.Timestamptz(6)
 
   /// Null until the user finishes /onboarding. Distinct from createdAt so you
   /// can measure signup-to-activated drop-off.

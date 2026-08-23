@@ -16,11 +16,13 @@
 // data source and a live video WebSocket, and routing between them would tear
 // the socket down and re-fetch everything on every click.
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { RefreshCw, Loader2, Eye } from 'lucide-react';
 
-import DashboardShell from './DashboardShell';
+import DashboardShell, { VIEWS } from './DashboardShell';
 import OverviewSection from './OverviewSection';
+import PlanSection from './PlanSection';
 import { VideoCanvasPlayer } from '../components/VideoCanvasPlayer';
 import { AnalyticsCharts } from '../components/AnalyticsCharts';
 import { FloorplanHeatmap } from '../components/FloorplanHeatmap';
@@ -85,14 +87,33 @@ function PageHeader({ eyebrow, title, subtitle, action }) {
   );
 }
 
-export default function Dashboard() {
-  const [view, setView] = useState('overview');
+function DashboardInner() {
+  const searchParams = useSearchParams();
+
+  // `?view=` is how the settings pages navigate BACK into a dashboard section:
+  // DashboardShell renders its nav as links there (`/dashboard?view=zones`)
+  // because those pages are separate routes. Without reading it here, every one
+  // of those links silently landed on Overview.
+  //
+  // Validated against VIEWS rather than trusted — the value is in the URL, so
+  // an unknown one falls back to 'overview' instead of rendering no section at
+  // all and leaving a blank page.
+  const requested = searchParams.get('view');
+  const initialView = VIEWS.some((v) => v.id === requested) ? requested : 'overview';
+
+  // Read once, as the INITIAL value only. Making this a synced effect would
+  // fight the sidebar: clicking a section sets state without touching the URL,
+  // and an effect watching `searchParams` would immediately reset it back.
+  const [view, setView] = useState(initialView);
   const [user, setUser] = useState(null);
   // LAYER 1 input. Null until resolved; every capability check below reads
   // false while it is, so a control never flashes visible before we know the
   // role and then disappear. Hiding is courtesy only — the action (layer 2)
   // and the RLS policy (layer 3) both re-check.
   const [role, setRole] = useState(null);
+  // The organisation's tier and name, resolved in the SAME round trip as the
+  // role (see getViewerRole) so the two can never describe different orgs.
+  const [org, setOrg] = useState({ name: null, plan: null, planSelectedAt: null });
 
   const [overview, setOverview] = useState({ status: 'loading', data: null, error: null });
   const [refreshing, setRefreshing] = useState(false);
@@ -119,7 +140,15 @@ export default function Dashboard() {
     });
     // Resolved on the server so the role the UI draws from is the same one the
     // Server Actions re-check against.
-    getViewerRole().then((r) => { if (active) setRole(r?.role ?? null); });
+    getViewerRole().then((r) => {
+      if (!active) return;
+      setRole(r?.role ?? null);
+      setOrg({
+        name: r?.orgName ?? null,
+        plan: r?.plan ?? null,
+        planSelectedAt: r?.planSelectedAt ?? null,
+      });
+    });
     return () => { active = false; };
   }, []);
 
@@ -263,6 +292,35 @@ export default function Dashboard() {
         </div>
       )}
 
+      {view === 'plan' && (
+        <div className="space-y-6">
+          <PageHeader
+            eyebrow="Plan"
+            title="Your subscription"
+            subtitle="The tier this organisation is on, what it includes, and how the plans compare. Billing is a demonstration — no payment was taken."
+          />
+
+          {/* `plan` is null until getViewerRole resolves. Rendering the panel
+              with a null tier would flash "Unknown plan" before settling, so
+              the section waits — the same reason every capability check reads
+              false while `role` is null. */}
+          {org.plan ? (
+            <PlanSection
+              plan={org.plan}
+              planSelectedAt={org.planSelectedAt}
+              orgName={org.name}
+            />
+          ) : (
+            <div className="glass-panel p-6 flex items-center gap-3">
+              <Loader2 className="w-4 h-4 animate-spin text-ink-faint" />
+              <span className="text-[13px] font-medium text-ink-muted">
+                Loading your plan…
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {view === 'reports' && (
         <div className="space-y-6">
           <PageHeader
@@ -277,5 +335,21 @@ export default function Dashboard() {
         </div>
       )}
     </DashboardShell>
+  );
+}
+
+/**
+ * `useSearchParams()` opts its subtree into a client-side rendering bailout,
+ * and Next requires that to sit inside a Suspense boundary — without one the
+ * build fails outright. Same pattern as app/login/page.jsx.
+ *
+ * The fallback is the page ground rather than a spinner: this resolves in the
+ * same tick, and a spinner that flashes for one frame reads as jank.
+ */
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-ground" />}>
+      <DashboardInner />
+    </Suspense>
   );
 }

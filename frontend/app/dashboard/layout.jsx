@@ -61,5 +61,24 @@ export default async function DashboardLayout({ children }) {
 
   if (!profile?.currentOrgId) redirect('/onboarding');
 
+  // The pointer existing is not enough — the organisation must still be
+  // REACHABLE. `org_select` hides rows with `deletedAt` set, so a member of a
+  // deleted org keeps a `currentOrgId` that resolves to nothing.
+  //
+  // That stranded a real account: the guard let them into the dashboard,
+  // then every page that read the org returned empty and hung. Checking
+  // reachability here sends them to onboarding instead, which is recoverable.
+  //
+  // This is a safety net, not the primary fix — `soft_delete_organisation()`
+  // now clears the pointer for every member. But a pointer can also go stale
+  // if a membership is revoked, so the guard verifies rather than assumes.
+  const { data: org } = await supabase
+    .from('organisations')
+    .select('id')
+    .eq('id', profile.currentOrgId)
+    .maybeSingle();
+
+  if (!org) redirect('/onboarding');
+
   return children;
 }

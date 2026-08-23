@@ -64,6 +64,19 @@ async function requireUser() {
 function describeDbError(error, fallback) {
   const msg = String(error?.message ?? '');
 
+  // Plan limits (015_plan_limits.sql). The trigger raises a message that is
+  // already written for a person and already carries the tier and the number,
+  // so it is passed through with a suffix rather than replaced by a vaguer
+  // sentence that would have to hardcode the limit a second time.
+  //
+  // The `plan_limit_` prefix is the contract between the trigger and this
+  // mapper; matching on it rather than on the prose means the wording can
+  // change in SQL without silently falling through to the raw error here.
+  const planLimit = msg.match(/plan_limit_(cameras|sites|seats):\s*(.+?)(?:\s*CONTEXT:|$)/is);
+  if (planLimit) {
+    return `${planLimit[2].trim()} Upgrade the plan to add more.`;
+  }
+
   if (/row-level security/i.test(msg)) {
     return 'You do not have permission to do that in this organisation.';
   }
@@ -149,10 +162,26 @@ export async function createOrganisation(formData) {
     return fail('Could not create your organisation. Please try again.');
   }
 
-  // The dashboard layout reads profiles.currentOrgId to decide whether to let
-  // the user in. That row just changed, so its cached render must not survive.
-  revalidatePath('/dashboard', 'layout');
-  revalidatePath('/onboarding');
+  // NOTHING IS REVALIDATED HERE, and that is deliberate.
+  //
+  // `revalidatePath('/dashboard', 'layout')` re-renders the CURRENT route as
+  // part of the Server Action's response — before any of the calling
+  // component's code runs. /dashboard and /onboarding share the root layout,
+  // so invalidating one re-runs the other's server component, which sees the
+  // organisation that was just created and issues `redirect('/dashboard')`.
+  // That redirect travels back with the action result and navigates the user
+  // away mid-wizard, before `advanceTo(2)` ever executes.
+  //
+  // Two earlier attempts to fix this failed because they treated the symptom:
+  // dropping `revalidatePath('/onboarding')` (the wrong call), then adding a
+  // `?step=` marker to the URL (which is not set yet at the moment the action
+  // responds).
+  //
+  // Nothing needs revalidating anyway. `/dashboard` and its layout are both
+  // `force-dynamic`, so they re-read `profiles.currentOrgId` on every request
+  // — there is no cached render for a stale pointer to survive in. The wizard
+  // navigates there itself via `router.replace()` + `router.refresh()` when
+  // the user is actually finished.
 
   return {
     ok: true,
@@ -260,7 +289,9 @@ export async function updateSite(formData) {
     return fail('That site could not be found in your organisation. Please restart setup.');
   }
 
-  revalidatePath('/dashboard', 'layout');
+  // Not revalidated, for the same reason as createOrganisation() above: doing
+  // so re-renders /onboarding mid-wizard and redirects the user away. The
+  // dashboard is force-dynamic and reads fresh data on arrival.
   return { ok: true };
 }
 
@@ -354,7 +385,9 @@ export async function createCamera(formData) {
   const { error } = await supabase.from('cameras').insert(row);
   if (error) return fail(describeDbError(error, 'Could not add this camera.'));
 
-  revalidatePath('/dashboard', 'layout');
+  // Not revalidated, for the same reason as createOrganisation() above: doing
+  // so re-renders /onboarding mid-wizard and redirects the user away. The
+  // dashboard is force-dynamic and reads fresh data on arrival.
   return { ok: true };
 }
 

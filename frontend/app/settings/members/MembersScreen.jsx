@@ -25,19 +25,18 @@
 // that always fail would be worse.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import {
-  ArrowLeft, UserPlus, Loader2, Copy, Check, X, MoreHorizontal,
+  UserPlus, Loader2, Copy, Check, X, MoreHorizontal,
   ShieldCheck, Wrench, Eye, Clock, AlertCircle, RotateCw, Trash2, Ban,
 } from 'lucide-react';
 
-import { ThemeToggle } from '../../components/ThemeToggle';
 import { Field, Banner, SubmitButton } from '../../components/AuthFormBits';
 import {
   listMembers, inviteMember, resendInvite, revokeInvite,
   changeRole, setMemberStatus, removeMember,
 } from './actions';
 import { can } from '../../lib/permissions';
+import DashboardShell from '../../dashboard/DashboardShell';
 
 const ROLE_META = {
   ADMIN:   { label: 'Administrator', icon: ShieldCheck, blurb: 'Full control, including members and billing' },
@@ -353,7 +352,7 @@ function MenuItem({ icon: Icon, children, onClick, danger, disabled, selected, t
 
 /* ── Screen ──────────────────────────────────────────────────────────────── */
 
-export default function MembersScreen({ orgName, viewer }) {
+export default function MembersScreen({ orgName, viewer, viewerRole: initialRole }) {
   const [state, setState] = useState({ status: 'loading', members: [], viewerRole: null, activeAdminCount: 0 });
   const [banner, setBanner] = useState(null);
   const [invite, setInvite] = useState(null);
@@ -444,19 +443,12 @@ export default function MembersScreen({ orgName, viewer }) {
   const pendingInvites = state.members.filter((m) => m.status === 'INVITED');
 
   return (
-    <div className="themed min-h-screen bg-ground text-ink font-sans selection:bg-red-600 selection:text-white">
-      <div className="mx-auto max-w-3xl px-[clamp(1.25rem,4vw,2rem)] py-[clamp(1.25rem,3vh,2.5rem)]">
-
-        <div className="flex items-center justify-between gap-4 mb-8">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center gap-2 text-[13px] font-bold text-ink-muted hover:text-accent transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to dashboard
-          </Link>
-          <ThemeToggle />
-        </div>
+    /* Wrapped in the same shell the dashboard uses, so the sidebar is present
+       on every signed-in page rather than vanishing when you open settings.
+       No `onViewChange` is passed, which puts the shell in routed mode: the
+       section nav becomes links back to /dashboard instead of view switches. */
+    <DashboardShell user={viewer} role={state.viewerRole ?? initialRole}>
+      <div className="mx-auto max-w-3xl">
 
         <header className="flex flex-col gap-2 mb-7">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">
@@ -617,6 +609,6 @@ export default function MembersScreen({ orgName, viewer }) {
           </>
         )}
       </div>
-    </div>
+    </DashboardShell>
   );
 }

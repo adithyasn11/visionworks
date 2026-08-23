@@ -51,5 +51,19 @@ export default async function OrganisationSettingsPage() {
 
   if (!profile?.currentOrgId) redirect('/onboarding');
 
-  return <OrganisationSettingsScreen />;
+  const { data: membership } = await supabase
+    .from('memberships').select('role')
+    .eq('orgId', profile.currentOrgId).eq('profileId', data.user.id)
+    .eq('status', 'ACTIVE').maybeSingle();
+
+  return (
+    <OrganisationSettingsScreen
+      role={membership?.role ?? null}
+      viewer={{
+        id: data.user.id,
+        email: data.user.email ?? null,
+        fullName: null,
+      }}
+    />
+  );
 }

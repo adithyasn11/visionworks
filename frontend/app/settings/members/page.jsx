@@ -62,15 +62,19 @@ export default async function MembersPage() {
   // and a member list for an organisation that does not exist is meaningless.
   if (!profile?.currentOrgId) redirect('/onboarding');
 
-  const { data: org } = await supabase
-    .from('organisations')
-    .select('name')
-    .eq('id', profile.currentOrgId)
-    .maybeSingle();
+  const [{ data: org }, { data: membership }] = await Promise.all([
+    supabase.from('organisations').select('name').eq('id', profile.currentOrgId).maybeSingle(),
+    // The sidebar needs the role to decide which links to show — the same
+    // value MembersScreen re-reads for its own controls.
+    supabase.from('memberships').select('role')
+      .eq('orgId', profile.currentOrgId).eq('profileId', data.user.id)
+      .eq('status', 'ACTIVE').maybeSingle(),
+  ]);
 
   return (
     <MembersScreen
       orgName={org?.name ?? 'your organisation'}
+      viewerRole={membership?.role ?? null}
       viewer={{
         id: data.user.id,
         email: profile.email ?? data.user.email ?? null,

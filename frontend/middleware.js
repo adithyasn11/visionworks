@@ -26,7 +26,7 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 /** Routes that require a signed-in user. */
-const PROTECTED_PREFIXES = ['/platform', '/dashboard', '/onboarding', '/settings'];
+const PROTECTED_PREFIXES = ['/platform', '/dashboard', '/onboarding', '/settings', '/home'];
 
 /** Routes a signed-in user should be bounced away from. */
 const AUTH_PAGES = ['/login', '/signup'];
@@ -98,6 +98,21 @@ export async function middleware(request) {
   // ── Signed in, sitting on /login or /signup ──
   // Route by role so an operator lands in the console rather than a customer
   // dashboard they have no organisation for.
+  //
+  // Customers go to /dashboard — the product itself. Middleware deliberately
+  // does NOT check whether they have an organisation or a plan: that needs a
+  // database read on every request, and the answer is already enforced one
+  // layer deeper. The chain resolves in one server hop each:
+  //
+  //   /dashboard   no org           -> /onboarding
+  //   /onboarding  no plan, no org  -> /home
+  //   /home        has org          -> /dashboard
+  //
+  // Every link is a `redirect()` in a Server Component, so nothing renders
+  // before it moves and the user sees only the screen they belong on.
+  //
+  // Operators still go to /platform: they run VisionWorks and never create a
+  // customer organisation, so plans and onboarding mean nothing to them.
   if (user && AUTH_PAGES.includes(pathname)) {
     const { data: isOperator } = await supabase.rpc('is_platform_admin');
     const target = request.nextUrl.clone();

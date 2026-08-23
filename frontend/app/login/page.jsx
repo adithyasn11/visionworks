@@ -37,10 +37,20 @@ function describeAuthError(err) {
 /**
  * Where to send someone after a successful sign-in.
  *
- * Platform operators go to the founder console; everyone else to the customer
- * dashboard. The role check is a database call (is_platform_admin()), not a
- * hardcoded list, so revoking access in platform_admins takes effect on the
- * next sign-in with nothing to redeploy.
+ * Platform operators go to the founder console; everyone else to /dashboard.
+ * The role check is a database call (is_platform_admin()), not a hardcoded
+ * list, so revoking access in platform_admins takes effect on the next sign-in
+ * with nothing to redeploy.
+ *
+ * WHY /dashboard AND NOT /home
+ *
+ * The dashboard is the product. A member signing in wants their workspace, not
+ * a marketing page they must click through — so they land there directly.
+ *
+ * A user with NO organisation is not stranded by this: the dashboard layout
+ * guard redirects them to /onboarding, which redirects to /home when they have
+ * no plan yet. The chain resolves to the right screen in one hop each way, and
+ * every link in it is a server redirect, so nothing renders before it moves.
  *
  * `next` is honoured only when it is a same-origin absolute path — an
  * attacker-supplied `?next=https://evil.example` would otherwise turn the login
@@ -52,7 +62,7 @@ async function resolveLandingPath(client, next) {
     const { data, error } = await client.rpc('is_platform_admin');
     if (!error && data === true) return '/platform';
   } catch {
-    // Fall through to the dashboard: a failed role probe should not block a
+    // Fall through to /dashboard: a failed role probe should not block a
     // successful sign-in.
   }
   return '/dashboard';

@@ -12,23 +12,68 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Video, Shapes, FileDown,
-  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings,
+  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard,
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import { supabase } from '../lib/supabase/browser';
 import { can } from '../lib/permissions';
 
+// `plan` sits with the other views rather than down with the settings links,
+// because it is view state on this page like the rest of them — no navigation,
+// no torn-down WebSocket. It is last because it is reference material: you read
+// it once and go back to the space you are measuring.
+//
+// Shown to EVERY member, not just admins. `org_select` returns the tier to
+// anyone in the organisation, and what a member pays for is not a secret from
+// them. Nothing on the panel is writable, so there is no capability to gate.
 export const VIEWS = [
   { id: 'overview', label: 'Overview',  icon: LayoutDashboard },
   { id: 'live',     label: 'Live feed', icon: Video },
   { id: 'zones',    label: 'Zones',     icon: Shapes },
   { id: 'reports',  label: 'Reports',   icon: FileDown },
+  { id: 'plan',     label: 'Plan',      icon: CreditCard },
 ];
 
-function NavItem({ view, active, onSelect }) {
+/**
+ * One sidebar entry.
+ *
+ * Renders as a BUTTON on /dashboard, where the four sections are view state
+ * sharing a polling source and a live WebSocket that routing would tear down —
+ * and as a LINK everywhere else, where clicking must actually navigate back to
+ * the dashboard and then select that view.
+ *
+ * Both look identical. The distinction is behavioural, not visual, so the
+ * sidebar reads the same on every page.
+ */
+function NavItem({ view, active, onSelect, asLink = false }) {
   const Icon = view.icon;
+  const className = `group relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 text-left ${
+    active
+      ? 'bg-accent-soft text-accent'
+      : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
+  }`;
+  const marker = (
+    <span
+      aria-hidden="true"
+      className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full bg-[color:var(--accent)] transition-all duration-200 ${
+        active ? 'h-5 opacity-100' : 'h-0 opacity-0'
+      }`}
+    />
+  );
+
+  if (asLink) {
+    return (
+      <Link href={`/dashboard?view=${view.id}`} onClick={onSelect} className={className}>
+        {marker}
+        <Icon className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
+        <span className="truncate">{view.label}</span>
+      </Link>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -54,8 +99,18 @@ function NavItem({ view, active, onSelect }) {
   );
 }
 
+/**
+ * `onViewChange` omitted -> the shell is being used by a routed page
+ * (/settings/*), so the section nav becomes links back to the dashboard and
+ * nothing is marked active. Passing it -> the dashboard itself, where the nav
+ * switches view state in place.
+ */
 export default function DashboardShell({ view, onViewChange, user, role, children }) {
   const [open, setOpen] = useState(false);
+  const routed = typeof onViewChange !== 'function';
+  // Highlights whichever settings page is open, so the sidebar always shows
+  // where you are — the same job the view marker does on the dashboard.
+  const pathname = usePathname();
   const [signingOut, setSigningOut] = useState(false);
 
   const signOut = async () => {
@@ -96,8 +151,9 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
           <NavItem
             key={v.id}
             view={v}
-            active={view === v.id}
-            onSelect={(id) => { onViewChange(id); setOpen(false); }}
+            asLink={routed}
+            active={!routed && view === v.id}
+            onSelect={routed ? () => setOpen(false) : (id) => { onViewChange(id); setOpen(false); }}
           />
         ))}
       </nav>
@@ -126,8 +182,15 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
         <Link
           href="/settings/members"
           onClick={() => setOpen(false)}
-          className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold text-ink-muted hover:text-ink hover:bg-surface-alt transition-colors duration-150"
+          className={`relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 ${
+            pathname === '/settings/members'
+              ? 'bg-accent-soft text-accent'
+              : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
+          }`}
         >
+          {pathname === '/settings/members' && (
+            <span aria-hidden="true" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[color:var(--accent)]" />
+          )}
           <Users className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
           <span className="truncate">Members</span>
         </Link>
@@ -141,8 +204,15 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
           <Link
             href="/settings/organisation"
             onClick={() => setOpen(false)}
-            className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold text-ink-muted hover:text-ink hover:bg-surface-alt transition-colors duration-150"
+            className={`relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 ${
+              pathname === '/settings/organisation'
+                ? 'bg-accent-soft text-accent'
+                : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
+            }`}
           >
+            {pathname === '/settings/organisation' && (
+              <span aria-hidden="true" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[color:var(--accent)]" />
+            )}
             <Settings className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
             <span className="truncate">Organisation</span>
           </Link>

@@ -282,6 +282,30 @@ html.theme-switching body {
   }
 }
 
+/* Dropdown / popover entry.
+   Deliberately NOT `.animate-fade-in-up`: that travels 40px over 1s, which is
+   right for a page section scrolling into view and absurd for a menu anchored
+   under its trigger — it would fly up from well below the button and take a
+   full second to settle. This is a short 6px drop with a subtle scale, so the
+   menu reads as attached to the control that opened it. */
+@keyframes menu-in {
+  0%   { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.animate-menu-in {
+  animation: menu-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: top right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-menu-in {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .delay-100 { animation-delay: 100ms; }
 .delay-200 { animation-delay: 200ms; }
 .delay-300 { animation-delay: 300ms; }
