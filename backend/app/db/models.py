@@ -7,6 +7,16 @@ class CameraModel(Base):
     __tablename__ = "cameras"
 
     camera_id = Column(String(64), primary_key=True, index=True)
+
+    # Owning organisation (a Supabase `organisations.id` UUID, stored as text).
+    #
+    # Nullable because rows written before tenancy existed have no owner, and
+    # because the pipeline still runs standalone with no Supabase configured.
+    # Every org-scoped query filters `org_id == <the caller's org>`, so a NULL
+    # here means "invisible to every tenant", which is the correct reading of
+    # data that predates organisations.
+    org_id = Column(String(64), nullable=True, index=True)
+
     name = Column(String(128), nullable=False)
     rtsp_url = Column(String(512), nullable=False)
     fps_target = Column(Integer, default=8)
@@ -17,6 +27,10 @@ class ZoneModel(Base):
     __tablename__ = "zones"
 
     zone_id = Column(String(64), primary_key=True, index=True)
+
+    # See the note on CameraModel.org_id.
+    org_id = Column(String(64), nullable=True, index=True)
+
     camera_id = Column(String(64), nullable=False, index=True)
     zone_name = Column(String(128), nullable=False)
     zone_type = Column(String(32), default="WORKSTATION") # WORKSTATION, MEETING, BREAK, CORRIDOR
@@ -28,6 +42,12 @@ class ActivityLogModel(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+    # Owning organisation. This is the column that makes the analytics
+    # multi-tenant: every endpoint filters on it, and a row with NULL belongs
+    # to no organisation and is returned to nobody. See CameraModel.org_id.
+    org_id = Column(String(64), nullable=True, index=True)
+
     camera_id = Column(String(64), nullable=False, index=True)
     zone_id = Column(String(64), nullable=False, index=True)
     track_id = Column(Integer, nullable=False)

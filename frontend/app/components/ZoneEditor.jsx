@@ -20,11 +20,11 @@
 // entirely when the window is resized.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { backendFetch } from '../lib/backend';
 import {
-  Shapes, Plus, Trash2, Check, X, Undo2, Loader2, AlertCircle, MousePointerClick,
+  Shapes, Plus, Trash2, Check, X, Undo2, Loader2, AlertCircle, MousePointerClick, Eye,
 } from 'lucide-react';
 
-const BACKEND_HTTP = 'http://localhost:8001';
 
 /** The frame space the backend pipeline operates in (it downscales to 640 wide). */
 const FRAME_W = 640;
@@ -109,7 +109,14 @@ function paint(canvas, zones, draft, hoverPoint) {
   });
 }
 
-export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged }) => {
+/**
+ * `readOnly` is LAYER 1 only: it hides the drawing and delete controls from a
+ * role that lacks `zones.edit`. It is not a security boundary — the backend
+ * refuses the write with a 403 (layer 2) and `zone_insert/update/delete`
+ * require manage_org_ids() in Postgres (layer 3, the one that actually holds).
+ * A VIEWER still sees the zones, because reading them is permitted.
+ */
+export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly = false }) => {
   const canvasRef = useRef(null);
 
   const [zones, setZones] = useState([]);
@@ -126,7 +133,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged }) => {
 
   const loadZones = useCallback(async () => {
     try {
-      const res = await fetch(`${BACKEND_HTTP}/api/v1/zones/${cameraId}`, { cache: 'no-store' });
+      const res = await backendFetch(`/api/v1/zones/${cameraId}`);
       if (!res.ok) throw new Error(`Zones API returned ${res.status}`);
       const data = await res.json();
       setZones(Array.isArray(data) ? data : []);
@@ -207,7 +214,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged }) => {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`${BACKEND_HTTP}/api/v1/zones/`, {
+      const res = await backendFetch('/api/v1/zones/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -234,7 +241,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged }) => {
   const deleteZone = async (zoneId) => {
     setError(null);
     try {
-      const res = await fetch(`${BACKEND_HTTP}/api/v1/zones/${zoneId}`, { method: 'DELETE' });
+      const res = await backendFetch(`/api/v1/zones/${zoneId}`, { method: 'DELETE' });
       if (!res.ok && res.status !== 204) throw new Error(`Delete failed (${res.status})`);
       await loadZones();
     } catch (err) {
@@ -252,7 +259,12 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged }) => {
           <span>Zone Mapping</span>
         </div>
 
-        {!drawing ? (
+        {readOnly ? (
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-ink-faint">
+            <Eye className="w-3.5 h-3.5" />
+            View only
+          </span>
+        ) : !drawing ? (
           <button
             type="button"
             onClick={startDrawing}
@@ -362,14 +374,16 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged }) => {
               <span className="font-mono text-[10px] text-ink-faint whitespace-nowrap">
                 {zone.polygon_coordinates?.length ?? 0} pts
               </span>
-              <button
-                type="button"
-                onClick={() => deleteZone(zone.zone_id)}
-                aria-label={`Delete ${zone.zone_name}`}
-                className="p-1 rounded text-ink-faint hover:text-accent transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => deleteZone(zone.zone_id)}
+                  aria-label={`Delete ${zone.zone_name}`}
+                  className="p-1 rounded text-ink-faint hover:text-accent transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
             </li>
           ))}
         </ul>

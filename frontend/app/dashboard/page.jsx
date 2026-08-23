@@ -1,149 +1,238 @@
 'use client';
 
 // frontend/app/dashboard/page.jsx
-import React, { useState, useEffect } from 'react';
-import { Header } from '../components/Header';
+//
+// The manager's workspace.
+//
+// Four sections behind one sidebar, matching the founder console's shell so the
+// customer and operator halves of the product read as one application:
+//
+//   Overview   what happened in the space — the home screen
+//   Live feed  the camera, with detection and posture overlays
+//   Zones      define the areas occupancy is attributed to
+//   Reports    export what was recorded
+//
+// Sections are view state rather than routes on purpose: they share one polling
+// data source and a live video WebSocket, and routing between them would tear
+// the socket down and re-fetch everything on every click.
+
+import React, { useCallback, useEffect, useState } from 'react';
+import { RefreshCw, Loader2, Eye } from 'lucide-react';
+
+import DashboardShell from './DashboardShell';
+import OverviewSection from './OverviewSection';
 import { VideoCanvasPlayer } from '../components/VideoCanvasPlayer';
 import { AnalyticsCharts } from '../components/AnalyticsCharts';
 import { FloorplanHeatmap } from '../components/FloorplanHeatmap';
 import { ZoneEditor } from '../components/ZoneEditor';
 import { ReportExport } from '../components/ReportExport';
-import { SupabaseModal } from '../components/SupabaseModal';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase/browser';
+import { backendFetch } from '../lib/backend';
+import { getViewerRole } from '../lib/session';
+import { can, denialMessage } from '../lib/permissions';
 
-const BACKEND_WS = 'ws://localhost:8001';
-
-/** The camera these dashboard zones belong to; matches the backend's id for
- *  the browser/live camera path. */
 const CAMERA_ID = 'live_webcam';
+const WINDOW_HOURS = 24;
+const REFRESH_MS = 15000;
 
 /**
- * Section heading for a band of panels.
+ * Explains why a control is missing.
  *
- * Same typographic system as the founder console: a mono eyebrow in the accent,
- * a bold title, and one line of plain-language context. The hairline underneath
- * separates bands without adding another boxed container.
+ * A VIEWER finding no "Save zone" button should be told they are read-only,
+ * not left wondering whether the page is broken. Only rendered once the role is
+ * known, so it never flashes during load.
  */
-function SectionLabel({ id, title, children }) {
+function ReadOnlyNotice({ capability }) {
   return (
-    <div className="border-b border-line pb-3">
-      <h2 id={id} className="text-[15px] font-black tracking-tight text-ink">
-        {title}
-      </h2>
-      <p className="mt-1 text-[12.5px] text-ink-muted leading-relaxed">{children}</p>
+    <div className="flex items-start gap-2.5 rounded-xl border border-line bg-surface-alt px-4 py-3">
+      <Eye className="w-4 h-4 shrink-0 mt-0.5 text-ink-faint" />
+      <p className="text-[12.5px] text-ink-muted font-medium leading-relaxed">
+        You have <strong className="text-ink">view-only</strong> access here. {denialMessage(capability)}
+      </p>
     </div>
   );
 }
 
-export default function Dashboard() {
-  const [isConnected, setIsConnected]       = useState(false);
-  const [supabaseModal, setSupabaseModal]   = useState(false);
-  const [supabaseClient, setSupabaseClient] = useState(null);
+/** Page header: title, one line of context, and the section's own action. */
+function PageHeader({ eyebrow, title, subtitle, action }) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent mb-2">
+          {eyebrow}
+        </p>
+        <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-[1.15] text-ink">
+          {title}
+        </h1>
+        <p className="mt-1.5 text-[13.5px] text-ink-muted max-w-xl leading-relaxed">
+          {subtitle}
+        </p>
+      </div>
+      {action}
+    </header>
+  );
+}
 
-  // Zones come from the database now, drawn by the user in ZoneEditor, rather
-  // than from a hardcoded pair of rectangles. The CV pipeline reads the same
-  // rows, so what is drawn here is what occupancy is actually attributed to.
+export default function Dashboard() {
+  const [view, setView] = useState('overview');
+  const [user, setUser] = useState(null);
+  // LAYER 1 input. Null until resolved; every capability check below reads
+  // false while it is, so a control never flashes visible before we know the
+  // role and then disappear. Hiding is courtesy only — the action (layer 2)
+  // and the RLS policy (layer 3) both re-check.
+  const [role, setRole] = useState(null);
+
+  const [overview, setOverview] = useState({ status: 'loading', data: null, error: null });
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Zones are loaded by the editor and handed up, so the live overlay draws the
+  // same shapes the CV pipeline is attributing occupancy to.
   const [activeZones, setActiveZones] = useState([]);
 
-  const handleConnectSupabase = ({ url, key }) => {
-    if (!url || !key) return;
-    try {
-      const client = createClient(url, key);
-      setSupabaseClient(client);
-      setSupabaseModal(false);
-    } catch (e) {
-      console.error('Supabase client init failed:', e);
-    }
-  };
-
-  // Save incoming frame data to Supabase activity_logs
-  const handleFrameData = async (data) => {
-    if (!supabaseClient || !data.tracked_entities?.length) return;
-
-    const rows = data.tracked_entities.map((e) => ({
-      camera_id: 'uploaded_video',
-      zone_id: e.zone_id || 'TRANSIT_ZONE',
-      track_id: e.track_id,
-      posture_state: e.posture,
-      activity_score: e.activity_score,
-      dwell_duration_seconds: e.dwell_duration_seconds || 0,
-    }));
-
-    const { error } = await supabaseClient.from('activity_logs').insert(rows);
-    if (error) console.error('Supabase insert error:', error.message);
-  };
-
-  // Also maintain a live WebSocket to /ws/stream for camera-based feeds (optional)
   useEffect(() => {
-    const ws = new WebSocket(`${BACKEND_WS}/api/v1/ws/stream/cam_floor_01`);
-    ws.onopen  = () => setIsConnected(true);
-    ws.onclose = () => setIsConnected(false);
-    ws.onerror = () => setIsConnected(false);
-    return () => ws.close();
+    if (!supabase) return;
+    let active = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (active && data?.user) {
+        setUser({
+          email: data.user.email,
+          fullName: data.user.user_metadata?.full_name ?? null,
+        });
+      }
+    });
+    // Resolved on the server so the role the UI draws from is the same one the
+    // Server Actions re-check against.
+    getViewerRole().then((r) => { if (active) setRole(r?.role ?? null); });
+    return () => { active = false; };
   }, []);
 
-  // dashboard-shell paints the dark control-room ground its panels expect.
+  const loadOverview = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setOverview((s) => ({ ...s, status: 'loading' }));
+    else setRefreshing(true);
+
+    try {
+      // backendFetch attaches the Supabase access token; the backend derives
+      // the organisation from it and returns only this tenant's telemetry.
+      const res = await backendFetch(
+        `/api/v1/analytics/overview?hours=${WINDOW_HOURS}`,
+      );
+      if (!res.ok) throw new Error(`Overview API returned ${res.status}`);
+      setOverview({ status: 'ready', data: await res.json(), error: null });
+    } catch (err) {
+      setOverview((s) => ({
+        ...s,
+        status: 'error',
+        error: /failed to fetch|networkerror|load failed/i.test(String(err?.message))
+          ? 'Cannot reach the backend. Start the FastAPI server on port 8001.'
+          : String(err?.message || err),
+      }));
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadOverview();
+    const timer = setInterval(() => {
+      if (!cancelled) loadOverview({ silent: true });
+    }, REFRESH_MS);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [loadOverview]);
+
+  const refreshButton = (
+    <button
+      type="button"
+      onClick={() => loadOverview({ silent: true })}
+      disabled={refreshing}
+      className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3.5 py-2 text-[12.5px] font-bold text-ink-muted hover:text-ink hover:border-field transition-colors disabled:opacity-50"
+    >
+      {refreshing
+        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        : <RefreshCw className="w-3.5 h-3.5" />}
+      Refresh
+    </button>
+  );
+
   return (
-    <div className="dashboard-shell">
-      <div className="max-w-7xl mx-auto p-4 md:p-6 min-h-screen flex flex-col gap-6">
-      <Header
-        isConnected={isConnected}
-        onOpenSupabaseModal={() => setSupabaseModal(true)}
-      />
+    <DashboardShell view={view} onViewChange={setView} user={user} role={role}>
+      {view === 'overview' && (
+        <div className="space-y-6">
+          <PageHeader
+            eyebrow="Workspace overview"
+            title="Your space, last 24 hours"
+            subtitle="Occupancy, posture and dwell time measured from the camera feed. No footage or identity is stored."
+            action={refreshButton}
+          />
 
-      {/* Three bands, ordered by how the page is actually used: watch the feed,
-          configure what it measures, then read what it measured. Each band gets
-          a rule and a label so the page scans as sections rather than as a wall
-          of equally-weighted panels. */}
-      <main className="flex flex-col gap-8">
+          <OverviewSection
+            data={overview.data}
+            status={overview.status}
+            error={overview.error}
+            hours={WINDOW_HOURS}
+          />
 
-        {/* ── Live monitoring ── */}
-        <section aria-labelledby="sec-live" className="flex flex-col gap-4">
-          <SectionLabel id="sec-live" title="Live monitoring">
-            Detection, tracking and posture, running on the current feed.
-          </SectionLabel>
+          {/* Trends sit below the headline numbers: the tiles answer "what is
+              true now", the charts answer "how did it get there". */}
+          <AnalyticsCharts />
+        </div>
+      )}
+
+      {view === 'live' && (
+        <div className="space-y-6">
+          <PageHeader
+            eyebrow="Live feed"
+            title="Camera & detection"
+            subtitle={
+              can(role, 'analysis.run')
+                ? 'Upload a recording or start the camera. Detection, tracking and posture run on your own hardware.'
+                : 'Live detection and posture, as recorded by your team. Starting an analysis writes new measurements, which your role does not permit.'
+            }
+          />
+
+          {!can(role, 'analysis.run') && role && <ReadOnlyNotice capability="analysis.run" />}
 
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
-            <VideoCanvasPlayer
-              activeZones={activeZones}
-              onFrameData={handleFrameData}
-            />
+            <VideoCanvasPlayer activeZones={activeZones} readOnly={!can(role, 'analysis.run')} />
             <FloorplanHeatmap />
           </div>
-        </section>
+        </div>
+      )}
 
-        {/* ── Configuration ── */}
-        <section aria-labelledby="sec-config" className="flex flex-col gap-4">
-          <SectionLabel id="sec-config" title="Configuration">
-            Define the areas occupancy is attributed to, and export what has been recorded.
-          </SectionLabel>
+      {view === 'zones' && (
+        <div className="space-y-6">
+          <PageHeader
+            eyebrow="Zones"
+            title="Define your spaces"
+            subtitle={
+              can(role, 'zones.edit')
+                ? 'Draw the areas you want measured. Occupancy and dwell time are attributed to whichever zone a person is standing in.'
+                : 'The areas being measured. Occupancy and dwell time are attributed to whichever zone a person is standing in.'
+            }
+          />
 
-          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5 items-start">
-            <ZoneEditor cameraId={CAMERA_ID} onZonesChanged={setActiveZones} />
+          {!can(role, 'zones.edit') && role && <ReadOnlyNotice capability="zones.edit" />}
+
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-5 items-start">
+            <ZoneEditor cameraId={CAMERA_ID} onZonesChanged={setActiveZones} readOnly={!can(role, 'zones.edit')} />
+            <FloorplanHeatmap />
+          </div>
+        </div>
+      )}
+
+      {view === 'reports' && (
+        <div className="space-y-6">
+          <PageHeader
+            eyebrow="Reports"
+            title="Export activity"
+            subtitle="Download recorded telemetry as raw data or an executive summary. Exports contain counts and postures only."
+          />
+
+          <div className="max-w-xl">
             <ReportExport />
           </div>
-        </section>
-
-        {/* ── Analytics ── */}
-        <section aria-labelledby="sec-analytics" className="flex flex-col gap-4">
-          <SectionLabel id="sec-analytics" title="Analytics">
-            Aggregated from recorded telemetry — counts, postures and dwell time only.
-          </SectionLabel>
-
-          <AnalyticsCharts />
-        </section>
-      </main>
-
-      <SupabaseModal
-        isOpen={supabaseModal}
-        onClose={() => setSupabaseModal(false)}
-        onSave={handleConnectSupabase}
-      />
-
-        <footer className="mt-4 text-center text-xs text-ink-faint py-4 border-t border-line">
-          Vision-Based Workplace Activity Analytics System • Next.js + FastAPI + Supabase • Major Project
-        </footer>
-      </div>
-    </div>
+        </div>
+      )}
+    </DashboardShell>
   );
 }

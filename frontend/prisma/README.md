@@ -17,11 +17,15 @@ project yet.
 | `sql/002_auth_triggers.sql` | Bridges Supabase `auth.users` → `profiles`. Auto-accepts invites. `create_organisation()`. Role helper functions. |
 | `sql/003_rls_policies.sql` | Row Level Security. Replaces the old `USING (true)` policies. |
 | `sql/004_secrets_and_retention.sql` | RTSP credential protection, day rollups, retention job. |
+| `sql/005_platform_admin.sql` | `platform_admins` table, `is_platform_admin()`, operator policies. |
+| `sql/006_fix_cameras_safe.sql` | Camera view/policy correction. |
+| `sql/007_operator_revoke.sql` | `revoke_operator()` with the last-operator lockout guard. |
+| `sql/008_uuid_defaults.sql` | **`DEFAULT gen_random_uuid()` on every generated `id`.** Prisma's `@default(uuid())` is client-side only, so PostgREST inserts (every Supabase Server Action) failed with a NOT NULL violation on `id`. |
 | `seed.ts` | Generates ~824,000 minute buckets of realistic shaped data. |
 
-**Order matters.** 001 → 002 → 003 → 004. Later files depend on earlier ones —
-004's column grants must run after 003's table grants, or the RTSP credential
-becomes readable again.
+**Order matters.** 001 → 002 → 003 → 004 → 005 → 006 → 007 → 008. Later files
+depend on earlier ones — 004's column grants must run after 003's table grants,
+or the RTSP credential becomes readable again.
 
 ---
 

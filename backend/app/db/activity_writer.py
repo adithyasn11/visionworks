@@ -90,8 +90,19 @@ class ActivityLogWriter:
     session's frame loop.
     """
 
-    def __init__(self, camera_id: str, min_interval_seconds: float = MIN_WRITE_INTERVAL_SECONDS):
+    def __init__(
+        self,
+        camera_id: str,
+        org_id: Optional[str] = None,
+        min_interval_seconds: float = MIN_WRITE_INTERVAL_SECONDS,
+    ):
         self.camera_id = camera_id
+        # The owning organisation, resolved from the caller's verified access
+        # token before the session started (see api/deps.py). None when the
+        # pipeline runs unauthenticated or standalone: those rows are written
+        # with no owner and are invisible to every org-scoped query, which is
+        # the correct outcome — telemetry nobody can be shown to attribute.
+        self.org_id = org_id
         self.min_interval = min_interval_seconds
         # track_id -> {"last_write": float, "last_posture": str}
         self._track_state: dict = {}
@@ -132,6 +143,7 @@ class ActivityLogWriter:
             floor_x, floor_y = _normalised_floor_position(entity)
 
             due.append({
+                "org_id": self.org_id,
                 "camera_id": self.camera_id,
                 "zone_id": entity.get("zone_id") or "TRANSIT_ZONE",
                 "track_id": int(track_id),

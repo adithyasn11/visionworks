@@ -8,8 +8,10 @@ import {
   RotateCcw, RotateCw, Cpu, Maximize2, Camera, CameraOff
 } from 'lucide-react';
 
-const BACKEND_HTTP = 'http://localhost:8001';
-const BACKEND_WS   = 'ws://localhost:8001';
+// Backend origin and the token-attaching helpers. Every processing socket
+// carries the Supabase access token so the telemetry it produces is attributed
+// to the caller's organisation — see app/lib/backend.js.
+import { backendFetch, backendSocketUrl } from '../lib/backend';
 
 /* Detection-box colours, kept inside the red/black/white palette. The three
    postures are separated by weight along one red ramp rather than by unrelated
@@ -69,7 +71,14 @@ function drawHUD(ctx, canvas, entities, zones, enableBlur) {
   });
 }
 
-export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
+/**
+ * `readOnly` hides the controls that START an analysis — upload and camera.
+ * Running the pipeline WRITES telemetry, so it is a configuration act
+ * (`analysis.run`, ADMIN + MANAGER), not a read. LAYER 1 only: the three
+ * processing WebSockets refuse a VIEWER server-side (layer 2), and any rows
+ * that did reach the database are still org-scoped by RLS (layer 3).
+ */
+export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = false }) => {
   const canvasRef   = useRef(null);
   const containerRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -130,10 +139,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
   }, [activeZones, enableBlur, onFrameData]);
 
   // Connect WebSocket to video file processing session
-  const connectProcessingWS = useCallback((sid) => {
+  const connectProcessingWS = useCallback(async (sid) => {
     if (wsRef.current) wsRef.current.close();
 
-    const ws = new WebSocket(`${BACKEND_WS}/api/v1/video/process/${sid}`);
+    const ws = new WebSocket(await backendSocketUrl(`/api/v1/video/process/${sid}`));
     wsRef.current = ws;
 
     ws.onopen  = () => setStatusMsg('Connected — AI pipeline running on RTX 4060 GPU...');
@@ -219,7 +228,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch(`${BACKEND_HTTP}/api/v1/video/upload`, {
+      const res = await backendFetch('/api/v1/video/upload', {
         method: 'POST',
         body: formData,
       });
@@ -263,7 +272,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
       }
 
       // Connect WebSocket to process_webcam_frame (Zero-Lag ACK Pipelining)
-      const ws = new WebSocket(`${BACKEND_WS}/api/v1/video/process_webcam_frame`);
+      const ws = new WebSocket(await backendSocketUrl('/api/v1/video/process_webcam_frame'));
       wsRef.current = ws;
 
       let isAwaitingResponse = false;
@@ -343,10 +352,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
   // Fallback: backend direct camera capture.
   // Reached from startLiveWebcam through startBackendDirectWebcamRef, so the
   // call sites above do not depend on this declaration order.
-  const startBackendDirectWebcam = useCallback(() => {
+  const startBackendDirectWebcam = useCallback(async () => {
     if (wsRef.current) wsRef.current.close();
 
-    const ws = new WebSocket(`${BACKEND_WS}/api/v1/video/live_webcam`);
+    const ws = new WebSocket(await backendSocketUrl('/api/v1/video/live_webcam'));
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -472,8 +481,14 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
         </div>
 
         <div className="flex items-center gap-2">
+          {readOnly && (
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-line text-[10px] font-bold text-ink-faint">
+              <Eye className="w-3 h-3" />
+              VIEW ONLY
+            </span>
+          )}
           {/* Turn On Camera Button */}
-          {isWebcamActive ? (
+          {readOnly ? null : isWebcamActive ? (
             <button
               onClick={stopWebcamStream}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/20 border border-[color:var(--accent)] text-accent text-xs font-bold transition-all hover:bg-accent/30"
@@ -505,6 +520,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
+          {!readOnly && (
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={phase === 'uploading' || isWebcamActive}
@@ -513,6 +529,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData }) => {
             <Upload className="w-3.5 h-3.5" />
             <span>{phase === 'uploading' ? 'Uploading...' : 'Upload Video'}</span>
           </button>
+          )}
         </div>
       </div>
 

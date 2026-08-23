@@ -1,4 +1,8 @@
 # backend/app/main.py
+from contextlib import asynccontextmanager
+import asyncio
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -20,10 +24,43 @@ from app.api.routers import cameras, zones, analytics, websocket, video_upload
 Base.metadata.create_all(bind=engine)
 apply_lightweight_migrations()
 
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Owns the minute aggregator's lifetime.
+
+    It runs on a 60s timer rather than only after a session, because a live
+    stream can run for hours: waiting for it to end would leave the analytics
+    empty for the whole run. Sessions ALSO trigger it directly, so a short
+    upload does not wait up to a minute for its numbers to appear.
+
+    The task is cancelled on shutdown so reload does not leave orphans stacking
+    up, each aggregating the same window.
+    """
+    from app.db.minute_aggregator import ensure_bucket_table, run_aggregator_loop
+
+    ensure_bucket_table()
+    task = asyncio.create_task(run_aggregator_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.warning(f"Aggregator shutdown: {e}")
+
+
 app = FastAPI(
     title="Vision-Based Workplace Activity Analytics System API",
     description="Real-time CCTV AI analytics, posture detection, and zone occupancy metrics backend.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Enable CORS for Next.js frontend

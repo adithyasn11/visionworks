@@ -216,12 +216,77 @@ class PostureEstimator:
             elif span_ratio < 0.55:
                 sitting_score += 2.5
 
-        # Feature E: Desk Occlusion / Aspect Ratio fallback when lower legs hidden
-        if not (has_knee and has_ank):
+        # ── Feature E: TORSO–THIGH GEOMETRY (works without ankles) ──────
+        #
+        # THE PROBLEM THIS SOLVES
+        #
+        # Features A-D all need the lower legs. When someone stands at a desk,
+        # or is framed from the waist up, the ankles (and often the knees) are
+        # simply not in the picture — every leg feature contributes 0, and the
+        # old aspect-ratio fallback then scored a *standing* person as SITTING,
+        # because a body cropped at the waist produces a short, wide box.
+        #
+        # The fix is to stop asking "where are the feet" and ask "what is the
+        # angle between the torso and the thigh", which needs only shoulder,
+        # hip and knee:
+        #
+        #   standing  torso and thigh are roughly collinear   -> hip angle ~165-180 deg
+        #   sitting   the hip is folded                       -> hip angle ~70-120 deg
+        #
+        # and "which way does the thigh point", which needs only hip and knee:
+        #
+        #   standing  the knee sits well BELOW the hip  -> large positive dy
+        #   sitting   the thigh runs toward the camera  -> knee dy is near zero
+        #
+        # Both are measured against torso length rather than in raw pixels, so
+        # they are invariant to how far away the person is and to how much of
+        # them is inside the frame.
+        legs_visible = has_knee and has_ank
+
+        torso_len = None
+        if has_sh and has_hip:
+            torso_len = float(np.linalg.norm(np.asarray(sh_mid) - np.asarray(hip_mid)))
+
+        # E1: torso-thigh fold angle. The single most reliable seated cue that
+        # survives desk occlusion, so it is weighted to be decisive on its own.
+        hip_fold = None
+        if valid_hip_angles:
+            # The straighter side wins: a person standing with one leg raised or
+            # partially occluded should still read as standing.
+            hip_fold = max(valid_hip_angles)
+        elif mid_hip_angle is not None:
+            hip_fold = mid_hip_angle
+
+        if hip_fold is not None:
+            if hip_fold >= 155.0:
+                standing_score += 6.0    # torso and thigh in line — upright
+            elif hip_fold <= 125.0:
+                sitting_score += 6.0     # hip clearly folded — seated
+            elif hip_fold >= 140.0:
+                standing_score += 2.5    # leaning but still open
+
+        # E2: thigh drop. How far the knee falls below the hip, relative to the
+        # torso. Standing thighs hang down; seated thighs project forward and
+        # foreshorten to almost nothing from a front-on camera.
+        if torso_len is not None and torso_len > 8.0 and has_knee:
+            thigh_drop = (float(np.asarray(knee_mid)[1]) - float(np.asarray(hip_mid)[1])) / torso_len
+            if thigh_drop >= 0.75:
+                standing_score += 4.5    # knee well below hip
+            elif thigh_drop <= 0.35:
+                sitting_score += 4.5     # thigh is horizontal / foreshortened
+
+        # E3: last-resort fallback, ONLY when the hips are invisible too.
+        #
+        # Aspect ratio is a genuinely weak signal — it reports the crop as much
+        # as the pose — so it is now reached only when nothing better exists,
+        # and it is scored low enough that any real geometry outvotes it. The
+        # old code applied this whenever the ANKLES were missing, which is what
+        # made a standing person at a desk classify as seated.
+        if not has_hip and not legs_visible:
             if aspect_ratio < 1.35:
-                sitting_score += 4.0
+                sitting_score += 1.5
             elif aspect_ratio >= 1.65:
-                standing_score += 3.0
+                standing_score += 1.5
 
         # ── 3. POSTURE DECISION & WALKING VALIDATION ─────────────────────
         # RULE 1: Seated posture (sitting_score > standing_score) is ALWAYS SITTING!

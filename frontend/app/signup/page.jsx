@@ -1,9 +1,9 @@
 'use client';
 
 // frontend/app/signup/page.jsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -41,11 +41,17 @@ function describeAuthError(err) {
   return msg || 'Something went wrong. Please try again.';
 }
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  // Prefilled from an invitation link (?email=). Acceptance matches on the
+  // address — the trigger flips the INVITED membership to ACTIVE — so getting
+  // this exactly right is what makes the invite work. Left editable rather than
+  // locked: someone forwarded a link may legitimately need to correct it, and a
+  // mismatch simply means no invite is matched, not a broken signup.
+  const [email, setEmail] = useState(() => (searchParams.get('email') ?? '').trim().toLowerCase());
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({});
   const [banner, setBanner] = useState(null);
@@ -304,5 +310,18 @@ export default function SignupPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+/**
+ * useSearchParams() opts a route out of static prerendering unless it sits
+ * inside a Suspense boundary — the same constraint the login page documents.
+ * The invitation link carries ?email=, so this page needs it.
+ */
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-ground" />}>
+      <SignupForm />
+    </Suspense>
   );
 }

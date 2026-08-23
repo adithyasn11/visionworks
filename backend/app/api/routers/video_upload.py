@@ -26,9 +26,32 @@ import torch
 import numpy as np
 
 from app.db.activity_writer import ActivityLogWriter, persist_frame
+from app.db.minute_aggregator import aggregate_after_session
+from app.api.deps import extract_token, resolve_org_role
+from app.api.permissions import can, denial_message
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _resolve_session_org(websocket):
+    """
+    (org_id, role) for a processing socket, or (None, None).
+
+    Running an analysis WRITES telemetry, so it is gated on `analysis.run`
+    (ADMIN + MANAGER) rather than on mere membership — a VIEWER watching a live
+    feed would be creating data they are not permitted to create.
+
+    Returns (None, None) for an unverified caller. The socket still runs: the
+    pipeline is usable standalone with no Supabase configured, and telemetry
+    written without an org is visible to nobody. What a VIEWER must not get is
+    an org-attributed write, which is what the role check prevents.
+    """
+    import asyncio
+    token = extract_token(websocket)
+    if not token:
+        return None, None
+    return await asyncio.to_thread(resolve_org_role, token)
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../"))
 SAMPLE_VIDEOS_DIR = os.path.join(ROOT_DIR, "sample_videos")
@@ -60,12 +83,21 @@ DEFAULT_ZONES = [
 ]
 
 
-def load_zones_for_camera(camera_id: str) -> list:
+def load_zones_for_camera(camera_id: str, org_id: str = None) -> list:
     """
     Reads a camera's zones from the database, in the shape SpatialEngine wants.
 
     Zones are drawn by the user against the displayed frame and stored in the
     same pixel space the CV pipeline works in, so no rescaling is needed here.
+
+    TENANCY. When `org_id` is given, only that organisation's zones are loaded.
+    Without this filter two organisations that both drew zones on a camera named
+    "live_webcam" — a shared default name, so this is likely rather than
+    exotic — would inherit each other's polygons, and their telemetry would be
+    attributed to zones they never drew.
+
+    Zones with org_id IS NULL predate tenancy and are skipped for the same
+    reason activity_logs rows are: they belong to no organisation.
 
     Falls back to DEFAULT_ZONES when nothing has been drawn for this camera, and
     also on a database error: losing zone attribution should degrade the
@@ -76,7 +108,10 @@ def load_zones_for_camera(camera_id: str) -> list:
 
     session = SessionLocal()
     try:
-        rows = session.query(ZoneModel).filter(ZoneModel.camera_id == camera_id).all()
+        query = session.query(ZoneModel).filter(ZoneModel.camera_id == camera_id)
+        if org_id is not None:
+            query = query.filter(ZoneModel.org_id == org_id)
+        rows = query.all()
         zones = [
             {
                 "zone_id": row.zone_id,
@@ -187,6 +222,31 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
     """
     await websocket.accept()
 
+    # The organisation is derived from the caller's verified access token, not
+    # from anything they assert about themselves. None means the telemetry this
+    # session produces is written with no owner and will be visible to nobody —
+    # see api/deps.py.
+    org_id, role = await _resolve_session_org(websocket)
+    if org_id is not None and not can(role, "analysis.run"):
+        # A VIEWER may read this org's measurements but not create new ones.
+        # Refusing here rather than silently writing unattributed rows: the
+        # caller asked to run an analysis, and they cannot.
+        # send_json() immediately followed by close() races: the frame can be
+        # dropped before delivery, and the client sees only an abnormal 1006
+        # with no reason. Measured — the refusal worked but was unexplained.
+        # Sending, then closing with an explicit policy-violation code (1008)
+        # and the reason in the handshake, means the client learns WHY even if
+        # the JSON frame loses the race.
+        reason = denial_message("analysis.run")
+        try:
+            await websocket.send_json({"error": reason})
+        except Exception:
+            pass
+        await websocket.close(code=1008, reason=reason)
+        return
+    if org_id is None:
+        logger.info(f"Session {session_id}: no verified organisation; telemetry will not be attributed.")
+
     if session_id not in _active_sessions:
         await websocket.send_json({"error": f"Session '{session_id}' not found. Upload a video first."})
         await websocket.close()
@@ -206,13 +266,13 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         from app.cv.anonymizer import PrivacyAnonymizer
 
         pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
-        zones_config = load_zones_for_camera(f"upload_{session_id}")
+        zones_config = load_zones_for_camera(f"upload_{session_id}", org_id=org_id)
         spatial_engine = SpatialEngine(zones_config=zones_config)
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
         # Telemetry for this session is attributed to the uploaded file, so rows
         # from different videos stay distinguishable in activity_logs.
-        activity_writer = ActivityLogWriter(camera_id=f"upload_{session_id}")
+        activity_writer = ActivityLogWriter(camera_id=f"upload_{session_id}", org_id=org_id)
 
     except Exception as e:
         logger.error(f"AI init error: {e}")
@@ -414,6 +474,17 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         _active_sessions.pop(session_id, None)
         logger.info(f"Session {session_id} closed and cleaned up.")
 
+        # Roll this run's telemetry into minute buckets. Fire-and-forget: the
+        # helper sleeps out the settle window first (so the final samples land
+        # in a closed minute), and the session must not block on it. The 60s
+        # timer would eventually catch these rows anyway; this just means a
+        # short upload's numbers appear promptly rather than up to a minute
+        # later.
+        if getattr(activity_writer, "org_id", None):
+            asyncio.create_task(
+                aggregate_after_session(f"upload_{session_id}", activity_writer.org_id)
+            )
+
 
 @router.websocket("/live_webcam")
 async def live_webcam_websocket(websocket: WebSocket):
@@ -422,6 +493,21 @@ async def live_webcam_websocket(websocket: WebSocket):
     Runs single-pass detection, tracking, and pose keypoint estimation at 60 FPS.
     """
     await websocket.accept()
+    org_id, role = await _resolve_session_org(websocket)
+    if org_id is not None and not can(role, "analysis.run"):
+        # send_json() immediately followed by close() races: the frame can be
+        # dropped before delivery, and the client sees only an abnormal 1006
+        # with no reason. Measured — the refusal worked but was unexplained.
+        # Sending, then closing with an explicit policy-violation code (1008)
+        # and the reason in the handshake, means the client learns WHY even if
+        # the JSON frame loses the race.
+        reason = denial_message("analysis.run")
+        try:
+            await websocket.send_json({"error": reason})
+        except Exception:
+            pass
+        await websocket.close(code=1008, reason=reason)
+        return
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     try:
@@ -431,11 +517,11 @@ async def live_webcam_websocket(websocket: WebSocket):
         from app.cv.anonymizer import PrivacyAnonymizer
 
         pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
-        zones_config = load_zones_for_camera("live_webcam")
+        zones_config = load_zones_for_camera("live_webcam", org_id=org_id)
         spatial_engine = SpatialEngine(zones_config=zones_config)
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
-        activity_writer = ActivityLogWriter(camera_id="live_webcam")
+        activity_writer = ActivityLogWriter(camera_id="live_webcam", org_id=org_id)
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
@@ -585,6 +671,21 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
     Runs on NVIDIA RTX 4060 CUDA GPU at 60 FPS.
     """
     await websocket.accept()
+    org_id, role = await _resolve_session_org(websocket)
+    if org_id is not None and not can(role, "analysis.run"):
+        # send_json() immediately followed by close() races: the frame can be
+        # dropped before delivery, and the client sees only an abnormal 1006
+        # with no reason. Measured — the refusal worked but was unexplained.
+        # Sending, then closing with an explicit policy-violation code (1008)
+        # and the reason in the handshake, means the client learns WHY even if
+        # the JSON frame loses the race.
+        reason = denial_message("analysis.run")
+        try:
+            await websocket.send_json({"error": reason})
+        except Exception:
+            pass
+        await websocket.close(code=1008, reason=reason)
+        return
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     try:
@@ -594,11 +695,11 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
         from app.cv.anonymizer import PrivacyAnonymizer
 
         pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
-        zones_config = load_zones_for_camera("browser_camera")
+        zones_config = load_zones_for_camera("browser_camera", org_id=org_id)
         spatial_engine = SpatialEngine(zones_config=zones_config)
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
-        activity_writer = ActivityLogWriter(camera_id="browser_camera")
+        activity_writer = ActivityLogWriter(camera_id="browser_camera", org_id=org_id)
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})

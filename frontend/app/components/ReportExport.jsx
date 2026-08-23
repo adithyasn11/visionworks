@@ -16,8 +16,8 @@
 
 import React, { useState } from 'react';
 import { FileDown, FileSpreadsheet, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { backendFetch } from '../lib/backend';
 
-const BACKEND_HTTP = 'http://localhost:8001';
 
 /** Matches the window the dashboard charts use, so exports agree with them. */
 const WINDOW_HOURS = 24;
@@ -43,14 +43,14 @@ export const ReportExport = () => {
     setBusy(kind);
     setError(null);
 
-    const url =
+    const path =
       kind === 'csv'
-        ? `${BACKEND_HTTP}/api/v1/analytics/report/csv?hours=${WINDOW_HOURS}`
-        : `${BACKEND_HTTP}/api/v1/analytics/report/pdf`;
+        ? `/api/v1/analytics/report/csv?hours=${WINDOW_HOURS}`
+        : '/api/v1/analytics/report/pdf';
 
     let objectUrl;
     try {
-      const res = await fetch(url, { cache: 'no-store' });
+      const res = await backendFetch(path);
 
       if (!res.ok) {
         // The API explains *why* there is nothing to export; prefer that over a

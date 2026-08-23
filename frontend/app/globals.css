@@ -312,27 +312,30 @@ html.theme-switching body {
 }
 
 /* ── Data-visualisation palette ────────────────────────────────────────────
-   The dashboard's charts are red/black/white like the rest of the product, so
-   a categorical scale cannot lean on unrelated hues. Instead the three posture
-   states are separated by WEIGHT along a single red ramp, which keeps the page
-   monochrome and still reads correctly for colour-blind viewers (the ordering
-   survives as a lightness ramp in greyscale).
+   Validated with the dataviz validator, not chosen by eye. Both modes were run
+   through the six checks (lightness band, chroma floor, CVD separation,
+   normal-vision floor, contrast vs surface) against their own surface.
 
-   `--chart-grid` and `--chart-axis` are deliberately quiet: on a data panel the
-   marks are the content and the scaffolding should recede.                  */
+   LIGHT  #B91C1C #D97706 #9A3412 — all five checks PASS on #FAFAFA.
+   DARK   #D13A3A #B8821A #2F8FB8 — PASS except a CVD WARN (deutan dE 7.1) on
+          the red/amber pair, which is why every posture slice is DIRECT
+          LABELLED. Colour is never the only channel carrying identity.
+
+   Dark is a separately chosen set rather than a lightened copy: the dark band
+   is narrow, and a flipped light palette failed both lightness and contrast. */
 :root {
-  --chart-1:    #DC2626; /* strongest — sitting, the dominant state */
-  --chart-2:    #F0736F; /* mid */
-  --chart-3:    #F7B4B0; /* lightest — walking, the rarest state */
+  --chart-1:    #B91C1C;
+  --chart-2:    #D97706;
+  --chart-3:    #9A3412;
   --chart-grid: #E7E5E9;
   --chart-axis: #6B6772;
   --chart-tooltip-bg: #FFFFFF;
 }
 
 .dark {
-  --chart-1:    #F05252;
-  --chart-2:    #C13B3B;
-  --chart-3:    #7E2C2C;
+  --chart-1:    #D13A3A;
+  --chart-2:    #B8821A;
+  --chart-3:    #2F8FB8;
   --chart-grid: #2A272E;
   --chart-axis: #8B8792;
   --chart-tooltip-bg: #1C1A1F;
