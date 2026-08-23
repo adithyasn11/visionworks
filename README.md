@@ -67,7 +67,7 @@ Make sure you have these installed before running anything:
 ### Step 1 — Clone the repo
 
 ```bash
-git clone https://github.com/your-username/visionworks.git
+git clone https://github.com/adithyasn11/majorproject.git
 cd visionworks
 ```
 
@@ -92,16 +92,29 @@ The setup script creates two pre-filled template files. Open them and add your r
 **Backend** → `backend/.env`
 ```env
 SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_KEY=your-anon-or-service-role-key
+SUPABASE_KEY=your-anon-key
+# Needed to WRITE minute buckets and alerts. zone_minute_stats and alerts have
+# no INSERT policy — measured data is deliberately read-only to browser
+# clients — so the only credential that can write them is the one that
+# bypasses RLS. Backend only. Never NEXT_PUBLIC_.
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
 **Frontend** → `frontend/.env.local`
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+# Prisma needs BOTH, and they are not interchangeable:
+#   6543  PgBouncer transaction pooler — the running app
+#   5432  a real session — `prisma migrate`, which takes advisory locks
+#         that a transaction-mode pooler cannot hold
+DATABASE_URL=postgresql://postgres.<ref>:<password>@<host>:6543/postgres?pgbouncer=true
+DIRECT_URL=postgresql://postgres.<ref>:<password>@<host>:5432/postgres
 ```
 
-> 📍 Get these from your Supabase project: **Settings → API**
+> 📍 API keys: Supabase → **Settings → API**
+> 📍 Connection strings: Supabase → **Settings → Database → Connection string**
 
 ---
 
@@ -153,6 +166,55 @@ Press **`Ctrl+C`** to shut down everything cleanly.
 
 ---
 
+## 🧭 Using the app
+
+### First run
+
+1. **Sign up** at `/signup` (email or Google).
+2. You land on **`/onboarding`** — not the dashboard. A user with no
+   organisation cannot see anything, because every Row-Level Security policy
+   resolves through membership. Create the organisation; a site and a camera are
+   optional.
+3. **Draw a zone** on the Zones tab. Occupancy is attributed to whichever zone a
+   person is standing in, so nothing is measured until at least one exists.
+4. **Upload a video** or start the camera on the Live feed tab.
+5. Within ~2 minutes the **minute-bucket aggregator** folds that telemetry into
+   `zone_minute_stats`, and the dashboard tiles and charts populate.
+6. **Export** a CSV or PDF from the Reports tab.
+
+> ⚠️ **The dashboard reads zero until step 5 completes.** Telemetry recorded
+> before an organisation existed carries `org_id = NULL`, belongs to no tenant,
+> and is invisible to everyone — deliberately.
+
+### Roles
+
+| Role | Can | Cannot |
+|------|-----|--------|
+| **ADMIN** | Everything, plus members, org settings and retention | — |
+| **MANAGER** | Cameras, zones, run analysis, exports, acknowledge alerts | Manage members or org settings |
+| **VIEWER** | Read dashboards, zones and reports | Change anything |
+
+Enforced in three places — hidden controls, a re-check in every server action,
+and Postgres RLS. The last one is the real boundary: a VIEWER POSTing directly
+to the zone-save endpoint gets **403**, and the policy would refuse the write
+even if that check were removed.
+
+### Inviting your team
+
+`/settings/members` → invite an address at a role. There is **no email
+provider configured**, so you are shown a one-time link to send yourself. The
+invite works regardless: signing up with the invited address activates the
+membership automatically, including through Google.
+
+### Retention
+
+`/settings/organisation` sets `dataRetentionDays` per organisation. A nightly
+`pg_cron` job deletes minute buckets older than that, per org, and writes a
+`retention.purged` audit row. Shortening retention shows how many minutes it
+will destroy before you confirm.
+
+---
+
 ## 📋 Environment Variables Reference
 
 ### `backend/.env`
@@ -160,7 +222,8 @@ Press **`Ctrl+C`** to shut down everything cleanly.
 | Variable | Description |
 |----------|-------------|
 | `SUPABASE_URL` | Your Supabase project URL |
-| `SUPABASE_KEY` | Supabase service role or anon key |
+| `SUPABASE_KEY` | Supabase **anon** key — verifies user tokens; RLS still applies |
+| `SUPABASE_SERVICE_ROLE_KEY` | Writes minute buckets and alerts. Bypasses every RLS policy — backend only |
 
 ### `frontend/.env.local`
 
@@ -168,6 +231,8 @@ Press **`Ctrl+C`** to shut down everything cleanly.
 |----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon (public) key |
+| `DATABASE_URL` | Pooled connection (port 6543) — used by the running app |
+| `DIRECT_URL` | Direct connection (port 5432) — used by `prisma migrate` and the seed |
 
 ---
 

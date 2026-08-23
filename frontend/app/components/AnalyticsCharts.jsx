@@ -12,6 +12,7 @@
 // situations and must not look alike.
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { getChartData } from '../lib/analytics/queries';
 import {
   ResponsiveContainer,
   LineChart,
@@ -31,10 +32,8 @@ import {
   Loader2, AlertCircle, Inbox, RefreshCw
 } from 'lucide-react';
 
-const BACKEND_HTTP = 'http://localhost:8001';
 
 /** How far back the charts look, and how often they re-poll. */
-const WINDOW_HOURS = 24;
 const REFRESH_INTERVAL_MS = 15000;
 
 /**
@@ -109,7 +108,7 @@ const EMPTY_HINT =
  * views of the same telemetry, so showing two charts while a third spins reads
  * as a broken panel rather than as partial progress.
  */
-function useTelemetry() {
+function useTelemetry(days) {
   const [state, setState] = useState({
     status: 'loading',   // 'loading' | 'ready' | 'error'
     summary: null,
@@ -122,26 +121,18 @@ function useTelemetry() {
     if (!silent) setState((s) => ({ ...s, status: 'loading' }));
 
     try {
-      const [summaryRes, historicalRes, zonesRes] = await Promise.all([
-        fetch(`${BACKEND_HTTP}/api/v1/analytics/summary`, { cache: 'no-store' }),
-        fetch(`${BACKEND_HTTP}/api/v1/analytics/historical?hours=${WINDOW_HOURS}`, { cache: 'no-store' }),
-        fetch(`${BACKEND_HTTP}/api/v1/analytics/zones?hours=${WINDOW_HOURS}`, { cache: 'no-store' }),
-      ]);
-
-      if (!summaryRes.ok || !historicalRes.ok || !zonesRes.ok) {
-        throw new Error(`Analytics API returned ${summaryRes.status}/${historicalRes.status}/${zonesRes.status}`);
-      }
-
-      const [summary, historical, zones] = await Promise.all([
-        summaryRes.json(),
-        historicalRes.json(),
-        zonesRes.json(),
-      ]);
+      // One server action instead of three browser fetches. Reads Postgres
+      // `zone_minute_stats` through the caller's own session, so RLS scopes it.
+      //
+      // This also closes a real gap: these three calls previously went out as
+      // plain fetch() with no Authorization header, so after Step 2 made the
+      // backend tenant-aware they were reading nothing at all.
+      const { summary, trend, zones } = await getChartData(days);
 
       setState({
         status: 'ready',
         summary,
-        historical: Array.isArray(historical) ? historical : [],
+        historical: Array.isArray(trend) ? trend : [],
         zones: Array.isArray(zones) ? zones : [],
         error: null,
       });
@@ -149,13 +140,10 @@ function useTelemetry() {
       setState((s) => ({
         ...s,
         status: 'error',
-        error:
-          /failed to fetch|networkerror|load failed/i.test(String(err?.message))
-            ? 'Cannot reach the analytics backend. Make sure the FastAPI server is running on port 8001.'
-            : String(err?.message || err),
+        error: String(err?.message || err),
       }));
     }
-  }, []);
+  }, [days]);
 
   useEffect(() => {
     let cancelled = false;
@@ -255,8 +243,8 @@ function useChartPalette() {
   return palette;
 }
 
-export const AnalyticsCharts = () => {
-  const { status, summary, historical, zones, error, reload } = useTelemetry();
+export const AnalyticsCharts = ({ days = 7 }) => {
+  const { status, summary, historical, zones, error, reload } = useTelemetry(days);
   const { series, grid, axis, tooltipBg, line, ink, posture: posturePalette } = useChartPalette();
 
   const tooltipStyle = {
@@ -267,6 +255,9 @@ export const AnalyticsCharts = () => {
     fontSize: '12px',
   };
 
+  // Matches the range the dashboard header shows, so the two never disagree
+  // about which window the reader is looking at.
+  const rangeLabel = days === 1 ? 'last 24h' : days === 365 ? 'last year' : `last ${days}d`;
   const timeline = buildTimeline(historical);
   const posture = buildPosture(summary, posturePalette);
   const hasAnyTelemetry = (summary?.total_logs ?? 0) > 0;
@@ -292,7 +283,7 @@ export const AnalyticsCharts = () => {
       {/* 1. Activity Score Timeline */}
       <Panel
         wide
-        title={`Activity Index Timeline — last ${WINDOW_HOURS}h (0 – 100 Score)`}
+        title={`Activity Index Timeline — ${rangeLabel} (0 – 100 Score)`}
         icon={TrendingUp}
         iconColor="text-accent"
       >

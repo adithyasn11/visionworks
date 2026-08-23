@@ -655,6 +655,18 @@ async def run_aggregator_loop(stop_event: asyncio.Event | None = None) -> None:
                             f"Synced {pushed.get('synced', 0)} buckets to Postgres"
                             f" ({pushed.get('unmapped', 0)} unmapped)"
                         )
+
+            # Rules are evaluated on every tick, not only when buckets were
+            # written. CAMERA_OFFLINE fires precisely BECAUSE nothing arrived,
+            # so gating this on new data would make that rule unable to fire.
+            if service_role_configured():
+                from app.db.alerts_engine import evaluate_rules
+                verdict = await evaluate_rules()
+                if verdict.get("fired"):
+                    logger.info(
+                        f"Alerts: {verdict['fired']} fired, "
+                        f"{verdict.get('suppressed', 0)} suppressed by cooldown"
+                    )
         except asyncio.CancelledError:
             logger.info("Minute aggregator stopped")
             raise

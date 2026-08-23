@@ -252,7 +252,19 @@ async function main() {
       name: 'Meridian Coworking',
       slug: `${DEMO_SLUG_PREFIX}meridian`,
       timezone: 'Europe/London',
-      dataRetentionDays: 30,
+      // 90, not 30, and the difference matters.
+      //
+      // The seed generates DAYS (90) of buckets for BOTH orgs. Setting this to
+      // 30 made the demo data inconsistent with its own policy: the very first
+      // run of purge_expired_minute_stats() legitimately deleted ~185,000 of
+      // Meridian's rows, because they were genuinely outside the retention
+      // window this org had declared. The retention job was right; the seed was
+      // wrong, and it made a correct nightly job look like data loss.
+      //
+      // A second, different retention value is still useful for demonstrating
+      // that retention is per-org — but it has to be >= the span of data the
+      // seed actually writes, or the demo destroys itself overnight.
+      dataRetentionDays: 90,
     },
   });
   console.log(`orgs:      ${org.name}, ${otherOrg.name}`);

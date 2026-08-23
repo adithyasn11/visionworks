@@ -14,7 +14,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   LayoutDashboard, Video, Shapes, FileDown,
-  Menu, X, LogOut, Loader2, ExternalLink, Users,
+  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings,
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import { supabase } from '../lib/supabase/browser';
@@ -131,6 +131,22 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
           <Users className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
           <span className="truncate">Members</span>
         </Link>
+
+        {/* Organisation settings. Shown to admins only — unlike Members, where
+            the roster is every member's colleague list, these are the controls
+            that decide when data is destroyed. `org_update` is admin-only, so
+            advertising the page to a manager would offer a screen they can only
+            read. They can still reach it directly if they need to. */}
+        {can(role, 'org.settings') && (
+          <Link
+            href="/settings/organisation"
+            onClick={() => setOpen(false)}
+            className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold text-ink-muted hover:text-ink hover:bg-surface-alt transition-colors duration-150"
+          >
+            <Settings className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
+            <span className="truncate">Organisation</span>
+          </Link>
+        )}
       </div>
       )}
 

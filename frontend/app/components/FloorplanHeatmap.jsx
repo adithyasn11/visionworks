@@ -19,8 +19,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import h337 from 'heatmap.js';
 import { MapPin, Loader2, AlertCircle, Inbox } from 'lucide-react';
+import { backendFetch } from '../lib/backend';
 
-const BACKEND_HTTP = 'http://localhost:8001';
 
 const WINDOW_HOURS = 24;
 const REFRESH_INTERVAL_MS = 15000;
@@ -78,9 +78,16 @@ export const FloorplanHeatmap = () => {
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setState((s) => ({ ...s, status: 'loading' }));
     try {
-      const res = await fetch(
-        `${BACKEND_HTTP}/api/v1/analytics/heatmap?hours=${WINDOW_HOURS}&grid=${GRID}`,
-        { cache: 'no-store' },
+      // backendFetch attaches the Supabase access token. Without it the
+      // backend resolves no tenant and returns an empty heatmap — which is
+      // exactly what this component did before Step 6 caught the omission.
+      //
+      // The heatmap stays on the Python backend rather than moving to Postgres
+      // with the other panels: it needs per-sample floor_x/floor_y, and
+      // `zone_minute_stats` deliberately has no coordinates. That absence is
+      // what makes a closed minute anonymous, so it is not a gap to fill.
+      const res = await backendFetch(
+        `/api/v1/analytics/heatmap?hours=${WINDOW_HOURS}&grid=${GRID}`,
       );
       if (!res.ok) throw new Error(`Heatmap API returned ${res.status}`);
       const data = await res.json();

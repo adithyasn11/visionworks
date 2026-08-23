@@ -21,9 +21,13 @@ project yet.
 | `sql/006_fix_cameras_safe.sql` | Camera view/policy correction. |
 | `sql/007_operator_revoke.sql` | `revoke_operator()` with the last-operator lockout guard. |
 | `sql/008_uuid_defaults.sql` | **`DEFAULT gen_random_uuid()` on every generated `id`.** Prisma's `@default(uuid())` is client-side only, so PostgREST inserts (every Supabase Server Action) failed with a NOT NULL violation on `id`. |
-| `seed.ts` | Generates ~824,000 minute buckets of realistic shaped data. |
+| `sql/009_dashboard_analytics.sql` | Dashboard aggregation in SQL. PostgREST caps responses at 1000 rows, so folding buckets in JS silently produced wrong numbers. |
+| `sql/010_alert_update_role.sql` | Restricts alert acknowledgement to ADMIN + MANAGER (`alert_update` had allowed VIEWER). |
+| `sql/011_retention_schedule.sql` | pg_cron jobs: day rollup 02:45, retention purge 03:15, report expiry 03:30 UTC. |
+| `sql/012_dashboard_covering_index.sql` | INCLUDE index so wide-window aggregations run index-only; fixes a cold-cache timeout on first load. |
+| `seed.ts` | Generates ~826,000 minute buckets of realistic shaped data. |
 
-**Order matters.** 001 → 002 → 003 → 004 → 005 → 006 → 007 → 008. Later files
+**Order matters.** 001 → 002 → … → 010 → 011 → 012. Later files
 depend on earlier ones — 004's column grants must run after 003's table grants,
 or the RTSP credential becomes readable again.
 

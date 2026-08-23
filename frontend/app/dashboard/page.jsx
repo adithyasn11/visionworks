@@ -29,11 +29,23 @@ import { ReportExport } from '../components/ReportExport';
 import { supabase } from '../lib/supabase/browser';
 import { backendFetch } from '../lib/backend';
 import { getViewerRole } from '../lib/session';
+import { getOverview, getDataCoverage } from '../lib/analytics/queries';
+import RangePicker from './RangePicker';
+import AlertsPanel from './AlertsPanel';
 import { can, denialMessage } from '../lib/permissions';
 
 const CAMERA_ID = 'live_webcam';
 const WINDOW_HOURS = 24;
 const REFRESH_MS = 15000;
+
+// Reads better than "last 1 days".
+const RANGE_LABELS = {
+  1: 'last 24 hours',
+  7: 'last 7 days',
+  30: 'last 30 days',
+  90: 'last 90 days',
+  365: 'last year',
+};
 
 /**
  * Explains why a control is missing.
@@ -84,6 +96,11 @@ export default function Dashboard() {
 
   const [overview, setOverview] = useState({ status: 'loading', data: null, error: null });
   const [refreshing, setRefreshing] = useState(false);
+  // The historical panels read Postgres `zone_minute_stats`, which holds the
+  // org's whole history — so the window is a user choice rather than a fixed
+  // 24 hours. Live feed and heatmap still read the running session.
+  const [rangeDays, setRangeDays] = useState(7);
+  const [coverage, setCoverage] = useState(null);
 
   // Zones are loaded by the editor and handed up, so the live overlay draws the
   // same shapes the CV pipeline is attributing occupancy to.
@@ -111,24 +128,29 @@ export default function Dashboard() {
     else setRefreshing(true);
 
     try {
-      // backendFetch attaches the Supabase access token; the backend derives
-      // the organisation from it and returns only this tenant's telemetry.
-      const res = await backendFetch(
-        `/api/v1/analytics/overview?hours=${WINDOW_HOURS}`,
-      );
-      if (!res.ok) throw new Error(`Overview API returned ${res.status}`);
-      setOverview({ status: 'ready', data: await res.json(), error: null });
+      // Reads Postgres `zone_minute_stats` through the caller's own session, so
+      // RLS scopes it — there is no orgId filter in the query, and none is
+      // needed. See app/lib/analytics/queries.js.
+      const data = await getOverview(rangeDays);
+      if (data?.error) throw new Error(data.error);
+      setOverview({ status: 'ready', data, error: null });
     } catch (err) {
       setOverview((s) => ({
         ...s,
         status: 'error',
-        error: /failed to fetch|networkerror|load failed/i.test(String(err?.message))
-          ? 'Cannot reach the backend. Start the FastAPI server on port 8001.'
-          : String(err?.message || err),
+        error: String(err?.message || err),
       }));
     } finally {
       setRefreshing(false);
     }
+  }, [rangeDays]);
+
+  // The org's real data extent, so the range picker can disable windows the
+  // data cannot fill rather than rendering an empty chart.
+  useEffect(() => {
+    let active = true;
+    getDataCoverage().then((c) => { if (active) setCoverage(c); }).catch(() => {});
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -154,27 +176,48 @@ export default function Dashboard() {
     </button>
   );
 
+  const rangeLabel = RANGE_LABELS[rangeDays] ?? `last ${rangeDays} days`;
+
+  // Range picker and refresh travel together — both change what the panel
+  // below is showing, so separating them would leave the reader hunting.
+  const overviewActions = (
+    <div className="flex items-center gap-2 flex-wrap">
+      <RangePicker
+        value={rangeDays}
+        onChange={setRangeDays}
+        coverage={coverage}
+        busy={refreshing}
+      />
+      {refreshButton}
+    </div>
+  );
+
   return (
     <DashboardShell view={view} onViewChange={setView} user={user} role={role}>
       {view === 'overview' && (
         <div className="space-y-6">
           <PageHeader
             eyebrow="Workspace overview"
-            title="Your space, last 24 hours"
+            title={`Your space, ${rangeLabel}`}
             subtitle="Occupancy, posture and dwell time measured from the camera feed. No footage or identity is stored."
-            action={refreshButton}
+            action={overviewActions}
           />
 
           <OverviewSection
             data={overview.data}
             status={overview.status}
             error={overview.error}
-            hours={WINDOW_HOURS}
+            hours={rangeDays * 24}
           />
+
+          {/* Alerts sit directly under the tiles: the tiles say what the space
+              did, alerts say what needs doing about it. Anything further down
+              would be below the fold on a laptop. */}
+          <AlertsPanel role={role} />
 
           {/* Trends sit below the headline numbers: the tiles answer "what is
               true now", the charts answer "how did it get there". */}
-          <AnalyticsCharts />
+          <AnalyticsCharts days={rangeDays} />
         </div>
       )}
 

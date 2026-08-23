@@ -388,9 +388,9 @@ Listed plainly, because a design doc that hides them is not useful.
 | ~~⬜ `/onboarding` missing~~ | ✅ **Done.** New users create an org and get an ACTIVE ADMIN membership | — |
 | ~~⬜ Member invite UI~~ | ✅ **Done.** `/settings/members`; copy-link delivery (no email provider configured) | — |
 | ~~⬜ Dashboard not org-scoped~~ | ✅ **Done.** Telemetry carries `org_id`; every endpoint derives the tenant from a verified token | — |
-| ~~🟡 `zone_minute_stats` unused~~ | ✅ **Writer built and verified end to end** (§11 Step 5). Reading it in the dashboard is Step 6 |
+| ~~🟡 `zone_minute_stats` unused~~ | ✅ **Done.** Written (Step 5) and read by the dashboard (Step 6) |
 | 🟡 Homography uncalibrated | Falls back to proportional mapping — spatially faithful, not true perspective correction (needs 4 surveyed point pairs) | Small |
-| ⬜ Alerts | `alert_rules` (3 rows) / `alerts` (40 rows) exist as demo data; no engine evaluates them | Medium |
+| ~~⬜ Alerts~~ | ✅ **Done.** Engine evaluates 4 rule types on the 60s tick, debounced (§11 Step 7) |
 
 ### 8.1 Recommended order
 
@@ -1139,71 +1139,172 @@ argument.
 
 ---
 
-## Step 6 — Switch the dashboard to Postgres ⬜
+## Step 6 — Switch the dashboard to Postgres ✅ Built
 
-**Why now:** buckets exist, tenancy exists, roles exist. Only now is the
-migration safe.
+The historical panels now read `zone_minute_stats` through Supabase. **The 824k
+demo rows are real dashboard content**: three months of history instead of an
+empty table.
 
-Repoint the dashboard from SQLite to `zone_minute_stats` via Supabase. RLS then
-scopes every query automatically — no `WHERE orgId = ?` needed in app code.
+### Tenancy is not written in app code ✅
+No `WHERE orgId = ?` appears anywhere in `app/lib/analytics/queries.js`. Every
+query runs through the caller's own session, so `zms_select` scopes it in the
+database. The SQL functions are deliberately **not** `SECURITY DEFINER` — a
+definer function would run with owner rights and hand every tenant's occupancy
+to any caller.
 
-**Payoff:** the 824k demo rows spanning 20 May → 17 Aug become real dashboard
-content. Your charts get three months of history instead of an empty table.
+### What stayed on the Python backend, and why
+The **live video overlay** and the **floorplan heatmap**. Both need per-sample
+`floor_x`/`floor_y`, which `zone_minute_stats` deliberately lacks — that absence
+is what makes a closed minute anonymous. Each source answers only what it can.
 
-### ✅ Verify
-- Dashboard shows data for the signed-in user's org only
-- A second org's user sees entirely different numbers
-- Date-range selection works across the full three-month span
+### ✅ Verified
+| Check | Result |
+|---|---|
+| Data for the signed-in user's org only | Northgate **457,429** people / 16 zones / 549,374 buckets |
+| A second org sees entirely different numbers | Meridian **228,622** / 8 zones / 274,938 buckets — and 549,374 + 274,938 = **824,312** ✓ |
+| Date range across the full span | 7d / 30d / 90d all return, percentages sum to 100 ✓ |
+| Coverage | 20 May → 17 Aug detected; ranges the data cannot fill are disabled with the reason in the tooltip |
+
+### 🔎 Two bugs found by measurement
+
+**1. Silent truncation — the serious one.** The first implementation fetched
+buckets and folded them in JavaScript:
+
+```
+.limit(50000) on a 30-day window -> 1,000 rows returned
+rows that actually matched        -> 146,359
+```
+
+PostgREST caps responses (`max-rows`) **after** filtering, with no error. So
+"last 30 days" was computed from the oldest 1,000 minutes of it and rendered as
+fact — 3,198 people instead of 457,539. A confidently wrong number is worse
+than a failure.
+*Fix:* aggregation moved into Postgres (`009_dashboard_analytics.sql`).
+
+**2. Statement timeout at 90 days.** The first SQL version scanned the window
+twice — once for totals, once for the peak zone. Measured: totals 366 ms, peak
+1.6 s, combined function **7.5 s**, past Supabase's timeout, so a 90-day range
+failed outright.
+*Fix:* one `per_zone` CTE aggregated once and rolled up. 90 days now returns
+1,596,934 people.
+
+**3. Two components were missing their token.** `AnalyticsCharts` and
+`FloorplanHeatmap` still used bare `fetch()` with a hardcoded backend URL —
+missed in Step 2, so after the backend became tenant-aware they were reading
+**nothing**. Both now go through the token-attaching helpers.
 
 ---
 
-## Step 7 — Alerts engine ⬜
+## Step 7 — Alerts engine ✅ Built
 
-**Why now:** needs buckets (Step 5) to evaluate against.
+`backend/app/db/alerts_engine.py`, evaluated on the aggregator's 60-second tick
+— where the buckets are produced, not when someone opens the dashboard. An
+overnight sedentary condition must fire with nobody watching.
 
-`alert_rules` (3 rows) and `alerts` (40 rows) exist as demo data with no engine.
+Four rule types: **SEDENTARY**, **OVERCROWDING**, **UNDERUTILISATION**,
+**CAMERA_OFFLINE**. `ZONE_EMPTY` is deliberately **not** evaluated — it needs
+booking data the system does not collect, and a rule that silently never fires
+is worse than one openly unimplemented.
 
-Evaluate rules after each bucket write:
-- **SEDENTARY** — sustained sitting beyond `defaultSedentaryThresholdMinutes` (60)
-- **UNDERUSED** — utilisation below `defaultUtilisationFloorPct` (30%) across the window
-- **CAMERA_ERROR** — no samples from an ACTIVE camera
+### The debounce is the whole problem ✅
+A two-hour condition spans 120 buckets. Three mechanisms, all from columns the
+schema already had, keep it to one alert:
 
-Add an alerts panel to the dashboard. Debounce: one alert per rule per window,
-not one per bucket.
+- `sustainedMinutes` — must hold this long before firing at all
+- `cooldownMinutes` — silent for this long after firing
+- **OPEN-state check** — a rule with an alert still open for that zone does not
+  fire again; acknowledging is what re-arms it
 
-### ✅ Verify
-- Seed sustained sitting → exactly one SEDENTARY alert, not fifty
-- Acknowledging an alert persists across reload
+### ✅ Verified
+| Check | Result |
+|---|---|
+| **Seed sustained sitting → one alert, not fifty** | 50 buckets of sitting, engine run **5 times** → `fired: 1`, then `suppressed: 1` every time. **Exactly 1 row.** ✓ |
+| Message quality | "Alert Test Desk has been predominantly seated for 44 minutes (91% of samples). Threshold is 30 minutes." ✓ |
+| **Acknowledging persists across reload** | state `ACKNOWLEDGED`, `acknowledgedById` recorded; re-read after reload confirms ✓ |
+| Double-acknowledge | 0 rows — correctly refused ✓ |
+
+### 🔎 A policy gap found and fixed — `010_alert_update_role.sql`
+
+`alert_update` used `user_org_ids()`, which covers **all three roles**. Measured:
+a VIEWER's UPDATE on an OPEN alert returned **1 row updated**.
+
+That is not what a VIEWER is, and acknowledging has a real effect — it re-arms
+the rule. The app already refused it, but the app was the *only* thing standing
+there, contradicting the layering every other table has.
+
+*Fix:* the policy now uses `manage_org_ids()` (ADMIN + MANAGER). Re-measured:
+VIEWER **0 rows**, MANAGER **1 row**. Reading is deliberately left open to all
+roles — knowing the space is overcrowded is not a privileged fact.
 
 ---
 
-## Step 8 — Organisation settings ⬜
+## Step 8 — Organisation settings ✅ Built
 
-`/settings/organisation`, ADMIN only. Every field already exists on the model:
+`/settings/organisation`. Name, timezone, `dataRetentionDays`,
+`purgeVideoAfterProcessing`, the two zone defaults, and a danger zone that
+soft-deletes via `deletedAt`.
 
-- Name, timezone
-- `dataRetentionDays` (90) — with a warning that shortening destroys data
-- `purgeVideoAfterProcessing`
-- `defaultSedentaryThresholdMinutes`, `defaultUtilisationFloorPct`
-- Danger zone: soft-delete via `deletedAt`
+### The retention field is not a dropdown ✅
+Shortening retention destroys data the next time the nightly job runs, so the
+form **counts** rather than warning. Before saving a shortened value it asks the
+server how many buckets fall outside the new window and makes the reader confirm
+that number. Measured against a real org: shortening 90 → 30 days reports
+**370,566 buckets** would be destroyed; → 7 days reports **507,041**.
 
-### ✅ Verify
-- Changing retention writes an `audit_logs` row
-- MANAGER gets 403 server-side, not just a hidden link
+"This will delete 370,566 minutes of history" is a decision someone can make.
+"Shortening destroys data" is a sentence people click past.
+
+### ✅ Verified
+| Check | Result |
+|---|---|
+| **Changing retention writes `audit_logs`** | `organisation.retention_changed` with `{from: 90, to: 45, shortened: true}` ✓ |
+| **MANAGER gets refused server-side, not just a hidden link** | `UPDATE organisations` → **0 rows** at the RLS layer ✓ |
+| VIEWER cannot change settings | **0 rows** ✓ |
+| MANAGER/VIEWER *can* read settings | mirrors `org_select` (all members) vs `org_update` (admins) ✓ |
+| ADMIN can save | 1 row ✓ |
+
+Deletion requires typing the organisation's name — a confirm dialog is dismissed
+by reflex; typing the name is not.
 
 ---
 
-## Step 9 — Retention job ⬜
+## Step 9 — Retention job ✅ Built
 
-**Why now:** the setting from Step 8 must actually do something, or the privacy
-claim is decorative.
+### The logic already existed
+`purge_expired_minute_stats()` was written in `004_secrets_and_retention.sql`:
+per-org (not global), reading each organisation's own `dataRetentionDays`,
+writing a `retention.purged` audit row per org that lost rows, `SECURITY
+DEFINER` with EXECUTE revoked from both PUBLIC and `authenticated`. Only the
+**schedule** was missing.
 
-Nightly `pg_cron` job deleting `zone_minute_stats` older than each org's
-`dataRetentionDays`. Per-org, not global.
+### `011_retention_schedule.sql` ✅
+`pg_cron` enabled and three jobs scheduled — verified active:
 
-### ✅ Verify
-- Set retention to 1 day on a test org → rows older than that disappear
-- Other orgs are untouched
+| Job | Schedule | Why |
+|---|---|---|
+| `visionworks-day-rollup` | 02:45 UTC | Day rollups must be built **before** the minute rows they summarise are deleted, or a 90-day policy silently loses the year-over-year trend |
+| `visionworks-retention` | 03:15 UTC | The purge |
+| `visionworks-expire-reports` | 03:30 UTC | Expire generated export files |
+
+Not scheduled from the Python backend deliberately: a privacy guarantee that
+only holds while a process happens to be running is a weak one.
+
+### ✅ Verified
+Set retention to 1 day on a test org, ran the function:
+- 5 buckets aged 10/5/3/2/0 days → **4 deleted, 1 kept** ✓
+- audit row: `{deletedRows: 4, retentionDays: 1}` ✓
+- other orgs' bucket counts **unchanged** ✓
+
+### 🔎 A seed bug this exposed
+
+The first run also deleted **185,389** of Meridian's rows — and the function was
+right to. The seed generates `DAYS = 90` of buckets for **both** demo orgs but
+set Meridian's `dataRetentionDays` to **30**, so two thirds of its own demo data
+was outside the policy it declared. A correct nightly job looked like data loss.
+
+*Fix:* the seed now sets 90 for both. A differing retention value is still
+useful for demonstrating that retention is per-org, but it has to be at least
+the span of data the seed writes, or the demo destroys itself overnight.
 
 ---
 
@@ -1222,34 +1323,75 @@ points ↔ 4 floorplan points**, store the matrix in `zones.homographyMatrix`
 
 ---
 
-## Step 11 — Documentation & polish ⬜
+## Step 11 — Documentation & polish 🟡 Partial
 
-- Update `README.md`: real clone URL, `DATABASE_URL`/`DIRECT_URL` rows, report
-  export, the onboarding flow
-- Record a demo: signup → onboarding → draw zone → process video → dashboard
-  populates → export PDF
-- Re-run `/security-review` on the final diff
+### ✅ README updated
+- Real clone URL (`github.com/adithyasn11/majorproject.git`)
+- **`SUPABASE_SERVICE_ROLE_KEY`** documented, with why it exists
+  (`zone_minute_stats` and `alerts` have no INSERT policy) and the warning that
+  it bypasses every RLS policy
+- **`DATABASE_URL` / `DIRECT_URL`** rows, with the 6543-vs-5432 distinction
+  spelled out — they are not interchangeable
+- A **"Using the app"** section: the onboarding-first flow, the note that the
+  dashboard reads zero until a video is processed under an org, the role matrix,
+  the copy-link invite flow, and how retention works
+
+### ✅ Security review re-run on the final diff
+| Check | Result |
+|---|---|
+| Service-role key referenced in frontend | **0** occurrences |
+| Hardcoded JWTs in hand-written code | **0** files |
+| `.env` / `.env.local` git-ignored | ✓ |
+| Dynamic SQL in new functions | **none** (the four `EXECUTE` hits were `GRANT EXECUTE`) |
+| `SECURITY DEFINER` on dashboard functions | **none** — they run as the caller so RLS applies |
+| `WHERE orgId` in app code | **none** — the three hits were explanatory comments |
+| RLS gaps across all tables | **0** |
+| Write policies scoped by membership only (weak) | **none** on zones, cameras, sites, alerts, organisations, memberships |
+
+### ⬜ Not done — the demo recording
+Recording signup → onboarding → zone → video → dashboard → PDF needs the app
+driven by hand. That is yours to do; everything it would show is verified below.
 
 ---
 
-## Sequence summary
+## Full-system test — 47 checks
 
-```
-1  Onboarding + org        ← THE BLOCKER. Nothing works before this.
-2  Org-scope pipeline      ← tenancy in telemetry
-3  Invitations             ← team access (DB half already works)
-4  Role enforcement        ← make the three roles mean something
-5  Minute aggregator       ← bridge to the analytics schema
-6  Dashboard → Postgres    ← unlocks the 824k existing rows
-7  Alerts engine           ← needs buckets from 5
-8  Org settings            ← policy controls
-9  Retention job           ← make the privacy claim real
-10 Homography calibration  ← accuracy, blocks nothing
-11 Docs + demo             ← last
-```
+Run against the live database with real users, real tokens and real RLS.
 
-**Steps 1–4 are the minimum for a coherent multi-tenant product.** Steps 5–6 are
-what make the analytics genuinely multi-tenant. Steps 7–11 are completeness.
+| Area | Result |
+|---|---|
+| **Step 1** Onboarding | **9/9** — trigger creates profile, new user has no org, atomic org creation, ADMIN/ACTIVE membership, audit row, site UPDATE returns rows, camera INSERT works |
+| **Step 2** Org-scoped pipeline | **6/6** — token→org, token→role, forged token→none, no token→none, writer stamps `org_id`, legacy rows stay NULL |
+| **Step 3** Invitations | **7/7** — invite created, 64-char hash, raw token stored nowhere, signup auto-activates, invitee skips onboarding, audit written, duplicate blocked |
+| **Step 4** Role enforcement | **7/7** — ADMIN/MANAGER write zones, VIEWER blocked, VIEWER reads, MANAGER cannot invite, MANAGER/VIEWER cannot change org settings |
+| **Step 5** Aggregator | **6/6** — 3 buckets, posture ≤ sample, minute-truncated, **no person columns**, idempotent, synced to Postgres |
+| **Step 6** Dashboard | **11/11** — overview returns, org-scoped, percentages sum 100, coverage scoped, ranges 1/7/30/90d, trend, zones |
+| **Step 7** Alerts | **8/8** — rule created, **0→1 alert across 5 runs**, embeds resolve, VIEWER reads, VIEWER cannot acknowledge, MANAGER can, acknowledgement persists with actor |
+| **Step 8** Org settings | **4/4** — MANAGER reads, ADMIN saves, audit with from/to, impact preview counts |
+| **Step 9** Retention | **4/4** — per-org purge, other orgs untouched, audit written, 3 cron jobs active |
+| **Backend integrity** | modules import, 12 capabilities, 4 alert types, fail-closed on bad roles and unknown capabilities |
 
-If time is short, do **1, 2, 3, 4, 11** and describe 5–10 as designed — which
-they are, with the schema to prove it.
+### 🔎 One real bug the test found
+
+**A 90-day dashboard range timed out on a cold cache.** Measured: 8.4s cold
+(827,510 buffer reads on a freshly-seeded table), 1.4s warm. That produces an
+error for exactly the first user and a working page for everyone after — the
+worst kind to diagnose.
+
+Two fixes, because either alone is incomplete:
+- `012_dashboard_covering_index.sql` — an `INCLUDE` index makes the scan
+  **Index Only**, verified in the plan, so the heap is never touched
+- a **retry on statement-timeout only** in the query layer, because the
+  cancelled first attempt still warms the cache, so the retry is the fast path
+
+### Two "failures" that were test bugs, not product bugs
+Recorded because dismissing a red result without proving why is how real bugs
+survive:
+- *"retention impact preview returned null"* — the count works and returned
+  **0** correctly; that org had already been purged and had only today's data.
+  Re-verified on an org with history: **370,566**.
+- *"other orgs affected by purge"* — the purge was correct; the **seed** was
+  wrong (see Step 9).
+
+---
+
