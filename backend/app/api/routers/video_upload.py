@@ -11,7 +11,8 @@ Handles:
   - WS   /process_webcam_frame -> Real-time browser camera stream processed through RTX 4060 GPU
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect, Depends, Header
+from typing import Optional
 import os
 import shutil
 import cv2
@@ -151,8 +152,34 @@ def _purge_orphaned_uploads(max_age_seconds: int = ORPHAN_UPLOAD_MAX_AGE_SECONDS
             logger.warning(f"Could not purge orphaned upload {name}: {e}")
 
 
+def require_analysis_run(authorization: Optional[str] = Header(default=None)) -> str:
+    """
+    LAYER 2 for the video endpoints: the caller must hold `analysis.run`.
+
+    THE BUG THIS FIXES. /upload, /samples and /status took no auth dependency
+    at all — measured against the running backend, an unauthenticated caller
+    got 200 from all three and could POST a file onto the server's disk.
+
+    Running analysis is a WRITE, not a read: it produces telemetry rows. So it
+    is gated on `analysis.run` (ADMIN or MANAGER), matching the WebSocket that
+    processes the upload and the capability the dashboard already checks before
+    drawing the button. A VIEWER watching a live feed would be creating data.
+
+    401 with no verified organisation, 403 with one but a read-only role.
+    """
+    org_id, role = resolve_org_role(authorization)
+    if org_id is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Sign in to an organisation before running analysis.",
+        )
+    if not can(role, "analysis.run"):
+        raise HTTPException(status_code=403, detail=denial_message("analysis.run"))
+    return org_id
+
+
 @router.get("/samples")
-def list_sample_videos():
+def list_sample_videos(org_id: str = Depends(require_analysis_run)):
     """Lists all available video files stored in sample_videos/"""
     files = [
         f for f in os.listdir(SAMPLE_VIDEOS_DIR)
@@ -162,13 +189,26 @@ def list_sample_videos():
 
 
 @router.get("/status")
-def get_processing_status():
-    """Returns summary of active AI processing sessions"""
-    return {"active_sessions": len(_active_sessions), "sessions": list(_active_sessions.keys())}
+def get_processing_status(org_id: str = Depends(require_analysis_run)):
+    """
+    Active sessions belonging to the CALLER's organisation.
+
+    It used to return every session id on the server regardless of who asked,
+    which told one tenant how much another was processing — and a session id is
+    the key the processing WebSocket accepts.
+    """
+    mine = {
+        sid: meta for sid, meta in _active_sessions.items()
+        if meta.get("org_id") == org_id
+    }
+    return {"active_sessions": len(mine), "sessions": list(mine.keys())}
 
 
 @router.post("/upload")
-async def upload_video_file(file: UploadFile = File(...)):
+async def upload_video_file(
+    file: UploadFile = File(...),
+    org_id: str = Depends(require_analysis_run),
+):
     """
     Uploads a video file to sample_videos/ and returns a session_id.
     The frontend then connects via WS /api/v1/video/process/{session_id} to receive frames.
@@ -194,6 +234,10 @@ async def upload_video_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Failed to save video: {e}")
 
     _active_sessions[session_id] = {
+        # The owning organisation, taken from the verified token — never from
+        # the request. Without it a session id is a bearer token anyone who
+        # guesses it can process against.
+        "org_id": org_id,
         "filename": safe_name,
         "path": save_path,
         "status": "READY",
@@ -253,6 +297,27 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         return
 
     session = _active_sessions[session_id]
+
+    # THE SESSION MUST BELONG TO THE CALLER'S ORGANISATION.
+    #
+    # The role check above asks "may this person run analysis at all". It does
+    # NOT ask "is this their session" — so a MANAGER of org A could process a
+    # video org B had uploaded, simply by guessing the eight-character id. The
+    # frames would be theirs to watch and the telemetry would be attributed to
+    # whoever connected.
+    #
+    # Sessions uploaded before this check existed carry no `org_id`; they are
+    # treated as unowned and refused rather than granted to the first caller.
+    # The same message is used for "not yours" and "not found", so a caller
+    # cannot probe which session ids exist in other organisations.
+    session_org = session.get("org_id")
+    if session_org != org_id or org_id is None:
+        logger.warning(
+            f"Session {session_id}: refused — belongs to {session_org!r}, caller is {org_id!r}"
+        )
+        await websocket.send_json({"error": f"Session '{session_id}' not found. Upload a video first."})
+        await websocket.close(code=1008, reason="Session not found")
+        return
     video_path = session["path"]
     session["status"] = "PROCESSING"
 
