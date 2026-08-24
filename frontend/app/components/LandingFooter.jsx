@@ -107,11 +107,8 @@ export default function LandingFooter() {
           <p className="opacity-55 font-bold text-[12px]">
             &copy; {new Date().getFullYear()} VisionWorks Analytics.
           </p>
-          {/* Stated in the footer as well as on the pricing page: this is the
-              chrome that appears on every screen of the billing flow, and it is
-              where someone looks to check whether a product is real. */}
           <p className="opacity-45 font-bold text-[11px] tracking-wide text-center sm:text-right">
-            Demonstration build · no payments processed
+            Workplace analytics · privacy by design
           </p>
         </div>
       </div>

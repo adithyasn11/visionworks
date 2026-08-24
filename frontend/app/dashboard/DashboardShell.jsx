@@ -23,18 +23,21 @@ import { can } from '../lib/permissions';
 
 // `plan` sits with the other views rather than down with the settings links,
 // because it is view state on this page like the rest of them — no navigation,
-// no torn-down WebSocket. It is last because it is reference material: you read
-// it once and go back to the space you are measuring.
+// no torn-down WebSocket. It is last because it is reference material.
 //
-// Shown to EVERY member, not just admins. `org_select` returns the tier to
-// anyone in the organisation, and what a member pays for is not a secret from
-// them. Nothing on the panel is writable, so there is no capability to gate.
+// PLAN IS ADMIN-ONLY, via `capability: 'org.settings'`. Billing is a
+// governance matter, the same as organisation settings, member management and
+// deletion — a MANAGER runs the space but does not decide what the account
+// pays for. `change_plan()` enforces this itself; the gate here just stops
+// offering a screen whose every control would be refused.
+//
+// A view with no `capability` is open to every ACTIVE member.
 export const VIEWS = [
   { id: 'overview', label: 'Overview',  icon: LayoutDashboard },
   { id: 'live',     label: 'Live feed', icon: Video },
   { id: 'zones',    label: 'Zones',     icon: Shapes },
   { id: 'reports',  label: 'Reports',   icon: FileDown },
-  { id: 'plan',     label: 'Plan',      icon: CreditCard },
+  { id: 'plan',     label: 'Plan',      icon: CreditCard, capability: 'org.settings' },
 ];
 
 /**
@@ -146,7 +149,7 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
         <p className="px-3 pb-1.5 font-mono text-[9.5px] uppercase tracking-[0.16em] text-ink-faint">
           Workspace
         </p>
-        {VIEWS.map((v) => (
+        {VIEWS.filter((v) => !v.capability || can(role, v.capability)).map((v) => (
           <NavItem
             key={v.id}
             view={v}

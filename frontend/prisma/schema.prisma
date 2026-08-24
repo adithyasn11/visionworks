@@ -149,8 +149,15 @@ enum ThemePreference {
   DARK
 }
 
-/// DEMO BILLING. Subscription tier. No payment processor is connected to this
-/// build — see prisma/sql/014_plans.sql and app/lib/plans.js.
+/// Subscription tier.
+///
+/// NOTE FOR WHOEVER READS THIS NEXT: no payment processor is connected to this
+/// build. Choosing a tier records a choice and starts a term; nothing is
+/// charged and no card is ever requested. The INTERFACE no longer says so, by
+/// request — fine for a controlled demo, and not fine once real users arrive,
+/// because someone completing an upgrade that looks real will believe they
+/// paid. See the header of prisma/sql/017_plan_term.sql for what to change
+/// when a processor is wired up.
 ///
 /// The tier gates REAL limits (see PlanLimit below): camera, site and seat
 /// counts are enforced by database triggers, and retention is capped on write.
@@ -160,6 +167,14 @@ enum PlanTier {
   FREE
   GROWTH
   ENTERPRISE
+}
+
+/// Length of one subscription term. plan_term_end() turns this plus a start
+/// date into a real renewal date, using INTERVAL arithmetic so 31 January
+/// renews 28 February rather than overflowing.
+enum BillingPeriod {
+  MONTHLY
+  YEARLY
 }
 
 /// ENFORCED plan allowances. The AUTHORITY for what each tier permits —
@@ -196,13 +211,22 @@ model Organisation {
   /// facility manager cares about.
   timezone String @default("UTC") @db.VarChar(64)
 
-  // ── Demo billing (014_plans.sql). Not proof of payment — no processor. ──
+  // ── Subscription (014_plans.sql, 017_plan_term.sql). ──
   /// Entitlement tier for this organisation. Copied from the creator's
   /// profiles."selectedPlan" by create_organisation(), inside the same
   /// transaction that creates the org, so an org can never exist without one.
   plan           PlanTier  @default(FREE)
-  /// When the demo checkout was completed. Null on the free tier.
+  /// When the current tier was chosen. Null on the free tier.
   planSelectedAt DateTime? @db.Timestamptz(6)
+  /// Length of the current term.
+  billingPeriod  BillingPeriod @default(MONTHLY)
+  /// When the current term began. Reset by change_plan() on every switch, so
+  /// upgrading mid-term never buys a shorter term than the one before.
+  planStartedAt  DateTime? @db.Timestamptz(6)
+  /// End of the current term. NULL on the free tier, which does not expire.
+  /// Computed in Postgres by plan_term_end(), never in the browser — two
+  /// places computing a renewal date is how they come to disagree.
+  planRenewsAt   DateTime? @db.Timestamptz(6)
 
   // ── Privacy & retention controls, surfaced on /settings/organisation ──
   /// ZoneMinuteStat rows older than this are deleted by the retention job.

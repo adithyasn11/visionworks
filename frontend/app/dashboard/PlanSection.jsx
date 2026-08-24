@@ -2,88 +2,121 @@
 
 // frontend/app/dashboard/PlanSection.jsx
 //
-// The plan panel inside the workspace.
+// Subscription: the current term, what it grants, and how to change it.
 //
-// WHY THIS EXISTS
+// ADMIN ONLY. The nav entry is gated on `org.settings` in DashboardShell and
+// this panel is only rendered from that view, matching every other governance
+// surface — organisation settings, member management, deletion. A MANAGER runs
+// the space; billing is an account matter.
 //
-// /home is a pre-membership gate — a member is redirected to /dashboard before
-// it can render. So everything the home page said about tiers had to move
-// somewhere a member can actually reach, and the workspace is that place. This
-// is the whole of it: which tier the organisation is on, what it grants, and
-// what the other tiers would.
+// ─────────────────────────────────────────────────────────────────────────────
+//  A NOTE FOR WHOEVER READS THIS NEXT
+// ─────────────────────────────────────────────────────────────────────────────
 //
-// WHY IT DOES NOT LET ANYONE CHANGE TIER
+// No payment processor is connected to this build. Choosing a tier records a
+// choice and starts a term; nothing is charged, and no card is ever requested
+// — there is deliberately no card field anywhere in the codebase.
 //
-// There is exactly ONE path that records a plan — the checkout flow calling
-// `select_plan()` — and that path is closed to members by design. Adding a
-// second here would mean two places writing the same column and two places to
-// keep honest, which is how a billing surface starts lying. The comparison
-// table is informational; upgrading in this build is a conversation, not a
-// button, and the panel says so rather than offering a control that does
-// nothing.
+// The interface no longer says so, by request. That is fine for a controlled
+// demo and NOT fine the moment real users arrive: someone who completes an
+// upgrade that looks real will believe they paid. Before this is exposed to
+// anyone outside the team, either wire a processor or restore the disclosure.
 //
-// DESIGN
+// ─────────────────────────────────────────────────────────────────────────────
+//  DESIGN
+// ─────────────────────────────────────────────────────────────────────────────
 //
-// This is the DASHBOARD, so it uses the dashboard's surfaces (`.glass-panel`,
-// rounded-2xl) — not the landing page's rounded-3xl bento. The two idioms are
-// deliberate: bento for the marketing/gate screens, glass panels for the app.
-// Mixing them is what made the first version of the home page read like a
-// settings screen.
+// The old version was three flat stacked panels and read like a settings form.
+// This is built around a HERO card — the current tier as a dark, full-bleed
+// statement with the term dates and a progress rail through the billing
+// period — with the tier comparison below as selectable cards rather than a
+// static table.
+//
+// It borrows the landing page's confident shapes (the dark panel, the
+// decorative ring, the accent fill) while keeping the app's rounded-2xl
+// geometry, so it reads as the most important screen in the workspace without
+// looking like a different product.
 
-import React, { useEffect, useState } from 'react';
-import { CreditCard, Check, Minus, ShieldCheck, Sparkles, Loader2 } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Check, Minus, Loader2, Calendar, TrendingUp, Sparkles,
+  AlertCircle, ArrowRight, Zap,
+} from 'lucide-react';
 
 import { PLANS, planName, formatPrice, getPlan } from '../lib/plans';
-import { getPlanUsage } from './planActions';
+import { Banner } from '../components/AuthFormBits';
+import { getPlanUsage, changePlan } from './planActions';
+
+/* ── Formatting ──────────────────────────────────────────────────────────── */
+
+/** "24 August 2026", or a dash when there is genuinely no date. */
+const fmtDate = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+};
 
 /**
- * One allowance tile: "2 / 10" with a bar, or "2" with no bar when the tier is
+ * Whole days from now until `iso`, or null when there is no end date.
+ *
+ * Compared at UTC-midnight rather than by dividing the raw millisecond
+ * difference: `(end - now) / 86400000` on a renewal 20 hours away floors to 0
+ * and reads "renews today" when it renews tomorrow.
+ */
+function daysUntil(iso) {
+  if (!iso) return null;
+  const end = new Date(iso);
+  if (Number.isNaN(end.getTime())) return null;
+  const a = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+  const now = new Date();
+  const b = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.round((a - b) / 86400000);
+}
+
+/* ── Usage tile ──────────────────────────────────────────────────────────── */
+
+/**
+ * One allowance: "2 / 10" with a bar, or a bare count when the tier is
  * unlimited.
  *
- * `max === null` means UNLIMITED, never zero — the same distinction the SQL
- * table makes. Rendering a progress bar against no ceiling would be meaningless,
- * so unlimited tiers show the count alone.
- *
- * The bar turns accent-coloured at the cap. It is not a warning state so much
- * as an answer to "why can I not add another camera", which is the question
- * this panel exists to pre-empt.
+ * `consumable` separates "you have used 2 of 10 cameras" from "your history
+ * window is 90 days and the tier allows 90". The first can run out; the second
+ * is a SETTING sitting at its ceiling, which is the normal healthy state — and
+ * painting it red told a paying customer they were out of something they were
+ * simply using fully.
  */
-function UsageTile({ label, used, max, suffix, consumable = true }) {
+function UsageTile({ label, used, max, suffix, consumable = true, dark = false }) {
   const unlimited = max === null || max === undefined;
-  // `consumable` separates "you have used 1 of 10 cameras" from "your window is
-  // 90 days and the tier allows 90". The first can run out; the second is a
-  // SETTING sitting at its ceiling, which is the normal, healthy state.
-  //
-  // Without this, History rendered a full RED bar at 90/90 — the same visual
-  // the product uses for "you cannot add another camera" — telling a Growth
-  // customer they were out of something they were simply using fully.
   const atCap = consumable && !unlimited && used >= max;
-  // Clamped: an org that was over its limit before enforcement existed would
-  // otherwise render a bar wider than its track.
-  const pct = unlimited || max === 0 ? 0 : Math.min(100, Math.round((used / max) * 100));
+  // Clamped: an organisation that predates enforcement could be over its limit,
+  // and an unclamped bar would render wider than its own track.
+  const pct = unlimited || !max ? 0 : Math.min(100, Math.round((used / max) * 100));
 
   return (
-    <div className="rounded-xl border border-line bg-surface-alt px-4 py-3">
-      <dt className="text-[10px] font-black uppercase tracking-[0.12em] text-ink-faint">
+    <div className={`rounded-xl px-4 py-3.5 ${dark ? 'bg-white/[0.06] border border-white/10' : 'bg-surface-alt border border-line'}`}>
+      <dt className={`text-[10px] font-black uppercase tracking-[0.12em] ${dark ? 'opacity-55' : 'text-ink-faint'}`}>
         {label}
       </dt>
-      <dd className="text-[17px] font-black text-ink mt-1 flex items-baseline gap-1">
-        {used === null ? '—' : `${used}${suffix ?? ''}`}
-        {!unlimited && (
-          <span className="text-[12px] font-bold text-ink-faint">
+      <dd className={`mt-1 flex items-baseline gap-1.5 ${dark ? 'text-white' : 'text-ink'}`}>
+        <span className="text-[19px] font-black tracking-tight">
+          {used === null ? '—' : `${used}${suffix ?? ''}`}
+        </span>
+        {!unlimited && used !== null && (
+          <span className={`text-[12px] font-bold ${dark ? 'opacity-55' : 'text-ink-faint'}`}>
             / {max}{suffix ?? ''}
           </span>
         )}
         {unlimited && (
-          <span className="text-[11px] font-bold text-ink-faint uppercase tracking-wider">
+          <span className={`text-[10px] font-black uppercase tracking-wider ${dark ? 'opacity-55' : 'text-ink-faint'}`}>
             unlimited
           </span>
         )}
       </dd>
 
-      {!unlimited && (
+      {!unlimited && used !== null && (
         <div
-          className="mt-2 h-1.5 rounded-full bg-[color:var(--line)] overflow-hidden"
+          className={`mt-2.5 h-1.5 rounded-full overflow-hidden ${dark ? 'bg-white/10' : 'bg-[color:var(--line)]'}`}
           role="progressbar"
           aria-valuenow={used}
           aria-valuemin={0}
@@ -91,8 +124,8 @@ function UsageTile({ label, used, max, suffix, consumable = true }) {
           aria-label={`${label}: ${used} of ${max} used`}
         >
           <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              atCap ? 'bg-accent' : consumable ? 'bg-emerald-500' : 'bg-[color:var(--ink-faint)]'
+            className={`h-full rounded-full transition-all duration-700 ${
+              atCap ? 'bg-accent' : consumable ? 'bg-emerald-500' : 'bg-white/30'
             }`}
             style={{ width: `${pct}%` }}
           />
@@ -102,113 +135,256 @@ function UsageTile({ label, used, max, suffix, consumable = true }) {
   );
 }
 
-export default function PlanSection({ plan, planSelectedAt, orgName }) {
-  // Live counts from plan_usage(), the SAME query shape the enforcement
-  // triggers use — so what this panel shows and what the database refuses can
-  // never disagree. Null until it resolves; the tiles render em-dashes rather
-  // than a misleading zero.
-  const [usage, setUsage] = useState(null);
+/* ── Screen ──────────────────────────────────────────────────────────────── */
 
-  useEffect(() => {
-    let active = true;
-    getPlanUsage().then((res) => {
-      if (active && res.ok) setUsage(res.usage);
-    });
-    return () => { active = false; };
+export default function PlanSection({ plan, orgName, canManage = false }) {
+  const [usage, setUsage] = useState(null);
+  const [banner, setBanner] = useState(null);
+  const [period, setPeriod] = useState('MONTHLY');
+  const [pending, setPending] = useState(null);   // tier id awaiting confirmation
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const res = await getPlanUsage();
+    if (res.ok) {
+      setUsage(res.usage);
+      // Follow the stored term rather than resetting the toggle to monthly on
+      // every load — a yearly customer opening this page should see yearly.
+      if (res.usage.billingPeriod) setPeriod(res.usage.billingPeriod);
+    }
   }, []);
 
-  // Fails closed: `getPlan` returns undefined for an unrecognised tier, and
-  // `planName` renders it as "Unknown" rather than blank. The allowance tiles
-  // do not depend on this at all — they come from plan_usage() in the database,
-  // which is the same source the triggers enforce from.
+  useEffect(() => { load(); }, [load]);
+
+  const apply = async (planId) => {
+    setBanner(null);
+    setBusy(true);
+    try {
+      const res = await changePlan(planId, period);
+      if (!res.ok) {
+        // Refusals here are informative, not failures — "that plan allows 1
+        // camera and you have 8" is the whole point of the downgrade guard.
+        setBanner({ kind: 'error', text: res.message });
+        return;
+      }
+      setBanner({ kind: 'success', text: res.message });
+      setPending(null);
+      await load();
+    } catch {
+      setBanner({ kind: 'error', text: 'Could not reach the server. Check your connection and try again.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Fails closed on an unrecognised tier: planName renders "Unknown" rather
+  // than blank, and the allowances come from the database regardless.
   const current = getPlan(plan);
   const isFree = !current || current.priceMonthly === 0;
+  const remaining = daysUntil(usage?.renewsAt);
 
   return (
     <div className="flex flex-col gap-5">
 
-      {/* ── Current tier ────────────────────────────────────────────────── */}
-      <section className="glass-panel p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
-          <div className="flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-accent-soft text-accent flex items-center justify-center shrink-0">
-              <CreditCard className="w-5 h-5" aria-hidden="true" />
-            </span>
+      {banner && <Banner kind={banner.kind}>{banner.text}</Banner>}
+
+      {/* ── HERO: the current subscription ──────────────────────────────── */}
+      <section className="card-dark rounded-2xl p-6 sm:p-8 relative overflow-hidden shadow-xl shadow-black/20 group">
+        <div
+          aria-hidden="true"
+          className="absolute -top-16 -right-16 w-64 h-64 border-[24px] border-white/[0.04] rounded-full group-hover:scale-110 transition-transform duration-1000 pointer-events-none"
+        />
+
+        <div className="relative z-10">
+          <div className="flex flex-wrap items-start justify-between gap-5 mb-7">
             <div>
-              <h2 className="text-[16px] font-black tracking-tight text-ink">
+              <div className="flex items-center gap-2 mb-2.5">
+                <Sparkles className="w-3.5 h-3.5 text-accent" aria-hidden="true" />
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] opacity-55">
+                  {orgName ? `${orgName} · current plan` : 'Current plan'}
+                </span>
+              </div>
+              <h2 className="text-4xl sm:text-5xl font-black tracking-tight text-white leading-none">
                 {planName(plan)}
               </h2>
-              <p className="text-[12.5px] text-ink-muted font-medium">
-                {orgName ? `${orgName}'s plan` : 'Your plan'}
-              </p>
+            </div>
+
+            <div className="text-right">
+              <div className="flex items-baseline gap-1.5 justify-end">
+                <span className="text-3xl font-black tracking-tight text-accent">
+                  {formatPrice(plan, period === 'YEARLY' ? 'yearly' : 'monthly')}
+                </span>
+                {!isFree && (
+                  <span className="text-[13px] font-bold opacity-55">
+                    /{period === 'YEARLY' ? 'year' : 'month'}
+                  </span>
+                )}
+              </div>
+              {usage && !isFree && (
+                <p className="text-[11.5px] font-bold opacity-45 mt-1">
+                  Billed {usage.billingPeriod === 'YEARLY' ? 'yearly' : 'monthly'}
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-black tracking-tight text-ink">
-              {formatPrice(plan, 'monthly')}
-            </span>
-            {!isFree && (
-              <span className="text-[12.5px] font-bold text-ink-faint">/month</span>
-            )}
+          {/* ── Term ── */}
+          <div className="rounded-xl bg-white/[0.06] border border-white/10 p-5 mb-5">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-2.5">
+                <Calendar className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
+                <span className="text-[12px] font-black uppercase tracking-[0.12em] opacity-55">
+                  Billing period
+                </span>
+              </div>
+              {/* Only meaningful when there IS an end date. The free tier does
+                  not expire, so a countdown would be inventing one. */}
+              {remaining !== null && (
+                <span className="text-[11.5px] font-bold text-accent">
+                  {remaining > 0
+                    ? `${remaining} day${remaining === 1 ? '' : 's'} remaining`
+                    : remaining === 0
+                      ? 'Renews today'
+                      : 'Term ended'}
+                </span>
+              )}
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] opacity-45">
+                  Started
+                </p>
+                <p className="text-[15px] font-black text-white mt-1">
+                  {usage ? fmtDate(usage.startedAt) : '—'}
+                </p>
+              </div>
+              <div className="sm:text-right">
+                <p className="text-[10px] font-black uppercase tracking-[0.12em] opacity-45">
+                  {isFree ? 'Expires' : 'Renews'}
+                </p>
+                <p className="text-[15px] font-black text-white mt-1">
+                  {usage
+                    ? (usage.renewsAt ? fmtDate(usage.renewsAt) : 'Does not expire')
+                    : '—'}
+                </p>
+              </div>
+            </div>
+
+            {/* Progress through the term. Rendered only with both endpoints —
+                a rail with one date is a bar with no meaning. */}
+            {usage?.startedAt && usage?.renewsAt && (() => {
+              const start = new Date(usage.startedAt).getTime();
+              const end = new Date(usage.renewsAt).getTime();
+              const now = Date.now();
+              const pct = end > start
+                ? Math.min(100, Math.max(0, Math.round(((now - start) / (end - start)) * 100)))
+                : 0;
+              return (
+                <div
+                  className="mt-5 h-1.5 rounded-full bg-white/10 overflow-hidden"
+                  role="progressbar"
+                  aria-valuenow={pct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Progress through the current billing period"
+                >
+                  <div
+                    className="h-full rounded-full bg-accent transition-all duration-700"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              );
+            })()}
           </div>
+
+          {/* ── Allowances ── */}
+          <dl className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <UsageTile dark label="Cameras" used={usage?.cameras.used ?? null} max={usage?.cameras.max ?? null} />
+            <UsageTile dark label="Sites"   used={usage?.sites.used ?? null}   max={usage?.sites.max ?? null} />
+            <UsageTile dark label="Members" used={usage?.seats.used ?? null}   max={usage?.seats.max ?? null} />
+            {/* Not consumable: a 90-day window on a 90-day tier is the setting
+                at its ceiling, not an allowance about to run out. */}
+            <UsageTile
+              dark
+              label="History"
+              used={usage?.retention.used ?? null}
+              max={usage?.retention.max ?? null}
+              suffix="d"
+              consumable={false}
+            />
+          </dl>
+
+          {!usage && (
+            <p className="flex items-center gap-2 text-[12px] font-medium opacity-45 mt-4">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+              Reading your usage…
+            </p>
+          )}
         </div>
-
-        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <UsageTile label="Cameras" used={usage?.cameras.used ?? null} max={usage?.cameras.max ?? null} />
-          <UsageTile label="Sites"   used={usage?.sites.used ?? null}   max={usage?.sites.max ?? null} />
-          <UsageTile label="Members" used={usage?.seats.used ?? null}   max={usage?.seats.max ?? null} />
-          {/* Not consumable: a 90-day window on a 90-day tier is the setting at
-              its ceiling, not an allowance about to run out. */}
-          <UsageTile
-            label="History"
-            used={usage?.retention.used ?? null}
-            max={usage?.retention.max ?? null}
-            suffix=" days"
-            consumable={false}
-          />
-        </dl>
-
-        {!usage && (
-          <p className="flex items-center gap-2 text-[12px] text-ink-faint font-medium mt-3">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
-            Reading your usage…
-          </p>
-        )}
-
-        {/* Rendered only when there is a real timestamp. `planSelectedAt` is
-            NULL on the free tier by design (014_plans.sql), and printing
-            "Selected Invalid Date" is worse than printing nothing. */}
-        {planSelectedAt && (
-          <p className="text-[12px] text-ink-faint font-medium mt-4">
-            Selected{' '}
-            {new Date(planSelectedAt).toLocaleDateString(undefined, {
-              year: 'numeric', month: 'long', day: 'numeric',
-            })}
-          </p>
-        )}
       </section>
 
-      {/* ── Comparison ──────────────────────────────────────────────────── */}
+      {/* ── CHANGE PLAN ─────────────────────────────────────────────────── */}
       <section className="glass-panel p-5 sm:p-6">
-        <h2 className="text-[15px] font-black tracking-tight text-ink mb-1">
-          All plans
-        </h2>
-        <p className="text-[12.5px] text-ink-muted font-medium mb-5 leading-relaxed">
-          Every tier includes the full analysis pipeline and the same privacy guarantees.
-          Higher tiers raise the limits, not the capabilities.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+          <div>
+            <h2 className="flex items-center gap-2 text-[16px] font-black tracking-tight text-ink">
+              <TrendingUp className="w-4 h-4 text-accent" aria-hidden="true" />
+              {canManage ? 'Change plan' : 'All plans'}
+            </h2>
+            <p className="text-[12.5px] text-ink-muted font-medium mt-1 leading-relaxed max-w-xl">
+              Every tier includes the full analysis pipeline and the same privacy guarantees.
+              Higher tiers raise the limits, not the capabilities.
+            </p>
+          </div>
+
+          {canManage && (
+            <div
+              role="radiogroup"
+              aria-label="Billing period"
+              className="inline-flex items-center gap-1 p-1 rounded-xl border border-line bg-surface-alt shrink-0"
+            >
+              {[
+                { id: 'MONTHLY', label: 'Monthly' },
+                { id: 'YEARLY', label: 'Yearly' },
+              ].map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={period === id}
+                  onClick={() => setPeriod(id)}
+                  disabled={busy}
+                  className={`px-4 py-1.5 rounded-lg text-[12.5px] font-bold transition-all duration-200 disabled:opacity-50 ${
+                    period === id
+                      ? 'bg-accent text-white shadow-sm shadow-red-600/30'
+                      : 'text-ink-muted hover:text-ink'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="grid md:grid-cols-3 gap-4">
           {PLANS.map((p) => {
             const active = p.id === plan;
+            const confirming = pending === p.id;
+            // Index order in PLANS is the price ladder, so comparing positions
+            // answers "is this an upgrade" without hardcoding tier names.
+            const isUpgrade = PLANS.findIndex((x) => x.id === p.id) > PLANS.findIndex((x) => x.id === plan);
+
             return (
               <div
                 key={p.id}
-                className={`relative rounded-xl border p-5 flex flex-col transition-colors duration-200 ${
+                className={`relative rounded-xl border p-5 flex flex-col transition-all duration-300 ${
                   active
                     ? 'border-[color:var(--accent)] bg-accent-soft'
-                    : 'border-line bg-surface-alt'
+                    : confirming
+                      ? 'border-[color:var(--accent)] bg-surface-alt shadow-lg'
+                      : 'border-line bg-surface-alt hover:border-[color:var(--accent)] hover:-translate-y-0.5'
                 }`}
               >
                 {active && (
@@ -216,18 +392,30 @@ export default function PlanSection({ plan, planSelectedAt, orgName }) {
                     Current
                   </span>
                 )}
+                {!active && p.featured && (
+                  <span className="absolute -top-2.5 right-4 bg-inverse text-inverse text-[9px] font-black uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full">
+                    Popular
+                  </span>
+                )}
 
                 <div className="flex items-baseline justify-between gap-3 mb-1">
-                  <h3 className={`text-[15px] font-black tracking-tight ${active ? 'text-accent' : 'text-ink'}`}>
+                  <h3 className={`text-[16px] font-black tracking-tight ${active ? 'text-accent' : 'text-ink'}`}>
                     {p.name}
                   </h3>
-                  <span className={`text-[15px] font-black ${active ? 'text-accent' : 'text-ink'}`}>
-                    {formatPrice(p.id, 'monthly')}
-                  </span>
+                  <div className="flex items-baseline gap-1">
+                    <span className={`text-[17px] font-black ${active ? 'text-accent' : 'text-ink'}`}>
+                      {formatPrice(p.id, period === 'YEARLY' ? 'yearly' : 'monthly')}
+                    </span>
+                    {p.priceMonthly > 0 && (
+                      <span className="text-[10.5px] font-bold text-ink-faint">
+                        /{period === 'YEARLY' ? 'yr' : 'mo'}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <p className="text-[12px] text-ink-faint font-bold mb-4">{p.tagline}</p>
+                <p className="text-[11.5px] text-ink-faint font-bold mb-4">{p.tagline}</p>
 
-                <ul className="flex flex-col gap-2">
+                <ul className="flex flex-col gap-2 flex-1">
                   {p.features.map((f) => (
                     <li key={f.text} className="flex items-start gap-2">
                       {f.included ? (
@@ -235,46 +423,86 @@ export default function PlanSection({ plan, planSelectedAt, orgName }) {
                       ) : (
                         <Minus className="w-3.5 h-3.5 text-ink-faint shrink-0 mt-0.5" strokeWidth={3} aria-hidden="true" />
                       )}
-                      {/* Prefixed for screen readers so the included/excluded
-                          distinction never rests on the icon alone. */}
-                      <span className={`text-[12.5px] font-medium ${f.included ? 'text-ink-muted' : 'text-ink-faint line-through'}`}>
+                      {/* Prefixed for screen readers so included/excluded never
+                          rests on the icon alone. */}
+                      <span className={`text-[12px] font-medium ${f.included ? 'text-ink-muted' : 'text-ink-faint line-through'}`}>
                         <span className="sr-only">{f.included ? 'Included: ' : 'Not included: '}</span>
                         {f.text}
                       </span>
                     </li>
                   ))}
                 </ul>
+
+                {canManage && (
+                  <div className="mt-5">
+                    {active ? (
+                      <div className="w-full text-center py-2.5 rounded-lg border border-line text-[12.5px] font-bold text-ink-faint">
+                        Your current plan
+                      </div>
+                    ) : confirming ? (
+                      // Two-step, because a DOWNGRADE can strand the
+                      // organisation over its new limits and an upgrade starts
+                      // a fresh term. One click is too few for either.
+                      <div className="flex flex-col gap-2">
+                        <p className="text-[11.5px] text-ink-muted font-medium leading-relaxed text-center">
+                          Switch to {p.name}, billed {period === 'YEARLY' ? 'yearly' : 'monthly'}?
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPending(null)}
+                            disabled={busy}
+                            className="flex-1 py-2.5 rounded-lg border border-line text-[12.5px] font-bold text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => apply(p.id)}
+                            disabled={busy}
+                            className="flex-1 py-2.5 rounded-lg bg-accent text-white text-[12.5px] font-bold hover:brightness-110 transition-[filter] disabled:opacity-60 flex items-center justify-center gap-1.5"
+                          >
+                            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Check className="w-3.5 h-3.5" strokeWidth={3} aria-hidden="true" />}
+                            Confirm
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => { setBanner(null); setPending(p.id); }}
+                        disabled={busy}
+                        className={`w-full py-2.5 rounded-lg text-[12.5px] font-bold transition-all duration-200 flex items-center justify-center gap-1.5 group/btn disabled:opacity-50 ${
+                          isUpgrade
+                            ? 'bg-accent text-white hover:brightness-110'
+                            : 'border border-line text-ink-muted hover:text-ink hover:border-field'
+                        }`}
+                      >
+                        {isUpgrade && <Zap className="w-3.5 h-3.5" aria-hidden="true" />}
+                        {isUpgrade ? `Upgrade to ${p.name}` : `Switch to ${p.name}`}
+                        {isUpgrade && (
+                          <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" aria-hidden="true" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
-      </section>
 
-      {/* ── The demo disclosure ─────────────────────────────────────────── */}
-      <section className="glass-panel p-5 sm:p-6 flex flex-col gap-4">
-        <div className="flex items-start gap-3">
-          <ShieldCheck className="w-5 h-5 text-accent shrink-0 mt-0.5" aria-hidden="true" />
-          <div className="flex flex-col gap-1.5">
-            <h2 className="text-[14px] font-black tracking-tight text-ink">
-              Demonstration billing — no payment was taken
-            </h2>
+        {/* Only shown to someone who cannot act, so it answers "why is there no
+            button" rather than stating a rule at the person who has it. */}
+        {!canManage && (
+          <div className="flex items-start gap-2.5 mt-5 rounded-lg border border-line bg-surface-alt px-4 py-3">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-ink-faint" aria-hidden="true" />
             <p className="text-[12.5px] text-ink-muted font-medium leading-relaxed">
-              This build has no payment processor connected. Your tier was recorded when you
-              chose it during setup; nothing was charged, no card was requested, and no card
-              details are stored anywhere. Prices are shown to illustrate the tiers.
+              Only an <strong className="text-ink">administrator</strong> can change the plan.
+              Ask one of your organisation’s admins if you need a different tier.
             </p>
           </div>
-        </div>
-
-        <div className="flex items-start gap-3">
-          <Sparkles className="w-5 h-5 text-ink-faint shrink-0 mt-0.5" aria-hidden="true" />
-          <p className="text-[12.5px] text-ink-faint font-medium leading-relaxed">
-            Plan limits are advisory in this build and are not enforced against your usage —
-            nothing stops you adding more cameras than your tier lists. Changing tier is not
-            available in the interface; the checkout that records a plan runs once, during
-            setup.
-          </p>
-        </div>
+        )}
       </section>
     </div>
   );

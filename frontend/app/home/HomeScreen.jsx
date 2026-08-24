@@ -496,9 +496,10 @@ export default function HomeScreen({ email, fullName, pendingPlan }) {
             ))}
           </div>
 
-          {/* THE DEMO DISCLOSURE. On the page, not only in a comment — see the
-              file header. Stated before the user reaches checkout, so nobody
-              types a card number expecting it to be handled. */}
+          {/* Closing reassurance, in the page's own bento language. Replaces
+              what used to be a billing disclosure panel; the shape is kept
+              because the pricing grid needs something to land on rather than
+              ending flush against the footer. */}
           <div
             className="mt-12 bg-surface border border-line shadow-xl shadow-black/5 rounded-3xl p-8 sm:p-10 flex flex-col sm:flex-row items-start gap-6 animate-fade-in-up group hover:border-[color:var(--accent)] hover:shadow-2xl transition-all duration-500"
             style={{ animationDelay: '1200ms' }}
@@ -508,12 +509,13 @@ export default function HomeScreen({ email, fullName, pendingPlan }) {
             </div>
             <div className="flex flex-col gap-2">
               <h3 className="text-xl font-black text-ink tracking-tight">
-                Demonstration billing — no payment is taken
+                Private by design, on every plan
               </h3>
               <p className="text-[14px] text-ink-muted font-medium leading-relaxed max-w-2xl group-hover:text-ink transition-colors">
-                This build has no payment processor connected. Choosing a plan records your
-                selection and unlocks the setup flow — no card is requested, no card details are
-                stored, and nothing is charged. Prices are shown to illustrate the tiers.
+                Frames are discarded the moment inference finishes. What is kept is a count
+                per zone per minute — no faces, no track ids, no coordinates — so the
+                database physically cannot answer what any individual did. That guarantee is
+                structural, and it does not change with your tier.
               </p>
             </div>
           </div>

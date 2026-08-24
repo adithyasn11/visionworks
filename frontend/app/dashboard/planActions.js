@@ -22,6 +22,7 @@
 // decision — the enforcement already happened in the trigger.
 
 import { createClient } from '../lib/supabase/server';
+import { isPlanId } from '../lib/plans';
 
 /**
  * `{ ok, usage }` for the caller's current organisation.
@@ -63,10 +64,56 @@ export async function getPlanUsage() {
     ok: true,
     usage: {
       plan: row.plan,
+      billingPeriod: row.billing_period,
+      startedAt: row.started_at,
+      renewsAt: row.renews_at,
       cameras: { used: row.cameras_used, max: row.cameras_max },
       sites: { used: row.sites_used, max: row.sites_max },
       seats: { used: row.seats_used, max: row.seats_max },
       retention: { used: row.retention_days, max: row.retention_max },
     },
   };
+}
+
+/**
+ * Switch tier. ADMIN only — enforced in `change_plan()` itself, not here.
+ *
+ * The function refuses a DOWNGRADE that the organisation's current usage would
+ * already exceed, and says so with the real numbers ("that plan allows 1 camera
+ * and this organisation has 8"). The limit triggers in 015 only fire on INSERT,
+ * so nothing else would stop an org landing on a tier it is already over —
+ * every existing row would keep working while every new one was refused.
+ */
+export async function changePlan(planId, period = 'MONTHLY') {
+  const { supabase, error: authError } = await requireUser();
+  if (authError) return { ok: false, message: authError };
+
+  if (!isPlanId(planId)) {
+    return { ok: false, message: 'That plan is not available.' };
+  }
+  if (period !== 'MONTHLY' && period !== 'YEARLY') {
+    return { ok: false, message: 'Choose a monthly or yearly term.' };
+  }
+
+  const { data, error } = await supabase.rpc('change_plan', {
+    p_plan: planId,
+    p_period: period,
+  });
+
+  if (error) {
+    const msg = String(error?.message ?? '');
+    if (/row-level security/i.test(msg)) {
+      return { ok: false, message: 'You do not have permission to change the plan.' };
+    }
+    if (/invalid input value for enum/i.test(msg)) {
+      // Only reachable if plans.js and the Postgres enum have drifted apart.
+      return { ok: false, message: 'That plan is not available.' };
+    }
+    return { ok: false, message: 'Could not update the plan. Please try again.' };
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.ok) return { ok: false, message: row?.message ?? 'Could not update the plan.' };
+
+  return { ok: true, message: row.message };
 }

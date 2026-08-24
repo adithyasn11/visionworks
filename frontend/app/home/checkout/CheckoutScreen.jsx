@@ -255,7 +255,7 @@ export default function CheckoutScreen({
                       None required
                     </span>
                     <span className="text-[12px] font-medium opacity-45">
-                      This demo collects no card details.
+                      Start now and add billing details later.
                     </span>
                   </div>
                 </div>
@@ -298,9 +298,9 @@ export default function CheckoutScreen({
               <div className="flex items-start gap-3">
                 <ShieldCheck className="w-[18px] h-[18px] text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="text-[12.5px] font-medium leading-relaxed opacity-70">
-                  <span className="font-black opacity-100">Demonstration billing.</span>{' '}
-                  No payment processor is connected. Nothing is charged, no card is requested,
-                  and no card details are stored.
+                  <span className="font-black opacity-100">Change or cancel any time.</span>{' '}
+                  Your plan can be switched from the workspace whenever you need a different
+                  tier.
                 </p>
               </div>
 

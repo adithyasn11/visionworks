@@ -304,12 +304,18 @@ function DashboardInner() {
         </div>
       )}
 
-      {view === 'plan' && (
+      {/* GATED, not merely unlinked. Hiding the sidebar entry stops a MANAGER
+          being OFFERED the plan screen; it does nothing about `?view=plan`
+          typed directly, and an unguarded view would render the upgrade cards
+          to someone every one of whose clicks `change_plan()` would refuse.
+          `role` is null until it resolves, so this reads false during load and
+          the panel never flashes in before disappearing. */}
+      {view === 'plan' && can(role, 'org.settings') && (
         <div className="space-y-6">
           <PageHeader
             eyebrow="Plan"
             title="Your subscription"
-            subtitle="The tier this organisation is on, what it includes, and how the plans compare. Billing is a demonstration — no payment was taken."
+            subtitle="Your current subscription, what it includes, and how the tiers compare."
           />
 
           {/* `plan` is null until getViewerRole resolves. Rendering the panel
@@ -319,8 +325,8 @@ function DashboardInner() {
           {org.plan ? (
             <PlanSection
               plan={org.plan}
-              planSelectedAt={org.planSelectedAt}
               orgName={org.name}
+              canManage={can(role, 'org.settings')}
             />
           ) : (
             /* `min-h` roughly matches the resolved panel, so the page does not
@@ -332,6 +338,20 @@ function DashboardInner() {
               </span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* The other half of the gate: a non-admin who reached ?view=plan gets an
+          explanation rather than an empty column. Only rendered once `role` is
+          known, so it does not flash for an admin mid-load. */}
+      {view === 'plan' && role && !can(role, 'org.settings') && (
+        <div className="space-y-6">
+          <PageHeader
+            eyebrow="Plan"
+            title="Your subscription"
+            subtitle="Your current subscription, what it includes, and how the tiers compare."
+          />
+          <ReadOnlyNotice capability="org.settings" />
         </div>
       )}
 
