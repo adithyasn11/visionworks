@@ -53,6 +53,7 @@ import {
 
 import AppHeader from '../components/AppHeader';
 import LandingFooter from '../components/LandingFooter';
+import InvitationsPanel from './InvitationsPanel';
 import { PLANS, formatPrice, planName } from '../lib/plans';
 
 /* ── Setup steps ─────────────────────────────────────────────────────────── */
@@ -239,6 +240,21 @@ export default function HomeScreen({ email, fullName, pendingPlan }) {
       <AppHeader email={email} fullName={fullName} />
 
       <main className="flex-1 w-full max-w-6xl mx-auto px-6 sm:px-8">
+
+        {/* ── PENDING INVITATIONS ─────────────────────────────────────────
+            Above the hero, because it changes what this page is FOR. Someone
+            invited to an existing workspace does not need to choose a plan at
+            all — accepting takes them straight to the dashboard. Burying that
+            under the pricing cards would sell them something they do not need.
+
+            Renders nothing at all when there are no invitations, which is the
+            case for almost everyone — so it is mounted WITHOUT a spacing
+            wrapper. The panel owns its own `mb-8`, and any padding here would
+            apply whether or not it drew anything, shrinking the hero's
+            full-viewport sizing on every ordinary visit. (`empty:` cannot help:
+            the div is not empty in CSS terms, it holds a component that
+            returned null.) */}
+        <InvitationsPanel />
 
         {/* ── HERO ────────────────────────────────────────────────────────
             Text card beside a bento of tiles — the landing hero's shape. */}
