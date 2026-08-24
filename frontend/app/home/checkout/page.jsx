@@ -55,6 +55,13 @@ export default async function CheckoutPage({ searchParams }) {
   if (error || !data?.user) redirect('/login?next=/home');
 
   const requested = String(searchParams?.plan ?? '');
+
+  // `?period=` is attacker-controlled like `?plan=`, so it is validated against
+  // the two known values rather than passed through. An unrecognised value
+  // falls back to monthly — the cheaper term, which is the safe direction to
+  // default when the intent is unclear.
+  const rawPeriod = String(searchParams?.period ?? '').toLowerCase();
+  const period = rawPeriod === 'yearly' ? 'yearly' : 'monthly';
   // Fails closed to the plans section rather than defaulting to a tier. Picking
   // one on the user's behalf would mean recording a choice they never made.
   if (!isPlanId(requested)) redirect('/home#pricing');
@@ -88,6 +95,7 @@ export default async function CheckoutPage({ searchParams }) {
   return (
     <CheckoutScreen
       plan={plan}
+      period={period}
       email={profile?.email ?? data.user.email ?? null}
       fullName={profile?.fullName ?? null}
     />

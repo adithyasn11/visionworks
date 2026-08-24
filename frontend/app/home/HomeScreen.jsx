@@ -231,7 +231,7 @@ function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
 
 /* ── Screen ──────────────────────────────────────────────────────────────── */
 
-export default function HomeScreen({ email, fullName, pendingPlan }) {
+export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod }) {
   const router = useRouter();
   const [period, setPeriod] = useState('monthly');
   const [busyPlan, setBusyPlan] = useState(null);
@@ -256,7 +256,12 @@ export default function HomeScreen({ email, fullName, pendingPlan }) {
   const choose = (planId) => {
     setBusyPlan(planId);
     try {
-      router.push(`/home/checkout?plan=${encodeURIComponent(planId)}`);
+      // The PERIOD travels with the tier. It used to be client-only state:
+      // choosing yearly changed the displayed price and was never sent
+      // anywhere, so a yearly customer's organisation was created MONTHLY.
+      router.push(
+        `/home/checkout?plan=${encodeURIComponent(planId)}&period=${encodeURIComponent(period)}`,
+      );
     } catch {
       setBusyPlan(null);
     }
@@ -332,7 +337,7 @@ export default function HomeScreen({ email, fullName, pendingPlan }) {
 
               {pendingPlan && (
                 <Link
-                  href={`/home/checkout?plan=${encodeURIComponent(pendingPlan)}`}
+                  href={`/home/checkout?plan=${encodeURIComponent(pendingPlan)}&period=${encodeURIComponent(pendingPeriod ?? 'monthly')}`}
                   className="bg-surface text-ink border-2 border-line px-8 py-4 rounded-2xl font-bold text-base hover:border-[color:var(--accent)] hover:bg-surface-alt hover:-translate-y-1 hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-3"
                 >
                   Resume {planName(pendingPlan)}

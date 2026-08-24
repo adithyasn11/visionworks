@@ -59,6 +59,12 @@ export async function confirmPlan(formData) {
 
   const planId = String(formData.get('plan') ?? '').trim();
 
+  // The database enum is MONTHLY | YEARLY; the UI speaks lowercase. Mapped
+  // here rather than trusting the form value, so an unrecognised string cannot
+  // reach a Postgres cast and fail with a message nobody can act on.
+  const rawPeriod = String(formData.get('period') ?? '').toLowerCase();
+  const period = rawPeriod === 'yearly' ? 'YEARLY' : 'MONTHLY';
+
   // Validated against the catalogue, not merely non-empty. The value reaches a
   // Postgres enum: an unrecognised string would be rejected by the database
   // with a cast error nobody could act on, so it is refused here with a
@@ -67,7 +73,10 @@ export async function confirmPlan(formData) {
     return fail('That plan is not available. Choose one of the plans listed.');
   }
 
-  const { data, error } = await supabase.rpc('select_plan', { p_plan: planId });
+  const { data, error } = await supabase.rpc('select_plan', {
+    p_plan: planId,
+    p_period: period,
+  });
 
   if (error) {
     // The only expected failures are a lost session or a profile row that has

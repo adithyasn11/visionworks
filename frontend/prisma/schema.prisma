@@ -299,6 +299,10 @@ model Profile {
   /// by create_organisation(), so it is a pending choice, never an entitlement:
   /// `profile_update_self` lets a user write this column themselves.
   selectedPlan   PlanTier?
+  /// The TERM chosen alongside the tier. Consumed and cleared by
+  /// create_organisation() together with selectedPlan — it used to be missing,
+  /// so a yearly customer's organisation was created MONTHLY (018).
+  selectedBillingPeriod BillingPeriod?
   selectedPlanAt DateTime? @db.Timestamptz(6)
 
   /// Null until the user finishes /onboarding. Distinct from createdAt so you

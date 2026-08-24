@@ -74,7 +74,7 @@ export default async function HomePage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('fullName, email, currentOrgId, selectedPlan')
+    .select('fullName, email, currentOrgId, selectedPlan, selectedBillingPeriod')
     .eq('id', data.user.id)
     .maybeSingle();
 
@@ -103,6 +103,8 @@ export default async function HomePage() {
       // A tier chosen but not yet spent on an organisation, so returning here
       // resumes the abandoned checkout rather than starting over.
       pendingPlan={profile?.selectedPlan ?? null}
+      // Lowercased for the UI, which speaks 'monthly' | 'yearly'.
+      pendingPeriod={profile?.selectedBillingPeriod === 'YEARLY' ? 'yearly' : 'monthly'}
     />
   );
 }

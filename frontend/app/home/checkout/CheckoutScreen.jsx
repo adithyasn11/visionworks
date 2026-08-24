@@ -38,10 +38,13 @@ import { formatPrice, yearlyPerMonth, yearlySaving } from '../../lib/plans';
 import { confirmPlan } from '../actions';
 
 export default function CheckoutScreen({
-  plan, email, fullName,
+  plan, email, fullName, period: initialPeriod = 'monthly',
 }) {
   const router = useRouter();
-  const [period, setPeriod] = useState('monthly');
+  // Seeded from the URL, which carries what was chosen on /home. Defaulting to
+  // 'monthly' here regardless of that choice is what made a yearly selection
+  // silently become a monthly subscription.
+  const [period, setPeriod] = useState(initialPeriod === 'yearly' ? 'yearly' : 'monthly');
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState(null);
   const [done, setDone] = useState(false);
@@ -70,6 +73,7 @@ export default function CheckoutScreen({
 
       const fd = new FormData();
       fd.set('plan', plan.id);
+      fd.set('period', period);
 
       const res = await confirmPlan(fd);
       if (!res.ok) {
