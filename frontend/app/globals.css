@@ -224,11 +224,24 @@ html.theme-switching body {
    Built from the same tokens as the founder console, so the dashboard is the
    same product in the same palette — red / black / white — and follows the
    theme toggle instead of being a hardcoded dark island. */
+/* The app's working surface. Deliberately QUIETER than the landing page's
+   bento cards: no lift, no shadow-xl, no rotating decoration. Those belong on
+   a page you are being sold something on. This is a panel someone reads a
+   number off for the fifth time today, and a surface that jumps when the
+   pointer crosses it becomes noise rather than polish.
+
+   The border warming toward the accent is the whole interaction — enough to
+   confirm the pointer is over a distinct region, not enough to distract. */
 .glass-panel {
   background-color: var(--surface);
   border: 1px solid var(--line);
   color: var(--ink);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
   @apply rounded-2xl shadow-sm;
+}
+
+.glass-panel:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
 }
 
 .glass-card {

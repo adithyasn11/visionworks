@@ -53,14 +53,26 @@ function Overlay({ kind, message }) {
     empty:   { Icon: Inbox, cls: 'text-ink-faint' },
   }[kind];
 
+  // The scrim is OPAQUE, not `/80` with a 1px blur.
+  //
+  // It was translucent, and the zone guides behind it stayed legible enough to
+  // collide with the message — "No positions recorded yet…" rendered directly
+  // on top of "Collaborative Desk" and the guide rectangles, and neither could
+  // be read. A backdrop whose whole job is to be a background has to actually
+  // cover what is behind it.
+  //
+  // The message itself sits in its own panel so it reads as a deliberate state
+  // rather than text floating in an empty box.
   return (
     <div
-      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2.5 px-6 text-center bg-[color:var(--ground)]/80 backdrop-blur-[1px]"
+      className="absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center bg-[color:var(--ground)]"
       role="status"
       aria-live="polite"
     >
-      <Icon className={`w-6 h-6 ${cls}`} strokeWidth={1.8} />
-      <p className="text-xs leading-relaxed max-w-xs text-ink-muted">{message}</p>
+      <div className="flex flex-col items-center gap-2.5 rounded-xl border border-line bg-surface px-5 py-4 max-w-xs">
+        <Icon className={`w-6 h-6 ${cls}`} strokeWidth={1.8} />
+        <p className="text-xs leading-relaxed text-ink-muted">{message}</p>
+      </div>
     </div>
   );
 }

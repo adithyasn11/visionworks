@@ -138,7 +138,7 @@ export default function AlertsPanel({ role }) {
   };
 
   return (
-    <section className="rounded-xl border border-line bg-surface overflow-hidden">
+    <section className="glass-panel overflow-hidden">
       <header className="flex items-center justify-between gap-3 px-4 py-3 border-b border-line">
         <h2 className="flex items-center gap-2 text-[13.5px] font-bold text-ink tracking-tight">
           <BellRing className="w-4 h-4 text-accent" />

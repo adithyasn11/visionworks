@@ -48,9 +48,16 @@ import { getPlanUsage } from './planActions';
  * as an answer to "why can I not add another camera", which is the question
  * this panel exists to pre-empt.
  */
-function UsageTile({ label, used, max, suffix }) {
+function UsageTile({ label, used, max, suffix, consumable = true }) {
   const unlimited = max === null || max === undefined;
-  const atCap = !unlimited && used >= max;
+  // `consumable` separates "you have used 1 of 10 cameras" from "your window is
+  // 90 days and the tier allows 90". The first can run out; the second is a
+  // SETTING sitting at its ceiling, which is the normal, healthy state.
+  //
+  // Without this, History rendered a full RED bar at 90/90 — the same visual
+  // the product uses for "you cannot add another camera" — telling a Growth
+  // customer they were out of something they were simply using fully.
+  const atCap = consumable && !unlimited && used >= max;
   // Clamped: an org that was over its limit before enforcement existed would
   // otherwise render a bar wider than its track.
   const pct = unlimited || max === 0 ? 0 : Math.min(100, Math.round((used / max) * 100));
@@ -84,7 +91,9 @@ function UsageTile({ label, used, max, suffix }) {
           aria-label={`${label}: ${used} of ${max} used`}
         >
           <div
-            className={`h-full rounded-full transition-all duration-500 ${atCap ? 'bg-accent' : 'bg-emerald-500'}`}
+            className={`h-full rounded-full transition-all duration-500 ${
+              atCap ? 'bg-accent' : consumable ? 'bg-emerald-500' : 'bg-[color:var(--ink-faint)]'
+            }`}
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -149,7 +158,15 @@ export default function PlanSection({ plan, planSelectedAt, orgName }) {
           <UsageTile label="Cameras" used={usage?.cameras.used ?? null} max={usage?.cameras.max ?? null} />
           <UsageTile label="Sites"   used={usage?.sites.used ?? null}   max={usage?.sites.max ?? null} />
           <UsageTile label="Members" used={usage?.seats.used ?? null}   max={usage?.seats.max ?? null} />
-          <UsageTile label="History" used={usage?.retention.used ?? null} max={usage?.retention.max ?? null} suffix=" days" />
+          {/* Not consumable: a 90-day window on a 90-day tier is the setting at
+              its ceiling, not an allowance about to run out. */}
+          <UsageTile
+            label="History"
+            used={usage?.retention.used ?? null}
+            max={usage?.retention.max ?? null}
+            suffix=" days"
+            consumable={false}
+          />
         </dl>
 
         {!usage && (

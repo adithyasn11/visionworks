@@ -83,7 +83,7 @@ function PostureBar({ sitting, standing, walking }) {
   if (rows.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-line bg-surface px-4 sm:px-5 py-4 themed">
+    <div className="glass-panel px-4 sm:px-5 py-4 themed">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
           <Armchair className="w-4 h-4 text-ink-faint" strokeWidth={2.2} />
@@ -123,7 +123,7 @@ function PostureBar({ sitting, standing, walking }) {
 
 function EmptyState() {
   return (
-    <div className="rounded-xl border border-line bg-surface px-6 py-14 text-center themed">
+    <div className="glass-panel px-6 py-14 text-center themed">
       <Inbox className="w-8 h-8 mx-auto text-ink-faint mb-3" strokeWidth={1.7} />
       <p className="text-[14px] font-bold text-ink">No activity recorded yet</p>
       <p className="text-[12.5px] text-ink-faint mt-1.5 max-w-md mx-auto leading-relaxed">
@@ -138,7 +138,7 @@ function EmptyState() {
 export default function OverviewSection({ data, status, error, hours }) {
   if (status === 'loading') {
     return (
-      <div className="rounded-xl border border-line bg-surface px-6 py-14 text-center themed">
+      <div className="glass-panel px-6 py-14 text-center themed">
         <Loader2 className="w-6 h-6 mx-auto text-accent animate-spin" />
         <p className="text-[12.5px] text-ink-muted mt-3">Loading activity…</p>
       </div>

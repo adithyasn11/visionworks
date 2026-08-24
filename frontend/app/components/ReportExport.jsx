@@ -19,8 +19,19 @@ import { FileDown, FileSpreadsheet, FileText, Loader2, AlertCircle } from 'lucid
 import { backendFetch } from '../lib/backend';
 
 
-/** Matches the window the dashboard charts use, so exports agree with them. */
-const WINDOW_HOURS = 24;
+/**
+ * Fallback window when no range is supplied.
+ *
+ * The Reports screen passes `hours` from its range picker, so this is only
+ * reached if the component is mounted somewhere that has no picker. It used to
+ * be a hardcoded constant that IGNORED the picker entirely — the header said
+ * "7d" while the export silently pulled 24 hours, which is worse than having no
+ * picker at all: a control that appears to do something and does not.
+ */
+const DEFAULT_WINDOW_HOURS = 24;
+
+/** The CSV endpoint's own ceiling: `Query(24, ge=1, le=168)` = 7 days. */
+const CSV_MAX_HOURS = 168;
 
 /**
  * Pulls the filename the server chose out of Content-Disposition.
@@ -35,17 +46,40 @@ function filenameFrom(response, fallback) {
   return match ? match[1] : fallback;
 }
 
-export const ReportExport = () => {
+export const ReportExport = ({ hours = DEFAULT_WINDOW_HOURS, rangeLabel }) => {
   const [busy, setBusy] = useState(null);   // 'csv' | 'pdf' | null
   const [error, setError] = useState(null);
+
+  // Computed once for both the request and the label, so what the panel
+  // PROMISES and what the URL ASKS FOR cannot disagree.
+  const clamped = hours > CSV_MAX_HOURS;
+  const effectiveCsvHours = Math.min(Math.max(1, hours), CSV_MAX_HOURS);
+  const clampedLabel =
+    effectiveCsvHours >= 24 && effectiveCsvHours % 24 === 0
+      ? `last ${effectiveCsvHours / 24}d`
+      : `last ${effectiveCsvHours}h`;
 
   const download = async (kind) => {
     setBusy(kind);
     setError(null);
 
+    // WHAT EACH FORMAT ACTUALLY COVERS — verified against the endpoints in
+    // backend/app/api/routers/analytics.py, not assumed:
+    //
+    //   CSV  takes `hours`, capped at `Query(24, ge=1, le=168)` — SEVEN DAYS.
+    //        A longer selection is clamped here rather than sent, because the
+    //        API would reject 720 with a validation error the user cannot act
+    //        on.
+    //   PDF  takes NO window parameter at all. It calls get_analytics_summary()
+    //        over the whole history, deliberately, so the executive summary
+    //        cannot drift from the dashboard's own totals.
+    //
+    // The UI states both of these plainly. Sending `hours` to the PDF endpoint
+    // would look correct and change nothing — a parameter silently ignored is
+    // how an export ends up covering a period nobody chose.
     const path =
       kind === 'csv'
-        ? `/api/v1/analytics/report/csv?hours=${WINDOW_HOURS}`
+        ? `/api/v1/analytics/report/csv?hours=${effectiveCsvHours}`
         : '/api/v1/analytics/report/pdf';
 
     let objectUrl;
@@ -90,9 +124,35 @@ export const ReportExport = () => {
       </div>
 
       <p className="text-[11.5px] text-ink-muted leading-relaxed">
-        Download the last {WINDOW_HOURS} hours of recorded telemetry. Exports contain
-        counts, postures, zones and timestamps only — never video or identity.
+        Exports contain counts, postures, zones and timestamps only — never video or
+        identity.
       </p>
+
+      {/* Each format states its OWN window, because they genuinely differ and
+          a single sentence covering both would have to be wrong about one. */}
+      <dl className="flex flex-col gap-1.5 rounded-lg border border-line bg-surface-alt px-3.5 py-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-[11.5px] font-bold text-ink">CSV data</dt>
+          <dd className="text-[11px] text-ink-muted font-mono text-right">
+            {clampedLabel}
+          </dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-[11.5px] font-bold text-ink">Executive PDF</dt>
+          <dd className="text-[11px] text-ink-muted font-mono text-right">
+            all recorded history
+          </dd>
+        </div>
+      </dl>
+
+      {/* Only shown when the selection was actually clamped, so it reads as an
+          answer to "why did I not get 30 days" rather than permanent noise. */}
+      {clamped && (
+        <p className="text-[11px] text-ink-faint leading-relaxed">
+          CSV exports cover at most 7 days. Your {rangeLabel ?? 'selected range'} was
+          shortened to fit; the PDF summary still covers everything.
+        </p>
+      )}
 
       <div className="flex items-center gap-2.5 flex-wrap">
         <button

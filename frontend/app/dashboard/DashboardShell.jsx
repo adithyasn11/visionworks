@@ -50,10 +50,10 @@ export const VIEWS = [
  */
 function NavItem({ view, active, onSelect, asLink = false }) {
   const Icon = view.icon;
-  const className = `group relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 text-left ${
+  const className = `group relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-all duration-200 text-left ${
     active
       ? 'bg-accent-soft text-accent'
-      : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
+      : 'text-ink-muted hover:text-ink hover:bg-surface-alt hover:translate-x-0.5'
   }`;
   const marker = (
     <span
@@ -74,25 +74,18 @@ function NavItem({ view, active, onSelect, asLink = false }) {
     );
   }
 
+  // Reuses `className` and `marker` rather than repeating them. The button and
+  // the link MUST look identical — the difference between them is behavioural
+  // — and two hand-maintained copies of the same class string is exactly how
+  // they drift apart.
   return (
     <button
       type="button"
       onClick={() => onSelect(view.id)}
       aria-current={active ? 'page' : undefined}
-      className={`group relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 text-left ${
-        active
-          ? 'bg-accent-soft text-accent'
-          : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
-      }`}
+      className={className}
     >
-      {/* Active marker as a bar rather than a full fill — keeps the sidebar
-          quiet while still being unmistakable at a glance. */}
-      <span
-        aria-hidden="true"
-        className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full bg-[color:var(--accent)] transition-all duration-200 ${
-          active ? 'h-5 opacity-100' : 'h-0 opacity-0'
-        }`}
-      />
+      {marker}
       <Icon className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
       <span className="truncate">{view.label}</span>
     </button>
@@ -132,21 +125,27 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
 
   const sidebar = (
     <div className="flex h-full flex-col bg-surface border-r border-line themed">
-      <div className="px-5 pt-5 pb-4">
+      {/* Brand. `h-16` matches AppHeader and the landing navbar exactly, so the
+          sidebar's first rule lines up with the mobile top bar and the eye
+          reads one horizontal band across the whole product. */}
+      <div className="h-16 px-5 flex items-center border-b border-line shrink-0">
         <Link href="/dashboard" className="flex items-center gap-2.5 w-max group">
-          <div className="w-7 h-7 bg-accent flex items-center justify-center rounded-lg group-hover:rotate-12 transition-transform duration-300">
+          <div className="w-7 h-7 bg-accent flex items-center justify-center rounded-lg shadow-sm shadow-red-600/30 group-hover:shadow-red-600/50 group-hover:rotate-12 transition-all duration-300">
             <div className="w-2 h-2 bg-white rounded-sm" />
           </div>
-          <div className="leading-none">
-            <div className="font-extrabold text-[15px] tracking-tight text-ink">VisionWorks</div>
-            <div className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-accent mt-1">
-              Workspace
-            </div>
-          </div>
+          <span className="font-extrabold text-[16px] tracking-tight text-ink group-hover:text-accent transition-colors duration-300">
+            VisionWorks
+          </span>
         </Link>
       </div>
 
-      <nav className="flex-1 min-h-0 overflow-y-auto px-3 space-y-1" aria-label="Dashboard sections">
+      <nav className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 space-y-1" aria-label="Dashboard sections">
+        {/* Group label. Five unlabelled items and two more below the rule read
+            as one long undifferentiated list; naming the groups is what makes
+            "where am I" answerable at a glance. */}
+        <p className="px-3 pb-1.5 font-mono text-[9.5px] uppercase tracking-[0.16em] text-ink-faint">
+          Workspace
+        </p>
         {VIEWS.map((v) => (
           <NavItem
             key={v.id}
@@ -157,15 +156,6 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
           />
         ))}
       </nav>
-
-      {/* The privacy boundary, stated in the chrome rather than buried in a doc,
-          so it is on screen whenever the product is being demonstrated. */}
-      <div className="mx-3 mb-3 rounded-lg border border-line bg-surface-alt px-3 py-2.5">
-        <p className="text-[11px] leading-relaxed text-ink-faint">
-          <span className="font-bold text-ink-muted">No footage stored.</span>{' '}
-          Frames are discarded after inference; only counts and postures are kept.
-        </p>
-      </div>
 
       {/* Members lives on its own route rather than in the nav above, because
           that nav switches view state inside this page — it shares a polling
@@ -179,6 +169,9 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
           willingly returns. */}
       {can(role, 'members.view') && (
       <div className="border-t border-line px-3 pt-3">
+        <p className="px-3 pb-1.5 font-mono text-[9.5px] uppercase tracking-[0.16em] text-ink-faint">
+          Account
+        </p>
         <Link
           href="/settings/members"
           onClick={() => setOpen(false)}
@@ -219,6 +212,19 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
         )}
       </div>
       )}
+
+      {/* The privacy boundary, stated in the chrome rather than buried in a doc,
+          so it is on screen whenever the product is being demonstrated.
+
+          It sits BELOW both nav groups. It used to sit between them, which cut
+          the sidebar in half and made "Account" read as a separate, unrelated
+          menu rather than the second half of one list. */}
+      <div className="mx-3 mt-3 mb-3 rounded-lg border border-line bg-surface-alt px-3 py-2.5">
+        <p className="text-[11px] leading-relaxed text-ink-faint">
+          <span className="font-bold text-ink-muted">No footage stored.</span>{' '}
+          Frames are discarded after inference; only counts and postures are kept.
+        </p>
+      </div>
 
       <div className="border-t border-line px-3 py-3 space-y-2">
         <div className="flex items-center gap-2.5 px-1">
@@ -308,7 +314,9 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
           </span>
         </div>
 
-        <main className="px-5 sm:px-7 lg:px-9 py-6 lg:py-8 max-w-[1400px]">
+        {/* mx-auto is load-bearing: `max-w` alone pins the column to the left
+            edge and leaves a growing band of dead space on a wide monitor. */}
+        <main className="px-5 sm:px-7 lg:px-9 py-6 lg:py-8 max-w-[1400px] mx-auto">
           {children}
         </main>
       </div>

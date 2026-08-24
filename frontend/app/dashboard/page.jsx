@@ -18,7 +18,7 @@
 
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { RefreshCw, Loader2, Eye } from 'lucide-react';
+import { RefreshCw, Loader2, Eye, ShieldCheck, Check } from 'lucide-react';
 
 import DashboardShell, { VIEWS } from './DashboardShell';
 import OverviewSection from './OverviewSection';
@@ -67,22 +67,34 @@ function ReadOnlyNotice({ capability }) {
   );
 }
 
-/** Page header: title, one line of context, and the section's own action. */
+/**
+ * Page header: title, one line of context, and the section's own action.
+ *
+ * The bottom rule matters more than it looks. Without it the header floats
+ * directly above the first card and reads as part of it, which is why the
+ * sections felt like a stack of boxes rather than a page with a title.
+ *
+ * `items-start` rather than `items-end`: when the action is a two-row control
+ * group (the range picker plus refresh, wrapped on a narrow window) bottom
+ * alignment drags the whole heading block down with it.
+ */
 function PageHeader({ eyebrow, title, subtitle, action }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4">
-      <div>
+    <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4 pb-5 border-b border-line">
+      <div className="min-w-0">
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent mb-2">
           {eyebrow}
         </p>
         <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-[1.15] text-ink">
           {title}
         </h1>
-        <p className="mt-1.5 text-[13.5px] text-ink-muted max-w-xl leading-relaxed">
-          {subtitle}
-        </p>
+        {subtitle && (
+          <p className="mt-2 text-[13.5px] text-ink-muted max-w-2xl leading-relaxed">
+            {subtitle}
+          </p>
+        )}
       </div>
-      {action}
+      {action && <div className="shrink-0">{action}</div>}
     </header>
   );
 }
@@ -311,8 +323,10 @@ function DashboardInner() {
               orgName={org.name}
             />
           ) : (
-            <div className="glass-panel p-6 flex items-center gap-3">
-              <Loader2 className="w-4 h-4 animate-spin text-ink-faint" />
+            /* `min-h` roughly matches the resolved panel, so the page does not
+               collapse to a thin strip and then jump when the plan arrives. */
+            <div className="glass-panel p-6 flex items-center justify-center gap-3 min-h-[220px]">
+              <Loader2 className="w-4 h-4 animate-spin text-ink-faint" aria-hidden="true" />
               <span className="text-[13px] font-medium text-ink-muted">
                 Loading your plan…
               </span>
@@ -327,10 +341,61 @@ function DashboardInner() {
             eyebrow="Reports"
             title="Export activity"
             subtitle="Download recorded telemetry as raw data or an executive summary. Exports contain counts and postures only."
+            action={
+              <RangePicker
+                value={rangeDays}
+                onChange={setRangeDays}
+                coverage={coverage}
+                busy={refreshing}
+              />
+            }
           />
 
-          <div className="max-w-xl">
-            <ReportExport />
+          {/* Two columns rather than a lone `max-w-xl` card stranded in a wide
+              page. The export control is the action; the panel beside it says
+              what an export actually contains — which is the question a
+              facilities manager asks before sending one to their director, and
+              it was previously answerable only by downloading one. */}
+          {/* `items-stretch`, not `items-start`. The two cards hold different
+              amounts of text, and letting each size to its own content left the
+              left one stopping well short of the right — a visibly ragged
+              bottom edge. Stretching makes them one row. */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-stretch">
+            <ReportExport hours={rangeDays * 24} rangeLabel={rangeLabel} />
+
+            <div className="glass-panel p-5 flex flex-col gap-4 h-full">
+              <div className="flex items-center gap-2 text-ink font-bold text-[13.5px] tracking-tight">
+                <ShieldCheck className="w-4 h-4 text-accent" aria-hidden="true" />
+                What an export contains
+              </div>
+
+              <dl className="flex flex-col gap-3">
+                {[
+                  ['Per-zone occupancy', 'Headcount per zone per minute, across the selected window.'],
+                  ['Posture breakdown', 'Sitting, standing and walking totals — as counts, never per person.'],
+                  ['Dwell time', 'How long the zone was occupied, aggregated per minute bucket.'],
+                ].map(([term, detail]) => (
+                  <div key={term} className="flex gap-3">
+                    <Check className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={3} aria-hidden="true" />
+                    <div className="min-w-0">
+                      <dt className="text-[12.5px] font-bold text-ink">{term}</dt>
+                      <dd className="text-[12px] text-ink-muted leading-relaxed mt-0.5">{detail}</dd>
+                    </div>
+                  </div>
+                ))}
+              </dl>
+
+              {/* The anonymity guarantee is structural, not a policy promise —
+                  `zone_minute_stats` holds no person reference at all, so
+                  there is nothing identifying that an export COULD leak. */}
+              <div className="rounded-lg border border-line bg-surface-alt px-3.5 py-3 mt-auto">
+                <p className="text-[11.5px] text-ink-faint leading-relaxed">
+                  <strong className="text-ink-muted font-bold">Nothing identifying is exported.</strong>{' '}
+                  The underlying table holds counts per zone per minute and carries no track id,
+                  coordinate or person reference — so an export physically cannot contain one.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}
