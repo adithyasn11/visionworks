@@ -34,7 +34,7 @@ import {
 import AppHeader from '../../components/AppHeader';
 import LandingFooter from '../../components/LandingFooter';
 import { Banner } from '../../components/AuthFormBits';
-import { formatPrice } from '../../lib/plans';
+import { formatPrice, yearlyPerMonth, yearlySaving } from '../../lib/plans';
 import { confirmPlan } from '../actions';
 
 export default function CheckoutScreen({
@@ -137,15 +137,34 @@ export default function CheckoutScreen({
                   <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-ink group-hover:translate-x-1 transition-transform duration-500">
                     {plan.name}
                   </h1>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-3xl font-black tracking-tight text-accent">
-                      {formatPrice(plan.id, period)}
-                    </span>
-                    {!isFree && (
-                      <span className="text-[13px] font-bold text-ink-faint">
-                        /{period === 'yearly' ? 'year' : 'month'}
+                  <div className="text-right">
+                    <div className="flex items-baseline gap-1.5 justify-end">
+                      <span className="text-3xl font-black tracking-tight text-accent">
+                        {formatPrice(plan.id, period)}
                       </span>
-                    )}
+                      {!isFree && (
+                        <span className="text-[13px] font-bold text-ink-faint">
+                          /{period === 'yearly' ? 'year' : 'month'}
+                        </span>
+                      )}
+                    </div>
+                    {/* The reader is about to commit to the yearly figure, so
+                        it stays the headline — with the per-month equivalent
+                        beneath it, which is the number they compare. */}
+                    {!isFree && period === 'yearly' && (() => {
+                      const pm = yearlyPerMonth(plan.id);
+                      const sv = yearlySaving(plan.id);
+                      const cents = pm !== null && Math.round(pm * 100) % 100 !== 0;
+                      return (
+                        <p className="text-[12px] font-bold text-ink-faint mt-1">
+                          ${pm?.toLocaleString('en-US', {
+                            minimumFractionDigits: cents ? 2 : 0,
+                            maximumFractionDigits: 2,
+                          })}/month
+                          {sv && <span className="text-emerald-500"> · saves ${sv.amount.toLocaleString('en-US')}</span>}
+                        </p>
+                      );
+                    })()}
                   </div>
                 </div>
                 <p className="text-[15px] text-ink-muted font-medium leading-relaxed max-w-lg">

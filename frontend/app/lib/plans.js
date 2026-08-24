@@ -161,6 +161,62 @@ export function formatPrice(id, period = 'monthly') {
 }
 
 /**
+ * What a yearly term works out at PER MONTH.
+ *
+ * WHY THIS EXISTS
+ *
+ * "$490/year" beside "$49/month" is not comparable at a glance, and a reader
+ * asking "is yearly worth it" has to do the division themselves. Showing
+ * "$40.83/month billed yearly" answers it directly.
+ *
+ * Returns a NUMBER, so the caller decides the formatting. Null for an unknown
+ * tier, 0 for a free one — a free tier divided by twelve is still free, not a
+ * missing value.
+ */
+export function yearlyPerMonth(id) {
+  const yearly = planPrice(id, 'yearly');
+  if (yearly === null) return null;
+  if (yearly === 0) return 0;
+  return yearly / 12;
+}
+
+/**
+ * Money saved by paying yearly instead of twelve monthly instalments.
+ *
+ * `{ amount, percent }`, or null when there is nothing to compare — a free
+ * tier, or an unknown one. Computed rather than written into the catalogue as
+ * copy: a hardcoded "save 17%" is a number that silently stops being true the
+ * first time a price changes.
+ */
+export function yearlySaving(id) {
+  const monthly = planPrice(id, 'monthly');
+  const yearly = planPrice(id, 'yearly');
+  if (monthly === null || yearly === null || monthly === 0) return null;
+
+  const full = monthly * 12;
+  const amount = full - yearly;
+  if (amount <= 0) return null;   // yearly is not cheaper; claim nothing
+
+  return { amount, percent: Math.round((amount / full) * 100) };
+}
+
+/**
+ * How many months of a monthly plan the yearly price buys.
+ *
+ * Used for "12 months for the price of 10", which reads better than a
+ * percentage when the ratio is clean. Returns null when it is not a whole
+ * number, so the copy falls back to the percentage rather than printing
+ * "the price of 10.4".
+ */
+export function yearlyEquivalentMonths(id) {
+  const monthly = planPrice(id, 'monthly');
+  const yearly = planPrice(id, 'yearly');
+  if (!monthly || !yearly) return null;
+  const months = yearly / monthly;
+  return Number.isInteger(months) ? months : null;
+}
+
+/**
  * A tier's ceiling for one resource.
  *
  * Returns `Infinity` for an unlimited allowance so a caller can write

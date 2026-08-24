@@ -54,7 +54,7 @@ import {
 import AppHeader from '../components/AppHeader';
 import LandingFooter from '../components/LandingFooter';
 import InvitationsPanel from './InvitationsPanel';
-import { PLANS, formatPrice, planName } from '../lib/plans';
+import { PLANS, formatPrice, planName, yearlyPerMonth, yearlySaving, yearlyEquivalentMonths } from '../lib/plans';
 
 /* ── Setup steps ─────────────────────────────────────────────────────────── */
 
@@ -77,6 +77,16 @@ const STEPS = [
 ];
 
 /* ── Pricing ─────────────────────────────────────────────────────────────── */
+
+/** Money, with cents only when there are any — "$40.83", but "$490". */
+const money = (n) => {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—';
+  const cents = Math.round(n * 100) % 100 !== 0;
+  return `$${n.toLocaleString('en-US', {
+    minimumFractionDigits: cents ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
+};
 
 function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
   const busy = busyPlan === plan.id;
@@ -140,13 +150,29 @@ function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
             </span>
           )}
         </div>
-        {/* Shown only where true, and as the arithmetic rather than a vague
-            "save more" — the yearly price is ten months, not twelve. */}
+        {/* The per-month equivalent, because "$490/year" beside a rival's
+            "$49/month" is not comparable at a glance. */}
         {period === 'yearly' && plan.priceMonthly > 0 && (
-          <p className="text-[12px] font-black text-emerald-500 mt-1.5 uppercase tracking-wider">
-            Two months free
+          <p className={`text-[12px] font-bold mt-1.5 ${dark ? 'opacity-60' : 'text-ink-faint'}`}>
+            {money(yearlyPerMonth(plan.id))}/month, billed yearly
           </p>
         )}
+
+        {/* COMPUTED, not written as copy. "Two months free" was hardcoded and
+            would have gone on claiming two months the first time a price
+            changed — the kind of wrong that survives review because it reads
+            fine. The whole-month phrasing is checkable arithmetic; it falls
+            back to a percentage when the ratio is not whole. */}
+        {period === 'yearly' && (() => {
+          const sv = yearlySaving(plan.id);
+          if (!sv) return null;
+          const months = yearlyEquivalentMonths(plan.id);
+          return (
+            <p className="text-[12px] font-black text-emerald-500 mt-1 uppercase tracking-wider">
+              {months ? `${12 - months} months free` : `Save ${sv.percent}%`}
+            </p>
+          );
+        })()}
 
         <p className={`text-[14px] font-medium leading-relaxed mt-5 transition-colors ${dark ? 'opacity-70 group-hover:opacity-90' : 'text-ink-muted group-hover:text-ink'}`}>
           {plan.blurb}
@@ -211,6 +237,9 @@ export default function HomeScreen({ email, fullName, pendingPlan }) {
   const [busyPlan, setBusyPlan] = useState(null);
 
   const firstName = (fullName ?? '').trim().split(/\s+/)[0] || null;
+  // One number on the toggle, taken from the featured tier — the one most
+  // readers compare against. Each card states its own saving.
+  const featuredSaving = yearlySaving(PLANS.find((p) => p.featured)?.id ?? 'GROWTH');
 
   /**
    * Send the user to checkout for a tier.
@@ -460,7 +489,7 @@ export default function HomeScreen({ email, fullName, pendingPlan }) {
             >
               {[
                 { id: 'monthly', label: 'Monthly' },
-                { id: 'yearly', label: 'Yearly' },
+                { id: 'yearly', label: featuredSaving ? `Yearly · save ${featuredSaving.percent}%` : 'Yearly' },
               ].map(({ id, label }) => (
                 <button
                   key={id}

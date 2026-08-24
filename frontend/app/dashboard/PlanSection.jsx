@@ -43,11 +43,27 @@ import {
   AlertCircle, ArrowRight, Zap,
 } from 'lucide-react';
 
-import { PLANS, planName, formatPrice, getPlan } from '../lib/plans';
+import { PLANS, planName, formatPrice, getPlan, yearlyPerMonth, yearlySaving, yearlyEquivalentMonths } from '../lib/plans';
 import { Banner } from '../components/AuthFormBits';
 import { getPlanUsage, changePlan } from './planActions';
 
 /* ── Formatting ──────────────────────────────────────────────────────────── */
+
+/**
+ * Money, with cents only when there are any.
+ *
+ * "$40.83" for a per-month equivalent, "$490" for a round yearly figure —
+ * printing "$490.00" adds noise to a number that has no cents. Null renders as
+ * a dash rather than "$NaN".
+ */
+const fmtMoney = (n) => {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—';
+  const cents = Math.round(n * 100) % 100 !== 0;
+  return `$${n.toLocaleString('en-US', {
+    minimumFractionDigits: cents ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
+};
 
 /** "24 August 2026", or a dash when there is genuinely no date. */
 const fmtDate = (iso) => {
@@ -181,6 +197,10 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
   // than blank, and the allowances come from the database regardless.
   const current = getPlan(plan);
   const isFree = !current || current.priceMonthly === 0;
+  // The toggle's badge quotes ONE number, so it comes from the featured tier —
+  // the one most readers are comparing. Every tier's own saving is shown on its
+  // own card, so nothing here has to be true of all of them.
+  const growthSaving = yearlySaving(PLANS.find((p) => p.featured)?.id ?? 'GROWTH');
   const remaining = daysUntil(usage?.renewsAt);
 
   return (
@@ -220,9 +240,25 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                   </span>
                 )}
               </div>
+
+              {/* On a yearly term the headline is the amount actually taken,
+                  which is the honest figure — but "$490/year" beside a rival
+                  "$49/month" is not comparable at a glance. The per-month
+                  equivalent answers "is this a good deal" without making the
+                  reader divide. */}
+              {!isFree && period === 'YEARLY' && (
+                <p className="text-[11.5px] font-bold text-accent/80 mt-1">
+                  {fmtMoney(yearlyPerMonth(plan))}/month equivalent
+                </p>
+              )}
+
               {usage && !isFree && (
                 <p className="text-[11.5px] font-bold opacity-45 mt-1">
                   Billed {usage.billingPeriod === 'YEARLY' ? 'yearly' : 'monthly'}
+                  {usage.billingPeriod === 'YEARLY' && (() => {
+                    const s = yearlySaving(plan);
+                    return s ? ` · saving $${s.amount.toLocaleString('en-US')} a year` : null;
+                  })()}
                 </p>
               )}
             </div>
@@ -346,7 +382,10 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
             >
               {[
                 { id: 'MONTHLY', label: 'Monthly' },
-                { id: 'YEARLY', label: 'Yearly' },
+                // The saving is COMPUTED from the catalogue, not written as
+                // copy. A hardcoded "save 17%" is a number that silently stops
+                // being true the first time a price changes.
+                { id: 'YEARLY', label: growthSaving ? `Yearly · save ${growthSaving.percent}%` : 'Yearly' },
               ].map(({ id, label }) => (
                 <button
                   key={id}
@@ -398,22 +437,49 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                   </span>
                 )}
 
-                <div className="flex items-baseline justify-between gap-3 mb-1">
+                <div className="flex items-start justify-between gap-3 mb-1">
                   <h3 className={`text-[16px] font-black tracking-tight ${active ? 'text-accent' : 'text-ink'}`}>
                     {p.name}
                   </h3>
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-[17px] font-black ${active ? 'text-accent' : 'text-ink'}`}>
-                      {formatPrice(p.id, period === 'YEARLY' ? 'yearly' : 'monthly')}
-                    </span>
-                    {p.priceMonthly > 0 && (
-                      <span className="text-[10.5px] font-bold text-ink-faint">
-                        /{period === 'YEARLY' ? 'yr' : 'mo'}
+                  <div className="text-right shrink-0">
+                    <div className="flex items-baseline gap-1 justify-end">
+                      <span className={`text-[17px] font-black ${active ? 'text-accent' : 'text-ink'}`}>
+                        {formatPrice(p.id, period === 'YEARLY' ? 'yearly' : 'monthly')}
                       </span>
+                      {p.priceMonthly > 0 && (
+                        <span className="text-[10.5px] font-bold text-ink-faint">
+                          /{period === 'YEARLY' ? 'yr' : 'mo'}
+                        </span>
+                      )}
+                    </div>
+                    {/* The yearly total is the honest headline — it is what
+                        would actually be taken — but it is not comparable to a
+                        monthly figure without this line. */}
+                    {period === 'YEARLY' && p.priceMonthly > 0 && (
+                      <p className="text-[10px] font-bold text-ink-faint mt-0.5 whitespace-nowrap">
+                        {fmtMoney(yearlyPerMonth(p.id))}/mo
+                      </p>
                     )}
                   </div>
                 </div>
-                <p className="text-[11.5px] text-ink-faint font-bold mb-4">{p.tagline}</p>
+                <p className="text-[11.5px] text-ink-faint font-bold mb-3">{p.tagline}</p>
+
+                {/* Stated as the arithmetic rather than a vague "save more":
+                    twelve months for the price of ten is checkable, and it
+                    falls back to the percentage when the ratio is not whole. */}
+                {period === 'YEARLY' && (() => {
+                  const sv = yearlySaving(p.id);
+                  if (!sv) return null;
+                  const months = yearlyEquivalentMonths(p.id);
+                  return (
+                    <p className="text-[10.5px] font-black text-emerald-600 dark:text-emerald-400 mb-3 uppercase tracking-wide">
+                      {months
+                        ? `12 months for the price of ${months}`
+                        : `Save ${sv.percent}%`}
+                      {' · '}{fmtMoney(sv.amount)} a year
+                    </p>
+                  );
+                })()}
 
                 <ul className="flex flex-col gap-2 flex-1">
                   {p.features.map((f) => (
