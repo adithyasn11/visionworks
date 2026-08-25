@@ -1,4 +1,7 @@
 # backend/app/api/routers/zones.py
+import logging
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -8,7 +11,90 @@ from app.db.schemas import ZoneCreate, ZoneResponse
 from app.api.deps import resolve_org, resolve_org_role
 from app.api.permissions import can, denial_message
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _mirror_zone_to_postgres(org_id: str, camera_name: str, zone_id: str, polygon: list) -> None:
+    """
+    Ensures a Postgres `zones` row exists NAMED `zone_id`, under the Postgres
+    camera of name `camera_name`, in this org.
+
+    WHY THE POSTGRES `name` HOLDS A `zone_id`, NOT THE HUMAN LABEL.
+    `minute_aggregator.sync_to_postgres_sync()` calls
+    `_resolve_ids(row["org_id"], row["camera_id"], row["zone_id"], cache)` —
+    it passes the SQLite `zone_id` (e.g. "workstation_01"), not `zone_name`
+    (e.g. "Workstation 1"), as the value `_resolve_ids` matches against
+    Postgres `zones.name`. Mirroring under the human-readable label instead
+    would create a Postgres row nothing ever looks up, and buckets would stay
+    unmapped exactly as before. This function matches what the aggregator
+    actually queries for, not what a user would recognise on a form — an
+    inconsistency in the existing sync design, not a choice made here.
+
+    WHY THIS EXISTS AT ALL. `_resolve_ids()` deliberately never invents a
+    missing camera or zone (see that function's own docstring) — fabricating
+    one would attribute telemetry to configuration the user never drew. That
+    means a zone drawn here, in the local pipeline's zone editor, must ALSO
+    exist in Postgres under the name the aggregator will look for, or every
+    bucket for it stays unmapped forever with nothing to fix it. This is that
+    missing other half: when a zone is actually saved here (a real user
+    action, not a guess), mirror it into Postgres immediately. Best-effort —
+    a Postgres outage or missing service-role key must not block saving the
+    zone locally, which is what the pipeline actually depends on to run.
+    """
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not key or "your-" in key:
+        return
+
+    import json
+    import urllib.parse
+    import urllib.request
+    from datetime import datetime, timezone
+
+    base = (os.getenv("SUPABASE_URL") or "").rstrip("/")
+    headers = {"apikey": key, "Authorization": f"Bearer {key}", "Accept": "application/json"}
+
+    def get(table: str, params: dict):
+        url = f"{base}/rest/v1/{table}?{urllib.parse.urlencode(params)}"
+        request = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return json.loads(response.read().decode("utf-8") or "[]")
+
+    try:
+        cameras = get("cameras", {"select": "id", "orgId": f"eq.{org_id}", "name": f"eq.{camera_name}", "limit": "1"})
+        if not cameras:
+            # No Postgres camera by this name yet — nothing to attach the zone
+            # to. Not an error: a user may draw zones before that camera is
+            # registered through the onboarding flow.
+            return
+        camera_id = cameras[0]["id"]
+
+        existing = get("zones", {"select": "id", "cameraId": f"eq.{camera_id}", "name": f"eq.{zone_id}", "limit": "1"})
+        if existing:
+            return
+
+        # `polygon` is NOT NULL jsonb in Postgres; PostgREST wants the JSON
+        # array encoded directly, not as a string. `updatedAt` is Prisma's
+        # client-side @updatedAt with no DB default — the same trap
+        # minute_aggregator.sync_to_postgres_sync() already documents.
+        payload = json.dumps([{
+            "orgId": org_id,
+            "cameraId": camera_id,
+            "name": zone_id,
+            "polygon": polygon,
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+        }]).encode("utf-8")
+        request = urllib.request.Request(
+            f"{base}/rest/v1/zones",
+            data=payload,
+            headers={**headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:
+            if response.status not in (200, 201, 204):
+                logger.warning(f"Postgres zone mirror returned {response.status} for '{zone_name}'")
+    except Exception as e:
+        logger.warning(f"Could not mirror zone '{zone_id}' to Postgres: {type(e).__name__}: {e}")
 
 
 # Zones are org-scoped for the same reason telemetry is. Two organisations both
@@ -135,6 +221,7 @@ def create_or_update_zone(
         existing.homography_matrix = zone.homography_matrix
         db.commit()
         db.refresh(existing)
+        _mirror_zone_to_postgres(org_id, existing.camera_id, existing.zone_id, existing.polygon_coordinates)
         return existing
 
     # `zone_id` is the PRIMARY KEY of this table, so it is unique across the
@@ -163,4 +250,5 @@ def create_or_update_zone(
     db.add(db_zone)
     db.commit()
     db.refresh(db_zone)
+    _mirror_zone_to_postgres(org_id, db_zone.camera_id, db_zone.zone_id, db_zone.polygon_coordinates)
     return db_zone

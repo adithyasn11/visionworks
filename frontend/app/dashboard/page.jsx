@@ -36,7 +36,11 @@ import RangePicker from './RangePicker';
 import AlertsPanel from './AlertsPanel';
 import { can, denialMessage } from '../lib/permissions';
 
-const CAMERA_ID = 'live_webcam';
+// Must match a camera actually registered for this org — both in the local
+// pipeline registry (backend/app/api/routers/cameras.py) and by NAME in
+// Postgres `cameras` (see minute_aggregator._resolve_ids), or telemetry is
+// captured but never syncs to the dashboard's data source.
+const CAMERA_ID = 'floor5';
 const WINDOW_HOURS = 24;
 const REFRESH_MS = 15000;
 
@@ -277,7 +281,7 @@ function DashboardInner() {
           {!can(role, 'analysis.run') && role && <ReadOnlyNotice capability="analysis.run" />}
 
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
-            <VideoCanvasPlayer activeZones={activeZones} readOnly={!can(role, 'analysis.run')} />
+            <VideoCanvasPlayer activeZones={activeZones} readOnly={!can(role, 'analysis.run')} cameraId={CAMERA_ID} />
             <FloorplanHeatmap />
           </div>
         </div>

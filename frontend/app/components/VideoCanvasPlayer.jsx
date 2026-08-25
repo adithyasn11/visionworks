@@ -78,7 +78,7 @@ function drawHUD(ctx, canvas, entities, zones, enableBlur) {
  * processing WebSockets refuse a VIEWER server-side (layer 2), and any rows
  * that did reach the database are still org-scoped by RLS (layer 3).
  */
-export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = false }) => {
+export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = false, cameraId = 'live_webcam' }) => {
   const canvasRef   = useRef(null);
   const containerRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -91,6 +91,12 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   // Holds startBackendDirectWebcam, which is declared further down but needs to
   // be callable from startLiveWebcam's error/catch paths above it.
   const startBackendDirectWebcamRef = useRef(null);
+  // Bumped by every connect/reset/unmount so an in-flight `await
+  // backendSocketUrl(...)` can tell it is no longer the active attempt and
+  // close the socket it just opened instead of installing it into wsRef —
+  // otherwise a fast Reset/Upload double-click during that await window
+  // leaks an orphaned, uncleaned-up WebSocket.
+  const connectionEpochRef = useRef(0);
 
   const [phase, setPhase] = useState('idle'); // idle | uploading | processing | webcam | done | error
   const [fileName, setFileName] = useState('');
@@ -142,7 +148,12 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   const connectProcessingWS = useCallback(async (sid) => {
     if (wsRef.current) wsRef.current.close();
 
+    const epoch = ++connectionEpochRef.current;
     const ws = new WebSocket(await backendSocketUrl(`/api/v1/video/process/${sid}`));
+    // A Reset or a second connect attempt during the await above must win —
+    // otherwise this socket overwrites wsRef.current with a connection nothing
+    // will ever close.
+    if (connectionEpochRef.current !== epoch) { ws.close(); return; }
     wsRef.current = ws;
 
     ws.onopen  = () => setStatusMsg('Connected — AI pipeline running on RTX 4060 GPU...');
@@ -169,6 +180,9 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   // Declared before handleFileChange / startLiveWebcam because both call it;
   // `const` bindings are not hoisted, so defining it later threw a ReferenceError.
   const stopWebcamStream = useCallback(() => {
+    // Invalidates any connect attempt still awaiting backendSocketUrl(), so it
+    // closes its socket instead of installing it after we just cleaned up.
+    connectionEpochRef.current += 1;
     if (captureIntervalRef.current) {
       clearInterval(captureIntervalRef.current);
       captureIntervalRef.current = null;
@@ -176,6 +190,12 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => track.stop());
       localStreamRef.current = null;
+    }
+    // Detach the stopped stream from the hidden <video> element too — leaving
+    // it attached keeps the (now-stopped) tracks referenced and a stale
+    // srcObject around for the next startLiveWebcam() to trip over.
+    if (hiddenVideoRef.current) {
+      hiddenVideoRef.current.srcObject = null;
     }
     if (wsRef.current) {
       try {
@@ -227,6 +247,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('camera_id', cameraId);
 
       const res = await backendFetch('/api/v1/video/upload', {
         method: 'POST',
@@ -250,11 +271,16 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       setPhase('error');
       setStatusMsg(`Upload error: ${err.message}`);
     }
-  }, [connectProcessingWS]);
+  }, [connectProcessingWS, cameraId]);
 
   // Start Live Webcam Stream
   const startLiveWebcam = useCallback(async () => {
     handleReset();
+    // Captured AFTER handleReset (which bumps the epoch via stopWebcamStream),
+    // so this attempt has its own id to check against once the awaits below
+    // resolve — a second click or a Reset while getUserMedia/backendSocketUrl
+    // is pending must not let this stream/socket land afterwards.
+    const epoch = connectionEpochRef.current;
     setPhase('webcam');
     setIsWebcamActive(true);
     setStatusMsg('Requesting camera permission & initializing RTX 4060 GPU...');
@@ -264,6 +290,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: { ideal: 960 }, height: { ideal: 540 }, facingMode: 'user' }
       });
+      if (connectionEpochRef.current !== epoch) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       localStreamRef.current = stream;
 
       if (hiddenVideoRef.current) {
@@ -272,7 +302,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       }
 
       // Connect WebSocket to process_webcam_frame (Zero-Lag ACK Pipelining)
-      const ws = new WebSocket(await backendSocketUrl('/api/v1/video/process_webcam_frame'));
+      const ws = new WebSocket(await backendSocketUrl(
+        `/api/v1/video/process_webcam_frame?camera_id=${encodeURIComponent(cameraId)}`
+      ));
+      if (connectionEpochRef.current !== epoch) { ws.close(); return; }
       wsRef.current = ws;
 
       let isAwaitingResponse = false;
@@ -330,6 +363,14 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
 
       ws.onerror = () => {
         setStatusMsg('WebSocket connection error — using backend camera stream fallback...');
+        // The browser's own camera stream is being abandoned for the backend's
+        // direct capture — stop it here or the camera indicator stays lit and
+        // the track keeps running for a stream nothing is reading from anymore.
+        if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach((t) => t.stop());
+          localStreamRef.current = null;
+        }
+        if (hiddenVideoRef.current) hiddenVideoRef.current.srcObject = null;
         startBackendDirectWebcamRef.current?.();
       };
 
@@ -347,15 +388,19 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       // Fallback: connect directly to backend /live_webcam
       startBackendDirectWebcamRef.current?.();
     }
-  }, [handleFrame, handleReset]);
+  }, [handleFrame, handleReset, cameraId]);
 
   // Fallback: backend direct camera capture.
   // Reached from startLiveWebcam through startBackendDirectWebcamRef, so the
   // call sites above do not depend on this declaration order.
   const startBackendDirectWebcam = useCallback(async () => {
     if (wsRef.current) wsRef.current.close();
+    const epoch = connectionEpochRef.current;
 
-    const ws = new WebSocket(await backendSocketUrl('/api/v1/video/live_webcam'));
+    const ws = new WebSocket(await backendSocketUrl(
+      `/api/v1/video/live_webcam?camera_id=${encodeURIComponent(cameraId)}`
+    ));
+    if (connectionEpochRef.current !== epoch) { ws.close(); return; }
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -381,7 +426,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       setPhase('error');
       setStatusMsg('Failed to open camera on backend or browser.');
     };
-  }, [handleFrame]);
+  }, [handleFrame, cameraId]);
 
   // Keep the ref pointing at the latest implementation so callers declared
   // earlier in the component can reach it.
@@ -414,6 +459,17 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     setProgress(targetPct);
     setCurrentTimeSec(targetTime);
     wsRef.current.send(JSON.stringify({ action: 'seek', pct: targetPct }));
+  };
+
+  // The checkbox only controlled local drawing state — drawHUD never read it,
+  // and the actual blur runs server-side (video_upload.py's privacy_state),
+  // toggled only by this message. Without sending it the control did nothing:
+  // frames stayed blurred (or not) regardless of what the user clicked.
+  const toggleBlur = (checked) => {
+    setEnableBlur(checked);
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ action: 'set_privacy_blur', enabled: checked }));
+    }
   };
 
   const toggleFullScreen = () => {
@@ -643,7 +699,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
               <input
                 type="checkbox"
                 checked={enableBlur}
-                onChange={(e) => setEnableBlur(e.target.checked)}
+                onChange={(e) => toggleBlur(e.target.checked)}
                 className="accent-[color:var(--accent)] cursor-pointer"
               />
             </label>

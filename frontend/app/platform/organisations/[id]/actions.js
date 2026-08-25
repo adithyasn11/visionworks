@@ -82,12 +82,21 @@ export async function setSuspended(orgId, suspended) {
 
   if (!before) return { ok: false, error: 'Organisation not found.' };
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('organisations')
     .update({ deletedAt: suspended ? new Date().toISOString() : null })
-    .eq('id', orgId);
+    .eq('id', orgId)
+    // An UPDATE whose row is filtered away by RLS is not an error — it is a
+    // successful statement that matched nothing (the same silent-success bug
+    // fixed in settings/members/actions.js and onboarding/actions.js). Asking
+    // for the row back turns that silence into an empty array we can detect,
+    // instead of telling the operator "Saved." for a write that did nothing.
+    .select('id');
 
   if (error) return { ok: false, error: error.message };
+  if (!updated || updated.length === 0) {
+    return { ok: false, error: 'That organisation could not be updated.' };
+  }
 
   await audit(supabase, {
     action: suspended ? 'platform.org_suspended' : 'platform.org_restored',
@@ -139,12 +148,18 @@ export async function setRetentionDays(orgId, days) {
     return { ok: true, unchanged: true };
   }
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('organisations')
     .update({ dataRetentionDays: parsed })
-    .eq('id', orgId);
+    .eq('id', orgId)
+    // See the matching comment in setSuspended() above — an RLS-filtered
+    // UPDATE returns no error, so the row must be asked for explicitly.
+    .select('id');
 
   if (error) return { ok: false, error: error.message };
+  if (!updated || updated.length === 0) {
+    return { ok: false, error: 'That organisation could not be updated.' };
+  }
 
   await audit(supabase, {
     action: 'platform.retention_changed',

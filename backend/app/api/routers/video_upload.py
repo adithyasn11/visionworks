@@ -760,11 +760,17 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
         from app.cv.anonymizer import PrivacyAnonymizer
 
         pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
-        zones_config = load_zones_for_camera("browser_camera", org_id=org_id)
+        # Same camera id as the /live_webcam fallback and as ZoneEditor's default
+        # `cameraId` prop in the frontend (see dashboard/page.jsx CAMERA_ID). The
+        # browser-camera and backend-direct-camera paths are two ways of reaching
+        # the SAME "Live feed" the user draws zones against — there is no camera
+        # picker in the UI, so they must share one id or zones drawn here would
+        # silently attribute to DEFAULT_ZONES instead of what the user configured.
+        zones_config = load_zones_for_camera("live_webcam", org_id=org_id)
         spatial_engine = SpatialEngine(zones_config=zones_config)
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
-        activity_writer = ActivityLogWriter(camera_id="browser_camera", org_id=org_id)
+        activity_writer = ActivityLogWriter(camera_id="live_webcam", org_id=org_id)
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})

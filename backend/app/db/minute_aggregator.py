@@ -615,11 +615,40 @@ async def sync_to_postgres(**kwargs) -> dict:
     return await asyncio.to_thread(sync_to_postgres_sync, **kwargs)
 
 
+def unsynced_bucket_count_sync(org_id: str | None = None) -> int:
+    """
+    How many local buckets have never reached Postgres.
+
+    This is the number that was silently zero-looking on the dashboard while
+    actually being nonzero in SQLite: `synced_at IS NULL` forever, with no
+    surface anywhere that showed it. Exposed so a caller (an admin endpoint,
+    a health page) can show it rather than the sync failing invisibly.
+    """
+    ensure_bucket_table()
+    session = SessionLocal()
+    try:
+        query = "SELECT count(*) FROM zone_minute_stats WHERE synced_at IS NULL"
+        params = {}
+        if org_id is not None:
+            query += " AND org_id = :org_id"
+            params["org_id"] = org_id
+        return int(session.execute(text(query), params).scalar() or 0)
+    finally:
+        session.close()
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 #  BACKGROUND TIMER
 # ═══════════════════════════════════════════════════════════════════════════
 
 AGGREGATE_INTERVAL_SECONDS = 60
+
+# Below this, an unmapped bucket most likely means "the zone was drawn a
+# minute after this bucket closed" and will resolve on its own next tick.
+# Above it, something is structurally wrong (no camera of that name was ever
+# registered) and staying quiet about it is how this bug went unnoticed the
+# first time.
+UNMAPPED_ALERT_THRESHOLD = 5
 
 
 async def run_aggregator_loop(stop_event: asyncio.Event | None = None) -> None:
@@ -654,6 +683,20 @@ async def run_aggregator_loop(stop_event: asyncio.Event | None = None) -> None:
                         logger.info(
                             f"Synced {pushed.get('synced', 0)} buckets to Postgres"
                             f" ({pushed.get('unmapped', 0)} unmapped)"
+                        )
+                    # Buckets left unmapped are invisible to every dashboard —
+                    # they never reach Postgres, so nothing downstream can even
+                    # know they exist. A one-off unmapped bucket is normal (a
+                    # zone drawn after the fact catches up next tick); a bucket
+                    # left unmapped for a long time means a camera/zone name
+                    # will never resolve on its own, which is worth a louder
+                    # signal than the per-row warning inside _resolve_ids.
+                    if pushed.get("unmapped", 0) >= UNMAPPED_ALERT_THRESHOLD:
+                        logger.error(
+                            f"{pushed['unmapped']} minute buckets could not be mapped "
+                            f"to a registered camera/zone and will stay unsynced until "
+                            f"one is registered with a matching name — see "
+                            f"minute_aggregator._resolve_ids."
                         )
 
             # Rules are evaluated on every tick, not only when buckets were

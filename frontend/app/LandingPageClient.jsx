@@ -55,8 +55,8 @@ export default function LandingPageClient() {
               >
                 Start for free <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
               </Link>
-              <a 
-                href="#demo"
+              <a
+                href="#platform"
                 className="bg-surface text-ink border-2 border-line px-8 py-4 rounded-2xl font-bold text-base hover:border-[color:var(--accent)] hover:bg-surface-alt hover:-translate-y-1 hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-3 group/btn2"
               >
                 <PlayCircle className="w-5 h-5 group-hover/btn2:scale-110 group-hover/btn2:text-accent transition-transform" /> Watch demo

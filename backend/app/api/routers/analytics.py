@@ -290,6 +290,30 @@ def export_pdf_report(
     )
 
 
+@router.get("/sync_health")
+def get_sync_health(org_id: Optional[str] = Depends(current_org)):
+    """
+    How many locally-aggregated minute buckets have not reached Postgres yet.
+
+    Not org-defensive in the paranoid sense — an unsynced count leaks no
+    occupancy data, only a number of pending rows — but still returns 0 rather
+    than the whole installation's count when there is no verified caller, for
+    the same "report nothing rather than everything" reason every other
+    endpoint here follows.
+
+    A persistently nonzero count means telemetry is being produced under a
+    camera/zone name that does not match anything registered in this org (see
+    minute_aggregator._resolve_ids) — the dashboard's Overview page reads from
+    Postgres, not SQLite, so those buckets are invisible until this resolves.
+    """
+    if org_id is None:
+        return {"unsynced_buckets": 0}
+
+    from app.db.minute_aggregator import unsynced_bucket_count_sync
+
+    return {"unsynced_buckets": unsynced_bucket_count_sync(org_id)}
+
+
 @router.get("/heatmap")
 def get_floorplan_heatmap(
     hours: int = Query(24, ge=1, le=168),

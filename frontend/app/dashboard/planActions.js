@@ -25,6 +25,21 @@ import { createClient } from '../lib/supabase/server';
 import { isPlanId } from '../lib/plans';
 
 /**
+ * Resolve the caller. getUser(), never getSession(): a Server Action is a POST
+ * endpoint the browser can call directly, so the cookie's own claims are not
+ * evidence. Same pattern as home/actions.js and onboarding/actions.js.
+ */
+async function requireUser() {
+  const supabase = createClient();
+  if (!supabase) {
+    return { error: 'Supabase is not configured.' };
+  }
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data?.user) return { error: 'Your session has expired. Please sign in again.' };
+  return { supabase, user: data.user };
+}
+
+/**
  * `{ ok, usage }` for the caller's current organisation.
  *
  * Returns `ok: false` rather than throwing on every failure path, because the
