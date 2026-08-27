@@ -213,8 +213,8 @@ function buildPosture(summary, palette) {
  */
 function useChartPalette() {
   const read = () => ({
-    series: cssVar('--chart-1', '#DC2626'),
-    grid: cssVar('--chart-grid', '#E7E5E9'),
+    series: cssVar('--chart-1', '#C7362F'),
+    grid: cssVar('--chart-grid', '#ECEAE7'),
     axis: cssVar('--chart-axis', '#6B6772'),
     tooltipBg: cssVar('--chart-tooltip-bg', '#FFFFFF'),
     line: cssVar('--line', '#E7E5E9'),

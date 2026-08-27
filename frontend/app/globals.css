@@ -353,26 +353,36 @@ html.theme-switching body {
    through the six checks (lightness band, chroma floor, CVD separation,
    normal-vision floor, contrast vs surface) against their own surface.
 
-   LIGHT  #B91C1C #D97706 #9A3412 — all five checks PASS on #FAFAFA.
-   DARK   #D13A3A #B8821A #2F8FB8 — PASS except a CVD WARN (deutan dE 7.1) on
-          the red/amber pair, which is why every posture slice is DIRECT
-          LABELLED. Colour is never the only channel carrying identity.
+   LIGHT  #C7362F #3B62B0 #B7791F — all five checks PASS on #FCFCFB.
+   DARK   #E05A52 #5B87D6 #B0821F — all five checks PASS on #1A1A19.
+
+   WHY THESE ARE NOT THREE REDS. The previous set (#B91C1C #D97706 #9A3412)
+   passed every check — the numbers were fine — and still read as one muddy
+   block, because three warm hues 30 deg apart are *measurably* separable and
+   *perceptually* the same family. A stacked posture bar drawn in them looked
+   like a single red bar with seams. Separation that only a validator can see
+   is not separation.
+
+   Red stays first so the brand accent still leads the series, but the second
+   and third slots cross into cool and gold, which lifts the worst adjacent
+   normal-vision pair from dE 18.8 to 28.1 and, more to the point, makes the
+   three segments legible as three things at a glance.
 
    Dark is a separately chosen set rather than a lightened copy: the dark band
-   is narrow, and a flipped light palette failed both lightness and contrast. */
+   is narrow (L 0.48-0.67) and a flipped light palette failed it outright. */
 :root {
-  --chart-1:    #B91C1C;
-  --chart-2:    #D97706;
-  --chart-3:    #9A3412;
-  --chart-grid: #E7E5E9;
+  --chart-1:    #C7362F;
+  --chart-2:    #3B62B0;
+  --chart-3:    #B7791F;
+  --chart-grid: #ECEAE7;
   --chart-axis: #6B6772;
   --chart-tooltip-bg: #FFFFFF;
 }
 
 .dark {
-  --chart-1:    #D13A3A;
-  --chart-2:    #B8821A;
-  --chart-3:    #2F8FB8;
+  --chart-1:    #E05A52;
+  --chart-2:    #5B87D6;
+  --chart-3:    #B0821F;
   --chart-grid: #2A272E;
   --chart-axis: #8B8792;
   --chart-tooltip-bg: #1C1A1F;

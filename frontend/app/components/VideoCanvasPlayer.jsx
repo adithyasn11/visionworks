@@ -17,10 +17,14 @@ import { backendFetch, backendSocketUrl } from '../lib/backend';
    postures are separated by weight along one red ramp rather than by unrelated
    hues, so the overlay belongs to the same product as everything under it.
    UNKNOWN stays neutral so an unclassified box never looks like a state. */
+/* Matches the posture slots in the dashboard's chart palette (--chart-1/2/3 in
+   globals.css), so a person boxed as STANDING on the video carries the same hue
+   as the STANDING segment of the posture bar. These are the DARK-mode steps:
+   the overlay is always drawn on video, never on the page ground. */
 const POSTURE_COLORS = {
-  SITTING:  '#DC2626',
-  STANDING: '#F0736F',
-  WALKING:  '#F7B4B0',
+  SITTING:  '#E05A52',
+  STANDING: '#5B87D6',
+  WALKING:  '#B0821F',
   UNKNOWN:  '#8B8792',
 };
 
