@@ -706,27 +706,41 @@ async def run_aggregator_loop(stop_event: asyncio.Event | None = None) -> None:
                 logger.info(
                     f"Aggregated {summary['buckets']} buckets from {summary['samples']} samples"
                 )
-                if service_role_configured():
-                    pushed = await sync_to_postgres()
-                    if pushed.get("synced") or pushed.get("unmapped"):
-                        logger.info(
-                            f"Synced {pushed.get('synced', 0)} buckets to Postgres"
-                            f" ({pushed.get('unmapped', 0)} unmapped)"
-                        )
-                    # Buckets left unmapped are invisible to every dashboard —
-                    # they never reach Postgres, so nothing downstream can even
-                    # know they exist. A one-off unmapped bucket is normal (a
-                    # zone drawn after the fact catches up next tick); a bucket
-                    # left unmapped for a long time means a camera/zone name
-                    # will never resolve on its own, which is worth a louder
-                    # signal than the per-row warning inside _resolve_ids.
-                    if pushed.get("unmapped", 0) >= UNMAPPED_ALERT_THRESHOLD:
-                        logger.error(
-                            f"{pushed['unmapped']} minute buckets could not be mapped "
-                            f"to a registered camera/zone and will stay unsynced until "
-                            f"one is registered with a matching name — see "
-                            f"minute_aggregator._resolve_ids."
-                        )
+
+            # SYNC RUNS EVERY TICK, NOT ONLY WHEN THIS ONE AGGREGATED SOMETHING.
+            #
+            # THE BUG THIS FIXES. Sync used to sit inside the `if buckets:`
+            # branch above. The final minute of a session aggregates on one
+            # tick; if that tick's push failed, or the bucket closed after it,
+            # the NEXT tick produced no new buckets — so sync never ran and the
+            # rows sat unsynced forever. In practice that meant analysis
+            # stopped appearing on the dashboard the moment you stopped
+            # uploading, which is exactly when a user goes to look at it.
+            #
+            # Unsynced rows are durable state, not an event, so the trigger has
+            # to be "is there anything pending" rather than "did something just
+            # happen".
+            if service_role_configured():
+                pushed = await sync_to_postgres()
+                if pushed.get("synced") or pushed.get("unmapped"):
+                    logger.info(
+                        f"Synced {pushed.get('synced', 0)} buckets to Postgres"
+                        f" ({pushed.get('unmapped', 0)} unmapped)"
+                    )
+                # Buckets left unmapped are invisible to every dashboard —
+                # they never reach Postgres, so nothing downstream can even
+                # know they exist. A one-off unmapped bucket is normal (a
+                # zone drawn after the fact catches up next tick); a bucket
+                # left unmapped for a long time means a camera/zone name
+                # will never resolve on its own, which is worth a louder
+                # signal than the per-row warning inside _resolve_ids.
+                if pushed.get("unmapped", 0) >= UNMAPPED_ALERT_THRESHOLD:
+                    logger.error(
+                        f"{pushed['unmapped']} minute buckets could not be mapped "
+                        f"to a registered camera/zone and will stay unsynced until "
+                        f"one is registered with a matching name — see "
+                        f"minute_aggregator._resolve_ids."
+                    )
 
             # Rules are evaluated on every tick, not only when buckets were
             # written. CAMERA_OFFLINE fires precisely BECAUSE nothing arrived,
