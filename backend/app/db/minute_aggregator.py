@@ -546,9 +546,20 @@ def sync_to_postgres_sync(limit: int = 500) -> dict:
             return {"synced": 0, "unmapped": 0}
 
         cache: dict = {}
-        payload, synced_ids, unmapped = [], [], 0
+        payload, synced_ids, unmapped, skipped_ids = [], [], 0, []
 
         for row in rows:
+            # TRANSIT_ZONE is the synthetic bucket for "inside the frame but not
+            # inside any drawn zone" (see SpatialEngine.check_zone_containment).
+            # It is not a place the user configured and no Postgres `zones` row
+            # will ever carry that name, so retrying it every 60s would warn
+            # forever about something that can never resolve. Stamp it synced to
+            # retire it: the occupancy it represents is still counted locally,
+            # it simply has no zone to be attributed to upstream.
+            if row["zone_id"] == "TRANSIT_ZONE":
+                skipped_ids.append(row["id"])
+                continue
+
             resolved = _resolve_ids(row["org_id"], row["camera_id"], row["zone_id"], cache)
             if resolved is None:
                 unmapped += 1
@@ -575,8 +586,21 @@ def sync_to_postgres_sync(limit: int = 500) -> dict:
             })
             synced_ids.append(row["id"])
 
+        def retire_skipped(stamp: str) -> None:
+            """Stamp TRANSIT_ZONE buckets synced so they stop being re-read."""
+            for row_id in skipped_ids:
+                session.execute(
+                    text("UPDATE zone_minute_stats SET synced_at = :now WHERE id = :id"),
+                    {"now": stamp, "id": row_id},
+                )
+
         if not payload:
-            return {"synced": 0, "unmapped": unmapped}
+            # Still retire the transit rows — otherwise a batch containing only
+            # those would loop on them forever.
+            if skipped_ids:
+                retire_skipped(datetime.now(timezone.utc).isoformat())
+                session.commit()
+            return {"synced": 0, "unmapped": unmapped, "skipped_transit": len(skipped_ids)}
 
         request = urllib.request.Request(
             f"{base}/rest/v1/zone_minute_stats?on_conflict=zoneId,bucketStart",
@@ -599,8 +623,13 @@ def sync_to_postgres_sync(limit: int = 500) -> dict:
                 text("UPDATE zone_minute_stats SET synced_at = :now WHERE id = :id"),
                 {"now": stamp, "id": row_id},
             )
+        retire_skipped(stamp)
         session.commit()
-        return {"synced": len(synced_ids), "unmapped": unmapped}
+        return {
+            "synced": len(synced_ids),
+            "unmapped": unmapped,
+            "skipped_transit": len(skipped_ids),
+        }
 
     except Exception as e:
         session.rollback()

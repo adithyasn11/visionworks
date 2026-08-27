@@ -11,7 +11,7 @@ Handles:
   - WS   /process_webcam_frame -> Real-time browser camera stream processed through RTX 4060 GPU
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect, Depends, Header
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect, Depends, Header
 from typing import Optional
 import os
 import shutil
@@ -82,6 +82,47 @@ DEFAULT_ZONES = [
         "polygon": [[500, 60], [900, 60], [900, 480], [500, 480]],
     },
 ]
+
+
+def resolve_registered_camera(camera_id: Optional[str], org_id: Optional[str]) -> Optional[str]:
+    """
+    Validates a caller-supplied camera_id against this organisation's own
+    registered cameras, returning it only if it genuinely exists and is theirs.
+
+    WHY THIS MATTERS. Telemetry is synced to Postgres by matching the local
+    camera_id/zone_id against a Postgres row BY NAME (see
+    minute_aggregator._resolve_ids, which deliberately never invents a missing
+    one). A session that runs under an auto-generated name like
+    "upload_<session>" therefore produces buckets that can never be mapped to
+    anything the user registered, and they stay unsynced forever — captured,
+    but invisible to every dashboard.
+
+    Returning the id only when it is both real and owned by the caller keeps
+    this from becoming a way to write into another tenant's camera. None means
+    "not registered, or none supplied", and the caller falls back to its
+    previous ad-hoc id rather than failing the session outright — a video that
+    processes with unmapped telemetry is still better than one that refuses to
+    run at all.
+    """
+    if not camera_id or not org_id:
+        return None
+
+    from app.db.database import SessionLocal
+    from app.db.models import CameraModel
+
+    session = SessionLocal()
+    try:
+        row = (
+            session.query(CameraModel)
+            .filter(CameraModel.camera_id == camera_id, CameraModel.org_id == org_id)
+            .first()
+        )
+        return row.camera_id if row is not None else None
+    except Exception as e:
+        logger.warning(f"Could not validate camera_id '{camera_id}': {e}")
+        return None
+    finally:
+        session.close()
 
 
 def load_zones_for_camera(camera_id: str, org_id: str = None) -> list:
@@ -207,11 +248,17 @@ def get_processing_status(org_id: str = Depends(require_analysis_run)):
 @router.post("/upload")
 async def upload_video_file(
     file: UploadFile = File(...),
+    camera_id: Optional[str] = Form(default=None),
     org_id: str = Depends(require_analysis_run),
 ):
     """
     Uploads a video file to sample_videos/ and returns a session_id.
     The frontend then connects via WS /api/v1/video/process/{session_id} to receive frames.
+
+    `camera_id` is optional and, when given, must name a camera already
+    registered in the caller's own organisation — see
+    resolve_registered_camera(). Omitting it keeps the previous behaviour of an
+    ad-hoc per-session camera, whose telemetry will not sync to the dashboard.
     """
     allowed_exts = ('.mp4', '.avi', '.webm', '.mov', '.mkv')
     if not file.filename or not file.filename.lower().endswith(allowed_exts):
@@ -233,11 +280,21 @@ async def upload_video_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save video: {e}")
 
+    # See resolve_registered_camera(). None (unregistered id, or none given)
+    # falls back to the ad-hoc "upload_<session_id>" camera at process time.
+    resolved_camera_id = resolve_registered_camera(camera_id, org_id)
+    if camera_id and not resolved_camera_id:
+        logger.warning(
+            f"Session {session_id}: camera_id '{camera_id}' is not registered "
+            f"in this organisation; telemetry will not sync to the dashboard."
+        )
+
     _active_sessions[session_id] = {
         # The owning organisation, taken from the verified token — never from
         # the request. Without it a session id is a bearer token anyone who
         # guesses it can process against.
         "org_id": org_id,
+        "camera_id": resolved_camera_id,
         "filename": safe_name,
         "path": save_path,
         "status": "READY",
@@ -330,14 +387,19 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         from app.cv.activity_aggregator import ActivityAggregator
         from app.cv.anonymizer import PrivacyAnonymizer
 
+        # Prefer the caller's registered camera (resolved at upload time), so
+        # this session's telemetry carries a name the Postgres sync can map.
+        # Falls back to the ad-hoc per-session id when none was supplied.
+        effective_camera_id = session.get("camera_id") or f"upload_{session_id}"
+
         pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
-        zones_config = load_zones_for_camera(f"upload_{session_id}", org_id=org_id)
+        zones_config = load_zones_for_camera(effective_camera_id, org_id=org_id)
         spatial_engine = SpatialEngine(zones_config=zones_config)
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
         # Telemetry for this session is attributed to the uploaded file, so rows
         # from different videos stay distinguishable in activity_logs.
-        activity_writer = ActivityLogWriter(camera_id=f"upload_{session_id}", org_id=org_id)
+        activity_writer = ActivityLogWriter(camera_id=effective_camera_id, org_id=org_id)
 
     except Exception as e:
         logger.error(f"AI init error: {e}")
@@ -547,7 +609,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         # later.
         if getattr(activity_writer, "org_id", None):
             asyncio.create_task(
-                aggregate_after_session(f"upload_{session_id}", activity_writer.org_id)
+                aggregate_after_session(activity_writer.camera_id, activity_writer.org_id)
             )
 
 
@@ -575,6 +637,11 @@ async def live_webcam_websocket(websocket: WebSocket):
         return
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    # See resolve_registered_camera(): a caller may pass ?camera_id=<own camera>
+    # so this session's telemetry maps to something the dashboard can read.
+    requested_camera_id = websocket.query_params.get("camera_id")
+    effective_camera_id = resolve_registered_camera(requested_camera_id, org_id) or "live_webcam"
+
     try:
         from app.cv.pose_estimator import PostureEstimator
         from app.cv.spatial_engine import SpatialEngine
@@ -582,11 +649,11 @@ async def live_webcam_websocket(websocket: WebSocket):
         from app.cv.anonymizer import PrivacyAnonymizer
 
         pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
-        zones_config = load_zones_for_camera("live_webcam", org_id=org_id)
+        zones_config = load_zones_for_camera(effective_camera_id, org_id=org_id)
         spatial_engine = SpatialEngine(zones_config=zones_config)
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
-        activity_writer = ActivityLogWriter(camera_id="live_webcam", org_id=org_id)
+        activity_writer = ActivityLogWriter(camera_id=effective_camera_id, org_id=org_id)
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
@@ -753,6 +820,11 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
         return
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    # See resolve_registered_camera(): a caller may pass ?camera_id=<own camera>
+    # so this session's telemetry maps to something the dashboard can read.
+    requested_camera_id = websocket.query_params.get("camera_id")
+    effective_camera_id = resolve_registered_camera(requested_camera_id, org_id) or "live_webcam"
+
     try:
         from app.cv.pose_estimator import PostureEstimator
         from app.cv.spatial_engine import SpatialEngine
@@ -760,17 +832,17 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
         from app.cv.anonymizer import PrivacyAnonymizer
 
         pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
-        # Same camera id as the /live_webcam fallback and as ZoneEditor's default
-        # `cameraId` prop in the frontend (see dashboard/page.jsx CAMERA_ID). The
-        # browser-camera and backend-direct-camera paths are two ways of reaching
-        # the SAME "Live feed" the user draws zones against — there is no camera
-        # picker in the UI, so they must share one id or zones drawn here would
-        # silently attribute to DEFAULT_ZONES instead of what the user configured.
-        zones_config = load_zones_for_camera("live_webcam", org_id=org_id)
+        # Falls back to the same camera id as the /live_webcam path and as
+        # ZoneEditor's default `cameraId` prop (see dashboard/page.jsx
+        # CAMERA_ID). The browser-camera and backend-direct-camera paths are two
+        # ways of reaching the SAME "Live feed" the user draws zones against, so
+        # they must share one id or zones drawn here would silently attribute to
+        # DEFAULT_ZONES instead of what the user configured.
+        zones_config = load_zones_for_camera(effective_camera_id, org_id=org_id)
         spatial_engine = SpatialEngine(zones_config=zones_config)
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
-        activity_writer = ActivityLogWriter(camera_id="live_webcam", org_id=org_id)
+        activity_writer = ActivityLogWriter(camera_id=effective_camera_id, org_id=org_id)
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
