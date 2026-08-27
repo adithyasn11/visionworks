@@ -164,34 +164,54 @@ class PostureEstimator:
         valid_hip_angles = [a for a in [l_hip_angle, r_hip_angle] if a is not None]
 
         # ── 2. MULTI-FACTOR SCORE ACCUMULATION ──────────────────────────
+        #
+        # WHY VERTICAL FORESHORTENING OUTRANKS JOINT ANGLES HERE
+        #
+        # A 2D keypoint model gives no depth, and from a front-facing camera a
+        # seated thigh points TOWARD the lens. It therefore projects to almost
+        # nothing: the knee lands directly under the hip, exactly where a
+        # standing knee lands. Measured on synthetic ideal poses, a textbook
+        # seated pose and a textbook standing pose both produce a hip angle of
+        # 177.6 deg and a knee angle of 180.0 deg — the angle features cannot
+        # separate the two classes at all on this view, and previously voted
+        # 8.5 points for STANDING in both cases.
+        #
+        # What DOES separate them is how far the knee falls below the hip
+        # relative to torso length (feature E2 below): ~1.0 standing versus
+        # ~0.12 seated on the same poses. So the angle features are kept only
+        # as weak corroboration for the profile view (where they are genuinely
+        # informative) and can no longer outvote the projection evidence.
         sitting_score = 0.0
         standing_score = 0.0
 
-        # Feature A: Individual Knee Angles (Hip -> Knee -> Ankle)
+        # Feature A: Knee flexion. Only meaningful when the leg is seen from
+        # the side; a front-on seated leg reads as straight, so a "straight"
+        # reading is weak evidence of standing while a clearly bent one is
+        # strong evidence of sitting.
         if valid_knee_angles:
             for ka in valid_knee_angles:
                 if ka <= 138.0:
-                    sitting_score += 5.0   # Bent knee sitting
+                    sitting_score += 5.0   # unambiguously folded — profile view
                 elif ka >= 155.0:
-                    standing_score += 2.5  # Straight leg standing
+                    standing_score += 1.0  # could equally be a foreshortened thigh
         elif mid_knee_angle is not None:
             if mid_knee_angle <= 138.0:
                 sitting_score += 5.0
             elif mid_knee_angle >= 155.0:
-                standing_score += 3.0
+                standing_score += 1.0
 
-        # Feature B: Individual Hip Angles (Shoulder -> Hip -> Knee)
+        # Feature B: Hip flexion. Same asymmetry, same reason.
         if valid_hip_angles:
             for ha in valid_hip_angles:
                 if ha <= 128.0:
-                    sitting_score += 4.5   # Bent hip sitting
+                    sitting_score += 4.5   # hip visibly folded — profile view
                 elif ha >= 148.0:
-                    standing_score += 2.0  # Straight hip standing
+                    standing_score += 0.8
         elif mid_hip_angle is not None:
             if mid_hip_angle <= 128.0:
                 sitting_score += 4.0
             elif mid_hip_angle >= 148.0:
-                standing_score += 2.5
+                standing_score += 0.8
 
         # Feature C: Individual Thigh Vertical Projection Ratio
         if k_conf[11] > 0.15 and k_conf[13] > 0.15 and k_conf[5] > 0.15:
@@ -257,23 +277,48 @@ class PostureEstimator:
         elif mid_hip_angle is not None:
             hip_fold = mid_hip_angle
 
+        # An OPEN hip angle is not evidence of standing — a front-on seated hip
+        # measures ~178 deg, indistinguishable from an upright one (see the note
+        # in section 2). Only the folded case, which requires a genuine profile
+        # view to observe, carries information.
         if hip_fold is not None:
-            if hip_fold >= 155.0:
-                standing_score += 6.0    # torso and thigh in line — upright
-            elif hip_fold <= 125.0:
-                sitting_score += 6.0     # hip clearly folded — seated
-            elif hip_fold >= 140.0:
-                standing_score += 2.5    # leaning but still open
+            if hip_fold <= 125.0:
+                sitting_score += 6.0     # hip clearly folded — seated, profile view
 
-        # E2: thigh drop. How far the knee falls below the hip, relative to the
-        # torso. Standing thighs hang down; seated thighs project forward and
-        # foreshorten to almost nothing from a front-on camera.
+        # E2: THIGH DROP — the primary discriminator on a front-facing camera.
+        #
+        # How far the knee falls below the hip, measured against torso length so
+        # it is invariant to distance and framing. A hanging thigh projects to
+        # roughly a full torso-length drop; a seated thigh points at the lens and
+        # collapses to near zero. Measured on ideal poses: 1.0 standing vs 0.12
+        # seated — the cleanest separation available without depth.
+        #
+        # Scored above every other feature because it is the only one that
+        # survives the view this system is actually deployed on (a ceiling or
+        # wall camera looking along the room, not across it), and the mid band
+        # is no longer left unscored: an unscored middle produced 0-0 ties that
+        # fell through to the STANDING default, which is what made a textbook
+        # seated pose classify as standing.
+        # THRESHOLDS ARE MEASURED, NOT ASSUMED. Ideal-geometry reasoning gives
+        # ~1.0 for a hanging thigh, but real detections never reach that: over
+        # 55 upright detections in reference footage the distribution was
+        # min 0.35, p10 0.59, median 0.70, p90 0.80. Foreshortening from camera
+        # tilt, keypoint jitter and a knee that is never perfectly under the hip
+        # all pull it down. Thresholds set from that distribution rather than
+        # from the idealised model, which had put the STANDING gate at 0.75 —
+        # above the median of genuinely standing people, so most of them scored
+        # as seated.
         if torso_len is not None and torso_len > 8.0 and has_knee:
             thigh_drop = (float(np.asarray(knee_mid)[1]) - float(np.asarray(hip_mid)[1])) / torso_len
-            if thigh_drop >= 0.75:
-                standing_score += 4.5    # knee well below hip
-            elif thigh_drop <= 0.35:
-                sitting_score += 4.5     # thigh is horizontal / foreshortened
+            if thigh_drop >= 0.55:
+                standing_score += 7.0    # within the upright band (p10 and above)
+            elif thigh_drop <= 0.30:
+                sitting_score += 8.0     # well below anything an upright leg produced
+            else:
+                # 0.30-0.55 is genuinely ambiguous: the bottom tail of upright
+                # overlaps the top of seated here. Lean seated, but weakly, so
+                # any corroborating feature decides it.
+                sitting_score += 2.0
 
         # E3: last-resort fallback, ONLY when the hips are invisible too.
         #
@@ -289,10 +334,35 @@ class PostureEstimator:
                 standing_score += 1.5
 
         # ── 3. POSTURE DECISION & WALKING VALIDATION ─────────────────────
+        #
+        # NO EVIDENCE MEANS UNKNOWN, NOT A GUESS.
+        #
+        # When neither hips nor legs are visible — a head-and-shoulders crop,
+        # someone behind a monitor, a detection at the frame edge — every
+        # geometric feature scores zero and the only thing left is the aspect
+        # ratio of a box whose shape describes the CROP rather than the pose.
+        # Both scores then land at or near zero and the decision falls through
+        # to whichever branch is written last.
+        #
+        # That default used to be STANDING, which meant an occluded desk worker
+        # was silently reported as standing. Returning UNKNOWN instead keeps a
+        # guess out of the aggregate: activity_writer records it, the minute
+        # aggregator counts it toward sampleFrames but into none of the three
+        # posture columns (which is exactly why that constraint is `<=` and not
+        # `=`), and the dashboard's posture mix stays honest about what was
+        # actually observed.
+        if not has_hip and not has_knee and not has_ank:
+            return "UNKNOWN"
+
         # RULE 1: Seated posture (sitting_score > standing_score) is ALWAYS SITTING!
         # Rolling an office chair on wheels or upper body fidgeting while seated MUST NEVER be labeled WALKING!
         if sitting_score > standing_score:
             return "SITTING"
+
+        # A genuine tie with real evidence on the table is not a standing
+        # reading either — it is an undecided one.
+        if standing_score == 0.0 and sitting_score == 0.0:
+            return "UNKNOWN"
 
         # RULE 2: WALKING is ONLY possible when standing upright (standing_score >= sitting_score)
         # AND exhibiting significant locomotion speed (>= 4.5 px/frame) + bipedal stride
