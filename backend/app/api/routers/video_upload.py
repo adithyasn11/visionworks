@@ -34,6 +34,7 @@ from app.cv.appearance import get_extractor
 from app.cv.identity_tracker import IdentityTracker
 from app.cv.face_identifier import FaceIdentifier, resolve_camera_role
 from app.cv.signature_registry import get_registry
+from app.cv.handoff import get_handoff_registry
 from app.db.minute_aggregator import aggregate_after_session
 from app.db.employee_aggregator import (
     aggregate_after_session as aggregate_employees_after_session,
@@ -563,6 +564,12 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             # Step 11: the day's signatures, shared across every session in
             # this process. A DOOR session writes to it; an AREA session reads.
             identity_tracker.set_registry(get_registry(org_id), camera_role)
+            # Step 13: cross-camera handoff. Shared across every camera's
+            # session in this process, so camera A can publish a departure
+            # that camera B reads a few seconds later.
+            handoff_registry = get_handoff_registry(org_id)
+            handoff_registry.load_links()
+            identity_tracker.set_handoff(handoff_registry, effective_camera_id)
 
     except Exception as e:
         logger.error(f"AI init error: {e}")
@@ -719,7 +726,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             f"{activity_writer.rows_written} telemetry rows, "
             f"{identity_writer.rows_written} identity rows written. "
             f"stitching: {identity_tracker.stats() if identity_tracker else 'off'} "
-            f"door: {face_identifier.stats() if face_identifier else 'n/a'}"
+            f"door: {face_identifier.stats() if face_identifier else 'n/a'} "
+            f"handoff: {identity_tracker.stats().get('handoffs_in') if identity_tracker else 0}"
         )
         await websocket.send_json({
             "type": "COMPLETE",
@@ -852,6 +860,12 @@ async def live_webcam_websocket(websocket: WebSocket):
             # Step 11: the day's signatures, shared across every session in
             # this process. A DOOR session writes to it; an AREA session reads.
             identity_tracker.set_registry(get_registry(org_id), camera_role)
+            # Step 13: cross-camera handoff. Shared across every camera's
+            # session in this process, so camera A can publish a departure
+            # that camera B reads a few seconds later.
+            handoff_registry = get_handoff_registry(org_id)
+            handoff_registry.load_links()
+            identity_tracker.set_handoff(handoff_registry, effective_camera_id)
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
@@ -1056,6 +1070,12 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
             # Step 11: the day's signatures, shared across every session in
             # this process. A DOOR session writes to it; an AREA session reads.
             identity_tracker.set_registry(get_registry(org_id), camera_role)
+            # Step 13: cross-camera handoff. Shared across every camera's
+            # session in this process, so camera A can publish a departure
+            # that camera B reads a few seconds later.
+            handoff_registry = get_handoff_registry(org_id)
+            handoff_registry.load_links()
+            identity_tracker.set_handoff(handoff_registry, effective_camera_id)
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})

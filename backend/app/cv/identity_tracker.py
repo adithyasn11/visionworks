@@ -283,6 +283,13 @@ class IdentityTracker:
         self.face_bindings = []
         self.registry_bindings = []
 
+        # Step 13. The handoff registry is shared across every camera's session
+        # in this process, the same way the signature registry is — camera A
+        # publishes a departure and camera B reads it.
+        self._handoff = None
+        self._camera_id = None
+        self.handoffs = []
+
         # Stitch-rate metrics — the plan asks for the ratio of raw ids to
         # stitched identities as the headline number for this step.
         self.raw_track_ids = set()
@@ -453,8 +460,10 @@ class IdentityTracker:
                         f"stitched track {tid} -> {ident.identity_id} (score {score:.3f})"
                     )
                 else:
-                    # 4. No match -> a genuinely new person.
-                    ident = self._new_identity(tid, now)
+                    # 4. No local match. Before calling this a new person, ask
+                    # whether they walked here from another camera (Step 13).
+                    handed = self._try_handoff(sig, tid, now)
+                    ident = handed if handed is not None else self._new_identity(tid, now)
 
             ident.observe(sig, now, zone_id=zone_by_track.get(tid), dt=dt)
 
@@ -513,11 +522,81 @@ class IdentityTracker:
         # different person cannot inherit a stale identity.
         for tid, ident in self._by_track.items():
             if tid not in seen_tracks and ident.hits >= MIN_HITS_FOR_GALLERY:
+                newly_lost = ident.identity_id not in self._lost
                 self._lost[ident.identity_id] = ident
+                # Step 13: tell the other cameras somebody just left here. Only
+                # on the frame they actually disappear, not every frame after —
+                # otherwise the departure time keeps resetting and the walk-time
+                # window never elapses.
+                if newly_lost and self._handoff is not None and self._camera_id:
+                    self._handoff.record_departure(ident, self._camera_id, now)
 
         return out
 
+    # ── Step 13: cross-camera handoff ───────────────────────────────────────
+
+    def _try_handoff(self, signature: dict, track_id: int, now: float):
+        """
+        Did this new track just walk in from another camera?
+
+        Returns a NEW identity carrying the other camera's attribution, or None.
+
+        A new identity rather than the departed one, deliberately. The two
+        cameras' trackers are independent, and reaching across to mutate
+        another session's live object would make one camera's state depend on
+        another camera's frame timing. What crosses the boundary is the
+        ATTRIBUTION — who this is, how confident, and by what method — which is
+        the only part that matters downstream.
+
+        Never raises. A handoff failure must leave the pipeline producing a new
+        UNKNOWN identity, which is exactly what it would have done anyway.
+        """
+        if self._handoff is None or not self._camera_id:
+            return None
+        try:
+            verdict = self._handoff.find_handoff(signature, self._camera_id, now)
+        except Exception as e:
+            logger.debug(f"handoff lookup failed: {e}")
+            return None
+
+        if not verdict.get("matched"):
+            return None
+
+        ident = self._new_identity(track_id, now)
+        employee_id = verdict.get("employee_id")
+        if employee_id and employee_id not in self._bound_employees:
+            ident.employee_id = employee_id
+            ident.confidence = round(float(verdict.get("confidence") or 0.0), 3)
+            # "handoff" is one of the five methods migration 020 accepts, and
+            # it says something the others do not: this attribution came from
+            # another camera, so its reliability is the handoff's, not a face
+            # match's. Step 17 can separate them because of this.
+            ident.method = "handoff"
+            self._bound_employees.add(employee_id)
+
+        record = {
+            "identity_id": ident.identity_id,
+            "from_identity": verdict.get("identity_id"),
+            "from_camera": verdict.get("from_camera"),
+            "employee_id": employee_id,
+            "score": verdict.get("score"),
+            "gap_seconds": verdict.get("gap"),
+            "components": verdict.get("components"),
+        }
+        self.handoffs.append(record)
+        return ident
+
     # ── Steps 10-11: face matches and the daily signature registry ──────────
+
+    def set_handoff(self, registry, camera_id: str):
+        """
+        Attach the cross-camera handoff registry, and say which camera this is.
+
+        Without a camera id a departure cannot be published — "somebody left"
+        is only useful to another camera if it knows WHICH camera they left.
+        """
+        self._handoff = registry
+        self._camera_id = camera_id
 
     def set_registry(self, registry, camera_role: str = "AREA"):
         """
@@ -847,8 +926,9 @@ class IdentityTracker:
             "seat_bound": len([i for i in self._all.values() if i.employee_id]),
             "by_method": {
                 m: len([i for i in self._all.values() if i.method == m])
-                for m in ("face", "fusion", "seat", "unknown")
+                for m in ("face", "fusion", "seat", "handoff", "unknown")
             },
+            "handoffs_in": len(self.handoffs),
         }
 
     def identities(self):
