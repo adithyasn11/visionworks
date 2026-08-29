@@ -44,6 +44,9 @@ CAPABILITIES = {
     "members.view": ("ADMIN", "MANAGER", "VIEWER"),
     # enforcedBy: employee_select — membership-based, like every other roster.
     "employees.view": ("ADMIN", "MANAGER", "VIEWER"),
+    # enforcedBy: employee_day_stat_select (migration 022) — other people's
+    # measured figures go to manage_org_ids() only. A VIEWER sees their own.
+    "team.compare": ("ADMIN", "MANAGER"),
 
     # Configuring the space — enforced by manage_org_ids().
     "zones.edit": ("ADMIN", "MANAGER"),

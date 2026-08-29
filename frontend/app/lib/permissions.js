@@ -57,6 +57,16 @@ const CAPABILITIES = {
   // membership-based read every other roster gets. The employee list is a
   // colleague list; what a VIEWER does not get is the editing controls.
   'employees.view':   ['ADMIN', 'MANAGER', 'VIEWER'],
+  // Step 16's team comparison — everyone's measured figures in one table.
+  //
+  // enforcedBy: employee_day_stat_select (migration 022), which returns other
+  // people's rows only to `manage_org_ids()` — ADMIN and MANAGER. A VIEWER
+  // sees exactly one employee's figures: their own.
+  //
+  // So this capability is not the security boundary, the policy is; it exists
+  // so a VIEWER is not shown a link to a table that would render with one row
+  // and look broken. Hiding the link is a courtesy, not a control.
+  'team.compare':     ['ADMIN', 'MANAGER'],
 
   // ── Configuring the space. ──
   // enforcedBy: manage_org_ids() — zone_insert/update/delete,

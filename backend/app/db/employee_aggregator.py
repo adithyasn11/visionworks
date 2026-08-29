@@ -727,6 +727,12 @@ async def aggregate_after_session(org_id: str = None) -> dict:
     Roll up today and push it upstream. Called when a session ends, so the
     numbers appear without waiting for a timer.
 
+    Runs BOTH rollups from the same events: the daily one this module owns, and
+    the hourly one Step 15's timeline reads. They are deliberately driven from
+    one place — two separate triggers would eventually diverge, and a dashboard
+    whose timeline disagrees with its own totals is worse than one without a
+    timeline.
+
     Swallows its own failures: an aggregation problem must not surface as a
     broken video session.
     """
@@ -734,6 +740,24 @@ async def aggregate_after_session(org_id: str = None) -> dict:
         result = await aggregate_day(org_id=org_id)
         if result.get("employees"):
             await sync_to_postgres()
+
+        # Hourly is imported here rather than at module scope: it imports back
+        # from this module for the shared helpers and the confidence floor, so
+        # a top-level import would be circular.
+        try:
+            from .employee_hour_aggregator import (
+                aggregate_hours, sync_hours_to_postgres,
+            )
+            hours = await aggregate_hours(org_id=org_id)
+            if hours.get("hours"):
+                await sync_hours_to_postgres()
+            result["hours"] = hours.get("hours", 0)
+        except Exception as e:
+            # The daily figures are the ones the plan calls essential; a failed
+            # timeline must not discard them.
+            logger.warning(f"hourly aggregation after session failed: {e}")
+            result["hours_error"] = str(e)
+
         return result
     except Exception as e:
         logger.warning(f"employee aggregation after session failed: {e}")

@@ -32,7 +32,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ContactRound, Plus, Loader2, Pencil, Trash2, X, Check, ScanFace,
-  MapPin, UserCheck, UserX, AlertTriangle,
+  MapPin, UserCheck, UserX, AlertTriangle, KeyRound,
 } from 'lucide-react';
 
 import DashboardShell from '../DashboardShell';
@@ -92,6 +92,54 @@ function StatusPill({ active }) {
  * holder's name tells them what to do next. The database would reject the write
  * either way — this only decides how the refusal reads.
  */
+/**
+ * Link this employee to a login (migration 022).
+ *
+ * WHY THIS CONTROL EXISTS
+ *
+ * The visibility rule is "a member sees only their own figures". That rule
+ * needs to know which employee a login IS, and nothing else in the product
+ * establishes it — a membership is an account in an organisation, an employee
+ * is a person on camera, and until now the two were unrelated.
+ *
+ * Leaving it unset is normal and common: most people who are measured never
+ * sign in. The cost of leaving it unset is only that THEY cannot see their own
+ * figures; managers and admins still see everyone.
+ */
+function AccountSelect({ id, value, onChange, members, linkedBy, disabled }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-[13px] font-bold text-ink">
+        Linked account <span className="font-medium text-ink-faint">(optional)</span>
+      </label>
+      <select
+        id={id}
+        name={id}
+        value={value ?? ''}
+        onChange={onChange}
+        disabled={disabled}
+        className="w-full rounded-lg bg-ground border-2 border-field hover:border-field-hover px-3.5 py-2.5 text-[14px] text-ink transition-colors duration-150 focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)] disabled:opacity-60"
+      >
+        <option value="">No account — measured only</option>
+        {members.map((m) => {
+          const holder = linkedBy.get(m.id);
+          return (
+            <option key={m.id} value={m.id} disabled={Boolean(holder)}>
+              {m.name}{m.email && m.name !== m.email ? ` (${m.email})` : ''}
+              {holder ? ` — already ${holder}` : ''}
+            </option>
+          );
+        })}
+      </select>
+      <p className="text-[12px] text-ink-faint font-medium">
+        {members.length === 0
+          ? 'No active members to link to yet.'
+          : 'Lets this person sign in and see their own figures — and nobody else’s. Managers and admins see the whole team either way.'}
+      </p>
+    </div>
+  );
+}
+
 function DeskSelect({ id, value, onChange, zones, takenBy, disabled }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -186,7 +234,7 @@ function RemoveDialog({ employee, busy, onCancel, onConfirm }) {
 
 export default function EmployeesScreen({ orgName, initialRole, viewer }) {
   const [state, setState] = useState({
-    employees: [], zones: [], viewerRole: initialRole, loading: true,
+    employees: [], zones: [], members: [], viewerRole: initialRole, loading: true,
   });
   const [banner, setBanner] = useState(null);
   const [busy, setBusy] = useState(null);       // id | 'create'
@@ -195,7 +243,7 @@ export default function EmployeesScreen({ orgName, initialRole, viewer }) {
   const [fieldError, setFieldError] = useState(null);
 
   const [form, setForm] = useState({ employeeCode: '', displayName: '', assignedZoneId: '' });
-  const [editForm, setEditForm] = useState({ employeeCode: '', displayName: '', assignedZoneId: '' });
+  const [editForm, setEditForm] = useState({ employeeCode: '', displayName: '', assignedZoneId: '', profileId: '' });
 
   const role = state.viewerRole ?? initialRole;
   const canEdit = can(role, 'employees.edit');
@@ -210,6 +258,7 @@ export default function EmployeesScreen({ orgName, initialRole, viewer }) {
     setState({
       employees: res.employees,
       zones: res.zones,
+      members: res.members ?? [],
       viewerRole: res.viewerRole,
       loading: false,
     });
@@ -244,9 +293,31 @@ export default function EmployeesScreen({ orgName, initialRole, viewer }) {
     return m;
   }, [state.employees]);
 
+  /**
+   * profileId -> the employee already holding that link, excluding this row.
+   *
+   * Mirrors `takenByExcept` and, like it, exists so the picker agrees with
+   * ux_employees_profile: one login cannot be two employees. Unlike the desk
+   * index this one is NOT restricted to active employees — the unique index
+   * is partial on `deletedAt IS NULL`, so an inactive-but-not-deleted person
+   * still holds their account.
+   */
+  const linkedByExcept = useCallback((employeeId) => {
+    const m = new Map();
+    for (const e of state.employees) {
+      if (e.id !== employeeId && e.profileId) m.set(e.profileId, e.displayName);
+    }
+    return m;
+  }, [state.employees]);
+
   const zoneName = useCallback(
     (id) => state.zones.find((z) => z.id === id)?.name ?? null,
     [state.zones],
+  );
+
+  const memberName = useCallback(
+    (id) => state.members.find((m) => m.id === id)?.name ?? null,
+    [state.members],
   );
 
   const run = async (key, fn) => {
@@ -282,6 +353,7 @@ export default function EmployeesScreen({ orgName, initialRole, viewer }) {
       employeeCode: emp.employeeCode,
       displayName: emp.displayName,
       assignedZoneId: emp.assignedZoneId ?? '',
+      profileId: emp.profileId ?? '',
     });
   };
 
@@ -444,6 +516,13 @@ export default function EmployeesScreen({ orgName, initialRole, viewer }) {
                           zones={state.zones}
                           takenBy={takenByExcept(emp.id)}
                         />
+                        <AccountSelect
+                          id={`profile-${emp.id}`}
+                          value={editForm.profileId}
+                          onChange={(e) => setEditForm({ ...editForm, profileId: e.target.value })}
+                          members={state.members}
+                          linkedBy={linkedByExcept(emp.id)}
+                        />
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
@@ -500,6 +579,20 @@ export default function EmployeesScreen({ orgName, initialRole, viewer }) {
                               </span>
                             )}
                           </p>
+
+                          {/* Only shown when a link EXISTS. Printing "no
+                              account" on every unlinked row would imply
+                              something is missing, when having no login is the
+                              normal case for somebody who is only measured. */}
+                          {emp.profileId && (
+                            <p className="text-[12.5px] font-medium mt-1 flex items-center gap-1.5">
+                              <KeyRound className="w-3.5 h-3.5 shrink-0 text-accent" />
+                              <span className="text-ink-muted">
+                                Signs in as {memberName(emp.profileId) ?? 'a member'}
+                                <span className="text-ink-faint"> — sees their own figures</span>
+                              </span>
+                            </p>
+                          )}
                         </div>
 
                         {canEdit && (

@@ -16,6 +16,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Video, Shapes, FileDown,
   Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard, ContactRound,
+  UsersRound,
   Waypoints,
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
@@ -195,6 +196,32 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
             )}
             <ContactRound className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
             <span className="truncate">Employees</span>
+          </Link>
+        )}
+
+        {/* Team (Step 16). Directly under Employees because it is the same
+            people, measured rather than listed.
+
+            Gated on `team.compare` — ADMIN and MANAGER. Unlike the links
+            around it, hiding this one withholds nothing the database would
+            return: employee_day_stat_select (022) already gives a VIEWER only
+            their own figures, so the page would render as a single row. The
+            link is hidden so it does not read as an empty team. */}
+        {can(role, 'team.compare') && (
+          <Link
+            href="/dashboard/team"
+            onClick={() => setOpen(false)}
+            className={`relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 ${
+              pathname === '/dashboard/team'
+                ? 'bg-accent-soft text-accent'
+                : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
+            }`}
+          >
+            {pathname === '/dashboard/team' && (
+              <span aria-hidden="true" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[color:var(--accent)]" />
+            )}
+            <UsersRound className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
+            <span className="truncate">Team</span>
           </Link>
         )}
 

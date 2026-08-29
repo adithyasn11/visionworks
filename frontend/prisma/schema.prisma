@@ -275,6 +275,7 @@ model Organisation {
   employees      Employee[]
   identityEvents IdentityEvent[]
   employeeDays   EmployeeDayStat[]
+  employeeHours  EmployeeHourStat[]
   cameraLinks    CameraLink[]
 
   @@index([deletedAt])
@@ -342,6 +343,10 @@ model Profile {
   zonesCreated      Zone[]
   platformAdmin     PlatformAdmin?
   platformGrants    PlatformAdmin[]   @relation("PlatformAdminGrantedBy")
+  /// The employee record this login IS, at most one (migration 022). Optional
+  /// on both sides: most logins are not measured, and most measured people do
+  /// not have a login.
+  employeeRecord    Employee?
 
   @@index([currentOrgId])
   @@map("profiles")
@@ -1093,14 +1098,29 @@ model Employee {
   /// session that owns it. Same constraint, and same solution, as organisations.
   deletedAt DateTime? @db.Timestamptz(6)
 
+  /// The login this employee IS, if any. NULL for people who are measured but
+  /// have no account — the common case.
+  ///
+  /// Drives per-person visibility of measured data (migration 022): a VIEWER
+  /// reads only the day/hour stats of the employee row pointing at them, while
+  /// ADMIN and MANAGER read the whole team.
+  profileId String? @db.Uuid
+
   org      Organisation      @relation(fields: [orgId], references: [id], onDelete: Cascade)
   /// SetNull, not Cascade: deleting a zone must not delete the person who sat there.
   zone     Zone?             @relation(fields: [assignedZoneId], references: [id], onDelete: SetNull)
+  /// SetNull for the same reason: losing an account must not erase the
+  /// employment record or the history attached to it.
+  profile  Profile?          @relation(fields: [profileId], references: [id], onDelete: SetNull)
   faces    FaceTemplate[]
   events   IdentityEvent[]
   dayStats EmployeeDayStat[]
+  hourStats EmployeeHourStat[]
 
   @@unique([orgId, employeeCode])
+  /// One login cannot be two employees. Partial on NOT NULL so the many
+  /// account-less people do not collide.
+  @@unique([profileId])
   @@index([orgId, active])
   @@index([assignedZoneId])
   @@map("employees")
@@ -1208,6 +1228,49 @@ model EmployeeDayStat {
   @@unique([employeeId, statDate])
   @@index([orgId, statDate])
   @@map("employee_day_stats")
+}
+
+/// Per-employee HOURLY rollup — one level finer than EmployeeDayStat, and what
+/// the Step 15 daily timeline reads.
+///
+/// The raw per-observation stream (IdentityEvent) holds the same shape, but at
+/// a sample every five seconds that is ~11.5k rows per person per day. The
+/// aggregation happens where the data already is; 24 rows cross the network.
+///
+/// Written only by the pipeline through the service role. There is no
+/// INSERT/UPDATE/DELETE policy at all: a figure about somebody's working day
+/// that a manager could quietly adjust would be worth nothing.
+model EmployeeHourStat {
+  id         String   @id @default(uuid()) @db.Uuid
+  orgId      String   @db.Uuid
+  employeeId String   @db.Uuid
+  statDate   DateTime @db.Date
+  /// 0-23. A BUCKET, not an instant: "hour 14" means 14:00-14:59.
+  hour       Int      @db.SmallInt
+
+  presentMinutes    Int @default(0)
+  deskMinutes       Int @default(0)
+  seatedMinutes     Int @default(0)
+  /// Observed but unattributable time, preserved at hour resolution so the
+  /// timeline can show WHEN the system was unsure, not only how much.
+  unknownMinutes    Int @default(0)
+  awayFromDeskCount Int @default(0)
+
+  /// Mean confidence for THIS hour, deliberately not inherited from the day.
+  /// An hour at 0.95 and an hour at 0.55 averaged into a daily 0.75 hides that
+  /// half the day is unreliable.
+  bindingConfidence Float @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  org      Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  employee Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, statDate, hour])
+  @@index([employeeId, statDate, hour])
+  @@index([orgId, statDate])
+  @@map("employee_hour_stats")
 }
 
 /// Physical topology: which camera exits lead to which entries, and how long

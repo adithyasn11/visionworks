@@ -195,21 +195,36 @@ export async function listEmployees() {
     .maybeSingle();
   if (!membership) return fail('You are not an active member of this organisation.');
 
-  const [{ data: employees, error }, { data: zones }] = await Promise.all([
-    supabase
-      .from('employees')
-      .select('id, employeeCode, displayName, assignedZoneId, active, createdAt')
-      .order('active', { ascending: false })
-      .order('displayName', { ascending: true }),
-    // Only WORKSTATION zones can be a desk. A corridor or a break area is not
-    // somebody's seat, and offering them would invite a seat prior that can
-    // never bind.
-    supabase
-      .from('zones')
-      .select('id, name, zoneType, cameraId')
-      .eq('zoneType', 'WORKSTATION')
-      .order('name', { ascending: true }),
-  ]);
+  const [{ data: employees, error }, { data: zones }, { data: members }] =
+    await Promise.all([
+      supabase
+        .from('employees')
+        .select('id, employeeCode, displayName, assignedZoneId, profileId, active, createdAt')
+        .order('active', { ascending: false })
+        .order('displayName', { ascending: true }),
+      // Only WORKSTATION zones can be a desk. A corridor or a break area is not
+      // somebody's seat, and offering them would invite a seat prior that can
+      // never bind.
+      supabase
+        .from('zones')
+        .select('id, name, zoneType, cameraId')
+        .eq('zoneType', 'WORKSTATION')
+        .order('name', { ascending: true }),
+      // Accounts an employee can be linked to (migration 022). Linking is what
+      // lets somebody see their OWN figures — without it a VIEWER's policy
+      // matches no employee row and they see nothing at all.
+      supabase
+        .from('memberships')
+        // The embed names its constraint. `memberships` has TWO foreign keys
+        // to `profiles` — `profileId` (the member) and `invitedById` (whoever
+        // invited them) — so a bare `profiles(...)` is ambiguous and PostgREST
+        // answers 300 PGRST201 rather than guessing. Measured: that 300 came
+        // back as an empty member list and the picker rendered "no active
+        // members to link to" for an org that plainly had one.
+        .select('profileId, role, profiles!memberships_profileId_fkey(id, fullName, email)')
+        .eq('orgId', orgId)
+        .eq('status', 'ACTIVE'),
+    ]);
 
   if (error) return fail(describeDbError(error, 'Could not load the employee roster.'));
 
@@ -217,6 +232,14 @@ export async function listEmployees() {
     ok: true,
     employees: employees ?? [],
     zones: zones ?? [],
+    members: (members ?? [])
+      .filter((m) => m.profiles)
+      .map((m) => ({
+        id: m.profileId,
+        role: m.role,
+        name: m.profiles.fullName || m.profiles.email || 'Unnamed member',
+        email: m.profiles.email ?? null,
+      })),
     viewerRole: membership.role,
   };
 }
@@ -277,13 +300,52 @@ export async function updateEmployee(id, form) {
     patch.assignedZoneId = form.assignedZoneId || null;
   }
 
+  // LINKING AN EMPLOYEE TO A LOGIN (migration 022)
+  //
+  // This is the one field here that changes who can SEE something rather than
+  // what is recorded. Pointing an employee row at a profile grants that login
+  // permanent sight of that person's measured figures, so the account must be
+  // an active member of THIS organisation — otherwise an admin could hand a
+  // stranger's login a window into their staff.
+  //
+  // The membership check is not the security boundary (a unique index and the
+  // RLS policy are), but it is the one that produces a sentence instead of a
+  // constraint violation.
+  if (form?.profileId !== undefined) {
+    const wanted = form.profileId || null;
+    if (wanted) {
+      const { data: member } = await supabase
+        .from('memberships')
+        .select('profileId')
+        .eq('orgId', orgId)
+        .eq('profileId', wanted)
+        .eq('status', 'ACTIVE')
+        .maybeSingle();
+      if (!member) {
+        return fail('That account is not an active member of this organisation.');
+      }
+      // ux_employees_profile would reject this anyway; catching it here says
+      // WHO already holds the link instead of surfacing an index name.
+      const { data: taken } = await supabase
+        .from('employees')
+        .select('id, displayName')
+        .eq('profileId', wanted)
+        .is('deletedAt', null)
+        .maybeSingle();
+      if (taken && taken.id !== id) {
+        return fail(`That account is already linked to ${taken.displayName}.`);
+      }
+    }
+    patch.profileId = wanted;
+  }
+
   if (Object.keys(patch).length === 0) return fail('Nothing to change.');
 
   const { data, error: dbError } = await supabase
     .from('employees')
     .update(patch)
     .eq('id', id)
-    .select('id, employeeCode, displayName, assignedZoneId, active, createdAt')
+    .select('id, employeeCode, displayName, assignedZoneId, profileId, active, createdAt')
     .maybeSingle();
 
   if (dbError) return fail(describeDbError(dbError, 'Could not save this employee.'));
