@@ -33,6 +33,9 @@ from app.db.identity_writer import IdentityEventWriter, persist_identity_frame
 from app.cv.appearance import get_extractor
 from app.cv.identity_tracker import IdentityTracker
 from app.db.minute_aggregator import aggregate_after_session
+from app.db.employee_aggregator import (
+    aggregate_after_session as aggregate_employees_after_session,
+)
 from app.api.deps import extract_token, resolve_org_role
 from app.api.permissions import can, denial_message
 
@@ -80,11 +83,13 @@ DEFAULT_ZONES = [
         "zone_id": "workstation_01",
         "zone_name": "Workstation 1",
         "polygon": [[100, 60], [480, 60], [480, 480], [100, 480]],
+        "zone_type": "WORKSTATION",
     },
     {
         "zone_id": "workstation_02",
         "zone_name": "Workstation 2",
         "polygon": [[500, 60], [900, 60], [900, 480], [500, 480]],
+        "zone_type": "WORKSTATION",
     },
 ]
 
@@ -128,6 +133,75 @@ def resolve_registered_camera(camera_id: Optional[str], org_id: Optional[str]) -
         return None
     finally:
         session.close()
+
+
+def load_seat_map(org_id: Optional[str], zones_config: list) -> dict:
+    """
+    zone_id -> [employee_id, ...] for Step 7's seat binding.
+
+    Read from Postgres, because that is where the Employees page writes. The
+    local SQLite mirror has no employees table — the roster is configuration a
+    human maintains, not telemetry the pipeline produces.
+
+    Zones are matched BY NAME, the same bridge `minute_aggregator._resolve_ids`
+    already uses: SQLite telemetry carries `zone_id = 'workstation_01'` while
+    Postgres carries a UUID, and `zones.name` is what connects them.
+
+    Returns {} on any failure — no org, no service key, no network. An empty
+    seat map means the tracker simply never names anyone, which is the correct
+    degradation: unnamed identities are still tracked and still recorded as
+    UNKNOWN.
+    """
+    if not org_id:
+        return {}
+    base = (os.getenv("SUPABASE_URL") or "").rstrip("/")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not base or not key or key.startswith("your-"):
+        return {}
+
+    import json
+    import urllib.parse
+    import urllib.request
+
+    def get(table, params):
+        url = f"{base}/rest/v1/{table}?" + urllib.parse.urlencode(params)
+        request = urllib.request.Request(url, headers={
+            "apikey": key, "Authorization": f"Bearer {key}",
+            "Accept": "application/json",
+        })
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return json.loads(response.read().decode("utf-8") or "[]")
+
+    try:
+        employees = get("employees", {
+            "select": "id,assignedZoneId", "orgId": f"eq.{org_id}",
+            "active": "is.true", "assignedZoneId": "not.is.null",
+        })
+        if not employees:
+            return {}
+
+        # Postgres zone UUID -> the local text zone_id the pipeline emits.
+        wanted = {e["assignedZoneId"] for e in employees}
+        zone_rows = get("zones", {"select": "id,name", "orgId": f"eq.{org_id}"})
+        local_names = {z["zone_id"] for z in zones_config}
+        uuid_to_local = {
+            z["id"]: z["name"] for z in zone_rows
+            if z["id"] in wanted and z["name"] in local_names
+        }
+
+        seat_map: dict = {}
+        for e in employees:
+            local = uuid_to_local.get(e["assignedZoneId"])
+            if local:
+                seat_map.setdefault(local, []).append(e["id"])
+
+        if seat_map:
+            logger.info(f"seat map for org {org_id}: "
+                        f"{ {z: len(v) for z, v in seat_map.items()} }")
+        return seat_map
+    except Exception as e:
+        logger.warning(f"could not load seat map ({e}); identities stay UNKNOWN.")
+        return {}
 
 
 def identity_tracking_enabled() -> bool:
@@ -205,6 +279,10 @@ def load_zones_for_camera(camera_id: str, org_id: str = None) -> list:
                 "zone_id": row.zone_id,
                 "zone_name": row.zone_name,
                 "polygon": row.polygon_coordinates,
+                # Needed by the employee aggregator (Step 8) to tell a BREAK
+                # area from a desk: time in a break zone is a break, time
+                # anywhere else away from your desk is a chair exit.
+                "zone_type": (row.zone_type or "WORKSTATION").upper(),
             }
             for row in rows
             if row.polygon_coordinates and len(row.polygon_coordinates) >= 3
@@ -462,6 +540,10 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         identity_tracker = (
             IdentityTracker(session_id=session_id) if identity_on else None
         )
+        if identity_tracker is not None:
+            # Step 7 needs to know who sits where before it can name
+            # anybody. An empty map is fine: nothing gets named.
+            identity_tracker.set_seat_map(load_seat_map(org_id, zones_config))
 
     except Exception as e:
         logger.error(f"AI init error: {e}")
@@ -655,6 +737,15 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             asyncio.create_task(
                 aggregate_after_session(activity_writer.camera_id, activity_writer.org_id)
             )
+            # Step 8: the per-EMPLOYEE rollup, alongside the anonymous one and
+            # never instead of it. Only meaningful once the seat binding has
+            # named somebody, and it swallows its own failures for the same
+            # reason the writers do — a rollup problem must not surface as a
+            # broken video session.
+            if identity_tracker is not None:
+                asyncio.create_task(
+                    aggregate_employees_after_session(activity_writer.org_id)
+                )
 
 
 @router.websocket("/live_webcam")
@@ -714,6 +805,14 @@ async def live_webcam_websocket(websocket: WebSocket):
         identity_tracker = (
             IdentityTracker(session_id=None) if identity_on else None
         )
+        if identity_tracker is not None:
+            # Step 7 needs to know who sits where before it can name
+            # anybody. An empty map is fine: nothing gets named.
+            identity_tracker.set_seat_map(load_seat_map(org_id, zones_config))
+        if identity_tracker is not None:
+            # Step 7 needs to know who sits where before it can name
+            # anybody. An empty map is fine: nothing gets named.
+            identity_tracker.set_seat_map(load_seat_map(org_id, zones_config))
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})

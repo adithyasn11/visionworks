@@ -91,6 +91,29 @@ MIN_AREA_FOR_REID = 900          # 30x30 px
 # would put noise in the pool that future tracks match against.
 MIN_HITS_FOR_GALLERY = 3
 
+# ── Step 7: seat-assignment binding ─────────────────────────────────────────
+#
+# The plan's rule, verbatim: "If it spends > 60% of its observed time in zone Z,
+# and exactly one employee has assignedZoneId == Z, bind, confidence =
+# fraction_of_time_in_zone."
+SEAT_BIND_MIN_FRACTION = 0.60
+
+# ...but 60% of four seconds is not evidence of anything. Someone walking past a
+# desk is briefly 100% inside it. A minimum observation window is what separates
+# "sat here" from "passed through", and it is the difference between a seat
+# prior worth 0.40 of the fusion score and a coin flip.
+SEAT_BIND_MIN_SECONDS = 20.0
+
+# Below this the binding is reported but should not be trusted as fact. Matches
+# the `bindingConfidence < 0.6` threshold migration 020 documents for the UI.
+SEAT_BIND_LOW_CONFIDENCE = 0.60
+
+# Bookkeeping key for time observed outside every drawn zone. It belongs in the
+# DENOMINATOR of the seat fraction — a person is only "at their desk 90% of the
+# time" relative to everywhere else they were — but it is not a place and can
+# never itself be somebody's seat.
+OUTSIDE_ZONE = "__outside__"
+
 # How many signatures to keep per identity. The median of several is far more
 # stable than the latest one, which may be motion-blurred or half-occluded.
 SIGNATURE_HISTORY = 12
@@ -148,8 +171,18 @@ class Identity:
             self.lowers.append(signature["lower"])
         if signature.get("height"):
             self.heights.append(signature["height"])
+        # Time is accumulated for EVERY observation, including the ones outside
+        # any drawn zone. That "outside" time is the denominator of Step 7's
+        # fraction, and dropping it was a real bug: with only in-zone time
+        # counted, someone at their desk 42% of the session computed as 100%
+        # and bound with full confidence. Measured — every confidence came back
+        # exactly 1.000 before this line changed.
+        #
+        # OUTSIDE_ZONE is a bookkeeping key, never a place: dominant_zone()
+        # excludes it from being chosen as somebody's seat.
+        key = zone_id or OUTSIDE_ZONE
+        self.zone_time[key] = self.zone_time.get(key, 0.0) + max(0.0, dt)
         if zone_id:
-            self.zone_time[zone_id] = self.zone_time.get(zone_id, 0.0) + max(0.0, dt)
             self.last_zone = zone_id
 
     def prototype(self) -> dict:
@@ -185,8 +218,19 @@ class Identity:
         total = sum(self.zone_time.values())
         if total <= 0:
             return None, 0.0
-        zid = max(self.zone_time, key=self.zone_time.get)
-        return zid, self.zone_time[zid] / total
+
+        # Only REAL zones can be a seat. OUTSIDE_ZONE is bookkeeping, and
+        # TRANSIT_ZONE is SpatialEngine's name for "inside the frame but inside
+        # no drawn zone" — a corridor is not a desk, and naming someone because
+        # they loitered in one would be exactly the confident-wrong-answer the
+        # plan says to avoid. Both still count toward `total`, so the fraction
+        # stays honest.
+        real = {z: t for z, t in self.zone_time.items()
+                if z not in (OUTSIDE_ZONE, "TRANSIT_ZONE")}
+        if not real:
+            return None, 0.0
+        zid = max(real, key=real.get)
+        return zid, real[zid] / total
 
 
 class IdentityTracker:
@@ -218,6 +262,17 @@ class IdentityTracker:
 
         self._seq = 0
         self._last_frame_time = None
+
+        # Step 7 state. zone_id -> [employee_id, ...]; empty until the caller
+        # supplies a seat map, and the binding is simply never attempted while
+        # it is empty.
+        self._seat_map = {}
+        self._bound_employees = set()
+        # Binding is re-attempted periodically rather than every frame: it is a
+        # scan over every identity, and time-in-zone changes by milliseconds
+        # between frames. 5 s matches the telemetry sampling interval.
+        self._last_bind_attempt = 0.0
+        self.seat_bindings = []
 
         # Stitch-rate metrics — the plan asks for the ratio of raw ids to
         # stitched identities as the headline number for this step.
@@ -402,6 +457,23 @@ class IdentityTracker:
                 "reattached": reattached,
             }
 
+        # Step 7: try to bind identities to seats. Throttled, because it scans
+        # every identity and the inputs barely move between frames.
+        if self._seat_map and (now - self._last_bind_attempt) >= 5.0:
+            self._last_bind_attempt = now
+            made = self.resolve_seats(now)
+            if made:
+                self.seat_bindings.extend(made)
+                # Reflect a fresh binding in THIS frame's output, so the writer
+                # records the named attribution from the moment it is known
+                # rather than a frame later.
+                for tid, res in out.items():
+                    ident = self._by_track.get(tid)
+                    if ident is not None and ident.employee_id:
+                        res["employee_id"] = ident.employee_id
+                        res["confidence"] = ident.confidence
+                        res["method"] = ident.method
+
         # Identities not seen this frame join the gallery, where they stay
         # reattachable for gallery_ttl seconds.
         #
@@ -421,6 +493,179 @@ class IdentityTracker:
                 self._lost[ident.identity_id] = ident
 
         return out
+
+    # ── Step 7: seat-assignment binding ─────────────────────────────────────
+
+    def set_seat_map(self, seat_map: dict):
+        """
+        Tell the tracker which employee sits in which zone.
+
+        `seat_map` is `{zone_id: [employee_id, ...]}`. A LIST, not a single id,
+        deliberately: the binding rule requires "exactly one employee has
+        assignedZoneId == Z", so the tracker has to be able to see that a zone
+        has two claimants and refuse to bind rather than pick one. Migration
+        020's `employees_one_active_per_zone` index makes that impossible to
+        create through the UI, but a seat map assembled from stale data could
+        still contain it, and guessing would silently attribute one person's
+        hours to another.
+        """
+        self._seat_map = {z: list(e) for z, e in (seat_map or {}).items()}
+        # Which employees are already claimed, so two identities in the same
+        # zone cannot both bind to the same person.
+        self._bound_employees = {
+            i.employee_id for i in self._all.values() if i.employee_id
+        }
+
+    def resolve_seats(self, now: float = None) -> list:
+        """
+        Bind identities to employees by where they sit. No biometrics involved.
+
+        Returns the bindings MADE by this call, so a caller can log or emit them
+        as events rather than diffing state.
+
+        THE RULE, and why each clause is there:
+
+          fraction > 0.60      the person is at that desk rather than passing
+          observed  > 20 s     60% of a moment is not evidence (see the constant)
+          exactly one employee assigned to the zone
+          that employee not already bound to a different identity
+
+        The last clause is the one the plan does not spell out but the data
+        demands. If stitching split one person into two identities, both would
+        satisfy the first three clauses for the same desk, and binding both
+        would double-count that person's day. First past the post wins, and the
+        second identity stays UNKNOWN — under-counting, which is visible, rather
+        than double-counting, which is not.
+
+        Idempotent: an identity that is already bound is left alone. Rebinding
+        mid-session would make a day's attribution depend on when the aggregator
+        happened to run.
+        """
+        if not getattr(self, "_seat_map", None):
+            return []
+
+        now = now if now is not None else time.time()
+        made = []
+
+        for ident in self._all.values():
+            if ident.employee_id is not None:
+                # ALREADY BOUND — but keep the confidence current.
+                #
+                # Binding fires as soon as the gates pass, which for a person
+                # who arrives and sits down is about 21 seconds in, when they
+                # are still 100% at their desk. Freezing the fraction there
+                # would report 1.00 for someone who then spent half the
+                # afternoon in meetings. Measured: an identity that ended the
+                # session at 90% reported 1.000 before this.
+                #
+                # The BINDING is never revisited — see the docstring, rebinding
+                # mid-session would make attribution depend on when the
+                # aggregator ran — only the number describing it.
+                zid, frac = ident.dominant_zone()
+                if zid is not None:
+                    ident.confidence = round(float(frac), 3)
+                    # The confidence is allowed to FALL below the threshold that
+                    # justified the binding, and the binding is kept anyway.
+                    #
+                    # Both halves of that are deliberate. Revoking mid-session
+                    # would make a person's morning vanish retroactively the
+                    # moment they went to a long meeting. But the number must
+                    # tell the truth: someone bound at 100% who ends the day at
+                    # 42% reports 0.42, and migration 020 already defines what
+                    # to do with that — below 0.6 the UI shows the row as
+                    # low-confidence rather than as fact.
+                    #
+                    # `method` stays "seat" because that IS how it was bound,
+                    # and it is one of the five values the database CHECK
+                    # accepts. Inventing a "seat_weak" here would be silently
+                    # rejected at write time and recorded as UNKNOWN instead.
+                continue
+
+            zone_id, fraction = ident.dominant_zone()
+            if zone_id is None:
+                continue
+
+            observed = sum(ident.zone_time.values())
+            if observed < SEAT_BIND_MIN_SECONDS:
+                continue
+            if fraction <= SEAT_BIND_MIN_FRACTION:
+                continue
+
+            claimants = self._seat_map.get(zone_id) or []
+            if len(claimants) != 1:
+                # Zero: nobody sits there — a corridor, or an unassigned desk.
+                # Two or more: ambiguous, and Step 7's rule explicitly requires
+                # exactly one. Either way, abstain.
+                continue
+
+            employee_id = claimants[0]
+            if employee_id in self._bound_employees:
+                continue
+
+            ident.employee_id = employee_id
+            # Confidence IS the fraction of time in the zone, as the plan
+            # specifies. It is a real measurement, not a tuned score: 0.95 means
+            # they were at that desk 95% of the time they were observed.
+            ident.confidence = round(float(fraction), 3)
+            ident.method = "seat"
+            self._bound_employees.add(employee_id)
+            made.append({
+                "identity_id": ident.identity_id,
+                "employee_id": employee_id,
+                "zone_id": zone_id,
+                "confidence": ident.confidence,
+                "observed_seconds": round(observed, 1),
+                "low_confidence": ident.confidence < SEAT_BIND_LOW_CONFIDENCE,
+            })
+            logger.info(
+                f"seat-bound {ident.identity_id} -> employee {employee_id} "
+                f"in {zone_id} ({ident.confidence:.0%} of {observed:.0f}s)"
+            )
+
+        return made
+
+    def binding_report(self) -> list:
+        """
+        Every identity and why it is (or is not) bound — for the Step 7
+        verification and for anyone debugging an attribution.
+        """
+        out = []
+        for ident in self._all.values():
+            zone_id, fraction = ident.dominant_zone()
+            observed = sum(ident.zone_time.values())
+            # Report the CURRENT fraction, not the one cached at bind time.
+            # resolve_seats() runs on a 5-second throttle, so the stored value
+            # can trail the last few seconds of a session; a report that
+            # disagreed with the data it was computed from would be worse than
+            # useless when someone is checking an attribution.
+            if ident.employee_id and zone_id is not None:
+                ident.confidence = round(float(fraction), 3)
+            claimants = (getattr(self, "_seat_map", {}) or {}).get(zone_id) or []
+            if ident.employee_id:
+                reason = "bound"
+            elif zone_id is None:
+                reason = "never inside a zone"
+            elif observed < SEAT_BIND_MIN_SECONDS:
+                reason = f"only observed {observed:.0f}s (need {SEAT_BIND_MIN_SECONDS:.0f}s)"
+            elif fraction <= SEAT_BIND_MIN_FRACTION:
+                reason = f"only {fraction:.0%} in {zone_id} (need >{SEAT_BIND_MIN_FRACTION:.0%})"
+            elif len(claimants) == 0:
+                reason = f"no employee assigned to {zone_id}"
+            elif len(claimants) > 1:
+                reason = f"{len(claimants)} employees assigned to {zone_id} — ambiguous"
+            else:
+                reason = f"employee {claimants[0]} already bound to another identity"
+            out.append({
+                "identity_id": ident.identity_id,
+                "employee_id": ident.employee_id,
+                "method": ident.method,
+                "confidence": ident.confidence,
+                "dominant_zone": zone_id,
+                "fraction": round(float(fraction), 3),
+                "observed_seconds": round(observed, 1),
+                "reason": reason,
+            })
+        return sorted(out, key=lambda r: r["identity_id"])
 
     # ── metrics ─────────────────────────────────────────────────────────────
 
@@ -446,6 +691,7 @@ class IdentityTracker:
             "rejected_by_position": self.rejected_by_position,
             "active": len(self._by_track),
             "in_gallery": len(self._lost),
+            "seat_bound": len([i for i in self._all.values() if i.employee_id]),
         }
 
     def identities(self):
