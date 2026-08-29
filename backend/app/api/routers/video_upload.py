@@ -30,6 +30,8 @@ from app.cv.anonymizer import privacy_blur_default
 from app.cv.frame_pipeline import process_detections
 from app.db.activity_writer import ActivityLogWriter, persist_frame
 from app.db.identity_writer import IdentityEventWriter, persist_identity_frame
+from app.cv.appearance import get_extractor
+from app.cv.identity_tracker import IdentityTracker
 from app.db.minute_aggregator import aggregate_after_session
 from app.api.deps import extract_token, resolve_org_role
 from app.api.permissions import can, denial_message
@@ -126,6 +128,22 @@ def resolve_registered_camera(camera_id: Optional[str], org_id: Optional[str]) -
         return None
     finally:
         session.close()
+
+
+def identity_tracking_enabled() -> bool:
+    """
+    Whether to run appearance extraction and fragment stitching (Steps 5-6).
+
+    On by default. Set IDENTITY_TRACKING=false to turn the whole identity path
+    off — the pipeline then behaves exactly as it did after Step 4, still
+    writing UNKNOWN identity_events, just without OSNet in the loop. That is
+    the switch to reach for on a machine with no GPU headroom, or for a
+    deployment that does not want per-person tracking at all.
+    """
+    raw = os.getenv("IDENTITY_TRACKING")
+    if raw is None:
+        return True
+    return raw.strip().lower() not in ("0", "false", "no", "off")
 
 
 def resolve_initial_blur(websocket) -> bool:
@@ -435,6 +453,16 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             camera_id=effective_camera_id, org_id=org_id, session_id=session_id
         )
 
+        # Steps 5-6: appearance signatures and fragment stitching. The
+        # extractor is process-wide (the model is stateless); the tracker
+        # is per session, so its identity namespace and its gallery cannot
+        # leak between concurrent videos.
+        identity_on = identity_tracking_enabled()
+        appearance_extractor = get_extractor() if identity_on else None
+        identity_tracker = (
+            IdentityTracker(session_id=session_id) if identity_on else None
+        )
+
     except Exception as e:
         logger.error(f"AI init error: {e}")
         await websocket.send_json({"error": f"Failed to initialize AI pipeline: {str(e)}"})
@@ -545,6 +573,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                 anonymizer,
                 zones_config,
                 blur_enabled=privacy_state["blur"],
+                appearance_extractor=appearance_extractor,
+                identity_tracker=identity_tracker,
             )
 
             # Persist sampled telemetry. Runs off the event loop and swallows its
@@ -581,14 +611,18 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         logger.info(
             f"Session {session_id}: {processed_count} frames processed, "
             f"{activity_writer.rows_written} telemetry rows, "
-            f"{identity_writer.rows_written} identity rows written."
+            f"{identity_writer.rows_written} identity rows written. "
+            f"stitching: {identity_tracker.stats() if identity_tracker else 'off'}"
         )
         await websocket.send_json({
             "type": "COMPLETE",
             "message": f"Video analysis complete. Processed {processed_count} frames.",
             "total_processed": processed_count,
             "telemetry_rows_written": activity_writer.rows_written,
-            "identity_rows_written": identity_writer.rows_written
+            "identity_rows_written": identity_writer.rows_written,
+            # The Step 6 stitch-rate metric, surfaced to the client so the
+            # dashboard can show how fragmented the tracking was.
+            "identity_stats": identity_tracker.stats() if identity_tracker else None
         })
 
     except WebSocketDisconnect:
@@ -671,6 +705,16 @@ async def live_webcam_websocket(websocket: WebSocket):
             camera_id=effective_camera_id, org_id=org_id, session_id=None
         )
 
+        # Steps 5-6: appearance signatures and fragment stitching. The
+        # extractor is process-wide (the model is stateless); the tracker
+        # is per session, so its identity namespace and its gallery cannot
+        # leak between concurrent videos.
+        identity_on = identity_tracking_enabled()
+        appearance_extractor = get_extractor() if identity_on else None
+        identity_tracker = (
+            IdentityTracker(session_id=None) if identity_on else None
+        )
+
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
         await websocket.close()
@@ -749,6 +793,8 @@ async def live_webcam_websocket(websocket: WebSocket):
                 anonymizer,
                 zones_config,
                 blur_enabled=privacy_state["blur"],
+                appearance_extractor=appearance_extractor,
+                identity_tracker=identity_tracker,
             )
 
             await persist_frame(activity_writer, tracked_entities)
@@ -837,6 +883,16 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
             camera_id=effective_camera_id, org_id=org_id, session_id=None
         )
 
+        # Steps 5-6: appearance signatures and fragment stitching. The
+        # extractor is process-wide (the model is stateless); the tracker
+        # is per session, so its identity namespace and its gallery cannot
+        # leak between concurrent videos.
+        identity_on = identity_tracking_enabled()
+        appearance_extractor = get_extractor() if identity_on else None
+        identity_tracker = (
+            IdentityTracker(session_id=None) if identity_on else None
+        )
+
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
         await websocket.close()
@@ -899,6 +955,8 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
                 anonymizer,
                 zones_config,
                 blur_enabled=privacy_state["blur"],
+                appearance_extractor=appearance_extractor,
+                identity_tracker=identity_tracker,
             )
 
             await persist_frame(activity_writer, tracked_entities)

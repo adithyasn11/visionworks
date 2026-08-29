@@ -72,3 +72,8 @@ yarn-error.log*
 *.bak
 *.swp
 *.tmp
+
+# Re-ID model weights. Fetched by backend/models/download_models.py rather than
+# committed — a binary in git history is dead weight for every future clone.
+backend/models/*.pth
+backend/models/*.onnx

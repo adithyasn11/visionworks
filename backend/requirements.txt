@@ -19,3 +19,11 @@ onnxruntime>=1.17.0
 supabase>=2.3.0
 python-multipart>=0.0.9
 python-dotenv>=1.0.0
+
+# ── Per-employee identity (IDENTITY_TRACKING_PLAN.md Phase B) ────────────────
+# OSNet person re-identification. `gdown` and `tensorboard` are transitive:
+# torchreid's package __init__ imports its whole training stack, so both are
+# needed even though only the inference model is used.
+torchreid>=0.2.5
+gdown>=4.7.0
+tensorboard>=2.14.0

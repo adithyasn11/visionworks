@@ -185,13 +185,16 @@ class IdentityEventWriter:
 
     def identity_for(self, track_id: int) -> str:
         """
-        The session-namespaced identity for a raw ByteTrack id.
+        The FALLBACK session-namespaced identity for a raw ByteTrack id.
 
-        Step 6 replaces this with real stitching, where one identity survives
-        several track ids across an occlusion. Until then the mapping is 1:1,
-        which is honest: nothing has stitched anything yet, and pretending
-        otherwise would make the Step 6 stitch-rate metric meaningless because
-        its baseline would already claim to be perfect.
+        Used only when the entity carries no stitched `identity_id` — identity
+        tracking disabled, or a frame where resolution failed. The 1:1 mapping
+        is honest in that case: nothing stitched anything, and inventing a
+        shared id would fabricate continuity that was never established.
+
+        When Step 6 IS running, `collect()` takes the stitched identity from the
+        entity instead, so one identity spans the several ByteTrack ids that a
+        single person accumulates across occlusions.
         """
         return f"{self.session_id}::{track_id}"
 
@@ -268,7 +271,11 @@ class IdentityEventWriter:
                 # `zones` would fail resolution at sync time.
                 "zone_id": entity.get("zone_id") or None,
                 "track_id": int(track_id),
-                "identity_id": self.identity_for(track_id),
+                # The STITCHED identity when Step 6 resolved one, so a person
+                # who was occluded and came back keeps a single identity_id
+                # across the several ByteTrack ids they were split into. Falls
+                # back to the 1:1 namespacing when identity tracking is off.
+                "identity_id": entity.get("identity_id") or self.identity_for(track_id),
                 "posture": str(posture).upper(),
                 "confidence": max(0.0, min(1.0, confidence)),
                 "method": method,

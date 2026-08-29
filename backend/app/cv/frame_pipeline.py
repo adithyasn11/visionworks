@@ -35,7 +35,11 @@ called out here because a future reader who "cleans up" the mutation would
 silently disable the privacy blur on every endpoint at once.
 """
 
+import logging
+
 from app.cv.spatial_engine import SpatialEngine
+
+_log = logging.getLogger(__name__)
 
 
 def process_detections(
@@ -46,6 +50,8 @@ def process_detections(
     anonymizer,
     zones_config,
     blur_enabled,
+    appearance_extractor=None,
+    identity_tracker=None,
 ):
     """
     Turn one frame's raw detections into the wire format, updating telemetry
@@ -59,6 +65,13 @@ def process_detections(
         anonymizer:          `PrivacyAnonymizer`
         zones_config:        the camera's zones, used to seed the occupancy tally
         blur_enabled:        this session's privacy state, already resolved
+        appearance_extractor: Step 5's `AppearanceExtractor`, or None to skip
+        identity_tracker:    Step 6's `IdentityTracker`, or None to skip
+
+    Both identity arguments default to None, and when either is absent the loop
+    behaves exactly as it did in Step 3 — `identity_id` is simply absent from
+    the entities. That is what lets identity be switched off per deployment
+    without a second code path to keep in sync.
 
     Returns:
         (tracked_entities, zone_summary)
@@ -74,6 +87,38 @@ def process_detections(
     # "empty" from "not measured".
     zone_summary = {z["zone_id"]: 0 for z in zones_config}
     zone_summary["TRANSIT_ZONE"] = 0
+
+    # ── Identity resolution (Steps 5 + 6) ───────────────────────────────────
+    #
+    # ORDER MATTERS, AND THIS IS THE SUBTLE PART: appearance signatures are
+    # extracted from the UNBLURRED frame, before the loop below blurs any
+    # heads. Running it after would feed OSNet a smeared head region on every
+    # crop and quietly degrade every match — the kind of bug that shows up as
+    # "the model is bad" rather than as an error.
+    #
+    # The zone each track is in has to be known before identities are assigned,
+    # because the tracker accumulates time-in-zone for Step 7's seat binding.
+    # So zones are resolved in a cheap first pass here rather than inside the
+    # main loop, which needs them again anyway.
+    identity_by_track = {}
+    if appearance_extractor is not None and identity_tracker is not None and detections:
+        try:
+            zone_by_track = {}
+            for det in detections:
+                b = det["bbox"]
+                zone_by_track[det["track_id"]] = spatial_engine.check_zone_containment(
+                    [(b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0]
+                )
+            signatures = appearance_extractor.extract_batch(
+                frame, detections, spatial_engine=spatial_engine
+            )
+            identity_by_track = identity_tracker.assign(signatures, zone_by_track=zone_by_track)
+        except Exception as e:
+            # Identity is an enrichment. A failure here must leave the frame,
+            # the telemetry and the video stream completely intact — the
+            # entities simply carry no identity_id this frame.
+            _log.warning(f"identity resolution skipped this frame: {e}")
+            identity_by_track = {}
 
     for det in detections:
         track_id = det["track_id"]
@@ -106,7 +151,7 @@ def process_detections(
         # array once the loop is done.
         anonymizer.blur_face_region(frame, bbox, blur_enabled=blur_enabled)
 
-        tracked_entities.append({
+        entity = {
             "track_id": track_id,
             "bbox": bbox,
             "posture": posture,
@@ -115,6 +160,22 @@ def process_detections(
             "dwell_duration_seconds": dwell_seconds,
             "floor_point": [round(floor_point[0], 1), round(floor_point[1], 1)],
             "floor_size": [SpatialEngine.FLOOR_WIDTH, SpatialEngine.FLOOR_HEIGHT]
-        })
+        }
+
+        # Identity fields are ADDED, never substituted: `track_id` keeps its
+        # old meaning so the dashboard HUD, the activity writer and the
+        # anonymous analytics path are all untouched by this step.
+        resolved = identity_by_track.get(track_id)
+        if resolved:
+            entity["identity_id"] = resolved["identity_id"]
+            entity["employee_id"] = resolved["employee_id"]
+            entity["identity_confidence"] = resolved["confidence"]
+            entity["identity_method"] = resolved["method"]
+            if resolved.get("reattached"):
+                # Only true on the frame a stitch happened, so it reads as an
+                # event in a log rather than a persistent flag.
+                entity["identity_reattached"] = True
+
+        tracked_entities.append(entity)
 
     return tracked_entities, zone_summary
