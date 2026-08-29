@@ -112,6 +112,17 @@ async function writeAudit(supabase, { orgId, user, action, targetId, metadata })
  *
  * Each branch names a constraint that migration 020 actually creates, so a
  * message here cannot drift away from what the database really rejected.
+ *
+ * ANYTHING UNRECOGNISED BECOMES THE CALLER'S FALLBACK, NEVER THE RAW MESSAGE.
+ *
+ * This used to end `return msg || fallback`, which passed the database's own
+ * words straight to the screen. A user with migration 020 unapplied was shown
+ * "Could not find the table 'public.employees' in the schema cache" — which
+ * means nothing to them, and leaks the schema's internals to anyone who can
+ * provoke an error. Postgres messages are for the server log; the screen gets
+ * a sentence written for a person.
+ *
+ * The raw text is still logged, so a real fault stays diagnosable.
  */
 function describeDbError(error, fallback) {
   const msg = String(error?.message ?? '');
@@ -131,7 +142,19 @@ function describeDbError(error, fallback) {
     return 'Only an administrator or manager can remove an employee.';
   }
   if (/no_data_found|Employee not found/i.test(msg)) return 'That employee no longer exists.';
-  return msg || fallback;
+
+  // The identity tables are created by prisma/sql/020_identity.sql. Until that
+  // has been applied to this deployment, PostgREST reports the table as missing
+  // from its schema cache. That is a setup step nobody has run, not a fault the
+  // user caused, so it gets its own message pointing at the fix.
+  if (/schema cache|does not exist|relation .* does not exist/i.test(msg)) {
+    return 'Employee tracking is not set up on this deployment yet. Apply the database migration prisma/sql/020_identity.sql, then reload.';
+  }
+
+  // Unrecognised. Log the real thing for whoever has to fix it; show the user
+  // a sentence rather than Postgres's internals.
+  if (msg) console.error('[employees] unhandled database error:', msg);
+  return fallback;
 }
 
 /** Trim, collapse whitespace, and cap. Empty becomes null so CHECKs speak. */

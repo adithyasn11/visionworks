@@ -95,7 +95,12 @@ function describeDbError(error, fallback) {
   if (/no profile for user/i.test(msg)) {
     return 'Your profile has not finished setting up. Wait a moment and try again.';
   }
-  return msg || fallback;
+  // Unrecognised. Postgres's own words are for the server log, not the screen:
+  // returning them leaks schema internals ("relation ... does not exist",
+  // "schema cache") to anyone who can provoke an error, and they tell the
+  // reader nothing they can act on. Log the real thing, show a sentence.
+  if (msg) console.error('[onboarding] unhandled database error:', msg);
+  return fallback;
 }
 
 /**

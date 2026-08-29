@@ -153,7 +153,12 @@ function describeDbError(error, fallback) {
   if (/memberships_email_lowercase/i.test(msg)) {
     return 'That email address could not be stored. Check it and try again.';
   }
-  return msg || fallback;
+  // Unrecognised. Postgres's own words are for the server log, not the screen:
+  // returning them leaks schema internals ("relation ... does not exist",
+  // "schema cache") to anyone who can provoke an error, and they tell the
+  // reader nothing they can act on. Log the real thing, show a sentence.
+  if (msg) console.error('[members] unhandled database error:', msg);
+  return fallback;
 }
 
 /**

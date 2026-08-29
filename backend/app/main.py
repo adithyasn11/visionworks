@@ -41,8 +41,14 @@ async def lifespan(app: FastAPI):
     up, each aggregating the same window.
     """
     from app.db.minute_aggregator import ensure_bucket_table, run_aggregator_loop
+    from app.db.identity_writer import ensure_identity_table
 
     ensure_bucket_table()
+    # The per-person mirror of migration 020. Created here rather than by
+    # Base.metadata.create_all() because it carries CHECK constraints that
+    # SQLAlchemy's declarative models do not express — including the one that
+    # keeps UNKNOWN honest in both employee_id and method.
+    ensure_identity_table()
     task = asyncio.create_task(run_aggregator_loop())
     try:
         yield

@@ -102,7 +102,12 @@ function describeDbError(error, fallback) {
     return 'Retention must be between 1 and 730 days.';
   }
   if (/row-level security/i.test(msg)) return 'Only an administrator can change these settings.';
-  return msg || fallback;
+  // Unrecognised. Postgres's own words are for the server log, not the screen:
+  // returning them leaks schema internals ("relation ... does not exist",
+  // "schema cache") to anyone who can provoke an error, and they tell the
+  // reader nothing they can act on. Log the real thing, show a sentence.
+  if (msg) console.error('[organisation] unhandled database error:', msg);
+  return fallback;
 }
 
 /* ── Read ────────────────────────────────────────────────────────────────── */

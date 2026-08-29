@@ -29,6 +29,7 @@ import numpy as np
 from app.cv.anonymizer import privacy_blur_default
 from app.cv.frame_pipeline import process_detections
 from app.db.activity_writer import ActivityLogWriter, persist_frame
+from app.db.identity_writer import IdentityEventWriter, persist_identity_frame
 from app.db.minute_aggregator import aggregate_after_session
 from app.api.deps import extract_token, resolve_org_role
 from app.api.permissions import can, denial_message
@@ -427,6 +428,12 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         # Telemetry for this session is attributed to the uploaded file, so rows
         # from different videos stay distinguishable in activity_logs.
         activity_writer = ActivityLogWriter(camera_id=effective_camera_id, org_id=org_id)
+        # The per-person analogue, written alongside the anonymous path
+        # rather than replacing it. Step 4 writes every row as UNKNOWN;
+        # Steps 5-14 fill in employee_id without changing this wiring.
+        identity_writer = IdentityEventWriter(
+            camera_id=effective_camera_id, org_id=org_id, session_id=session_id
+        )
 
     except Exception as e:
         logger.error(f"AI init error: {e}")
@@ -543,6 +550,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             # Persist sampled telemetry. Runs off the event loop and swallows its
             # own failures, so it cannot stall or break the video stream.
             await persist_frame(activity_writer, tracked_entities)
+            await persist_identity_frame(identity_writer, tracked_entities)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
@@ -572,13 +580,15 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         session["status"] = "DONE"
         logger.info(
             f"Session {session_id}: {processed_count} frames processed, "
-            f"{activity_writer.rows_written} telemetry rows written."
+            f"{activity_writer.rows_written} telemetry rows, "
+            f"{identity_writer.rows_written} identity rows written."
         )
         await websocket.send_json({
             "type": "COMPLETE",
             "message": f"Video analysis complete. Processed {processed_count} frames.",
             "total_processed": processed_count,
-            "telemetry_rows_written": activity_writer.rows_written
+            "telemetry_rows_written": activity_writer.rows_written,
+            "identity_rows_written": identity_writer.rows_written
         })
 
     except WebSocketDisconnect:
@@ -654,6 +664,12 @@ async def live_webcam_websocket(websocket: WebSocket):
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
         activity_writer = ActivityLogWriter(camera_id=effective_camera_id, org_id=org_id)
+        # The per-person analogue, written alongside the anonymous path
+        # rather than replacing it. Step 4 writes every row as UNKNOWN;
+        # Steps 5-14 fill in employee_id without changing this wiring.
+        identity_writer = IdentityEventWriter(
+            camera_id=effective_camera_id, org_id=org_id, session_id=None
+        )
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
@@ -736,6 +752,7 @@ async def live_webcam_websocket(websocket: WebSocket):
             )
 
             await persist_frame(activity_writer, tracked_entities)
+            await persist_identity_frame(identity_writer, tracked_entities)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
@@ -813,6 +830,12 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
         activity_writer = ActivityLogWriter(camera_id=effective_camera_id, org_id=org_id)
+        # The per-person analogue, written alongside the anonymous path
+        # rather than replacing it. Step 4 writes every row as UNKNOWN;
+        # Steps 5-14 fill in employee_id without changing this wiring.
+        identity_writer = IdentityEventWriter(
+            camera_id=effective_camera_id, org_id=org_id, session_id=None
+        )
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
@@ -879,6 +902,7 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
             )
 
             await persist_frame(activity_writer, tracked_entities)
+            await persist_identity_frame(identity_writer, tracked_entities)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
