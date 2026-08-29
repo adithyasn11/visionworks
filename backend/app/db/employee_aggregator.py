@@ -98,6 +98,20 @@ BREAK_MIN_SECONDS = 300.0
 # Continuous seated work that counts as a focus block.
 FOCUS_BLOCK_MIN_SECONDS = 1200.0
 
+# ── Step 14: the abstention floor ────────────────────────────────────────────
+#
+# The same 0.50 the tracker enforces (cv/identity_tracker.py), repeated here
+# rather than imported because this module must be able to clean up rows the
+# TRACKER never saw — anything written before Step 14 existed, or by a future
+# writer that forgets. A stored attribution below the floor is not a slightly
+# weaker fact, it is a guess, and the plan's rule is that a guess is recorded
+# as UNKNOWN.
+#
+# The consequence is visible in the output: that time lands in
+# `unknownMinutes` rather than on somebody's desk total, so a day that could
+# not be attributed reads as unattributed rather than as a short day.
+IDENTITY_MIN_CONFIDENCE = 0.50
+
 # ── The sampling rule ───────────────────────────────────────────────────────
 
 # The writer samples every ~5 s. A gap beyond this means the person was not
@@ -369,11 +383,27 @@ def aggregate_day_sync(day: date = None, org_id: str = None) -> dict:
         unknown_seconds_by_org = defaultdict(float)
         prev_unknown_t = {}
 
+        low_confidence_rows = 0
+
         for r in rows:
             t = _parse(r["observed_at"])
             if t is None:
                 continue
-            if r["employee_id"]:
+
+            # STEP 14. A row that names somebody but does so below the floor is
+            # treated as UNATTRIBUTED, not as weak evidence about that person.
+            #
+            # This matters more than it looks. Without it, a 0.30 attribution
+            # contributes its minutes to somebody's desk total AND drags their
+            # bindingConfidence down — so the day is both wrong and looks
+            # plausible. Routing it here means the minutes land in
+            # unknownMinutes and the person's own average stays honest.
+            confident = (r["employee_id"]
+                         and float(r["confidence"] or 0.0) >= IDENTITY_MIN_CONFIDENCE)
+            if r["employee_id"] and not confident:
+                low_confidence_rows += 1
+
+            if confident:
                 by_employee[(r["org_id"], r["employee_id"])].append({
                     "observed_at": t,
                     "zone_id": r["zone_id"],
@@ -381,9 +411,10 @@ def aggregate_day_sync(day: date = None, org_id: str = None) -> dict:
                     "confidence": r["confidence"],
                 })
             else:
-                # Unattributed observation. Measured as a span like everything
-                # else, so "we could not say who this was for 12 minutes" is a
-                # number rather than a row count.
+                # Unattributed: either nobody was identified, or the
+                # identification was too weak to act on. Measured as a span
+                # like everything else, so "we could not say who this was for
+                # 12 minutes" is a number rather than a row count.
                 key = (r["org_id"], r["camera_id"])
                 prev = prev_unknown_t.get(key)
                 if prev is not None:
@@ -391,6 +422,12 @@ def aggregate_day_sync(day: date = None, org_id: str = None) -> dict:
                     if 0 < gap <= MAX_SAMPLE_GAP_SECONDS:
                         unknown_seconds_by_org[r["org_id"]] += gap
                 prev_unknown_t[key] = t
+
+        if low_confidence_rows:
+            logger.info(
+                f"{low_confidence_rows} observation(s) named somebody below the "
+                f"{IDENTITY_MIN_CONFIDENCE} confidence floor; counted as "
+                "unattributed rather than attributed")
 
         written = 0
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -467,6 +504,12 @@ def aggregate_day_sync(day: date = None, org_id: str = None) -> dict:
             "day": day.isoformat(),
             "employees": written,
             "rows_read": len(rows),
+            # Step 14: how much of the day the system declined to attribute.
+            # Reported alongside the rollup so a caller can see the abstention
+            # rate without querying for it.
+            "low_confidence_rows": low_confidence_rows,
+            "unknown_seconds": round(sum(unknown_seconds_by_org.values()), 1),
+            "confidence_floor": IDENTITY_MIN_CONFIDENCE,
             "results": results,
         }
 

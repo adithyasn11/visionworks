@@ -108,6 +108,21 @@ SEAT_BIND_MIN_SECONDS = 20.0
 # the `bindingConfidence < 0.6` threshold migration 020 documents for the UI.
 SEAT_BIND_LOW_CONFIDENCE = 0.60
 
+# ── Step 14: the abstention floor ────────────────────────────────────────────
+#
+# The plan's central rule: "When the system is not confident, it must output
+# UNKNOWN rather than guess." Below this, an attribution is discarded — the
+# identity keeps employee_id = None and method = "unknown", and its time lands
+# in employee_day_stats.unknownMinutes instead of on somebody's record.
+#
+# 0.50 is the plan's number, and note what it is NOT. It is not a tuning knob
+# for accuracy: raising it does not make the system more right, it makes it
+# abstain more often, which is a different and usually better trade. The plan
+# is explicit that "a system that is right 92% of the time and abstains 15% of
+# the time is worth far more than one that guesses on everything and is right
+# 70%".
+IDENTITY_MIN_CONFIDENCE = 0.50
+
 # Bookkeeping key for time observed outside every drawn zone. It belongs in the
 # DENOMINATOR of the seat fraction — a person is only "at their desk 90% of the
 # time" relative to everywhere else they were — but it is not a place and can
@@ -135,7 +150,8 @@ class Identity:
 
     __slots__ = ("identity_id", "track_ids", "embeddings", "uppers", "lowers",
                  "heights", "last_bbox", "last_seen", "first_seen", "hits",
-                 "employee_id", "confidence", "method", "zone_time", "last_zone")
+                 "employee_id", "confidence", "method", "zone_time", "last_zone",
+                 "rejected_low_confidence", "seat_withdrawn_from")
 
     def __init__(self, identity_id: str, track_id: int, now: float):
         self.identity_id = identity_id
@@ -153,9 +169,73 @@ class Identity:
         self.employee_id = None
         self.confidence = 0.0
         self.method = "unknown"
+        # Set when a SEAT binding is withdrawn only because the measured
+        # fraction dipped under the floor. It records who this identity was,
+        # so the same evidence can reinstate them when they come back to the
+        # desk. Withdrawals for any other reason leave this None and are final.
+        self.seat_withdrawn_from = None
         # zone_id -> seconds observed there. Step 7's binding rule reads this.
         self.zone_time = {}
         self.last_zone = None
+        # How many times this identity was ALMOST named and the evidence was
+        # too weak. Surfaced in stats(), because an identity rejected nine
+        # times is a camera placement problem, not a model problem.
+        self.rejected_low_confidence = 0
+
+    def attribute(self, employee_id, confidence: float, method: str) -> bool:
+        """
+        Name this identity — or refuse to, and say so.
+
+        THE ONE PLACE an attribution is set. Four different call sites can name
+        somebody (face, fusion, seat, handoff) and putting the floor in each of
+        them would be four chances to forget it; a fifth added later would be a
+        fifth. Here it cannot be bypassed.
+
+        Returns True when the attribution was accepted. False means the evidence
+        was too weak and the identity stays UNKNOWN, which is a successful
+        outcome rather than an error — the plan's rule is that the system
+        abstains rather than guesses, and this is where it does that.
+        """
+        if not employee_id:
+            return False
+        confidence = float(confidence or 0.0)
+
+        if confidence < IDENTITY_MIN_CONFIDENCE:
+            # Below the floor. The identity is left UNKNOWN and the rejection
+            # is recorded, so "we saw somebody we could not name" is a number
+            # rather than a silence — that is what unknownMinutes is built from.
+            self.rejected_low_confidence += 1
+            logger.debug(
+                f"{self.identity_id}: refusing to attribute to {employee_id} "
+                f"at confidence {confidence:.3f} (floor {IDENTITY_MIN_CONFIDENCE})")
+            return False
+
+        self.employee_id = employee_id
+        self.confidence = round(min(1.0, max(0.0, confidence)), 3)
+        self.method = method
+        return True
+
+    def revoke(self, reason: str = "confidence collapsed",
+           reinstatable: bool = False):
+        """
+        Take a name back off an identity.
+
+        Used when a stronger claim arrives for the same employee, and when a
+        confidence that once cleared the floor has since fallen below it. The
+        identity survives; only the name is withdrawn.
+        """
+        if self.employee_id is None:
+            return
+        logger.debug(f"{self.identity_id}: releasing {self.employee_id} ({reason})")
+        # A seat binding withdrawn for a dip is provisional: the same desk, the
+        # same person, the same evidence may reinstate it. Every other
+        # withdrawal (a stronger claim, a contradiction) is final, and must not
+        # leave a name here for the seat rule to pick back up.
+        self.seat_withdrawn_from = (
+            self.employee_id if reinstatable and self.method == "seat" else None)
+        self.employee_id = None
+        self.confidence = 0.0
+        self.method = "unknown"
 
     def observe(self, signature: dict, now: float, zone_id=None, dt: float = 0.0):
         """Fold one frame's observation into this identity."""
@@ -565,14 +645,17 @@ class IdentityTracker:
         ident = self._new_identity(track_id, now)
         employee_id = verdict.get("employee_id")
         if employee_id and employee_id not in self._bound_employees:
-            ident.employee_id = employee_id
-            ident.confidence = round(float(verdict.get("confidence") or 0.0), 3)
             # "handoff" is one of the five methods migration 020 accepts, and
             # it says something the others do not: this attribution came from
             # another camera, so its reliability is the handoff's, not a face
             # match's. Step 17 can separate them because of this.
-            ident.method = "handoff"
-            self._bound_employees.add(employee_id)
+            #
+            # attribute() applies the Step 14 floor: a handoff whose confidence
+            # arrived below 0.50 leaves the identity UNKNOWN rather than
+            # carrying a weak claim across a camera boundary.
+            if ident.attribute(employee_id,
+                               verdict.get("confidence") or 0.0, "handoff"):
+                self._bound_employees.add(employee_id)
 
         record = {
             "identity_id": ident.identity_id,
@@ -649,9 +732,12 @@ class IdentityTracker:
                         other.method = "unknown"
 
             previous = ident.employee_id
-            ident.employee_id = employee_id
-            ident.confidence = round(confidence, 3)
-            ident.method = "face"
+            if not ident.attribute(employee_id, confidence, "face"):
+                # Below the Step 14 floor. A face match this weak is not
+                # evidence, and the plan is explicit that an unenrolled or
+                # uncertain person must come back UNKNOWN rather than as the
+                # nearest name.
+                continue
             self._bound_employees.add(employee_id)
 
             made.append({
@@ -706,12 +792,11 @@ class IdentityTracker:
                 # identities cannot be the same person at once.
                 continue
 
-            ident.employee_id = employee_id
-            ident.confidence = round(float(confidence), 3)
             # "fusion": named by combining appearance signals against a
             # registry entry, rather than by seeing a face or inferring a seat.
             # One of the five methods migration 020's CHECK accepts.
-            ident.method = "fusion"
+            if not ident.attribute(employee_id, confidence, "fusion"):
+                continue
             self._bound_employees.add(employee_id)
             made.append({
                 "identity_id": ident.identity_id,
@@ -796,6 +881,16 @@ class IdentityTracker:
                 zid, frac = ident.dominant_zone()
                 if zid is not None:
                     ident.confidence = round(float(frac), 3)
+                    # Step 14: an attribution whose evidence has since collapsed
+                    # below the floor is withdrawn, not merely flagged. Keeping
+                    # a 0.30 seat binding would attribute a whole day to
+                    # somebody on evidence the system would refuse to act on if
+                    # it saw it fresh — and that time belongs in
+                    # unknownMinutes instead.
+                    if ident.method == "seat" and ident.confidence < IDENTITY_MIN_CONFIDENCE:
+                        self._bound_employees.discard(ident.employee_id)
+                        ident.revoke("seat fraction fell below the floor",
+                                     reinstatable=True)
                     # The confidence is allowed to FALL below the threshold that
                     # justified the binding, and the binding is kept anyway.
                     #
@@ -820,6 +915,34 @@ class IdentityTracker:
             observed = sum(ident.zone_time.values())
             if observed < SEAT_BIND_MIN_SECONDS:
                 continue
+
+            # REINSTATEMENT
+            #
+            # Withdrawing at 0.50 while only binding above 0.60 leaves a dead
+            # band: somebody who dips to 0.48 during a long meeting and comes
+            # back to finish the day at 0.55 would stay UNKNOWN for the rest of
+            # the session, and their afternoon at their own desk would land in
+            # unknownMinutes. That is not caution, it is a threshold gap.
+            #
+            # So a binding withdrawn for a dip is restored as soon as the
+            # fraction clears the floor again, provided it is the same desk and
+            # the same claimant. The stricter 0.60 gate governs naming somebody
+            # for the FIRST time, where the cost of being wrong is a stranger's
+            # name on a day; reinstating an identity we already had evidence for
+            # is a weaker claim and the floor is the right bar for it.
+            if (ident.seat_withdrawn_from
+                    and fraction >= IDENTITY_MIN_CONFIDENCE
+                    and (self._seat_map.get(zone_id) or [None])[0]
+                        == ident.seat_withdrawn_from
+                    and ident.seat_withdrawn_from not in self._bound_employees):
+                if ident.attribute(ident.seat_withdrawn_from, fraction, "seat"):
+                    self._bound_employees.add(ident.employee_id)
+                    ident.seat_withdrawn_from = None
+                    logger.info(
+                        f"seat-reinstated {ident.identity_id} -> "
+                        f"{ident.employee_id} in {zone_id} ({fraction:.0%})")
+                    continue
+
             if fraction <= SEAT_BIND_MIN_FRACTION:
                 continue
 
@@ -834,12 +957,11 @@ class IdentityTracker:
             if employee_id in self._bound_employees:
                 continue
 
-            ident.employee_id = employee_id
             # Confidence IS the fraction of time in the zone, as the plan
             # specifies. It is a real measurement, not a tuned score: 0.95 means
             # they were at that desk 95% of the time they were observed.
-            ident.confidence = round(float(fraction), 3)
-            ident.method = "seat"
+            if not ident.attribute(employee_id, fraction, "seat"):
+                continue
             self._bound_employees.add(employee_id)
             made.append({
                 "identity_id": ident.identity_id,
@@ -929,6 +1051,14 @@ class IdentityTracker:
                 for m in ("face", "fusion", "seat", "handoff", "unknown")
             },
             "handoffs_in": len(self.handoffs),
+            # Step 14: how often the system declined to name somebody it had a
+            # candidate for. A high number here is the system working, not
+            # failing — but a persistently high one means a camera is placed
+            # where it cannot see enough to be sure.
+            "rejected_low_confidence": sum(
+                i.rejected_low_confidence for i in self._all.values()),
+            "unattributed": len([i for i in self._all.values() if not i.employee_id]),
+            "confidence_floor": IDENTITY_MIN_CONFIDENCE,
         }
 
     def identities(self):

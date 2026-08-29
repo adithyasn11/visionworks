@@ -30,6 +30,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from app.cv.identity_tracker import (      # noqa: E402
     IdentityTracker, SEAT_BIND_MIN_FRACTION, SEAT_BIND_MIN_SECONDS,
+    IDENTITY_MIN_CONFIDENCE,
 )
 
 FAILS = []
@@ -141,24 +142,33 @@ def main():
     check("refuses when the fraction never exceeds 60%",
           r["employee_id"] is None, r["reason"])
 
-    # The same 42%, but at the desk FIRST. This one DOES bind, and that is
-    # correct: for the first 25 s the person really was 100% at that desk, and
-    # the gates were genuinely satisfied. What must not happen is the
-    # confidence continuing to claim 1.00 after they wandered off.
+    # The same 42%, but at the desk FIRST. This one DOES bind at the time —
+    # correctly, because for the first 25 s the person really was 100% at that
+    # desk and the gates were genuinely satisfied. The question is what happens
+    # afterwards, once they wander off and the measured fraction collapses.
     #
-    # The binding is deliberately not revoked — a person's morning must not
-    # vanish retroactively because of how their afternoon went — but the number
-    # falls to the truth, and migration 020 defines 0.6 as the line below which
-    # the UI stops presenting a row as fact.
+    # Step 7 originally let the binding stand with an honest, falling number,
+    # reasoning that a person's morning must not vanish because of how their
+    # afternoon went. Step 14 overrides that: below IDENTITY_MIN_CONFIDENCE the
+    # name is WITHDRAWN, not merely marked down. An attribution the system is
+    # not willing to defend must not keep somebody's name on it, because a name
+    # attached to a low number still reads as an accusation.
+    #
+    # The morning is not lost. Revocation touches only the live identity; the
+    # identity_events rows already written keep the confidence they had when
+    # they were written, and the aggregator judges every row on its own value.
+    # So the confident early minutes stay attributed in the database and only
+    # the frames from here on go unnamed — which is the correct division.
     tk = run_session({1: ["desk_1"] * 250 + [None] * 350})
     r = tk.binding_report()[0]
     print(f"   42% at desk_1, desk first -> {r['employee_id']}  "
           f"conf={r['confidence']:.3f}  ({r['reason']})")
-    check("an early binding survives, but its confidence tells the truth",
-          r["employee_id"] is not None and r["confidence"] < SEAT_BIND_MIN_FRACTION,
-          f"bound with confidence {r['confidence']:.3f} < {SEAT_BIND_MIN_FRACTION}")
-    check("the collapsed confidence is flagged as low",
-          r["confidence"] < 0.6, f"{r['confidence']:.3f} < 0.6 -> UI shows low-confidence")
+    check("a binding whose evidence collapses is withdrawn (step 14)",
+          r["employee_id"] is None,
+          f"{r['employee_id']} @ {r['confidence']:.3f}")
+    check("...and is left genuinely unknown, not half-named",
+          r["confidence"] < IDENTITY_MIN_CONFIDENCE,
+          f"{r['confidence']:.3f} < {IDENTITY_MIN_CONFIDENCE}")
 
     # Too brief to mean anything, even at 100%.
     tk = run_session({1: ["desk_1"] * 50})     # 5 s at 10 fps

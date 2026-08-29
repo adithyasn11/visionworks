@@ -473,7 +473,13 @@ export default function EmployeesScreen({ orgName, initialRole, viewer }) {
 
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-[14px] font-black text-ink truncate">{emp.displayName}</p>
+                            <Link
+                            href={`/dashboard/employees/${emp.id}`}
+                            className="text-[14px] font-black text-ink truncate hover:text-accent transition-colors"
+                            title={`See ${emp.displayName}'s measured figures`}
+                          >
+                            {emp.displayName}
+                          </Link>
                             <StatusPill active={emp.active} />
                           </div>
 
