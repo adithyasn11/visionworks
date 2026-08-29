@@ -16,7 +16,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.db.database import engine, Base, apply_lightweight_migrations
-from app.api.routers import cameras, zones, analytics, websocket, video_upload
+from app.api.routers import cameras, zones, analytics, websocket, video_upload, enrolment
 
 # Create database tables automatically on startup, then add any columns that
 # were introduced after an existing database was created (create_all does not
@@ -84,6 +84,10 @@ app.include_router(zones.router, prefix="/api/v1/zones", tags=["Zones"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(websocket.router, prefix="/api/v1/ws", tags=["WebSockets"])
 app.include_router(video_upload.router, prefix="/api/v1/video", tags=["Video Upload"])
+# Face enrolment (Step 9). Separate from /video because it is roster
+# configuration, not analysis: it is gated on employees.edit and it writes to
+# Postgres rather than to the local telemetry tables.
+app.include_router(enrolment.router, prefix="/api/v1/employees", tags=["Face Enrolment"])
 
 @app.get("/")
 def read_root():

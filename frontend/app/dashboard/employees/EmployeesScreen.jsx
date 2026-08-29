@@ -29,8 +29,9 @@
 // is rejected, and an ADMIN of another organisation sees zero of these rows.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
-  ContactRound, Plus, Loader2, Pencil, Trash2, X, Check,
+  ContactRound, Plus, Loader2, Pencil, Trash2, X, Check, ScanFace,
   MapPin, UserCheck, UserX, AlertTriangle,
 } from 'lucide-react';
 
@@ -497,6 +498,19 @@ export default function EmployeesScreen({ orgName, initialRole, viewer }) {
 
                         {canEdit && (
                           <div className="flex items-center gap-1 shrink-0">
+                            {/* Face enrolment (Step 9). A routed page rather
+                                than an inline panel: it needs the camera, and
+                                a live video element inside a list row would
+                                keep a webcam open behind whatever the user
+                                scrolls to next. */}
+                            <Link
+                              href={`/dashboard/employees/${emp.id}/enroll`}
+                              title="Enrol a face"
+                              aria-label={`Enrol a face for ${emp.displayName}`}
+                              className="p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-alt transition-colors duration-150"
+                            >
+                              <ScanFace className="w-4 h-4" />
+                            </Link>
                             <button
                               type="button"
                               onClick={() => startEdit(emp)}

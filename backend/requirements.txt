@@ -27,3 +27,8 @@ python-dotenv>=1.0.0
 torchreid>=0.2.5
 gdown>=4.7.0
 tensorboard>=2.14.0
+
+# ── Face enrolment (Phase C, Step 9) ─────────────────────────────────────────
+# SCRFD detection + ArcFace embedding, via the buffalo_l pack. Models download
+# once (~300 MB) into ~/.insightface on first use and are cached from then on.
+insightface>=0.7.3

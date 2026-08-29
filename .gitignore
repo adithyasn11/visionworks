@@ -77,3 +77,7 @@ yarn-error.log*
 # committed — a binary in git history is dead weight for every future clone.
 backend/models/*.pth
 backend/models/*.onnx
+
+# Test face images, fetched on demand by backend/tests/test_face_enrolment.py.
+# Photographs of people do not belong in git, even public ones.
+backend/tests/_faces/
