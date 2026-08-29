@@ -21,6 +21,23 @@ class CameraModel(Base):
     rtsp_url = Column(String(512), nullable=False)
     fps_target = Column(Integer, default=8)
     status = Column(String(32), default="ACTIVE")
+
+    # DOOR or AREA (Step 10).
+    #
+    # A DOOR camera is the one place where a face is close enough to recognise:
+    # the plan's optics table shows ~18 px between the eyes at 2 m and ~7 px at
+    # 5 m, against the ~80 px face recognition needs. So face matching runs on
+    # DOOR cameras and nowhere else — not as an optimisation, but because the
+    # information is not in the frame anywhere else.
+    role = Column(String(16), default="AREA")
+
+    # What width frames are resized to before inference.
+    #
+    # 640 everywhere else, for 60 FPS throughput. A door camera keeps 1280,
+    # because downscaling is exactly what destroys the face signal it exists to
+    # capture. NULL means "use the default for this role".
+    inference_width = Column(Integer, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class ZoneModel(Base):

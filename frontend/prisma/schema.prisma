@@ -66,6 +66,17 @@ enum SourceType {
   WEBCAM /// machine-local camera
 }
 
+/// Which job a camera does (021).
+///
+/// Face recognition needs ~80 px between the eyes and this pipeline produces
+/// ~12 px at 3 m, so it runs at ONE camera positioned at a doorway and nowhere
+/// else. AREA is the default: face matching is off unless somebody
+/// deliberately marks a camera as the door.
+enum CameraRole {
+  AREA
+  DOOR
+}
+
 enum CameraStatus {
   ACTIVE
   INACTIVE /// configured but intentionally not running
@@ -513,6 +524,15 @@ model Camera {
   homographyPoints Json?
 
   status           CameraStatus @default(INACTIVE)
+
+  /// DOOR or AREA (021). Only a DOOR camera runs face matching.
+  role CameraRole @default(AREA)
+
+  /// What width frames are resized to before inference. 640 everywhere for
+  /// throughput; a DOOR camera keeps 1280, because downscaling is exactly what
+  /// destroys the face signal it exists to capture. NULL means "the default for
+  /// this role".
+  inferenceWidth Int?
   lastSeenAt       DateTime?    @db.Timestamptz(6)
   lastErrorMessage String?      @db.VarChar(500)
 

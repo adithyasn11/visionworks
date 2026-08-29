@@ -56,7 +56,12 @@ def apply_lightweight_migrations():
     additions = {
         "activity_logs": {"floor_x": "FLOAT", "floor_y": "FLOAT", "org_id": "VARCHAR(64)"},
         "zones": {"org_id": "VARCHAR(64)"},
-        "cameras": {"org_id": "VARCHAR(64)"},
+        # `role` and `inference_width` arrived with Step 10's door camera. A
+        # camera with no role recorded is an AREA camera, which is the safe
+        # reading: face matching stays off until somebody deliberately marks a
+        # camera as the door.
+        "cameras": {"org_id": "VARCHAR(64)", "role": "VARCHAR(16)",
+                    "inference_width": "INTEGER"},
     }
 
     statements = []

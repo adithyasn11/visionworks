@@ -274,6 +274,15 @@ class IdentityTracker:
         self._last_bind_attempt = 0.0
         self.seat_bindings = []
 
+        # Steps 10-11. The registry is process-wide and shared between the door
+        # camera's session and every area camera's session — that sharing IS
+        # the mechanism, not an optimisation.
+        self._registry = None
+        self._camera_role = "AREA"
+        self._last_registry_attempt = 0.0
+        self.face_bindings = []
+        self.registry_bindings = []
+
         # Stitch-rate metrics — the plan asks for the ratio of raw ids to
         # stitched identities as the headline number for this step.
         self.raw_track_ids = set()
@@ -474,6 +483,20 @@ class IdentityTracker:
                         res["confidence"] = ident.confidence
                         res["method"] = ident.method
 
+        # Step 11: name identities from the day's registry. Same 5-second
+        # throttle as the seat binding, and for the same reason — it scans
+        # every identity and the inputs barely move between frames.
+        if (self._registry is not None and self._camera_role != "DOOR"
+                and (now - self._last_registry_attempt) >= 5.0):
+            self._last_registry_attempt = now
+            if self.resolve_from_registry(now):
+                for tid, res in out.items():
+                    ident = self._by_track.get(tid)
+                    if ident is not None and ident.employee_id:
+                        res["employee_id"] = ident.employee_id
+                        res["confidence"] = ident.confidence
+                        res["method"] = ident.method
+
         # Identities not seen this frame join the gallery, where they stay
         # reattachable for gallery_ttl seconds.
         #
@@ -493,6 +516,136 @@ class IdentityTracker:
                 self._lost[ident.identity_id] = ident
 
         return out
+
+    # ── Steps 10-11: face matches and the daily signature registry ──────────
+
+    def set_registry(self, registry, camera_role: str = "AREA"):
+        """
+        Attach the day's signature registry, and say what kind of camera this is.
+
+        DOOR sessions WRITE to the registry: a face match records what that
+        person looks like today. AREA sessions READ from it: an unnamed
+        identity is compared against the day's signatures and can be named
+        without any face ever being seen. That asymmetry is the whole of
+        Phase C.
+        """
+        self._registry = registry
+        self._camera_role = (camera_role or "AREA").upper()
+
+    def apply_face_matches(self, matches: dict, now: float = None) -> list:
+        """
+        Bind identities named by the door camera, and register their signature.
+
+        `matches` is Step 10's output: track_id -> {employee_id, confidence,
+        ...}. Returns the bindings made, so a caller can log them.
+
+        A face match OVERRIDES a seat binding. Both name somebody, but a face
+        is direct evidence while a seat is an inference from where they sat —
+        and when the two disagree, one of them is wrong about a person's whole
+        day. The stronger evidence wins.
+        """
+        if not matches:
+            return []
+        now = now if now is not None else time.time()
+        made = []
+
+        for track_id, match in matches.items():
+            ident = self._by_track.get(track_id)
+            if ident is None:
+                continue
+            employee_id = match.get("employee_id")
+            confidence = float(match.get("confidence") or 0.0)
+            if not employee_id:
+                continue
+
+            # An employee already bound to a DIFFERENT identity. Rather than
+            # naming two people the same, release the weaker claim: the face
+            # match is direct evidence and the other was almost certainly a
+            # seat inference or a failed stitch.
+            for other in self._all.values():
+                if other is not ident and other.employee_id == employee_id:
+                    if other.method != "face" or other.confidence < confidence:
+                        other.employee_id = None
+                        other.confidence = 0.0
+                        other.method = "unknown"
+
+            previous = ident.employee_id
+            ident.employee_id = employee_id
+            ident.confidence = round(confidence, 3)
+            ident.method = "face"
+            self._bound_employees.add(employee_id)
+
+            made.append({
+                "identity_id": ident.identity_id,
+                "employee_id": employee_id,
+                "name": match.get("name"),
+                "confidence": ident.confidence,
+                "cosine": match.get("cosine"),
+                "replaced": previous,
+            })
+
+            # Step 11: capture what they look like right now. Taken from the
+            # identity's pooled prototype rather than a single frame, so a
+            # motion-blurred crop at the moment of the match does not become
+            # the thing every other camera matches against all day.
+            if self._registry is not None:
+                self._registry.register(
+                    employee_id, ident.prototype(), confidence, source="face")
+
+        self.face_bindings.extend(made)
+        return made
+
+    def resolve_from_registry(self, now: float = None) -> list:
+        """
+        Name unbound identities from the day's registry — no face needed.
+
+        This is Step 11's verification: the door camera identified somebody, and
+        now a desk camera picks up the same person by appearance alone.
+
+        Only runs on AREA cameras. On a DOOR camera the face IS available, and
+        preferring appearance there would be choosing the weaker signal while
+        standing in front of the stronger one.
+        """
+        if self._registry is None or self._camera_role == "DOOR":
+            return []
+        now = now if now is not None else time.time()
+        made = []
+
+        for ident in self._all.values():
+            if ident.employee_id is not None:
+                continue
+            if ident.hits < MIN_HITS_FOR_GALLERY:
+                # Too few observations for a stable prototype. Naming somebody
+                # off two frames is how a registry match becomes a wrong name.
+                continue
+
+            employee_id, confidence = self._registry.match(ident.prototype())
+            if not employee_id:
+                continue
+            if employee_id in self._bound_employees:
+                # Already claimed by another identity in this session. Two
+                # identities cannot be the same person at once.
+                continue
+
+            ident.employee_id = employee_id
+            ident.confidence = round(float(confidence), 3)
+            # "fusion": named by combining appearance signals against a
+            # registry entry, rather than by seeing a face or inferring a seat.
+            # One of the five methods migration 020's CHECK accepts.
+            ident.method = "fusion"
+            self._bound_employees.add(employee_id)
+            made.append({
+                "identity_id": ident.identity_id,
+                "employee_id": employee_id,
+                "confidence": ident.confidence,
+                "method": "fusion",
+            })
+            logger.info(
+                f"registry match: {ident.identity_id} -> employee {employee_id} "
+                f"(confidence {confidence:.3f}, no face seen)")
+
+        self.registry_bindings.extend(made)
+        return made
 
     # ── Step 7: seat-assignment binding ─────────────────────────────────────
 
@@ -692,6 +845,10 @@ class IdentityTracker:
             "active": len(self._by_track),
             "in_gallery": len(self._lost),
             "seat_bound": len([i for i in self._all.values() if i.employee_id]),
+            "by_method": {
+                m: len([i for i in self._all.values() if i.method == m])
+                for m in ("face", "fusion", "seat", "unknown")
+            },
         }
 
     def identities(self):

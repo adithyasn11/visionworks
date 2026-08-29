@@ -52,6 +52,7 @@ def process_detections(
     blur_enabled,
     appearance_extractor=None,
     identity_tracker=None,
+    face_identifier=None,
 ):
     """
     Turn one frame's raw detections into the wire format, updating telemetry
@@ -67,6 +68,9 @@ def process_detections(
         blur_enabled:        this session's privacy state, already resolved
         appearance_extractor: Step 5's `AppearanceExtractor`, or None to skip
         identity_tracker:    Step 6's `IdentityTracker`, or None to skip
+        face_identifier:     Step 10's `FaceIdentifier` on a DOOR camera, else
+                             None. Present only where a face is close enough to
+                             recognise; every other camera relies on appearance.
 
     Both identity arguments default to None, and when either is absent the loop
     behaves exactly as it did in Step 3 — `identity_id` is simply absent from
@@ -113,6 +117,26 @@ def process_detections(
                 frame, detections, spatial_engine=spatial_engine
             )
             identity_by_track = identity_tracker.assign(signatures, zone_by_track=zone_by_track)
+
+            # Step 10: on a DOOR camera, put a NAME to the identities just
+            # resolved. Runs on the same unblurred frame the signatures came
+            # from, and after assign() so the identities exist to bind to.
+            #
+            # A face match also registers that person's appearance for the day
+            # (Step 11), which is what lets every other camera recognise them
+            # without ever seeing a face.
+            if face_identifier is not None:
+                matches = face_identifier.identify(frame, detections)
+                if matches:
+                    identity_tracker.apply_face_matches(matches)
+                    # Reflect the new names in THIS frame, so the writer records
+                    # the attribution from the moment it is known.
+                    for tid, res in identity_by_track.items():
+                        ident = identity_tracker._by_track.get(tid)
+                        if ident is not None and ident.employee_id:
+                            res["employee_id"] = ident.employee_id
+                            res["confidence"] = ident.confidence
+                            res["method"] = ident.method
         except Exception as e:
             # Identity is an enrichment. A failure here must leave the frame,
             # the telemetry and the video stream completely intact — the

@@ -32,6 +32,8 @@ from app.db.activity_writer import ActivityLogWriter, persist_frame
 from app.db.identity_writer import IdentityEventWriter, persist_identity_frame
 from app.cv.appearance import get_extractor
 from app.cv.identity_tracker import IdentityTracker
+from app.cv.face_identifier import FaceIdentifier, resolve_camera_role
+from app.cv.signature_registry import get_registry
 from app.db.minute_aggregator import aggregate_after_session
 from app.db.employee_aggregator import (
     aggregate_after_session as aggregate_employees_after_session,
@@ -540,10 +542,27 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         identity_tracker = (
             IdentityTracker(session_id=session_id) if identity_on else None
         )
+        # Steps 10-11. A camera is AREA unless somebody deliberately marked it
+        # DOOR, so face matching is off by default in every deployment.
+        camera_role, inference_width = resolve_camera_role(effective_camera_id, org_id)
+        face_identifier = (
+            FaceIdentifier(org_id=org_id)
+            if identity_on and camera_role == "DOOR" else None
+        )
+        if face_identifier is not None:
+            face_identifier.load_gallery()
+            logger.info(
+                f"{effective_camera_id} is a DOOR camera: face matching on, "
+                f"inference width {inference_width}, "
+                f"{face_identifier.gallery_size} enrolled employee(s)")
+
         if identity_tracker is not None:
             # Step 7 needs to know who sits where before it can name
             # anybody. An empty map is fine: nothing gets named.
             identity_tracker.set_seat_map(load_seat_map(org_id, zones_config))
+            # Step 11: the day's signatures, shared across every session in
+            # this process. A DOOR session writes to it; an AREA session reads.
+            identity_tracker.set_registry(get_registry(org_id), camera_role)
 
     except Exception as e:
         logger.error(f"AI init error: {e}")
@@ -635,10 +654,14 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             frame_idx += 1
 
             # Scale to 640px width for 60 FPS real-time throughput
+            # Per-camera width (Step 10). 640 everywhere for throughput, but a
+            # DOOR camera keeps 1280: downscaling is precisely what destroys
+            # the face signal that camera exists to capture, so the one camera
+            # that could recognise somebody would be the one least able to.
             h, w = frame.shape[:2]
-            if w > 640:
-                scale = 640.0 / w
-                frame = cv2.resize(frame, (640, int(h * scale)))
+            if w > inference_width:
+                scale = inference_width / float(w)
+                frame = cv2.resize(frame, (inference_width, int(h * scale)))
 
             # Collect recent motion speeds per track ID to validate WALKING vs STANDING
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
@@ -657,6 +680,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                 blur_enabled=privacy_state["blur"],
                 appearance_extractor=appearance_extractor,
                 identity_tracker=identity_tracker,
+                face_identifier=face_identifier,
             )
 
             # Persist sampled telemetry. Runs off the event loop and swallows its
@@ -694,7 +718,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             f"Session {session_id}: {processed_count} frames processed, "
             f"{activity_writer.rows_written} telemetry rows, "
             f"{identity_writer.rows_written} identity rows written. "
-            f"stitching: {identity_tracker.stats() if identity_tracker else 'off'}"
+            f"stitching: {identity_tracker.stats() if identity_tracker else 'off'} "
+            f"door: {face_identifier.stats() if face_identifier else 'n/a'}"
         )
         await websocket.send_json({
             "type": "COMPLETE",
@@ -704,7 +729,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             "identity_rows_written": identity_writer.rows_written,
             # The Step 6 stitch-rate metric, surfaced to the client so the
             # dashboard can show how fragmented the tracking was.
-            "identity_stats": identity_tracker.stats() if identity_tracker else None
+            "identity_stats": identity_tracker.stats() if identity_tracker else None,
+            "door_stats": face_identifier.stats() if face_identifier else None
         })
 
     except WebSocketDisconnect:
@@ -805,14 +831,27 @@ async def live_webcam_websocket(websocket: WebSocket):
         identity_tracker = (
             IdentityTracker(session_id=None) if identity_on else None
         )
+        # Steps 10-11. A camera is AREA unless somebody deliberately marked it
+        # DOOR, so face matching is off by default in every deployment.
+        camera_role, inference_width = resolve_camera_role(effective_camera_id, org_id)
+        face_identifier = (
+            FaceIdentifier(org_id=org_id)
+            if identity_on and camera_role == "DOOR" else None
+        )
+        if face_identifier is not None:
+            face_identifier.load_gallery()
+            logger.info(
+                f"{effective_camera_id} is a DOOR camera: face matching on, "
+                f"inference width {inference_width}, "
+                f"{face_identifier.gallery_size} enrolled employee(s)")
+
         if identity_tracker is not None:
             # Step 7 needs to know who sits where before it can name
             # anybody. An empty map is fine: nothing gets named.
             identity_tracker.set_seat_map(load_seat_map(org_id, zones_config))
-        if identity_tracker is not None:
-            # Step 7 needs to know who sits where before it can name
-            # anybody. An empty map is fine: nothing gets named.
-            identity_tracker.set_seat_map(load_seat_map(org_id, zones_config))
+            # Step 11: the day's signatures, shared across every session in
+            # this process. A DOOR session writes to it; an AREA session reads.
+            identity_tracker.set_registry(get_registry(org_id), camera_role)
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
@@ -873,10 +912,14 @@ async def live_webcam_websocket(websocket: WebSocket):
 
             frame_idx += 1
 
+            # Per-camera width (Step 10). 640 everywhere for throughput, but a
+            # DOOR camera keeps 1280: downscaling is precisely what destroys
+            # the face signal that camera exists to capture, so the one camera
+            # that could recognise somebody would be the one least able to.
             h, w = frame.shape[:2]
-            if w > 640:
-                scale = 640.0 / w
-                frame = cv2.resize(frame, (640, int(h * scale)))
+            if w > inference_width:
+                scale = inference_width / float(w)
+                frame = cv2.resize(frame, (inference_width, int(h * scale)))
 
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
             detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
@@ -894,6 +937,7 @@ async def live_webcam_websocket(websocket: WebSocket):
                 blur_enabled=privacy_state["blur"],
                 appearance_extractor=appearance_extractor,
                 identity_tracker=identity_tracker,
+                face_identifier=face_identifier,
             )
 
             await persist_frame(activity_writer, tracked_entities)
@@ -991,6 +1035,27 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
         identity_tracker = (
             IdentityTracker(session_id=None) if identity_on else None
         )
+        # Steps 10-11. A camera is AREA unless somebody deliberately marked it
+        # DOOR, so face matching is off by default in every deployment.
+        camera_role, inference_width = resolve_camera_role(effective_camera_id, org_id)
+        face_identifier = (
+            FaceIdentifier(org_id=org_id)
+            if identity_on and camera_role == "DOOR" else None
+        )
+        if face_identifier is not None:
+            face_identifier.load_gallery()
+            logger.info(
+                f"{effective_camera_id} is a DOOR camera: face matching on, "
+                f"inference width {inference_width}, "
+                f"{face_identifier.gallery_size} enrolled employee(s)")
+
+        if identity_tracker is not None:
+            # Step 7 needs to know who sits where before it can name
+            # anybody. An empty map is fine: nothing gets named.
+            identity_tracker.set_seat_map(load_seat_map(org_id, zones_config))
+            # Step 11: the day's signatures, shared across every session in
+            # this process. A DOOR session writes to it; an AREA session reads.
+            identity_tracker.set_registry(get_registry(org_id), camera_role)
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
@@ -1035,10 +1100,14 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
 
             frame_idx += 1
 
+            # Per-camera width (Step 10). 640 everywhere for throughput, but a
+            # DOOR camera keeps 1280: downscaling is precisely what destroys
+            # the face signal that camera exists to capture, so the one camera
+            # that could recognise somebody would be the one least able to.
             h, w = frame.shape[:2]
-            if w > 640:
-                scale = 640.0 / w
-                frame = cv2.resize(frame, (640, int(h * scale)))
+            if w > inference_width:
+                scale = inference_width / float(w)
+                frame = cv2.resize(frame, (inference_width, int(h * scale)))
 
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
             detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
@@ -1056,6 +1125,7 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
                 blur_enabled=privacy_state["blur"],
                 appearance_extractor=appearance_extractor,
                 identity_tracker=identity_tracker,
+                face_identifier=face_identifier,
             )
 
             await persist_frame(activity_writer, tracked_entities)
