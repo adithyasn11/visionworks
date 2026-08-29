@@ -25,6 +25,7 @@ project yet.
 | `sql/010_alert_update_role.sql` | Restricts alert acknowledgement to ADMIN + MANAGER (`alert_update` had allowed VIEWER). |
 | `sql/011_retention_schedule.sql` | pg_cron jobs: day rollup 02:45, retention purge 03:15, report expiry 03:30 UTC. |
 | `sql/012_dashboard_covering_index.sql` | INCLUDE index so wide-window aggregations run index-only; fixes a cold-cache timeout on first load. |
+| `sql/020_identity.sql` | **Per-employee identity.** Five tables, RLS mirroring 003, and the biometric column revoked from `authenticated` the way 004 protects `rtspUrl`. The anonymous path is untouched. |
 | `seed.ts` | Generates ~826,000 minute buckets of realistic shaped data. |
 
 **Order matters.** 001 → 002 → … → 010 → 011 → 012. Later files

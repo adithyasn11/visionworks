@@ -53,6 +53,10 @@ const CAPABILITIES = {
   'reports.export':   ['ADMIN', 'MANAGER', 'VIEWER'],
   'zones.view':       ['ADMIN', 'MANAGER', 'VIEWER'],
   'members.view':     ['ADMIN', 'MANAGER', 'VIEWER'],
+  // enforcedBy: employee_select — "orgId IN user_org_ids()", the same
+  // membership-based read every other roster gets. The employee list is a
+  // colleague list; what a VIEWER does not get is the editing controls.
+  'employees.view':   ['ADMIN', 'MANAGER', 'VIEWER'],
 
   // ── Configuring the space. ──
   // enforcedBy: manage_org_ids() — zone_insert/update/delete,
@@ -61,6 +65,11 @@ const CAPABILITIES = {
   'zones.edit':       ['ADMIN', 'MANAGER'],
   'cameras.edit':     ['ADMIN', 'MANAGER'],
   'sites.edit':       ['ADMIN', 'MANAGER'],
+  // enforcedBy: employee_insert/update (manage_org_ids()) and
+  // soft_delete_employee(), which re-checks ADMIN-or-MANAGER inside the
+  // definer context. Naming who works here is configuring the space, exactly
+  // like naming its zones.
+  'employees.edit':   ['ADMIN', 'MANAGER'],
   // Running analysis writes telemetry, so it is a configuration act, not a
   // read. A VIEWER watching a live feed would be creating data.
   'analysis.run':     ['ADMIN', 'MANAGER'],

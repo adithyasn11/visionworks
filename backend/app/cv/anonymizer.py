@@ -1,6 +1,31 @@
 # backend/app/cv/anonymizer.py
+import os
 import cv2
 import numpy as np
+
+# Values that count as "on" when read from the environment. Anything else —
+# including the empty string, "0", "no" and typos — is off. Read at call time
+# rather than at import so load_dotenv() in main.py is guaranteed to have run,
+# and so tests can flip the variable without reimporting the module.
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def privacy_blur_default() -> bool:
+    """
+    The blur setting a new session starts with, from `PRIVACY_BLUR_DEFAULT`.
+
+    Defaults to False. Blur destroys the face signal, and the identity pipeline
+    (the door camera in particular) needs that signal to exist at all — a
+    development default of ON means every face experiment silently measures
+    blurred pixels. Deployments that want privacy-by-default set
+    PRIVACY_BLUR_DEFAULT=true, which is the one line the deployment docs call
+    out; the runtime toggle is unaffected either way.
+    """
+    raw = os.getenv("PRIVACY_BLUR_DEFAULT")
+    if raw is None:
+        return False
+    return raw.strip().lower() in _TRUTHY
+
 
 class PrivacyAnonymizer:
     """
@@ -8,11 +33,24 @@ class PrivacyAnonymizer:
     Applies Gaussian Blur over face and head regions of detected human bounding boxes.
     """
     @staticmethod
-    def blur_face_region(frame: np.ndarray, bbox: list, blur_kernel_size: int = 25) -> np.ndarray:
+    def blur_face_region(
+        frame: np.ndarray,
+        bbox: list,
+        blur_kernel_size: int = 25,
+        blur_enabled: bool = True,
+    ) -> np.ndarray:
         """
         Estimates top 25% of bounding box as head region and applies Gaussian blur.
         Guarantees array boundary protection.
+
+        `blur_enabled=False` returns the frame untouched. Callers that already
+        branch on a session toggle can ignore it; a per-camera caller (the door
+        camera, which must never blur) passes its own decision straight in
+        rather than duplicating the branch at every call site.
         """
+        if not blur_enabled:
+            return frame
+
         x1, y1, x2, y2 = bbox
         frame_h, frame_w = frame.shape[:2]
 

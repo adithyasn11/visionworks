@@ -110,7 +110,17 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   const [durationSec, setDurationSec] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
-  const [enableBlur, setEnableBlur] = useState(true);
+  // Not `useState(true)`: the server owns this now (PRIVACY_BLUR_DEFAULT),
+  // and a hardcoded `true` here would show "Face Anonymisation ✓" over
+  // unblurred frames — a privacy claim the pixels do not support. `null`
+  // means "not yet told", and the control stays disabled until the first
+  // frame reports the real state.
+  const [enableBlur, setEnableBlur] = useState(null);
+  // A click is optimistic; the server echoes privacy_blur on EVERY frame,
+  // so without this the next frame in flight would snap the checkbox back
+  // to the pre-click value for a few hundred ms. Holds the value we asked
+  // for until the server's echo agrees with it.
+  const pendingBlurRef = useRef(null);
   const [deviceInfo, setDeviceInfo] = useState('GPU (CUDA)');
   const [isWebcamActive, setIsWebcamActive] = useState(false);
   const [stats, setStats] = useState({ detected: 0, sitting: 0, standing: 0, walking: 0 });
@@ -121,6 +131,19 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     if (data.current_time_seconds !== undefined) setCurrentTimeSec(data.current_time_seconds);
     if (data.duration_seconds !== undefined) setDurationSec(data.duration_seconds);
     if (data.is_paused !== undefined) setIsPaused(data.is_paused);
+    // The server is the authority on whether the frame we just received was
+    // blurred, so the toggle mirrors what actually happened to the pixels.
+    // While a click is in flight, ignore echoes of the OLD value; once the
+    // server confirms the requested value, drop the pending marker.
+    if (data.privacy_blur !== undefined) {
+      const pending = pendingBlurRef.current;
+      if (pending === null) {
+        setEnableBlur(data.privacy_blur);
+      } else if (pending === data.privacy_blur) {
+        pendingBlurRef.current = null;
+        setEnableBlur(data.privacy_blur);
+      }
+    }
 
     const entities = data.tracked_entities || [];
     const newStats = { detected: entities.length, sitting: 0, standing: 0, walking: 0 };
@@ -224,6 +247,11 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     setIsPaused(false);
     setStatusMsg('');
     setStats({ detected: 0, sitting: 0, standing: 0, walking: 0 });
+    // Forget the last session's privacy setting. The next session re-reads it
+    // from the server, which may well have a different one (a door camera
+    // opening with ?blur=false, or a changed PRIVACY_BLUR_DEFAULT).
+    setEnableBlur(null);
+    pendingBlurRef.current = null;
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -469,11 +497,15 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   // and the actual blur runs server-side (video_upload.py's privacy_state),
   // toggled only by this message. Without sending it the control did nothing:
   // frames stayed blurred (or not) regardless of what the user clicked.
+  //
+  // The local update is deliberately conditional on the send succeeding. Moving
+  // the checkbox when no socket is open would claim a privacy state the server
+  // never heard about, which is the one direction this control must never lie in.
   const toggleBlur = (checked) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify({ action: 'set_privacy_blur', enabled: checked }));
+    pendingBlurRef.current = checked;
     setEnableBlur(checked);
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ action: 'set_privacy_blur', enabled: checked }));
-    }
   };
 
   const toggleFullScreen = () => {
@@ -696,15 +728,27 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Privacy Anonymization Toggle */}
-            <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-ink-muted">
+            {/* Privacy Anonymization Toggle.
+                `enableBlur === null` means no frame has arrived yet, so the
+                server's setting is still unknown. The control renders unchecked
+                and disabled rather than guessing — `checked={null}` would also
+                make React treat the input as uncontrolled. */}
+            <label
+              className={`flex items-center gap-2 select-none text-xs text-ink-muted ${
+                enableBlur === null ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+              }`}
+              title={enableBlur === null
+                ? 'Waiting for the analysis stream to report its privacy setting'
+                : 'Blur head regions server-side before frames are sent'}
+            >
               <Shield className={`w-4 h-4 ${enableBlur ? 'text-accent' : 'text-ink-faint'}`} />
               <span>Face Anonymisation</span>
               <input
                 type="checkbox"
-                checked={enableBlur}
+                checked={enableBlur === true}
+                disabled={enableBlur === null}
                 onChange={(e) => toggleBlur(e.target.checked)}
-                className="accent-[color:var(--accent)] cursor-pointer"
+                className="accent-[color:var(--accent)] cursor-pointer disabled:cursor-not-allowed"
               />
             </label>
 

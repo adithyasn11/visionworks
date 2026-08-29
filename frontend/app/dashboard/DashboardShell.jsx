@@ -15,7 +15,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Video, Shapes, FileDown,
-  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard,
+  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard, ContactRound,
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import { supabase } from '../lib/supabase/browser';
@@ -175,6 +175,28 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
         <p className="px-3 pb-1.5 font-mono text-[9.5px] uppercase tracking-[0.16em] text-ink-faint">
           Account
         </p>
+        {/* Employees. A routed page like Members, and shown on the same terms:
+            `employee_select` returns the roster to every member of the org, so
+            hiding the link would hide what the database willingly returns. The
+            add/edit controls inside are gated on `employees.edit`. */}
+        {can(role, 'employees.view') && (
+          <Link
+            href="/dashboard/employees"
+            onClick={() => setOpen(false)}
+            className={`relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 ${
+              pathname === '/dashboard/employees'
+                ? 'bg-accent-soft text-accent'
+                : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
+            }`}
+          >
+            {pathname === '/dashboard/employees' && (
+              <span aria-hidden="true" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[color:var(--accent)]" />
+            )}
+            <ContactRound className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
+            <span className="truncate">Employees</span>
+          </Link>
+        )}
+
         <Link
           href="/settings/members"
           onClick={() => setOpen(false)}

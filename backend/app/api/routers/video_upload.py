@@ -26,6 +26,8 @@ import time
 import torch
 import numpy as np
 
+from app.cv.anonymizer import privacy_blur_default
+from app.cv.frame_pipeline import process_detections
 from app.db.activity_writer import ActivityLogWriter, persist_frame
 from app.db.minute_aggregator import aggregate_after_session
 from app.api.deps import extract_token, resolve_org_role
@@ -123,6 +125,31 @@ def resolve_registered_camera(camera_id: Optional[str], org_id: Optional[str]) -
         return None
     finally:
         session.close()
+
+
+def resolve_initial_blur(websocket) -> bool:
+    """
+    The blur state a socket starts in.
+
+    Precedence: an explicit `?blur=` query param, else `PRIVACY_BLUR_DEFAULT`
+    from the environment. The query param is what lets one camera differ from
+    the deployment default without a restart — a door camera opens its socket
+    with `?blur=false` and keeps a usable face signal while every other camera
+    still honours the deployment setting.
+
+    An unparseable value is ignored rather than guessed at, so a typo falls
+    back to the configured default instead of silently choosing a privacy
+    posture nobody asked for.
+    """
+    raw = websocket.query_params.get("blur")
+    if raw is not None:
+        val = raw.strip().lower()
+        if val in ("1", "true", "yes", "on"):
+            return True
+        if val in ("0", "false", "no", "off"):
+            return False
+        logger.warning(f"Ignoring unparseable ?blur={raw!r}; using PRIVACY_BLUR_DEFAULT")
+    return privacy_blur_default()
 
 
 def load_zones_for_camera(camera_id: str, org_id: str = None) -> list:
@@ -432,9 +459,12 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         "paused": False,
         "seek_frame": None
     }
-    # Blur is ON unless a client turns it off, so the privacy-preserving path is
-    # the default rather than something you have to remember to enable.
-    privacy_state = {"blur": True}
+    # Starting state comes from PRIVACY_BLUR_DEFAULT (or this socket's ?blur=),
+    # not from a hardcoded True: the identity pipeline needs an unblurred face
+    # signal in development, while a deployment that wants privacy-by-default
+    # sets the env var. The set_privacy_blur control below still overrides this
+    # at any point in the session.
+    privacy_state = {"blur": resolve_initial_blur(websocket)}
 
     async def receive_controls():
         try:
@@ -448,7 +478,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                     elif action in ("play", "resume"):
                         control_state["paused"] = False
                     elif action == "set_privacy_blur":
-                        privacy_state["blur"] = bool(data.get("enabled", True))
+                        privacy_state["blur"] = bool(data.get("enabled", privacy_state["blur"]))
                     elif action == "seek":
                         target_pct = data.get("pct")
                         if target_pct is not None:
@@ -497,48 +527,18 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
             detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
 
-            tracked_entities = []
-            zone_summary = {z["zone_id"]: 0 for z in zones_config}
-            zone_summary["TRANSIT_ZONE"] = 0
-
-            for det in detections:
-                track_id = det["track_id"]
-                bbox = det["bbox"]
-                posture = det["posture"]
-
-                centroid = [(bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0]
-                zone_id = spatial_engine.check_zone_containment(centroid)
-
-                if zone_id in zone_summary:
-                    zone_summary[zone_id] += 1
-                else:
-                    zone_summary["TRANSIT_ZONE"] += 1
-
-                activity_aggregator.update_track(track_id, centroid, posture)
-                activity_score = activity_aggregator.calculate_activity_score(track_id)
-                dwell_seconds = activity_aggregator.get_dwell_time_seconds(track_id)
-
-                # Project the person's ground point onto the floorplan. This is
-                # what feeds the top-down heatmap.
-                floor_point = spatial_engine.project_to_floor(bbox, frame.shape)
-
-                # Privacy-by-design: blur the head region before the frame is
-                # encoded and sent. This is the claim the whole system rests on,
-                # so it runs by default and is only skipped when a viewer
-                # explicitly turns it off to inspect detection quality.
-                if privacy_state["blur"]:
-                    frame = anonymizer.blur_face_region(frame, bbox)
-
-                tracked_entities.append({
-                    "track_id": track_id,
-                    "bbox": bbox,
-                    "posture": posture,
-                    "activity_score": round(activity_score, 2),
-                    "zone_id": zone_id,
-                    "dwell_duration_seconds": dwell_seconds,
-                    "floor_point": [round(floor_point[0], 1), round(floor_point[1], 1)],
-                    "floor_size": [SpatialEngine.FLOOR_WIDTH, SpatialEngine.FLOOR_HEIGHT]
-                })
+            # One shared implementation — see cv/frame_pipeline.py. Identity
+            # resolution (Steps 5-14) goes inside that function, once, rather
+            # than in three places that could drift apart.
+            tracked_entities, zone_summary = process_detections(
+                detections,
+                frame,
+                spatial_engine,
+                activity_aggregator,
+                anonymizer,
+                zones_config,
+                blur_enabled=privacy_state["blur"],
+            )
 
             # Persist sampled telemetry. Runs off the event loop and swallows its
             # own failures, so it cannot stall or break the video stream.
@@ -685,7 +685,7 @@ async def live_webcam_websocket(websocket: WebSocket):
     })
 
     control_state = {"stop": False}
-    privacy_state = {"blur": True}
+    privacy_state = {"blur": resolve_initial_blur(websocket)}
 
     async def listen_control():
         try:
@@ -697,7 +697,7 @@ async def live_webcam_websocket(websocket: WebSocket):
                     control_state["stop"] = True
                     break
                 if action == "set_privacy_blur":
-                    privacy_state["blur"] = bool(data.get("enabled", True))
+                    privacy_state["blur"] = bool(data.get("enabled", privacy_state["blur"]))
         except Exception:
             pass
 
@@ -722,48 +722,18 @@ async def live_webcam_websocket(websocket: WebSocket):
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
             detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
 
-            tracked_entities = []
-            zone_summary = {z["zone_id"]: 0 for z in zones_config}
-            zone_summary["TRANSIT_ZONE"] = 0
-
-            for det in detections:
-                track_id = det["track_id"]
-                bbox = det["bbox"]
-                posture = det["posture"]
-
-                centroid = [(bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0]
-                zone_id = spatial_engine.check_zone_containment(centroid)
-
-                if zone_id in zone_summary:
-                    zone_summary[zone_id] += 1
-                else:
-                    zone_summary["TRANSIT_ZONE"] += 1
-
-                activity_aggregator.update_track(track_id, centroid, posture)
-                activity_score = activity_aggregator.calculate_activity_score(track_id)
-                dwell_seconds = activity_aggregator.get_dwell_time_seconds(track_id)
-
-                # Project the person's ground point onto the floorplan. This is
-                # what feeds the top-down heatmap.
-                floor_point = spatial_engine.project_to_floor(bbox, frame.shape)
-
-                # Privacy-by-design: blur the head region before the frame is
-                # encoded and sent. This is the claim the whole system rests on,
-                # so it runs by default and is only skipped when a viewer
-                # explicitly turns it off to inspect detection quality.
-                if privacy_state["blur"]:
-                    frame = anonymizer.blur_face_region(frame, bbox)
-
-                tracked_entities.append({
-                    "track_id": track_id,
-                    "bbox": bbox,
-                    "posture": posture,
-                    "activity_score": round(activity_score, 2),
-                    "zone_id": zone_id,
-                    "dwell_duration_seconds": dwell_seconds,
-                    "floor_point": [round(floor_point[0], 1), round(floor_point[1], 1)],
-                    "floor_size": [SpatialEngine.FLOOR_WIDTH, SpatialEngine.FLOOR_HEIGHT]
-                })
+            # One shared implementation — see cv/frame_pipeline.py. Identity
+            # resolution (Steps 5-14) goes inside that function, once, rather
+            # than in three places that could drift apart.
+            tracked_entities, zone_summary = process_detections(
+                detections,
+                frame,
+                spatial_engine,
+                activity_aggregator,
+                anonymizer,
+                zones_config,
+                blur_enabled=privacy_state["blur"],
+            )
 
             await persist_frame(activity_writer, tracked_entities)
 
@@ -858,7 +828,7 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
 
     frame_idx = 0
     start_time = time.time()
-    privacy_state = {"blur": True}
+    privacy_state = {"blur": resolve_initial_blur(websocket)}
 
     try:
         while True:
@@ -869,7 +839,7 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
             if action == "stop":
                 break
             if action == "set_privacy_blur":
-                privacy_state["blur"] = bool(data.get("enabled", True))
+                privacy_state["blur"] = bool(data.get("enabled", privacy_state["blur"]))
                 continue
 
             img_bytes_b64 = data.get("image_base64")
@@ -895,48 +865,18 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
             detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
 
-            tracked_entities = []
-            zone_summary = {z["zone_id"]: 0 for z in zones_config}
-            zone_summary["TRANSIT_ZONE"] = 0
-
-            for det in detections:
-                track_id = det["track_id"]
-                bbox = det["bbox"]
-                posture = det["posture"]
-
-                centroid = [(bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0]
-                zone_id = spatial_engine.check_zone_containment(centroid)
-
-                if zone_id in zone_summary:
-                    zone_summary[zone_id] += 1
-                else:
-                    zone_summary["TRANSIT_ZONE"] += 1
-
-                activity_aggregator.update_track(track_id, centroid, posture)
-                activity_score = activity_aggregator.calculate_activity_score(track_id)
-                dwell_seconds = activity_aggregator.get_dwell_time_seconds(track_id)
-
-                # Project the person's ground point onto the floorplan. This is
-                # what feeds the top-down heatmap.
-                floor_point = spatial_engine.project_to_floor(bbox, frame.shape)
-
-                # Privacy-by-design: blur the head region before the frame is
-                # encoded and sent. This is the claim the whole system rests on,
-                # so it runs by default and is only skipped when a viewer
-                # explicitly turns it off to inspect detection quality.
-                if privacy_state["blur"]:
-                    frame = anonymizer.blur_face_region(frame, bbox)
-
-                tracked_entities.append({
-                    "track_id": track_id,
-                    "bbox": bbox,
-                    "posture": posture,
-                    "activity_score": round(activity_score, 2),
-                    "zone_id": zone_id,
-                    "dwell_duration_seconds": dwell_seconds,
-                    "floor_point": [round(floor_point[0], 1), round(floor_point[1], 1)],
-                    "floor_size": [SpatialEngine.FLOOR_WIDTH, SpatialEngine.FLOOR_HEIGHT]
-                })
+            # One shared implementation — see cv/frame_pipeline.py. Identity
+            # resolution (Steps 5-14) goes inside that function, once, rather
+            # than in three places that could drift apart.
+            tracked_entities, zone_summary = process_detections(
+                detections,
+                frame,
+                spatial_engine,
+                activity_aggregator,
+                anonymizer,
+                zones_config,
+                blur_enabled=privacy_state["blur"],
+            )
 
             await persist_frame(activity_writer, tracked_entities)
 
