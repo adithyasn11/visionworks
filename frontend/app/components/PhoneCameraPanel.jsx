@@ -46,16 +46,25 @@ function wsBase() {
 }
 
 /**
- * The address the PHONE must open — not the one the laptop is using.
+ * The address the PHONE must open — not the one this laptop is using.
  *
- * A laptop on `localhost:3000` that puts "localhost" in a QR code sends the
- * phone to the phone's own localhost, where nothing is listening. The phone
- * needs this machine's LAN address, and it needs https, because browsers
- * refuse camera access on an insecure origin that is not localhost.
+ * `lanHost` comes from the BACKEND, which is the only party that knows this
+ * machine's address on the network. The browser only knows the address it was
+ * itself opened at, and that is normally localhost — which, scanned by a
+ * phone, means the phone. The QR then points at nothing and the scan appears
+ * to work right up until the page fails to load.
+ *
+ * An earlier version built the URL from `window.location.hostname` and merely
+ * WARNED when that was loopback. A warning is not a fix: it tells somebody
+ * they have a problem and leaves them to solve it. Using the address the
+ * server reports means the QR is correct however the dashboard was opened.
+ *
+ * The protocol still follows the page, because that is genuinely a property
+ * of how the servers were started, not of the network.
  */
-function phoneUrlFor(code) {
+function phoneUrlFor(code, lanHost) {
   if (typeof window === 'undefined') return '';
-  const host = window.location.hostname;
+  const host = lanHost || window.location.hostname;
   const port = window.location.port ? `:${window.location.port}` : '';
   return `${window.location.protocol}//${host}${port}/camera/${code}`;
 }
@@ -63,6 +72,7 @@ function phoneUrlFor(code) {
 export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }) {
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState(null);
+  const [lanHost, setLanHost] = useState(null);
   const [qrSvg, setQrSvg] = useState(null);
   const [paired, setPaired] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -79,18 +89,9 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
   const isLoopback = ['localhost', '127.0.0.1', '::1'].includes(host);
 
-  // TWO DIFFERENT PROBLEMS, TWO DIFFERENT MESSAGES.
-  //
-  // `onLoopback` — the QR would point the phone at ITS OWN localhost, where
-  // nothing is listening. The scan appears to work and then the page never
-  // loads, which is the most confusing possible failure.
-  //
-  // `insecure` — the address is right but the protocol is http, so the phone
-  // will load the page and then be refused camera access.
-  //
-  // Warning about only one of them, as this first did, leaves somebody
-  // debugging the wrong thing.
-  const onLoopback = isLoopback;
+  // Only one problem is left to warn about. The loopback case — a QR pointing
+  // the phone at its own localhost — used to be the other, and is now fixed
+  // rather than announced: the address comes from the server.
   const insecure = typeof window !== 'undefined'
     && window.location.protocol !== 'https:'
     && !isLoopback;
@@ -228,12 +229,13 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
         try { const b = await res.json(); if (b?.detail) detail = b.detail; } catch { /* status will do */ }
         throw new Error(detail);
       }
-      const { code: newCode } = await res.json();
+      const { code: newCode, lan_host: host } = await res.json();
       setCode(newCode);
+      setLanHost(host || null);
       setPaired(false);
 
       const QRCode = (await import('qrcode')).default;
-      setQrSvg(await QRCode.toString(phoneUrlFor(newCode), {
+      setQrSvg(await QRCode.toString(phoneUrlFor(newCode, host), {
         type: 'svg', margin: 1, width: 200,
         color: { dark: '#0b0a0c', light: '#ffffff' },
       }));
@@ -303,39 +305,21 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
         </button>
       </div>
 
-      {onLoopback && (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
-          <p className="text-[12px] text-ink-muted font-medium leading-relaxed">
-            <span className="font-bold text-ink">
-              This dashboard is open at “{host}”, so the QR code points there too —
-              and on your phone that means the PHONE.
-            </span>{' '}
-            Open the dashboard at this laptop&apos;s network address instead, then
-            generate a new code. Run{' '}
-            <code className="font-mono text-[11px] bg-ground px-1 rounded">
-              python scripts/make_dev_cert.py
-            </code>{' '}
-            to see the address, and{' '}
-            <code className="font-mono text-[11px] bg-ground px-1 rounded">
-              npm run dev:https
-            </code>{' '}
-            so the phone is allowed to use its camera.
-          </p>
-        </div>
-      )}
-
+      {/* The QR now names the address the SERVER reported, so opening the
+          dashboard at localhost is no longer a problem to warn about — it is
+          simply handled. What remains worth saying is when the phone will be
+          able to load the page but not use its camera. */}
       {insecure && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
           <p className="text-[12px] text-ink-muted font-medium leading-relaxed">
             <span className="font-bold text-ink">This page is not on HTTPS.</span>{' '}
-            The phone will load the camera page and then be refused access to
-            its camera — browsers only allow it on a secure origin. Restart the
-            dev server with{' '}
-            <code className="font-mono text-[11px] bg-ground px-1 rounded">npm run dev:https</code>{' '}
-            and reopen the dashboard at{' '}
+            The QR address is correct and the phone will load the page — but it
+            will then be refused access to its camera, because browsers only
+            allow that on a secure origin. Restart with{' '}
             <code className="font-mono text-[11px] bg-ground px-1 rounded">
-              https://{host}:3000
-            </code>.
+              python run_system.py --https
+            </code>{' '}
+            and reload the dashboard.
           </p>
         </div>
       )}
@@ -359,7 +343,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
                 or type this address
               </p>
               <p className="font-mono text-[11.5px] text-ink break-all">
-                {code ? phoneUrlFor(code) : ''}
+                {code ? phoneUrlFor(code, lanHost) : ''}
               </p>
             </div>
           </div>

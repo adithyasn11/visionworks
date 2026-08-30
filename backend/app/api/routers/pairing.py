@@ -43,8 +43,10 @@ the warning logged when a room is created.
 """
 
 import asyncio
+import ipaddress
 import logging
 import secrets
+import socket
 import time
 from dataclasses import dataclass, field
 from typing import Optional
@@ -132,6 +134,32 @@ def new_code() -> str:
     return "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
 
 
+def lan_host() -> Optional[str]:
+    """
+    This machine's address on the local network, or None.
+
+    THE BROWSER CANNOT WORK THIS OUT, WHICH IS WHY THE SERVER DOES.
+
+    The pairing QR used to be built from `window.location.hostname`, so a
+    dashboard opened at localhost — the normal thing to do — produced a QR
+    saying "localhost". Scanned by a phone, that means the PHONE, and the page
+    never loads. Warning about it was not good enough: the fix is for the code
+    to name an address the phone can actually reach.
+
+    Only the server knows that address. Found by asking the routing table
+    which interface would carry a packet to the internet; no packet is sent.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        return ip if ipaddress.ip_address(ip).is_private else None
+    except Exception:
+        return None
+    finally:
+        s.close()
+
+
 # ── HTTP: the laptop asks for a code ──────────────────────────────────────
 
 @router.post("/session")
@@ -152,6 +180,10 @@ async def create_pairing_session(org_id: str = Depends(require_analysis_run)):
     return {
         "code": code,
         "expires_in": int(ROOM_TTL_SECONDS),
+        # The address the PHONE must dial. Sent from here because the browser
+        # only knows the address IT used, which is usually localhost and is
+        # useless to another device.
+        "lan_host": lan_host(),
     }
 
 

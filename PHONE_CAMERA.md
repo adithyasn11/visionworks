@@ -66,17 +66,19 @@ Plain `python run_system.py` still starts everything over http for normal
 laptop-only work, which is what you want day to day: the certificate warning is
 a small tax you should not pay when no phone is involved.
 
-### 3. Open the dashboard by IP, not localhost
+### 3. Open the dashboard
 
-On the laptop, go to **`https://<your-laptop-ip>:3000`** rather than
-`https://localhost:3000`.
+Either address works on the laptop:
 
-This matters more than it looks. The QR code contains whatever address the
-dashboard is being viewed at — so a dashboard opened at `localhost` produces a
-QR pointing at *the phone's own* localhost, where nothing is listening.
+```
+https://localhost:3000          your usual link, now with the S
+https://192.168.3.5:3000        the network address
+```
 
-The script prints your IP. On the run that wrote this file it was
-`192.168.3.5`.
+The QR code always names the machine's **network** address, whichever one you
+used — the backend reports it, because the browser only knows the address it
+was itself opened at and that is normally localhost. A QR saying "localhost"
+would send your phone to the phone.
 
 Your browser will warn about the certificate. Click **Advanced → Proceed**.
 
@@ -135,7 +137,6 @@ webcam and the phone, each keeps its own set. Give them distinct camera names.
 | Phone pairs, no frames on the laptop | The `:8001` certificate has not been accepted — see above |
 | "This pairing code has expired" | Codes last five minutes. Press **New code** |
 | Feed stops after a minute | The phone screen locked. Increase the screen timeout |
-| QR scans to a page that will not load | The dashboard was opened at `localhost`. Use the laptop's IP |
 | "Another device took over this pairing" | A second phone scanned the same code. One camera per code |
 
 ---
