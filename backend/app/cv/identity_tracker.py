@@ -524,6 +524,19 @@ class IdentityTracker:
 
             # 1. Known track: reuse its identity.
             ident = self._by_track.get(tid)
+            if ident is not None:
+                # A track that vanished and came back under the SAME id is
+                # alive again, so it must leave the lost gallery.
+                #
+                # Without this an identity stays in `_lost` forever after its
+                # first disappearance, and `newly_lost` below — which tests
+                # membership of that dict — never fires again. Measured on the
+                # Step 13 evaluation: somebody who left their desk five times
+                # produced two departures, so the handoff had nothing to match
+                # on trips three onward and scored 2/10 against an expected
+                # 6-8. The reattach path already pops the gallery; this is the
+                # same removal for the case where ByteTrack kept the id.
+                self._lost.pop(ident.identity_id, None)
 
             if ident is None:
                 # 2. New track: try the gallery of recently-lost identities.
@@ -644,7 +657,7 @@ class IdentityTracker:
 
         ident = self._new_identity(track_id, now)
         employee_id = verdict.get("employee_id")
-        if employee_id and employee_id not in self._bound_employees:
+        if employee_id and not self._claimed_by_live_identity(employee_id):
             # "handoff" is one of the five methods migration 020 accepts, and
             # it says something the others do not: this attribution came from
             # another camera, so its reliability is the handoff's, not a face
@@ -832,6 +845,38 @@ class IdentityTracker:
         self._bound_employees = {
             i.employee_id for i in self._all.values() if i.employee_id
         }
+
+    def _claimed_by_live_identity(self, employee_id: str) -> bool:
+        """
+        Is this employee currently held by an identity that is still tracked?
+
+        THE GUARD THIS REPLACES WAS TOO BROAD
+
+        `_bound_employees` accumulates every employee any identity has ever
+        been given, and nothing removes them when that identity dies. The
+        intent was to stop two identities claiming one person AT THE SAME TIME,
+        which is right — two people cannot both be Prajwal. But a person who
+        walked out of frame an hour ago is not competing with anybody, and
+        treating their stale claim as live means the same person can never be
+        recognised again in that session.
+
+        Measured on the Step 13 evaluation: somebody who walked the corridor
+        twice was named on the first crossing and UNKNOWN on every one after,
+        scoring 2/10 where the plan expects 6-8. That was not the matching
+        failing — the handoff matched at 0.86-0.89 every time — it was this
+        guard refusing to let the name be reused.
+
+        So the question is asked about live identities only: those currently
+        bound to a track, or sitting in the lost gallery waiting to be
+        reattached. An identity that has aged out entirely releases its claim.
+        """
+        for ident in self._by_track.values():
+            if ident.employee_id == employee_id:
+                return True
+        for ident in self._lost.values():
+            if ident.employee_id == employee_id:
+                return True
+        return False
 
     def resolve_seats(self, now: float = None) -> list:
         """

@@ -16,7 +16,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Video, Shapes, FileDown,
   Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard, ContactRound,
-  UsersRound,
+  UsersRound, FlaskConical,
   Waypoints,
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
@@ -224,6 +224,28 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
             <span className="truncate">Team</span>
           </Link>
         )}
+
+        {/* Evaluation (Step 17). Open to every member, deliberately.
+
+            This is the page that says how far the other pages can be trusted,
+            and restricting it would mean the people whose time is being
+            measured cannot see the accuracy of the measurement. It contains no
+            personal data — only aggregate rates and failure counts. */}
+        <Link
+          href="/dashboard/evaluation"
+          onClick={() => setOpen(false)}
+          className={`relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 ${
+            pathname === '/dashboard/evaluation'
+              ? 'bg-accent-soft text-accent'
+              : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
+          }`}
+        >
+          {pathname === '/dashboard/evaluation' && (
+            <span aria-hidden="true" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[color:var(--accent)]" />
+          )}
+          <FlaskConical className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
+          <span className="truncate">Accuracy</span>
+        </Link>
 
         {/* Camera layout (Step 12). Beside Employees because both describe
             the space rather than measure it, and both are read by every

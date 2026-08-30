@@ -81,3 +81,11 @@ backend/models/*.onnx
 # Test face images, fetched on demand by backend/tests/test_face_enrolment.py.
 # Photographs of people do not belong in git, even public ones.
 backend/tests/_faces/
+
+# Evaluation artefacts. The code and the committed report are tracked; the
+# intermediate signature caches and per-run truth files are not — they are
+# large, regenerable, and change on every run.
+backend/eval/results/frames_*.pkl
+backend/eval/results/thumbnails/
+backend/eval/results/truth_*.json
+backend/eval/results/tracks_*.json

@@ -1,0 +1,654 @@
+{
+ "source": "simulated",
+ "scenarios": {
+  "normal_day": {
+   "description": "Three employees at three fixed desks, 20 minutes, occasional short absences",
+   "accuracy": 1.0,
+   "coverage": 0.8931,
+   "correct": 643,
+   "wrong": 0,
+   "abstained": 77,
+   "missed": 0,
+   "strangers": 0,
+   "correct_rejections": 0,
+   "false_names": 0,
+   "hallucinations": 0,
+   "stitch": {
+    "raw_ids": 3,
+    "identities": 3,
+    "people": 3,
+    "rate": 1.0,
+    "purity": 1.0,
+    "wrong_joins": 0
+   },
+   "handoff": {
+    "attempts": 0,
+    "correct": 0,
+    "wrong": 0,
+    "unknown": 0,
+    "accuracy": 0.0
+   },
+   "chair_exits": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+   },
+   "confusion": {
+    "emp-a": {
+     "UNKNOWN": 4,
+     "emp-a": 236
+    },
+    "emp-b": {
+     "UNKNOWN": 69,
+     "emp-b": 171
+    },
+    "emp-c": {
+     "UNKNOWN": 4,
+     "emp-c": 236
+    }
+   },
+   "bands": [
+    {
+     "low": 0.0,
+     "high": 0.5,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.5,
+     "high": 0.6,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.6,
+     "high": 0.7,
+     "n": 23,
+     "correct": 23
+    },
+    {
+     "low": 0.7,
+     "high": 0.8,
+     "n": 46,
+     "correct": 46
+    },
+    {
+     "low": 0.8,
+     "high": 0.9,
+     "n": 102,
+     "correct": 102
+    },
+    {
+     "low": 0.9,
+     "high": 1.01,
+     "n": 472,
+     "correct": 472
+    }
+   ]
+  },
+  "occlusion": {
+   "description": "Two employees; one is occluded three times and ByteTrack issues a new track id each time",
+   "accuracy": 1.0,
+   "coverage": 0.9658,
+   "correct": 226,
+   "wrong": 0,
+   "abstained": 8,
+   "missed": 0,
+   "strangers": 0,
+   "correct_rejections": 0,
+   "false_names": 0,
+   "hallucinations": 0,
+   "stitch": {
+    "raw_ids": 5,
+    "identities": 2,
+    "people": 2,
+    "rate": 1.0,
+    "purity": 1.0,
+    "wrong_joins": 0
+   },
+   "handoff": {
+    "attempts": 0,
+    "correct": 0,
+    "wrong": 0,
+    "unknown": 0,
+    "accuracy": 0.0
+   },
+   "chair_exits": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+   },
+   "confusion": {
+    "emp-a": {
+     "UNKNOWN": 4,
+     "emp-a": 110
+    },
+    "emp-b": {
+     "UNKNOWN": 4,
+     "emp-b": 116
+    }
+   },
+   "bands": [
+    {
+     "low": 0.0,
+     "high": 0.5,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.5,
+     "high": 0.6,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.6,
+     "high": 0.7,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.7,
+     "high": 0.8,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.8,
+     "high": 0.9,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.9,
+     "high": 1.01,
+     "n": 226,
+     "correct": 226
+    }
+   ]
+  },
+  "similar_clothing": {
+   "description": "Two employees in identical clothing with confusable appearance vectors: half the time at their own desks, half in a shared area where only appearance is available",
+   "accuracy": 1.0,
+   "coverage": 0.9667,
+   "correct": 232,
+   "wrong": 0,
+   "abstained": 8,
+   "missed": 0,
+   "strangers": 0,
+   "correct_rejections": 0,
+   "false_names": 0,
+   "hallucinations": 0,
+   "stitch": {
+    "raw_ids": 2,
+    "identities": 2,
+    "people": 2,
+    "rate": 1.0,
+    "purity": 1.0,
+    "wrong_joins": 0
+   },
+   "handoff": {
+    "attempts": 0,
+    "correct": 0,
+    "wrong": 0,
+    "unknown": 0,
+    "accuracy": 0.0
+   },
+   "chair_exits": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+   },
+   "confusion": {
+    "emp-a": {
+     "UNKNOWN": 4,
+     "emp-a": 116
+    },
+    "emp-b": {
+     "UNKNOWN": 4,
+     "emp-b": 116
+    }
+   },
+   "bands": [
+    {
+     "low": 0.0,
+     "high": 0.5,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.5,
+     "high": 0.6,
+     "n": 38,
+     "correct": 38
+    },
+    {
+     "low": 0.6,
+     "high": 0.7,
+     "n": 28,
+     "correct": 28
+    },
+    {
+     "low": 0.7,
+     "high": 0.8,
+     "n": 22,
+     "correct": 22
+    },
+    {
+     "low": 0.8,
+     "high": 0.9,
+     "n": 16,
+     "correct": 16
+    },
+    {
+     "low": 0.9,
+     "high": 1.01,
+     "n": 128,
+     "correct": 128
+    }
+   ]
+  },
+  "chair_exits": {
+   "description": "One employee; three genuine chair exits over 90 s and one 40 s absence that must be rejected by the debounce",
+   "accuracy": 1.0,
+   "coverage": 0.8167,
+   "correct": 196,
+   "wrong": 0,
+   "abstained": 44,
+   "missed": 0,
+   "strangers": 0,
+   "correct_rejections": 0,
+   "false_names": 0,
+   "hallucinations": 0,
+   "stitch": {
+    "raw_ids": 1,
+    "identities": 1,
+    "people": 1,
+    "rate": 1.0,
+    "purity": 1.0,
+    "wrong_joins": 0
+   },
+   "handoff": {
+    "attempts": 0,
+    "correct": 0,
+    "wrong": 0,
+    "unknown": 0,
+    "accuracy": 0.0
+   },
+   "chair_exits": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+   },
+   "confusion": {
+    "emp-a": {
+     "UNKNOWN": 44,
+     "emp-a": 196
+    }
+   },
+   "bands": [
+    {
+     "low": 0.0,
+     "high": 0.5,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.5,
+     "high": 0.6,
+     "n": 125,
+     "correct": 125
+    },
+    {
+     "low": 0.6,
+     "high": 0.7,
+     "n": 22,
+     "correct": 22
+    },
+    {
+     "low": 0.7,
+     "high": 0.8,
+     "n": 7,
+     "correct": 7
+    },
+    {
+     "low": 0.8,
+     "high": 0.9,
+     "n": 5,
+     "correct": 5
+    },
+    {
+     "low": 0.9,
+     "high": 1.01,
+     "n": 37,
+     "correct": 37
+    }
+   ]
+  },
+  "cross_camera": {
+   "description": "Two employees seated at their desks, making ten trips out to the corridor and pantry, with a cross-camera colour shift on the pantry camera",
+   "accuracy": 1.0,
+   "coverage": 0.9862,
+   "correct": 571,
+   "wrong": 0,
+   "abstained": 8,
+   "missed": 0,
+   "strangers": 0,
+   "correct_rejections": 0,
+   "false_names": 0,
+   "hallucinations": 0,
+   "stitch": {
+    "raw_ids": 22,
+    "identities": 22,
+    "people": 2,
+    "rate": 0.0,
+    "purity": 1.0,
+    "wrong_joins": 0
+   },
+   "handoff": {
+    "attempts": 10,
+    "correct": 10,
+    "wrong": 0,
+    "unknown": 0,
+    "accuracy": 1.0
+   },
+   "chair_exits": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+   },
+   "confusion": {
+    "emp-a": {
+     "UNKNOWN": 4,
+     "emp-a": 286
+    },
+    "emp-b": {
+     "UNKNOWN": 4,
+     "emp-b": 285
+    }
+   },
+   "bands": [
+    {
+     "low": 0.0,
+     "high": 0.5,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.5,
+     "high": 0.6,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.6,
+     "high": 0.7,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.7,
+     "high": 0.8,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.8,
+     "high": 0.9,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.9,
+     "high": 1.01,
+     "n": 571,
+     "correct": 571
+    }
+   ]
+  },
+  "stranger": {
+   "description": "One employee plus an unenrolled visitor sitting at an unassigned desk \u2014 abstention here is the correct answer",
+   "accuracy": 1.0,
+   "coverage": 0.9583,
+   "correct": 92,
+   "wrong": 0,
+   "abstained": 4,
+   "missed": 0,
+   "strangers": 96,
+   "correct_rejections": 96,
+   "false_names": 0,
+   "hallucinations": 0,
+   "stitch": {
+    "raw_ids": 2,
+    "identities": 2,
+    "people": 2,
+    "rate": 1.0,
+    "purity": 1.0,
+    "wrong_joins": 0
+   },
+   "handoff": {
+    "attempts": 0,
+    "correct": 0,
+    "wrong": 0,
+    "unknown": 0,
+    "accuracy": 0.0
+   },
+   "chair_exits": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+   },
+   "confusion": {
+    "emp-a": {
+     "UNKNOWN": 4,
+     "emp-a": 92
+    },
+    "(stranger)": {
+     "UNKNOWN": 96
+    }
+   },
+   "bands": [
+    {
+     "low": 0.0,
+     "high": 0.5,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.5,
+     "high": 0.6,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.6,
+     "high": 0.7,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.7,
+     "high": 0.8,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.8,
+     "high": 0.9,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.9,
+     "high": 1.01,
+     "n": 92,
+     "correct": 92
+    }
+   ]
+  },
+  "hot_desking": {
+   "description": "Three employees sitting at each other's desks \u2014 the hot-desking case the seat prior is not designed for",
+   "accuracy": 0.0,
+   "coverage": 0.9778,
+   "correct": 0,
+   "wrong": 528,
+   "abstained": 12,
+   "missed": 0,
+   "strangers": 0,
+   "correct_rejections": 0,
+   "false_names": 0,
+   "hallucinations": 0,
+   "stitch": {
+    "raw_ids": 3,
+    "identities": 3,
+    "people": 3,
+    "rate": 1.0,
+    "purity": 1.0,
+    "wrong_joins": 0
+   },
+   "handoff": {
+    "attempts": 0,
+    "correct": 0,
+    "wrong": 0,
+    "unknown": 0,
+    "accuracy": 0.0
+   },
+   "chair_exits": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+   },
+   "confusion": {
+    "emp-a": {
+     "UNKNOWN": 4,
+     "emp-b": 176
+    },
+    "emp-b": {
+     "UNKNOWN": 4,
+     "emp-c": 176
+    },
+    "emp-c": {
+     "UNKNOWN": 4,
+     "emp-a": 176
+    }
+   },
+   "bands": [
+    {
+     "low": 0.0,
+     "high": 0.5,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.5,
+     "high": 0.6,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.6,
+     "high": 0.7,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.7,
+     "high": 0.8,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.8,
+     "high": 0.9,
+     "n": 0,
+     "correct": 0
+    },
+    {
+     "low": 0.9,
+     "high": 1.01,
+     "n": 528,
+     "correct": 0
+    }
+   ]
+  }
+ },
+ "overall": {
+  "accuracy": 0.7878,
+  "coverage": 0.9392,
+  "abstention_rate": 0.0608,
+  "wrong": 528,
+  "strangers": 96,
+  "correct_rejections": 96,
+  "headline": "76% accurate on the 88% of cases above 0.75 confidence, correctly abstaining on the rest",
+  "bands": [
+   {
+    "low": 0.0,
+    "high": 0.5,
+    "n": 0,
+    "correct": 0,
+    "accuracy": 0.0
+   },
+   {
+    "low": 0.5,
+    "high": 0.6,
+    "n": 163,
+    "correct": 163,
+    "accuracy": 1.0
+   },
+   {
+    "low": 0.6,
+    "high": 0.7,
+    "n": 73,
+    "correct": 73,
+    "accuracy": 1.0
+   },
+   {
+    "low": 0.7,
+    "high": 0.8,
+    "n": 75,
+    "correct": 75,
+    "accuracy": 1.0
+   },
+   {
+    "low": 0.8,
+    "high": 0.9,
+    "n": 123,
+    "correct": 123,
+    "accuracy": 1.0
+   },
+   {
+    "low": 0.9,
+    "high": 1.01,
+    "n": 2054,
+    "correct": 1526,
+    "accuracy": 0.7429
+   }
+  ]
+ },
+ "failure_summary": {
+  "abstention": 161,
+  "misidentification": 528
+ },
+ "generated_at": "2026-08-30T04:17:53.384437+00:00"
+}
