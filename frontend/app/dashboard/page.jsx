@@ -139,8 +139,23 @@ function DashboardInner() {
   const [rangeDays, setRangeDays] = useState(7);
   const [coverage, setCoverage] = useState(null);
 
-  // Zones are loaded by the editor and handed up, so the live overlay draws the
-  // same shapes the CV pipeline is attributing occupancy to.
+  // WHICH CAMERA EVERYTHING ON THIS PAGE IS ABOUT.
+  //
+  // This was the hardcoded constant CAMERA_ID. One camera name, baked in, so
+  // a zone drawn for the door camera and a zone drawn for the desk camera
+  // landed in the same bucket and the pipeline attributed both to whichever
+  // it happened to be running. Zones ARE per-camera — a polygon is a region
+  // of one camera's frame and means nothing in another's — so the camera has
+  // to be a choice, and a visible one.
+  const [cameraId, setCameraId] = useState(CAMERA_ID);
+  const [cameras, setCameras] = useState([]);
+
+  // Zones for the SELECTED camera, loaded here rather than by the editor.
+  //
+  // They used to be handed up by ZoneEditor's onZonesChanged, which meant the
+  // live overlay drew nothing until you had visited the Zones page in that
+  // session. The overlay is the whole point of drawing them; it should not
+  // depend on which tab you opened first.
   const [activeZones, setActiveZones] = useState([]);
 
   useEffect(() => {
@@ -207,6 +222,73 @@ function DashboardInner() {
     return () => { cancelled = true; clearInterval(timer); };
   }, [loadOverview]);
 
+  // The cameras this org actually has, so the picker offers real ones rather
+  // than a name compiled into the page.
+  useEffect(() => {
+    let active = true;
+    backendFetch('/api/v1/cameras/')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list) => {
+        if (!active || !Array.isArray(list)) return;
+        setCameras(list);
+        // Only switch away from the default if it is not a real camera —
+        // otherwise a reload would silently move somebody to a different
+        // camera than the one they were working on.
+        const names = list.map((c) => c.camera_id || c.id || c.name);
+        if (names.length && !names.includes(CAMERA_ID)) setCameraId(names[0]);
+      })
+      .catch(() => { /* the default still works; the picker just has one entry */ });
+    return () => { active = false; };
+  }, []);
+
+  // Zones for the selected camera. Loaded HERE, not in the editor, so the live
+  // overlay has them whether or not the Zones page has been opened — and so
+  // changing camera reloads them rather than showing the previous camera's
+  // shapes over a different view.
+  const loadZones = useCallback(async () => {
+    if (!cameraId) return;
+    try {
+      const res = await backendFetch(`/api/v1/zones/${cameraId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setActiveZones(Array.isArray(data) ? data : []);
+    } catch {
+      // Non-fatal: the overlay simply has nothing to draw.
+    }
+  }, [cameraId]);
+
+  useEffect(() => { loadZones(); }, [loadZones]);
+
+  /**
+   * Which camera the live feed and the zone editor are both about.
+   *
+   * Rendered on BOTH views deliberately. They are two halves of configuring
+   * one camera — draw the zones, then watch them fill — and a selector that
+   * appeared on only one of them would let the two drift apart without
+   * anybody noticing which camera they were looking at.
+   */
+  const cameraPicker = cameras.length > 1 ? (
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+        camera
+      </span>
+      <select
+        value={cameraId}
+        onChange={(e) => setCameraId(e.target.value)}
+        className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12.5px] font-bold text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors"
+      >
+        {cameras.map((c) => {
+          const id = c.camera_id || c.id || c.name;
+          return (
+            <option key={id} value={id}>
+              {c.name || id}{c.role === 'DOOR' ? ' · door' : ''}
+            </option>
+          );
+        })}
+      </select>
+    </div>
+  ) : null;
+
   const refreshButton = (
     <button
       type="button"
@@ -266,26 +348,45 @@ function DashboardInner() {
         </div>
       )}
 
-      {view === 'live' && (
+      {/* KEPT MOUNTED, NOT CONDITIONALLY RENDERED.
+          
+          `{view === 'live' && <VideoCanvasPlayer/>}` unmounts the player the
+          moment you click another section, and the unmount cleanup stops the
+          webcam tracks and closes the WebSocket — by design, because a camera
+          left running after you navigate away is worse. But that meant a
+          five-minute upload was destroyed by a glance at the Zones page, and
+          the camera light went out with it.
+          
+          Hiding it with CSS keeps the component alive: the stream, the
+          socket and the processed frames all survive a trip to Zones and
+          back. The cleanup still fires when the DASHBOARD unmounts, so
+          leaving for /dashboard/employees or signing out still releases the
+          camera properly. */}
+      <div className={view === 'live' ? 'block' : 'hidden'} aria-hidden={view !== 'live'}>
         <div className="space-y-6">
           <PageHeader
             eyebrow="Live feed"
             title="Camera & detection"
             subtitle={
               can(role, 'analysis.run')
-                ? 'Upload a recording or start the camera. Detection, tracking and posture run on your own hardware.'
+                ? 'Upload a recording or start the camera. Detection, tracking and posture run on your own hardware. Zones drawn for this camera are outlined on the frame.'
                 : 'Live detection and posture, as recorded by your team. Starting an analysis writes new measurements, which your role does not permit.'
             }
+            action={cameraPicker}
           />
 
           {!can(role, 'analysis.run') && role && <ReadOnlyNotice capability="analysis.run" />}
 
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
-            <VideoCanvasPlayer activeZones={activeZones} readOnly={!can(role, 'analysis.run')} cameraId={CAMERA_ID} />
+            <VideoCanvasPlayer
+              activeZones={activeZones}
+              readOnly={!can(role, 'analysis.run')}
+              cameraId={cameraId}
+            />
             <FloorplanHeatmap />
           </div>
         </div>
-      )}
+      </div>
 
       {view === 'zones' && (
         <div className="space-y-6">
@@ -294,15 +395,20 @@ function DashboardInner() {
             title="Define your spaces"
             subtitle={
               can(role, 'zones.edit')
-                ? 'Draw the areas you want measured. Occupancy and dwell time are attributed to whichever zone a person is standing in.'
+                ? 'Draw the areas you want measured, on the camera they belong to. A zone is a region of ONE camera’s view — it means nothing in another’s.'
                 : 'The areas being measured. Occupancy and dwell time are attributed to whichever zone a person is standing in.'
             }
+            action={cameraPicker}
           />
 
           {!can(role, 'zones.edit') && role && <ReadOnlyNotice capability="zones.edit" />}
 
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-5 items-start">
-            <ZoneEditor cameraId={CAMERA_ID} onZonesChanged={setActiveZones} readOnly={!can(role, 'zones.edit')} />
+            <ZoneEditor
+              cameraId={cameraId}
+              onZonesChanged={setActiveZones}
+              readOnly={!can(role, 'zones.edit')}
+            />
             <FloorplanHeatmap />
           </div>
         </div>

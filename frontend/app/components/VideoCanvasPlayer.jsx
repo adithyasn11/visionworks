@@ -28,6 +28,11 @@ const POSTURE_COLORS = {
   UNKNOWN:  '#8B8792',
 };
 
+/* Matches ZONE_COLORS in ZoneEditor: a zone must be the same colour where it
+   is drawn and where it is watched, or the two screens look like they are
+   showing different things. */
+const ZONE_OUTLINE_COLORS = ['#DC2626', '#F0736F', '#8C1A1A', '#F7B4B0', '#B02525'];
+
 function formatTime(seconds) {
   if (!seconds || isNaN(seconds) || seconds < 0) return '00:00';
   const m = Math.floor(seconds / 60);
@@ -35,8 +40,74 @@ function formatTime(seconds) {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
+/** The space zone polygons are stored in — see ZoneEditor's FRAME_W. */
+const ZONE_FRAME_W = 640;
+
+/**
+ * The zones this camera is measuring, outlined on the live frame.
+ *
+ * `zones` was accepted by drawHUD and never used: the overlay drew people and
+ * nothing else, so a zone you had just spent time drawing was invisible
+ * exactly where it mattered — over the footage it applies to. Without it there
+ * is no way to see that a desk polygon is in the wrong place until the desk
+ * time comes out wrong days later.
+ *
+ * SCALED, NOT DRAWN RAW
+ *
+ * Polygons are stored in the 640-wide space the CV pipeline works in, and the
+ * player's canvas is whatever size the processed frame arrives at (960 wide in
+ * practice). Drawing the stored coordinates directly would put every zone at
+ * two-thirds of its true position — visibly wrong, and wrong in a way that
+ * looks like a tracking fault rather than a scaling one.
+ *
+ * Drawn FIRST, underneath the detection boxes, and kept faint. This is
+ * context, not the subject: a zone outline that competes with a person's
+ * bounding box makes the thing you are actually watching harder to read.
+ */
+function drawZones(ctx, canvas, zones) {
+  if (!Array.isArray(zones) || zones.length === 0) return;
+
+  const scale = canvas.width / ZONE_FRAME_W;
+
+  zones.forEach((zone, index) => {
+    const pts = zone.polygon_coordinates;
+    if (!Array.isArray(pts) || pts.length < 3) return;
+
+    const color = ZONE_OUTLINE_COLORS[index % ZONE_OUTLINE_COLORS.length];
+
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0] * scale, pts[0][1] * scale);
+    pts.slice(1).forEach(([x, y]) => ctx.lineTo(x * scale, y * scale));
+    ctx.closePath();
+
+    ctx.fillStyle = `${color}1A`;
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // The name, at the polygon's centroid rather than its first point: a
+    // label pinned to a corner drifts off the shape on an L-shaped zone.
+    const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length * scale;
+    const cy = pts.reduce((a, p) => a + p[1], 0) / pts.length * scale;
+    const label = zone.zone_name || zone.zone_id || `Zone ${index + 1}`;
+
+    ctx.font = '600 11px Inter, sans-serif';
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = 'rgba(11,10,12,0.72)';
+    ctx.fillRect(cx - tw / 2 - 5, cy - 9, tw + 10, 18);
+    ctx.fillStyle = color;
+    ctx.fillText(label, cx - tw / 2, cy + 4);
+  });
+}
+
 function drawHUD(ctx, canvas, entities, zones, enableBlur) {
-  // Only draw person annotations (Bounding boxes, Track IDs, Posture, Activity Scores, Face Blur)
+  // Zones first, so the person boxes sit on top of them.
+  drawZones(ctx, canvas, zones);
+
+  // Then person annotations (bounding boxes, track IDs, posture, scores).
   entities.forEach((entity) => {
     const [x1, y1, x2, y2] = entity.bbox;
     const w = x2 - x1;

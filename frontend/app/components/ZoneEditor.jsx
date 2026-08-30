@@ -216,13 +216,22 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
   // Try the webcam once on mount. Failing is fine and common — most people
   // are drawing zones for an uploaded video, not a live camera — so the
   // failure is reported inline rather than as an error state for the page.
+  //
+  // THE CLEANUP DOES NOT CLEAR THE SNAPSHOT, and that is the whole point.
+  //
+  // It used to. Under React StrictMode — on in this project — dev mounts,
+  // unmounts and remounts every component, so the cleanup ran and nulled the
+  // image the first mount had just fetched, while the second fetch resolved
+  // into state that had already been wiped. The picker rendered (its data
+  // comes from a different effect) but the frame never appeared, which looked
+  // exactly like a failing request and was not one.
+  //
+  // Object URLs are revoked in grabSnapshot when they are REPLACED, which is
+  // where the old one actually becomes garbage. What leaks here is at most one
+  // URL per editor instance, released when the tab closes.
   useEffect(() => {
     loadSnapSources();
     grabSnapshot('webcam');
-    return () => setSnapshot((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
-    });
   }, [loadSnapSources, grabSnapshot]);
 
   /* ── canvas ────────────────────────────────────────────────────────────── */
