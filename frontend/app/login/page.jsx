@@ -84,6 +84,23 @@ function LoginForm() {
   // The OAuth callback redirects back here with ?authError=... when the provider
   // or the code exchange failed. Surfacing it beats a silent bounce to a blank
   // login form — "provider is not enabled" is a config fix the reader can act on.
+  // Supabase sent us to a different address than the one we started from —
+  // see the guard in app/auth/callback/route.js. Name the setting and the
+  // exact value to paste, because the dashboard field is easy to find but
+  // impossible to guess the right contents for.
+  useEffect(() => {
+    const landedOn = searchParams.get('originMismatch');
+    if (!landedOn) return;
+    const here = typeof window !== 'undefined' ? window.location.origin : '';
+    setBanner({
+      kind: 'error',
+      text: `Google sent you to ${landedOn} instead of this address. Add `
+        + `${here}/** to Supabase → Authentication → URL Configuration → `
+        + `Redirect URLs, then try again. Signing in with email and password `
+        + `works right now and needs no setup.`,
+    });
+  }, [searchParams]);
+
   useEffect(() => {
     const authError = searchParams.get('authError');
     if (!authError) return;
@@ -182,6 +199,12 @@ function LoginForm() {
     try {
       const nextParam = searchParams.get('next');
       const callback = new URL('/auth/callback', window.location.origin);
+      // Carry the host we started on. Supabase silently swaps `redirectTo` for
+      // the project's Site URL when the address is not in the redirect
+      // allow-list, and the swap is invisible: the user just arrives at a
+      // localhost link that their phone cannot open. The callback compares
+      // this against where it actually ran and says so.
+      callback.searchParams.set('from', window.location.host);
       // Preserve where the user was heading, so the callback can send them
       // there instead of dropping them on a default landing page.
       if (nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')) {

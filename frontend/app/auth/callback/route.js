@@ -24,9 +24,37 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 export async function GET(request) {
-  const { searchParams, origin } = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const { searchParams } = requestUrl;
   const code = searchParams.get('code');
   const next = searchParams.get('next');
+
+  // Behind `next dev`, request.url is the address this process bound, which is
+  // not necessarily the address the browser typed. The forwarded host is what
+  // the user actually sees, so cookies and redirects must follow it.
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  const host = forwardedHost || request.headers.get('host') || requestUrl.host;
+  const proto = forwardedProto || requestUrl.protocol.replace(':', '');
+  const origin = `${proto}://${host}`;
+
+  // WHERE THE FLOW STARTED, VS WHERE IT LANDED
+  //
+  // The login page stamps `from` with the host it was opened at. If we are
+  // running on a different host, Supabase discarded our redirectTo and
+  // substituted the project's Site URL — which happens whenever the address
+  // is missing from the Auth redirect allow-list.
+  //
+  // This matters far more than it looks. Landing on localhost from a phone is
+  // a dead end, and the session cookies would be written for the WRONG host,
+  // so even reopening the right address would still show you signed out. Fail
+  // loudly with the fix instead of exchanging the code into the void.
+  const from = searchParams.get('from');
+  if (from && from !== host) {
+    const back = new URL('/login', `${proto}://${from}`);
+    back.searchParams.set('originMismatch', host);
+    return NextResponse.redirect(back);
+  }
 
   // Supabase reports provider-side failures (user cancelled, provider not
   // enabled) as query params rather than an HTTP error.
