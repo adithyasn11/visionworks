@@ -44,20 +44,27 @@ never be committed.
 
 ### 2. Start both servers over HTTPS
 
-Two terminals.
+One command:
 
 ```
-cd frontend
-npm run dev:https
+python run_system.py --https
 ```
 
-```
-venv/Scripts/python.exe scripts/run_backend_https.py
-```
+It generates the certificate if there is not one — so step 1 is optional, and
+this is really the only command you need. It also regenerates automatically if
+this laptop has changed network since the last run, because a certificate that
+does not name the address the phone dialled is rejected with an error that
+looks nothing like "your IP changed".
 
-Both now listen on `0.0.0.0`, so your phone can reach them. On a home or lab
-network that is fine. **Do not do this on a public network** — anything on the
-same Wi-Fi can reach these ports.
+When it is up it prints the address to open. Use that one, not localhost.
+
+Both servers listen on `0.0.0.0`, so your phone can reach them. On a home or
+lab network that is fine. **Do not do this on a public network** — anything on
+the same Wi-Fi can reach these ports.
+
+Plain `python run_system.py` still starts everything over http for normal
+laptop-only work, which is what you want day to day: the certificate warning is
+a small tax you should not pay when no phone is involved.
 
 ### 3. Open the dashboard by IP, not localhost
 
