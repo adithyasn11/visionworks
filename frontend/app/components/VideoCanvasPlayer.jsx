@@ -16,6 +16,15 @@ import PhoneCameraPanel from './PhoneCameraPanel';
 import { backendFetch, backendSocketUrl } from '../lib/backend';
 import { drawHUD } from '../lib/overlay';
 
+/** mm:ss for the scrubber. */
+function formatTime(seconds) {
+  if (!seconds || isNaN(seconds) || seconds < 0) return '00:00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+
 /* Detection-box colours, kept inside the red/black/white palette. The three
    postures are separated by weight along one red ramp rather than by unrelated
    hues, so the overlay belongs to the same product as everything under it.

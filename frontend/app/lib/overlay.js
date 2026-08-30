@@ -24,13 +24,6 @@ const POSTURE_COLORS = {
    showing different things. */
 const ZONE_OUTLINE_COLORS = ['#DC2626', '#F0736F', '#8C1A1A', '#F7B4B0', '#B02525'];
 
-function formatTime(seconds) {
-  if (!seconds || isNaN(seconds) || seconds < 0) return '00:00';
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-}
-
 /** The space zone polygons are stored in — see ZoneEditor's FRAME_W. */
 const ZONE_FRAME_W = 640;
 
