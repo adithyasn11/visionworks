@@ -19,8 +19,37 @@
 
 import { supabase } from './supabase/browser';
 
-export const BACKEND_HTTP =
-  process.env.NEXT_PUBLIC_BACKEND_HTTP || 'http://localhost:8001';
+/**
+ * Where the backend lives, derived from the page rather than hardcoded.
+ *
+ * IT USED TO BE `http://localhost:8001`, AND THAT BROKE TWICE OVER.
+ *
+ * When the launcher runs with --https the backend serves TLS, so a plain
+ * http:// request to that port gets no response at all — and a page loaded
+ * over https is FORBIDDEN from calling http:// anyway, because browsers block
+ * mixed content silently. The dashboard rendered fine and every backend call
+ * failed, which reads as "the backend is down" rather than "the scheme is
+ * wrong".
+ *
+ * It also broke the phone. A phone loading the dashboard at
+ * https://192.168.3.5:3000 would try to reach the backend at
+ * `localhost:8001`, and on a phone localhost is the phone.
+ *
+ * So both parts follow the page: same protocol, same hostname, backend port.
+ * An explicit NEXT_PUBLIC_BACKEND_HTTP still wins, for a deployment where the
+ * backend genuinely lives somewhere else.
+ */
+function inferBackendOrigin() {
+  if (process.env.NEXT_PUBLIC_BACKEND_HTTP) {
+    return process.env.NEXT_PUBLIC_BACKEND_HTTP;
+  }
+  // Server-side render: no window, and nothing in this module is called
+  // during SSR anyway. The literal keeps the export a string.
+  if (typeof window === 'undefined') return 'http://localhost:8001';
+  return `${window.location.protocol}//${window.location.hostname}:8001`;
+}
+
+export const BACKEND_HTTP = inferBackendOrigin();
 
 export const BACKEND_WS = BACKEND_HTTP.replace(/^http/, 'ws');
 
