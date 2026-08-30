@@ -309,7 +309,17 @@ def main():
         # the dashboard at localhost puts "localhost" into the pairing QR, and
         # on a phone that means the phone — the scan appears to work and then
         # nothing ever loads.
-        print(f"{GREEN} Open the dashboard here:{RESET}")
+        # BOTH addresses, because forgetting the "s" is the first thing that
+        # goes wrong: the port is serving TLS, so a plain http:// request gets
+        # no response at all and the browser reports the site as simply down.
+        # Somebody who has typed localhost:3000 a hundred times will type it
+        # again, and needs to be told what changed rather than left debugging
+        # a server that is running perfectly.
+        print(f"{GREEN} On this laptop:{RESET}")
+        print(f"{GREEN}   https://localhost:3000{RESET}"
+              f"        <- note the S; plain http will NOT load")
+        print()
+        print(f"{GREEN} To pair a phone, open this one instead:{RESET}")
         print(f"{GREEN}   https://{ip}:3000{RESET}   <- NOT localhost")
         print()
         print(f"{YELLOW} Your browser will warn about the certificate. It is")
