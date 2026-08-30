@@ -37,6 +37,7 @@ import {
 
 import { backendFetch, backendSocketUrl, BACKEND_HTTP } from '../lib/backend';
 import { publishFrame, clearFrame } from '../lib/liveFrame';
+import { drawHUD } from '../lib/overlay';
 
 /** How often to re-check whether the phone has joined, while showing the QR. */
 const POLL_MS = 1500;
@@ -69,7 +70,7 @@ function phoneUrlFor(code, lanHost) {
   return `${window.location.protocol}//${host}${port}/camera/${code}`;
 }
 
-export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }) {
+export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, activeZones = [] }) {
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState(null);
   const [lanHost, setLanHost] = useState(null);
@@ -144,20 +145,34 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
       pendingRef.current = false;
       setAnalysed((n) => n + 1);
 
-      // Paint the annotated frame, and publish it so the zone editor can use
-      // it as a backdrop exactly as it does the laptop camera's.
+      // Paint the frame AND the detection overlay on the panel's preview.
+      //
+      // The backend sends a clean jpeg plus `tracked_entities`; it does not
+      // burn boxes into the pixels. Drawing only the image — which is what
+      // this did — gives a live feed with no boxes on it, indistinguishable
+      // from the AI not running at all. Same drawHUD the laptop path uses.
       const canvas = canvasRef.current;
       if (canvas) {
         if (!imgRef.current) imgRef.current = new window.Image();
         const img = imgRef.current;
+        const entities = data.tracked_entities || [];
         img.onload = () => {
           canvas.width = img.naturalWidth;
           canvas.height = img.naturalHeight;
-          canvas.getContext('2d').drawImage(img, 0, 0);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          drawHUD(ctx, canvas, entities, activeZones, data.privacy_blur);
         };
         img.src = data.frame_base64;
       }
+
+      // The RAW frame, so the zone editor gets a clean backdrop to draw over
+      // — the same contract the laptop camera publishes under.
       publishFrame(data.frame_base64);
+
+      // And hand the frame to the parent player, which paints it on the big
+      // canvas and updates the posture counts. Without this the phone feed
+      // only ever appeared in this small preview.
       if (onFrame) onFrame(data);
     };
 
@@ -196,7 +211,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
     });
 
     return ws;
-  }, [cameraId, onFrame]);
+  }, [cameraId, onFrame, activeZones]);
 
   /* ── the pairing room ───────────────────────────────────────────────── */
 
