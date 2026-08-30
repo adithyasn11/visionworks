@@ -38,7 +38,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Camera, CameraOff, Wifi, WifiOff, AlertTriangle, CheckCircle2,
-  Loader2, SwitchCamera, Radio,
+  Loader2, SwitchCamera, Radio, RefreshCw,
 } from 'lucide-react';
 
 /** Frames per second sent to the backend. */
@@ -72,7 +72,22 @@ export default function CameraClient({ code }) {
   const timerRef = useRef(null);
   const wakeLockRef = useRef(null);
   const retryRef = useRef(0);
-  const closedByUsRef = useRef(false);
+
+  // WHY A GENERATION COUNTER AND NOT A BOOLEAN.
+  //
+  // This was `closedByUsRef`, a single shared flag meaning "we are shutting
+  // down, do not reconnect". Under React StrictMode — on in this project —
+  // dev mounts, unmounts and remounts every component. The unmount set the
+  // flag and closed socket #1; the remount opened socket #2; then socket #1's
+  // delayed `onclose` fired, saw the flag still true, and stopped everything.
+  //
+  // From the laptop that looks exactly like what you reported: the phone
+  // connects and immediately disconnects, with no error anywhere.
+  //
+  // A counter fixes it because each socket captures the generation it was
+  // born in. A stale socket closing can only ever cancel ITSELF.
+  const genRef = useRef(0);
+  const aliveRef = useRef(true);
 
   const [status, setStatus] = useState('connecting');
   // connecting | waiting | streaming | denied | error | expired | replaced
@@ -176,6 +191,7 @@ export default function CameraClient({ code }) {
 
   const connect = useCallback(() => {
     if (!code) return;
+    const myGen = genRef.current;
     const url = `${backendWsBase()}/api/v1/pair/ws/${encodeURIComponent(code)}?role=camera`;
     let ws;
     try {
@@ -190,8 +206,16 @@ export default function CameraClient({ code }) {
     ws.onopen = () => {
       retryRef.current = 0;
       setOnline(true);
-      setStatus((s) => (s === 'streaming' ? s : 'waiting'));
-      setMessage((m) => (status === 'streaming' ? m : 'Paired. Waiting for the laptop to start the camera…'));
+      // Both reads go through the updater form so this callback does not
+      // close over `status`. Depending on it would rebuild `connect` on every
+      // status change, and a rebuilt `connect` is a new socket — the page
+      // would reconnect to the room each time it changed what it was showing.
+      setStatus((prev) => {
+        if (prev !== 'streaming') {
+          setMessage('Paired. Waiting for the laptop to start the camera…');
+        }
+        return prev === 'streaming' ? prev : 'waiting';
+      });
     };
 
     ws.onmessage = (event) => {
@@ -209,13 +233,13 @@ export default function CameraClient({ code }) {
           break;
         case 'error':
           if (msg.reason === 'expired') {
-            closedByUsRef.current = true;   // do not reconnect into a dead room
+            genRef.current += 1;   // do not reconnect into a dead room
             setStatus('expired');
             setMessage(msg.message || 'This pairing code has expired.');
           }
           break;
         case 'replaced':
-          closedByUsRef.current = true;
+          genRef.current += 1;
           stopCapture();
           setStatus('replaced');
           setMessage('Another phone took over this pairing.');
@@ -234,28 +258,34 @@ export default function CameraClient({ code }) {
     };
 
     ws.onclose = () => {
+      // A socket from a previous generation closing says nothing about the
+      // current one. Ignoring it is the whole point of the counter.
+      if (myGen !== genRef.current || !aliveRef.current) return;
+
       setOnline(false);
-      if (closedByUsRef.current) return;
       // Reconnect with backoff. A phone in a lift comes back; a session that
       // gave up on the first drop would not.
       const delay = Math.min(1000 * 2 ** retryRef.current, 15000);
       retryRef.current += 1;
       setMessage(`Connection lost. Retrying in ${Math.round(delay / 1000)}s…`);
       setTimeout(() => {
-        if (!closedByUsRef.current) connect();
+        if (myGen === genRef.current && aliveRef.current) connect();
       }, delay);
     };
 
     ws.onerror = () => { /* onclose follows and handles it */ };
-  }, [code, startCapture, stopCapture, status]);
+  }, [code, startCapture, stopCapture]);
 
   useEffect(() => {
-    closedByUsRef.current = false;
+    aliveRef.current = true;
     connect();
     return () => {
-      closedByUsRef.current = true;
+      // Retire this generation. Sockets opened under it stop being listened
+      // to; a remount bumps nothing and simply opens a new one.
+      aliveRef.current = false;
+      genRef.current += 1;
       stopCapture();
-      wsRef.current?.close();
+      try { wsRef.current?.close(); } catch { /* already gone */ }
     };
     // `connect` is intentionally not a dependency: re-running this effect on
     // every status change would tear the socket down mid-session.
@@ -306,21 +336,27 @@ export default function CameraClient({ code }) {
 
   /* ── rendering ──────────────────────────────────────────────────────── */
 
+  // COLOUR AND MOTION ARE SEPARATE PROPERTIES.
+  //
+  // They were one `cls` string containing both, applied to the whole badge —
+  // so `animate-spin` rotated the label along with the icon and "Ready" span
+  // sideways down the corner. Only the icon should ever move.
   const tone = {
     streaming: { Icon: Radio, cls: 'text-emerald-400', label: 'Live' },
-    waiting: { Icon: Loader2, cls: 'text-amber-400 animate-spin', label: 'Ready' },
-    connecting: { Icon: Loader2, cls: 'text-ink-faint animate-spin', label: 'Connecting' },
+    waiting: { Icon: Loader2, cls: 'text-amber-400', label: 'Ready', spin: true },
+    connecting: { Icon: Loader2, cls: 'text-white/40', label: 'Connecting', spin: true },
     denied: { Icon: CameraOff, cls: 'text-red-400', label: 'Blocked' },
     error: { Icon: AlertTriangle, cls: 'text-red-400', label: 'Error' },
     expired: { Icon: AlertTriangle, cls: 'text-red-400', label: 'Expired' },
     replaced: { Icon: AlertTriangle, cls: 'text-amber-400', label: 'Replaced' },
-  }[status] || { Icon: Loader2, cls: 'text-ink-faint', label: '' };
+  }[status] || { Icon: Loader2, cls: 'text-white/40', label: '', spin: true };
 
   const StatusIcon = tone.Icon;
+  const spinClass = tone.spin ? 'animate-spin' : '';
 
   return (
     <div className="min-h-[100dvh] bg-[#0b0a0c] text-white flex flex-col">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+      <header className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-[#dc2626] rounded-md grid place-items-center">
             <div className="w-1.5 h-1.5 bg-white rounded-[2px]" />
@@ -331,8 +367,11 @@ export default function CameraClient({ code }) {
           {online
             ? <Wifi className="w-4 h-4 text-white/40" />
             : <WifiOff className="w-4 h-4 text-red-400" />}
-          <span className={`inline-flex items-center gap-1.5 text-[12px] font-bold ${tone.cls}`}>
-            <StatusIcon className="w-3.5 h-3.5" />
+          {/* nowrap and shrink-0: without them the flex row squeezes this to
+              its icon width and the word wraps one letter per line, which is
+              how "Ready" ended up printed vertically down the corner. */}
+          <span className={`inline-flex items-center gap-1.5 text-[12px] font-bold whitespace-nowrap shrink-0 ${tone.cls}`}>
+            <StatusIcon className={`w-3.5 h-3.5 ${spinClass}`} />
             {tone.label}
           </span>
         </div>
@@ -350,7 +389,7 @@ export default function CameraClient({ code }) {
 
         {status !== 'streaming' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center">
-            <StatusIcon className={`w-8 h-8 ${tone.cls}`} strokeWidth={1.8} />
+            <StatusIcon className={`w-8 h-8 ${tone.cls} ${spinClass}`} strokeWidth={1.8} />
             <p className="text-[15px] font-bold">{message}</p>
 
             {status === 'waiting' && (
@@ -368,10 +407,36 @@ export default function CameraClient({ code }) {
             )}
 
             {status === 'expired' && (
-              <p className="text-[13px] text-white/50 leading-relaxed max-w-xs">
-                Codes last five minutes. Generate a new one on the laptop and
-                scan it again.
-              </p>
+              <>
+                <p className="text-[13px] text-white/50 leading-relaxed max-w-xs">
+                  Codes last five minutes. Press{' '}
+                  <strong className="text-white/80">New code</strong> on the
+                  laptop, then scan again — or retry if you have just done that.
+                </p>
+                {/* A dead end is not an acceptable end state on a phone.
+                    Reloading is the whole recovery, and asking somebody to
+                    find the browser's refresh button while holding a propped-
+                    up phone is worse than putting it on screen. */}
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="mt-1 inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-[14px] font-bold active:bg-white/10 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Try again
+                </button>
+              </>
+            )}
+
+            {(status === 'error' || status === 'replaced') && (
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="mt-1 inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-[14px] font-bold active:bg-white/10 transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Try again
+              </button>
             )}
           </div>
         )}
