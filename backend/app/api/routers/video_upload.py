@@ -356,6 +356,95 @@ def list_sample_videos(org_id: str = Depends(require_analysis_run)):
     return {"sample_videos": files}
 
 
+@router.get("/snapshot")
+def camera_snapshot(
+    source: str = "webcam",
+    org_id: str = Depends(require_analysis_run),
+):
+    """
+    One still frame, as JPEG, for the zone editor to draw on.
+
+    WHY THIS EXISTS
+
+    Zones are polygons in frame coordinates, and the editor asked people to
+    click those polygons onto a black rectangle — there was no picture behind
+    the canvas. Drawing a desk outline you cannot see is not a workflow; it is
+    a guess, and a wrong guess silently mis-attributes everyone's desk time
+    from then on.
+
+    `source` is either "webcam" or the name of a file in sample_videos/. For a
+    video the frame is taken a little way in rather than at position zero:
+    the first frame of a recording is often a fade, an auto-exposure ramp, or
+    an empty room, and none of those help somebody locate a desk.
+
+    RETURNS THE FRAME AT PIPELINE RESOLUTION
+
+    Resized to the same 640-wide space the CV pipeline works in, because the
+    editor stores clicks in frame pixels. Handing back a 1080p still would make
+    every polygon four times too large the moment it was saved.
+    """
+    frame = None
+
+    if source == "webcam":
+        cap = cv2.VideoCapture(0)
+        try:
+            if cap.isOpened():
+                # Discard a few frames: most webcams hand back a black or
+                # badly exposed image for the first several reads while the
+                # sensor settles.
+                for _ in range(5):
+                    ok, f = cap.read()
+                    if ok:
+                        frame = f
+        finally:
+            cap.release()
+        if frame is None:
+            raise HTTPException(
+                status_code=503,
+                detail="No webcam available. Connect a camera, or upload a "
+                       "video and pick it as the snapshot source.",
+            )
+    else:
+        safe = os.path.basename(source)
+        path = os.path.join(SAMPLE_VIDEOS_DIR, safe)
+        if not os.path.exists(path):
+            raise HTTPException(status_code=404,
+                                detail=f"No video named {safe} was found.")
+        cap = cv2.VideoCapture(path)
+        try:
+            total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+            if total > 30:
+                # A tenth of the way in: past any fade-in, still early enough
+                # that the scene is the one the camera normally sees.
+                cap.set(cv2.CAP_PROP_POS_FRAMES, min(total // 10, total - 1))
+            ok, frame = cap.read()
+            if not ok:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ok, frame = cap.read()
+        finally:
+            cap.release()
+        if frame is None:
+            raise HTTPException(status_code=422,
+                                detail=f"Could not read a frame from {safe}.")
+
+    h, w = frame.shape[:2]
+    if w != 640:
+        frame = cv2.resize(frame, (640, int(h * 640 / w)))
+
+    ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 82])
+    if not ok:
+        raise HTTPException(status_code=500, detail="Could not encode the frame.")
+
+    from fastapi.responses import Response
+    return Response(
+        content=buf.tobytes(),
+        media_type="image/jpeg",
+        # Never cached: the point is to show the room as it is NOW, and a
+        # stale still would have somebody drawing around furniture that moved.
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @router.get("/status")
 def get_processing_status(org_id: str = Depends(require_analysis_run)):
     """

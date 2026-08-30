@@ -23,6 +23,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { backendFetch } from '../lib/backend';
 import {
   Shapes, Plus, Trash2, Check, X, Undo2, Loader2, AlertCircle, MousePointerClick, Eye,
+  RefreshCw,
 } from 'lucide-react';
 
 
@@ -129,6 +130,21 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
   const [zoneName, setZoneName] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // THE PICTURE BEHIND THE CANVAS.
+  //
+  // Without it this editor asked people to outline desks on a black
+  // rectangle. Drawing a polygon you cannot see is not a workflow — it is a
+  // guess, and a wrong guess silently mis-attributes somebody's desk time for
+  // as long as the zone exists.
+  //
+  // `snapshot` is an object URL for a JPEG from GET /video/snapshot. It is
+  // revoked on replacement so a long editing session does not leak blobs.
+  const [snapshot, setSnapshot] = useState(null);
+  const [snapSource, setSnapSource] = useState('webcam');
+  const [snapVideos, setSnapVideos] = useState([]);
+  const [snapState, setSnapState] = useState('idle');  // idle|loading|ready|error
+  const [snapError, setSnapError] = useState(null);
+
   /* ── data ──────────────────────────────────────────────────────────────── */
 
   const loadZones = useCallback(async () => {
@@ -151,6 +167,63 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
   }, [cameraId, onZonesChanged]);
 
   useEffect(() => { loadZones(); }, [loadZones]);
+
+  /* ── the camera frame behind the canvas ────────────────────────────────── */
+
+  /** Which videos could be used as a backdrop, if there is no webcam. */
+  const loadSnapSources = useCallback(async () => {
+    try {
+      const res = await backendFetch('/api/v1/video/samples');
+      if (!res.ok) return;
+      const data = await res.json();
+      setSnapVideos(Array.isArray(data?.sample_videos) ? data.sample_videos : []);
+    } catch {
+      // Not fatal: the webcam option still works, and the picker just has
+      // fewer entries.
+    }
+  }, []);
+
+  const grabSnapshot = useCallback(async (source) => {
+    setSnapState('loading');
+    setSnapError(null);
+    try {
+      const res = await backendFetch(
+        `/api/v1/video/snapshot?source=${encodeURIComponent(source)}`);
+      if (!res.ok) {
+        let detail = `Snapshot failed (${res.status})`;
+        try {
+          const body = await res.json();
+          if (body?.detail) detail = body.detail;
+        } catch { /* the body was not JSON; the status line will do */ }
+        throw new Error(detail);
+      }
+      const blob = await res.blob();
+      setSnapshot((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(blob);
+      });
+      setSnapState('ready');
+    } catch (err) {
+      setSnapState('error');
+      setSnapError(
+        /failed to fetch|networkerror|load failed/i.test(String(err?.message))
+          ? 'Cannot reach the backend. Start the FastAPI server first.'
+          : String(err?.message || err),
+      );
+    }
+  }, []);
+
+  // Try the webcam once on mount. Failing is fine and common — most people
+  // are drawing zones for an uploaded video, not a live camera — so the
+  // failure is reported inline rather than as an error state for the page.
+  useEffect(() => {
+    loadSnapSources();
+    grabSnapshot('webcam');
+    return () => setSnapshot((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, [loadSnapSources, grabSnapshot]);
 
   /* ── canvas ────────────────────────────────────────────────────────────── */
 
@@ -321,7 +394,56 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
         </div>
       )}
 
+      {/* WHERE THE PICTURE COMES FROM.
+          
+          A webcam if one is connected, otherwise any uploaded video. Offered
+          as a plain picker rather than guessed at, because "no webcam" is the
+          normal case when somebody is setting up zones for footage they have
+          already recorded — and silently showing black taught them nothing. */}
+      {!readOnly && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-mono uppercase tracking-[0.12em] text-ink-faint">
+            backdrop
+          </span>
+          <select
+            value={snapSource}
+            onChange={(e) => { setSnapSource(e.target.value); grabSnapshot(e.target.value); }}
+            className="rounded-lg bg-ground border border-line px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors"
+          >
+            <option value="webcam">Live webcam</option>
+            {snapVideos.map((v) => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => grabSnapshot(snapSource)}
+            disabled={snapState === 'loading'}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-alt hover:bg-surface border border-line hover:border-field text-ink-muted text-xs font-semibold transition-colors disabled:opacity-60"
+          >
+            {snapState === 'loading'
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <RefreshCw className="w-3.5 h-3.5" />}
+            Refresh
+          </button>
+          {snapState === 'error' && (
+            <span className="text-[11px] text-accent font-medium">{snapError}</span>
+          )}
+        </div>
+      )}
+
       <div className="relative w-full rounded-xl bg-ground border border-line overflow-hidden">
+        {/* The frame sits UNDER the canvas, at the same aspect ratio, so a
+            click at (x, y) on screen lands on the same pixel in both. */}
+        {snapshot && (
+          <img
+            src={snapshot}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
+            draggable={false}
+          />
+        )}
         <canvas
           ref={canvasRef}
           width={FRAME_W}
@@ -329,7 +451,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
           onClick={handleClick}
           onMouseMove={handleMove}
           onMouseLeave={() => setHoverPoint(null)}
-          className={`w-full h-auto block ${drawing ? 'cursor-crosshair' : 'cursor-default'}`}
+          className={`relative w-full h-auto block ${drawing ? 'cursor-crosshair' : 'cursor-default'}`}
         />
 
         {status === 'loading' && (
@@ -338,14 +460,38 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
           </div>
         )}
 
-        {status === 'ready' && zones.length === 0 && !drawing && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center pointer-events-none">
-            <MousePointerClick className="w-6 h-6 text-ink-faint" strokeWidth={1.8} />
-            <p className="text-xs text-ink-muted max-w-xs leading-relaxed">
-              No zones yet. Click <span className="text-ink font-semibold">Draw zone</span>,
-              then click points on the frame to outline an area. Occupancy and dwell
-              time are attributed to whichever zone a person stands in.
+        {/* Two different empty states, because they need two different
+            actions. "No picture" is a setup problem the person must fix
+            before drawing is even possible; "no zones" is an invitation to
+            start. Showing the second one over a black rectangle — which is
+            what this did — tells somebody to click points on a frame they
+            cannot see. */}
+        {status === 'ready' && !snapshot && snapState !== 'loading' && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
+            <AlertCircle className="w-6 h-6 text-ink-faint" strokeWidth={1.8} />
+            <p className="text-xs text-ink-muted max-w-sm leading-relaxed">
+              <span className="text-ink font-semibold">No camera image.</span>{' '}
+              Zones are drawn onto the actual view, so there is nothing to aim
+              at yet. Connect a webcam, or pick an uploaded video from the
+              <span className="text-ink font-semibold"> backdrop</span> menu
+              above.
             </p>
+          </div>
+        )}
+
+        {status === 'ready' && snapshot && zones.length === 0 && !drawing && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center pointer-events-none">
+            {/* Opaque, not translucent. Over a bright window or a patterned
+                curtain, 85% transparency left the text unreadable — and an
+                instruction you cannot read is the same as no instruction. */}
+            <div className="rounded-xl border border-line bg-surface px-4 py-3 shadow-lg max-w-[19rem]">
+              <MousePointerClick className="w-6 h-6 text-accent mx-auto mb-1.5" strokeWidth={1.8} />
+              <p className="text-[12px] text-ink-muted leading-relaxed">
+                <span className="text-ink font-bold">Click “Draw zone”</span>, then
+                click each corner of a desk. Click the first point again, or press
+                Finish, to close the shape.
+              </p>
+            </div>
           </div>
         )}
       </div>

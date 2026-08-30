@@ -43,6 +43,26 @@ export const VIEWS = [
 ];
 
 /**
+ * What every sidebar row looks like.
+ *
+ * This string was written out seven times — once in NavItem and once per
+ * routed link below. Seven hand-maintained copies of the same class list is
+ * how a sidebar ends up with two slightly different row heights, and it made
+ * tuning the vertical rhythm a seven-place edit.
+ *
+ * `py-[7px]` rather than `py-2`: at eleven rows, the 2px saved on each is 22px
+ * back in the list, which is the difference between the whole nav fitting on a
+ * 700px laptop screen and not. It is still a 34px target, comfortably above
+ * the 24px minimum for a pointer and unchanged for touch, where the mobile
+ * drawer has room to spare.
+ */
+const NAV_ROW = 'relative w-full flex items-center gap-3 rounded-lg px-3 py-[7px] '
+  + 'text-[13.5px] font-semibold transition-colors duration-150';
+
+const NAV_ROW_ACTIVE = 'bg-accent-soft text-accent';
+const NAV_ROW_IDLE = 'text-ink-muted hover:text-ink hover:bg-surface-alt';
+
+/**
  * One sidebar entry.
  *
  * Renders as a BUTTON on /dashboard, where the four sections are view state
@@ -55,10 +75,8 @@ export const VIEWS = [
  */
 function NavItem({ view, active, onSelect, asLink = false }) {
   const Icon = view.icon;
-  const className = `group relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-all duration-200 text-left ${
-    active
-      ? 'bg-accent-soft text-accent'
-      : 'text-ink-muted hover:text-ink hover:bg-surface-alt hover:translate-x-0.5'
+  const className = `group ${NAV_ROW} text-left ${
+    active ? NAV_ROW_ACTIVE : `${NAV_ROW_IDLE} hover:translate-x-0.5`
   }`;
   const marker = (
     <span
@@ -144,11 +162,26 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
         </Link>
       </div>
 
-      <nav className="flex-1 min-h-0 overflow-y-auto px-3 pt-4 space-y-1" aria-label="Dashboard sections">
+      {/* ONE SCROLL REGION FOR BOTH NAV GROUPS.
+          
+          `Workspace` and `Account` used to be siblings: the first had
+          `flex-1 overflow-y-auto`, the second did not shrink. So as Account
+          grew — Employees, Team, Accuracy, Camera layout, Members,
+          Organisation — it squeezed Workspace until only part of it fitted,
+          and a scrollbar appeared in the MIDDLE of the sidebar with plenty of
+          empty space below it. Measured: the nav was cut to 156px while
+          needing 238px, with a 251px Account block underneath.
+          
+          Wrapping both in one scroller means the whole list scrolls as one
+          thing, at the sidebar's own edge, and only when the list is genuinely
+          taller than the space. `overscroll-contain` stops a scroll that
+          reaches the end of the list from continuing into the page behind it. */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain nav-scroll pb-1">
+      <nav className="px-3 pt-3.5 space-y-0.5" aria-label="Dashboard sections">
         {/* Group label. Five unlabelled items and two more below the rule read
             as one long undifferentiated list; naming the groups is what makes
             "where am I" answerable at a glance. */}
-        <p className="px-3 pb-1.5 font-mono text-[9.5px] uppercase tracking-[0.16em] text-ink-faint">
+        <p className="px-3 pb-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-ink-faint">
           Workspace
         </p>
         {VIEWS.filter((v) => !v.capability || can(role, v.capability)).map((v) => (
@@ -173,8 +206,8 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
           MembersScreen. Hiding the link would hide information the database
           willingly returns. */}
       {can(role, 'members.view') && (
-      <div className="border-t border-line px-3 pt-3">
-        <p className="px-3 pb-1.5 font-mono text-[9.5px] uppercase tracking-[0.16em] text-ink-faint">
+      <div className="mt-3 pt-3 border-t border-line px-3 space-y-0.5">
+        <p className="px-3 pb-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-ink-faint">
           Account
         </p>
         {/* Employees. A routed page like Members, and shown on the same terms:
@@ -185,10 +218,8 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
           <Link
             href="/dashboard/employees"
             onClick={() => setOpen(false)}
-            className={`relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 ${
-              pathname === '/dashboard/employees'
-                ? 'bg-accent-soft text-accent'
-                : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
+            className={`${NAV_ROW} ${
+              pathname === '/dashboard/employees' ? NAV_ROW_ACTIVE : NAV_ROW_IDLE
             }`}
           >
             {pathname === '/dashboard/employees' && (
@@ -211,10 +242,8 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
           <Link
             href="/dashboard/team"
             onClick={() => setOpen(false)}
-            className={`relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 ${
-              pathname === '/dashboard/team'
-                ? 'bg-accent-soft text-accent'
-                : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
+            className={`${NAV_ROW} ${
+              pathname === '/dashboard/team' ? NAV_ROW_ACTIVE : NAV_ROW_IDLE
             }`}
           >
             {pathname === '/dashboard/team' && (
@@ -234,10 +263,8 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
         <Link
           href="/dashboard/evaluation"
           onClick={() => setOpen(false)}
-          className={`relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 ${
-            pathname === '/dashboard/evaluation'
-              ? 'bg-accent-soft text-accent'
-              : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
+          className={`${NAV_ROW} ${
+            pathname === '/dashboard/evaluation' ? NAV_ROW_ACTIVE : NAV_ROW_IDLE
           }`}
         >
           {pathname === '/dashboard/evaluation' && (
@@ -254,10 +281,8 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
           <Link
             href="/dashboard/cameras/topology"
             onClick={() => setOpen(false)}
-            className={`relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 ${
-              pathname === '/dashboard/cameras/topology'
-                ? 'bg-accent-soft text-accent'
-                : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
+            className={`${NAV_ROW} ${
+              pathname === '/dashboard/cameras/topology' ? NAV_ROW_ACTIVE : NAV_ROW_IDLE
             }`}
           >
             {pathname === '/dashboard/cameras/topology' && (
@@ -271,10 +296,8 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
         <Link
           href="/settings/members"
           onClick={() => setOpen(false)}
-          className={`relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 ${
-            pathname === '/settings/members'
-              ? 'bg-accent-soft text-accent'
-              : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
+          className={`${NAV_ROW} ${
+            pathname === '/settings/members' ? NAV_ROW_ACTIVE : NAV_ROW_IDLE
           }`}
         >
           {pathname === '/settings/members' && (
@@ -293,10 +316,8 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
           <Link
             href="/settings/organisation"
             onClick={() => setOpen(false)}
-            className={`relative w-full flex items-center gap-3 rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-150 ${
-              pathname === '/settings/organisation'
-                ? 'bg-accent-soft text-accent'
-                : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
+            className={`${NAV_ROW} ${
+              pathname === '/settings/organisation' ? NAV_ROW_ACTIVE : NAV_ROW_IDLE
             }`}
           >
             {pathname === '/settings/organisation' && (
@@ -312,17 +333,29 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
       {/* The privacy boundary, stated in the chrome rather than buried in a doc,
           so it is on screen whenever the product is being demonstrated.
 
-          It sits BELOW both nav groups. It used to sit between them, which cut
-          the sidebar in half and made "Account" read as a separate, unrelated
-          menu rather than the second half of one list. */}
-      <div className="mx-3 mt-3 mb-3 rounded-lg border border-line bg-surface-alt px-3 py-2.5">
-        <p className="text-[11px] leading-relaxed text-ink-faint">
-          <span className="font-bold text-ink-muted">No footage stored.</span>{' '}
-          Frames are discarded after inference; only counts and postures are kept.
-        </p>
-      </div>
+          INSIDE the scroll region, at the end of the list, and no longer a
+          boxed panel. As a bordered card it was 75px and read as a third nav
+          group — a thing to click — competing with the items above it. As
+          quiet text under a rule it is 40px, reads as a footnote, and gives
+          the list back the room it needed: measured, the sidebar overflowed
+          by 71px and this is most of it.
 
-      <div className="border-t border-line px-3 py-3 space-y-2">
+          The full sentence lives in `title`, and the visible text is short
+          enough to survive the clip. On a short screen the previous wording
+          was cut mid-phrase at the fold — "Frames are discarded" with the rest
+          below the edge — which reads as a rendering fault rather than as
+          something you can scroll to. A promise about privacy is the last
+          thing that should look broken. */}
+      <p
+        title="No footage is stored. Frames are discarded after inference; only counts and postures are kept."
+        className="mx-3 mt-3 mb-1 pt-2.5 border-t border-line text-[10.5px] leading-snug text-ink-faint"
+      >
+        <span className="font-semibold text-ink-muted">No footage stored.</span>{' '}
+        Only counts and postures are kept.
+      </p>
+      </div>{/* end of the single scroll region */}
+
+      <div className="shrink-0 border-t border-line px-3 py-3 space-y-2">
         <div className="flex items-center gap-2.5 px-1">
           <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center font-bold text-[11px] shrink-0">
             {initials}
