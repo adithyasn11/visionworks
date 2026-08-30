@@ -27,6 +27,47 @@ apply_lightweight_migrations()
 logger = logging.getLogger(__name__)
 
 
+def _silence_proactor_disconnects() -> None:
+    """
+    Stop Windows' asyncio loop shouting about clients that hung up.
+
+    On the Proactor loop, a peer closing a TLS connection abruptly — which is
+    every browser tab you close, every phone that sleeps, every reload — makes
+    `_ProactorBasePipeTransport._call_connection_lost` call `sock.shutdown()`
+    on a socket the peer already tore down. That raises ConnectionResetError
+    (WinError 10054) inside a bare callback, so asyncio prints a full traceback
+    with no request context attached.
+
+    It is entirely cosmetic: the response has already been delivered and no
+    handler is involved. But it prints several times a minute and buries the
+    logs that matter — the reason the pairing and pipeline lines were hard to
+    find at all.
+
+    Only that exact case is dropped. A ConnectionResetError raised anywhere
+    else still reaches the default handler, because a connection dying inside
+    a handler is a real event worth seeing.
+    """
+    if sys.platform != "win32":
+        return
+
+    loop = asyncio.get_running_loop()
+    default = loop.get_exception_handler()
+
+    def handler(loop_, context):
+        exc = context.get("exception")
+        if isinstance(exc, ConnectionResetError) and getattr(exc, "winerror", None) == 10054:
+            cb = repr(context.get("handle") or "")
+            if "_call_connection_lost" in cb:
+                logger.debug("client disconnected abruptly (WinError 10054)")
+                return
+        if default is not None:
+            default(loop_, context)
+        else:
+            loop_.default_exception_handler(context)
+
+    loop.set_exception_handler(handler)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -42,6 +83,9 @@ async def lifespan(app: FastAPI):
     """
     from app.db.minute_aggregator import ensure_bucket_table, run_aggregator_loop
     from app.db.identity_writer import ensure_identity_table
+
+    # Needs the running loop, so it belongs here rather than at import time.
+    _silence_proactor_disconnects()
 
     ensure_bucket_table()
     # The per-person mirror of migration 020. Created here rather than by

@@ -600,6 +600,9 @@ def sync_to_postgres_sync(limit: int = 500) -> dict:
 
         cache: dict = {}
         payload, synced_ids, unmapped, skipped_ids = [], [], 0, []
+        # Which camera/zone pairs failed, so the warning can name them. A count
+        # alone tells you something is wrong and nothing about what to fix.
+        unmapped_pairs: dict = {}
 
         for row in rows:
             # TRANSIT_ZONE is the synthetic bucket for "inside the frame but not
@@ -616,6 +619,8 @@ def sync_to_postgres_sync(limit: int = 500) -> dict:
             resolved = _resolve_ids(row["org_id"], row["camera_id"], row["zone_id"], cache)
             if resolved is None:
                 unmapped += 1
+                key = f"{row['camera_id']}/{row['zone_id']}"
+                unmapped_pairs[key] = unmapped_pairs.get(key, 0) + 1
                 continue
             camera_uuid, zone_uuid = resolved
             payload.append({
@@ -653,7 +658,9 @@ def sync_to_postgres_sync(limit: int = 500) -> dict:
             if skipped_ids:
                 retire_skipped(datetime.now(timezone.utc).isoformat())
                 session.commit()
-            return {"synced": 0, "unmapped": unmapped, "skipped_transit": len(skipped_ids)}
+            return {"synced": 0, "unmapped": unmapped,
+                    "unmapped_pairs": unmapped_pairs,
+                    "skipped_transit": len(skipped_ids)}
 
         request = urllib.request.Request(
             f"{base}/rest/v1/zone_minute_stats?on_conflict=zoneId,bucketStart",
@@ -681,6 +688,7 @@ def sync_to_postgres_sync(limit: int = 500) -> dict:
         return {
             "synced": len(synced_ids),
             "unmapped": unmapped,
+            "unmapped_pairs": unmapped_pairs,
             "skipped_transit": len(skipped_ids),
         }
 
@@ -788,11 +796,16 @@ async def run_aggregator_loop(stop_event: asyncio.Event | None = None) -> None:
                 # will never resolve on its own, which is worth a louder
                 # signal than the per-row warning inside _resolve_ids.
                 if pushed.get("unmapped", 0) >= UNMAPPED_ALERT_THRESHOLD:
+                    pairs = pushed.get("unmapped_pairs") or {}
+                    named = ", ".join(
+                        f"{k} x{v}" for k, v in
+                        sorted(pairs.items(), key=lambda kv: -kv[1])[:6]
+                    ) or "unknown"
                     logger.error(
-                        f"{pushed['unmapped']} minute buckets could not be mapped "
-                        f"to a registered camera/zone and will stay unsynced until "
-                        f"one is registered with a matching name — see "
-                        f"minute_aggregator._resolve_ids."
+                        f"{pushed['unmapped']} minute buckets could not be mapped to a "
+                        f"registered camera/zone: {named}. They stay in SQLite until a "
+                        f"camera and zone with those exact names exist in Postgres — "
+                        f"draw the zone again, or delete the rows if the camera is gone."
                     )
 
             # Rules are evaluated on every tick, not only when buckets were
