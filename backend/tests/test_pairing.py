@@ -27,8 +27,33 @@ except ImportError:
 import urllib.request
 import urllib.error
 
-BASE = "http://localhost:8001"
-WS = "ws://localhost:8001"
+def _discover_backend():
+    """
+    Find the backend, over http or https, rather than assuming one.
+
+    The launcher serves TLS with --https and plain http without, and this test
+    has no way to know which was used. Assuming http made it die with a raw
+    RemoteDisconnected traceback the moment somebody ran it against the phone-
+    camera setup — a crash that says nothing about pairing.
+    """
+    import ssl as _ssl
+    ctx = _ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = _ssl.CERT_NONE
+    for scheme in ("http", "https"):
+        try:
+            req = urllib.request.Request(f"{scheme}://localhost:8001/openapi.json")
+            kw = {"context": ctx} if scheme == "https" else {}
+            with urllib.request.urlopen(req, timeout=5, **kw):
+                return scheme, (ctx if scheme == "https" else None)
+        except Exception:
+            continue
+    return None, None
+
+
+SCHEME, SSL_CTX = _discover_backend()
+BASE = f"{SCHEME}://localhost:8001" if SCHEME else None
+WS = f"{'wss' if SCHEME == 'https' else 'ws'}://localhost:8001" if SCHEME else None
 FAILS = []
 
 
@@ -150,13 +175,23 @@ async def main():
     print("=" * 68)
     print()
 
+    if BASE is None:
+        print("  The backend is not running on port 8001, over http or https.")
+        print("  Start it first:  python run_system.py")
+        print()
+        print("=" * 68)
+        return 0
+
+    print(f"  backend found at {BASE}")
+    print()
+
     token = service_token()
 
     print("1. THE SESSION ENDPOINT IS GUARDED")
     print("-" * 68)
     req = urllib.request.Request(f"{BASE}/api/v1/pair/session", method="POST")
     try:
-        urllib.request.urlopen(req, timeout=15)
+        urllib.request.urlopen(req, timeout=15, context=SSL_CTX)
         check("an unauthenticated caller cannot mint a code", False, "it succeeded")
     except urllib.error.HTTPError as e:
         check("an unauthenticated caller cannot mint a code",
@@ -177,7 +212,7 @@ async def main():
     req = urllib.request.Request(
         f"{BASE}/api/v1/pair/session", method="POST",
         headers={"Authorization": f"Bearer {token}"})
-    with urllib.request.urlopen(req, timeout=15) as r:
+    with urllib.request.urlopen(req, timeout=15, context=SSL_CTX) as r:
         body = json.loads(r.read().decode())
     code = body.get("code")
     print(f"   code {code}, expires in {body.get('expires_in')}s")
@@ -192,14 +227,15 @@ async def main():
     cam_url = f"{WS}/api/v1/pair/ws/{code}?role=camera"
 
     async with websockets.connect(
-            host_url, additional_headers={"Authorization": f"Bearer {token}"}) as host:
+            host_url, additional_headers={"Authorization": f"Bearer {token}"},
+            ssl=SSL_CTX) as host:
         hello = json.loads(await asyncio.wait_for(host.recv(), 5))
         check("the laptop joins", hello.get("type") == "joined"
               and hello.get("role") == "host", str(hello))
         check("...and is told no phone is present yet",
               hello.get("peer_present") is False, str(hello))
 
-        async with websockets.connect(cam_url) as phone:
+        async with websockets.connect(cam_url, ssl=SSL_CTX) as phone:
             phone_hello = json.loads(await asyncio.wait_for(phone.recv(), 5))
             check("the phone joins with no token at all",
                   phone_hello.get("type") == "joined", str(phone_hello))
@@ -230,7 +266,7 @@ async def main():
             print()
             print("5. A SECOND PHONE REPLACES THE FIRST")
             print("-" * 68)
-            async with websockets.connect(cam_url) as phone2:
+            async with websockets.connect(cam_url, ssl=SSL_CTX) as phone2:
                 await asyncio.wait_for(phone2.recv(), 5)   # its own 'joined'
                 evicted = json.loads(await asyncio.wait_for(phone.recv(), 5))
                 check("the first phone is told it was replaced",
@@ -256,7 +292,8 @@ async def main():
     print("7. A DEAD CODE IS REFUSED")
     print("-" * 68)
     try:
-        async with websockets.connect(f"{WS}/api/v1/pair/ws/ZZZZZZZZ?role=camera") as dead:
+        async with websockets.connect(
+                f"{WS}/api/v1/pair/ws/ZZZZZZZZ?role=camera", ssl=SSL_CTX) as dead:
             msg = json.loads(await asyncio.wait_for(dead.recv(), 5))
             check("an unknown code is rejected with a reason",
                   msg.get("type") == "error" and msg.get("reason") == "expired",

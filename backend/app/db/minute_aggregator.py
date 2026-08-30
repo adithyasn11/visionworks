@@ -473,6 +473,7 @@ def _resolve_ids(org_id: str, camera_name: str, zone_name: str, cache: dict):
     bucket at all.
     """
     import json
+    import urllib.error
     import urllib.parse
     import urllib.request
 
@@ -509,8 +510,25 @@ def _resolve_ids(org_id: str, camera_name: str, zone_name: str, cache: dict):
             with urllib.request.urlopen(request, timeout=10) as response:
                 data = json.loads(response.read().decode("utf-8") or "[]")
             resolved = data[0]["id"] if data else None
+        except urllib.error.HTTPError as e:
+            # The status and PostgREST's own message, not just "HTTPError".
+            #
+            # This used to log only the exception class, which is the one
+            # detail that never helps: 404 (no such row), 400 (a column that
+            # does not exist), and 401 (a bad key) are three different
+            # problems with three different fixes, and all three printed
+            # identically. Diagnosing it meant reproducing the request by hand.
+            detail = ""
+            try:
+                detail = e.read().decode("utf-8")[:200]
+            except Exception:
+                pass
+            logger.warning(
+                f"Lookup failed for {table}.{name}: HTTP {e.code} {detail}")
+            resolved = None
         except Exception as e:
-            logger.warning(f"Lookup failed for {table}.{name}: {type(e).__name__}")
+            logger.warning(
+                f"Lookup failed for {table}.{name}: {type(e).__name__}: {e}")
             resolved = None
         cache[cache_key] = resolved
         return resolved
@@ -553,6 +571,25 @@ def sync_to_postgres_sync(limit: int = 500) -> dict:
             text("""
                 SELECT * FROM zone_minute_stats
                 WHERE synced_at IS NULL AND org_id IS NOT NULL
+                  -- Only rows whose org_id could BE a Postgres uuid.
+                  --
+                  -- Early development wrote telemetry under names like
+                  -- "test-org". Postgres rejects those with 22P02 (invalid
+                  -- input syntax for type uuid) on every attempt, and since a
+                  -- failed row is never marked synced, the aggregator retried
+                  -- all of them on every pass — 35 warnings a minute, for rows
+                  -- that can never succeed. They drowned out real problems.
+                  --
+                  -- 36 characters with hyphens in the four canonical places.
+                  -- A cheap shape test, not validation: a malformed uuid that
+                  -- passes this still fails at Postgres, which is correct —
+                  -- what matters is that an obviously impossible one is not
+                  -- retried forever.
+                  AND length(org_id) = 36
+                  AND substr(org_id, 9, 1) = '-'
+                  AND substr(org_id, 14, 1) = '-'
+                  AND substr(org_id, 19, 1) = '-'
+                  AND substr(org_id, 24, 1) = '-'
                 ORDER BY bucket_start ASC
                 LIMIT :limit
             """),
