@@ -89,3 +89,7 @@ backend/eval/results/frames_*.pkl
 backend/eval/results/thumbnails/
 backend/eval/results/truth_*.json
 backend/eval/results/tracks_*.json
+
+# Local HTTPS development certificate. Machine-specific and regenerable
+# (scripts/make_dev_cert.py); the private key must never be committed.
+certs/

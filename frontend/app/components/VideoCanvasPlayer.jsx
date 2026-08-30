@@ -12,6 +12,7 @@ import {
 // carries the Supabase access token so the telemetry it produces is attributed
 // to the caller's organisation — see app/lib/backend.js.
 import { publishFrame, clearFrame } from '../lib/liveFrame';
+import PhoneCameraPanel from './PhoneCameraPanel';
 import { backendFetch, backendSocketUrl } from '../lib/backend';
 
 /* Detection-box colours, kept inside the red/black/white palette. The three
@@ -708,6 +709,17 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           )}
         </div>
       </div>
+
+      {/* Phone as a camera.
+          
+          A laptop webcam points at your face from 40cm; a CCTV camera looks
+          down at a room from a corner. A phone propped on a shelf is the only
+          way to produce the second view without buying hardware, and the seat
+          binding, the chair-exit debounce and the handoff logic were all
+          designed for that geometry. */}
+      {!readOnly && (
+        <PhoneCameraPanel cameraId={cameraId} disabled={isWebcamActive} />
+      )}
 
       {/* Status Bar */}
       {(fileName || statusMsg || isWebcamActive) && (
