@@ -479,11 +479,25 @@ def _resolve_ids(org_id: str, camera_name: str, zone_name: str, cache: dict):
     base = (os.getenv("SUPABASE_URL") or "").rstrip("/")
     key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
-    def lookup(table: str, name: str, extra: dict):
-        cache_key = (table, org_id, name)
+    def lookup(table: str, name: str, extra: dict, match_field: str = "name"):
+        """
+        `match_field` is "name" for cameras and "slug" for zones.
+
+        Zones used to be matched on `name`, which forced the Postgres row to
+        store the pipeline's slug ("zone_mtfirbfy") in the column the employee
+        desk dropdown reads — so the dropdown listed machine codes and nobody
+        could tell which desk was which. Migration 023 split the two: `slug`
+        is the stable key this lookup uses, `name` is what a person reads and
+        is free to change.
+
+        Cameras still match on `name`, because a camera's name IS its
+        pipeline identifier — there is no second column and no ambiguity.
+        """
+        cache_key = (table, org_id, match_field, name)
         if cache_key in cache:
             return cache[cache_key]
-        params = {"select": "id", "orgId": f"eq.{org_id}", "name": f"eq.{name}", "limit": "1"}
+        params = {"select": "id", "orgId": f"eq.{org_id}",
+                  match_field: f"eq.{name}", "limit": "1"}
         params.update(extra)
         url = f"{base}/rest/v1/{table}?{urllib.parse.urlencode(params)}"
         request = urllib.request.Request(url, headers={
@@ -504,7 +518,9 @@ def _resolve_ids(org_id: str, camera_name: str, zone_name: str, cache: dict):
     camera_uuid = lookup("cameras", camera_name, {})
     if not camera_uuid:
         return None
-    zone_uuid = lookup("zones", zone_name, {"cameraId": f"eq.{camera_uuid}"})
+    # Zones match on `slug`, not `name` — see the note in lookup().
+    zone_uuid = lookup("zones", zone_name, {"cameraId": f"eq.{camera_uuid}"},
+                       match_field="slug")
     if not zone_uuid:
         return None
     return camera_uuid, zone_uuid

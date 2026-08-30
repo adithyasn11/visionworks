@@ -21,9 +21,10 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { backendFetch } from '../lib/backend';
+import { subscribeToFrames, getLatestFrame } from '../lib/liveFrame';
 import {
   Shapes, Plus, Trash2, Check, X, Undo2, Loader2, AlertCircle, MousePointerClick, Eye,
-  RefreshCw,
+  RefreshCw, Pencil,
 } from 'lucide-react';
 
 
@@ -32,6 +33,25 @@ const FRAME_W = 640;
 const FRAME_H = 360;
 
 const MIN_POINTS = 3;
+
+/**
+ * What a zone can BE, and what each kind actually drives.
+ *
+ * These are not labels. WORKSTATION is what the employee desk dropdown filters
+ * on, so a desk drawn as anything else can never be assigned to anybody;
+ * BREAK is what the day aggregator counts as break time rather than absence.
+ * Choosing wrong produces no error — the zone simply never appears where it
+ * is expected — so the choice is offered explicitly with its consequence
+ * written next to it.
+ *
+ * Must stay in step with VALID_ZONE_TYPES in backend/app/api/routers/zones.py.
+ */
+const ZONE_TYPES = [
+  { value: 'WORKSTATION', label: 'Desk', hint: 'A seat that can be assigned to an employee' },
+  { value: 'BREAK',       label: 'Break', hint: 'Kitchen or lounge — counted as break time' },
+  { value: 'MEETING',     label: 'Meeting', hint: 'Working, but away from their desk' },
+  { value: 'TRANSIT',     label: 'Transit', hint: 'A corridor — passed through, not occupied' },
+];
 
 /* Zone outlines, cycled so adjacent areas stay distinguishable while staying
    inside the red/black/white palette. Separation comes from lightness along one
@@ -145,6 +165,17 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
   const [snapState, setSnapState] = useState('idle');  // idle|loading|ready|error
   const [snapError, setSnapError] = useState(null);
 
+  // Inline rename / retype of an existing zone.
+  const [editingZone, setEditingZone] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editType, setEditType] = useState('WORKSTATION');
+
+  // The kind of the zone currently being drawn. Defaults to Desk because that
+  // is what most zones are, but it is CHOSEN rather than assumed — every zone
+  // used to be created as WORKSTATION with no way to say otherwise, so a
+  // break room was counted as somebody's desk.
+  const [newType, setNewType] = useState('WORKSTATION');
+
   /* ── data ──────────────────────────────────────────────────────────────── */
 
   const loadZones = useCallback(async () => {
@@ -213,6 +244,35 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
     }
   }, []);
 
+  // FOLLOW THE LIVE SESSION.
+  //
+  // When the player on the Live feed page is running, its frames appear here
+  // as the backdrop — press "Turn On Camera" there, come to Zones, and you
+  // are drawing over what the camera is seeing right now rather than over a
+  // still taken at some earlier moment.
+  //
+  // The subscription supersedes the snapshot while it is producing frames and
+  // steps aside when it stops, so a paused session falls back to the picker
+  // rather than freezing on its last frame.
+  const [liveFrame, setLiveFrame] = useState(null);
+
+  useEffect(() => {
+    setLiveFrame(getLatestFrame());
+    return subscribeToFrames(setLiveFrame);
+  }, []);
+
+  // Is a session running RIGHT NOW? Checked on a timer as well as through the
+  // subscription, because `clearFrame()` fires during startup — the player
+  // stops any previous stream before opening a new one — and a single null
+  // must not be read as "the session ended".
+  const [liveActive, setLiveActive] = useState(false);
+  useEffect(() => {
+    const tick = () => setLiveActive(Boolean(getLatestFrame()));
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
+  }, []);
+
   // Try the webcam once on mount. Failing is fine and common — most people
   // are drawing zones for an uploaded video, not a live camera — so the
   // failure is reported inline rather than as an error state for the page.
@@ -231,7 +291,11 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
   // URL per editor instance, released when the tab closes.
   useEffect(() => {
     loadSnapSources();
-    grabSnapshot('webcam');
+    // Only grab a still if nothing is already streaming. When the live feed
+    // owns the webcam, asking the backend to open it too fails with a 503 —
+    // and would be pointless anyway, since the live frames are a better
+    // backdrop than a still.
+    if (!getLatestFrame()) grabSnapshot('webcam');
   }, [loadSnapSources, grabSnapshot]);
 
   /* ── canvas ────────────────────────────────────────────────────────────── */
@@ -303,7 +367,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
           zone_id: zoneId,
           camera_id: cameraId,
           zone_name: name,
-          zone_type: 'WORKSTATION',
+          zone_type: newType,
           polygon_coordinates: draft,
         }),
       });
@@ -320,6 +384,36 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
     }
   };
 
+  /**
+   * Rename a zone, or change what kind of space it is.
+   *
+   * A PATCH rather than delete-and-redraw. Redrawing produces a NEW zone with
+   * a new id, which orphans any employee already assigned to it — so
+   * correcting a typo would silently cost somebody their desk assignment and
+   * the seat prior that depends on it.
+   */
+  const saveZoneEdit = async (zoneId) => {
+    const name = editName.trim();
+    if (!name) { setError('A zone name is required.'); return; }
+    try {
+      const res = await backendFetch(`/api/v1/zones/${zoneId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zone_name: name, zone_type: editType }),
+      });
+      if (!res.ok) {
+        let detail = `Could not save (${res.status})`;
+        try { const b = await res.json(); if (b?.detail) detail = b.detail; } catch {}
+        throw new Error(detail);
+      }
+      setEditingZone(null);
+      setError(null);
+      await loadZones();
+    } catch (err) {
+      setError(String(err?.message || err));
+    }
+  };
+
   const deleteZone = async (zoneId) => {
     setError(null);
     try {
@@ -332,6 +426,12 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
   };
 
   const canSave = draft.length >= MIN_POINTS && !saving;
+
+  // The live session wins when it is running: a moving picture of the room
+  // right now beats a still of it a minute ago, and it is what somebody
+  // pressing "Turn On Camera" expects to see here.
+  const backdrop = liveFrame || snapshot;
+  const backdropIsLive = Boolean(liveFrame) || liveActive;
 
   return (
     <div className="glass-panel p-5 flex flex-col gap-4">
@@ -396,6 +496,16 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
             placeholder={`Zone ${zones.length + 1}`}
             className="flex-1 min-w-[140px] rounded-lg bg-ground border border-line px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:outline-none focus:border-[color:var(--accent)] transition-colors"
           />
+          <select
+            value={newType}
+            onChange={(e) => setNewType(e.target.value)}
+            title={ZONE_TYPES.find((t) => t.value === newType)?.hint}
+            className="rounded-lg bg-ground border border-line px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors"
+          >
+            {ZONE_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
           <span className="text-[11px] text-ink-muted font-mono whitespace-nowrap">
             {draft.length} pt{draft.length === 1 ? '' : 's'}
             {draft.length < MIN_POINTS && ` · need ${MIN_POINTS}`}
@@ -416,8 +526,9 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
           </span>
           <select
             value={snapSource}
+            disabled={backdropIsLive}
             onChange={(e) => { setSnapSource(e.target.value); grabSnapshot(e.target.value); }}
-            className="rounded-lg bg-ground border border-line px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors"
+            className="rounded-lg bg-ground border border-line px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="webcam">Live webcam</option>
             {snapVideos.map((v) => (
@@ -444,9 +555,9 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
       <div className="relative w-full rounded-xl bg-ground border border-line overflow-hidden">
         {/* The frame sits UNDER the canvas, at the same aspect ratio, so a
             click at (x, y) on screen lands on the same pixel in both. */}
-        {snapshot && (
+        {backdrop && (
           <img
-            src={snapshot}
+            src={backdrop}
             alt=""
             aria-hidden="true"
             className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
@@ -475,7 +586,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
             start. Showing the second one over a black rectangle — which is
             what this did — tells somebody to click points on a frame they
             cannot see. */}
-        {status === 'ready' && !snapshot && snapState !== 'loading' && (
+        {status === 'ready' && !backdrop && snapState !== 'loading' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
             <AlertCircle className="w-6 h-6 text-ink-faint" strokeWidth={1.8} />
             <p className="text-xs text-ink-muted max-w-sm leading-relaxed">
@@ -488,7 +599,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
           </div>
         )}
 
-        {status === 'ready' && snapshot && zones.length === 0 && !drawing && (
+        {status === 'ready' && backdrop && zones.length === 0 && !drawing && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center pointer-events-none">
             {/* Opaque, not translucent. Over a bright window or a patterned
                 curtain, 85% transparency left the text unreadable — and an
@@ -514,7 +625,9 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
 
       {zones.length > 0 && (
         <ul className="flex flex-col gap-1.5">
-          {zones.map((zone, index) => (
+          {zones.map((zone, index) => {
+            const isEditing = editingZone === zone.zone_id;
+            return (
             <li
               key={zone.zone_id}
               className="flex items-center gap-2.5 rounded-lg bg-surface-alt border border-line px-3 py-2"
@@ -523,24 +636,96 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
                 className="w-2.5 h-2.5 rounded-full shrink-0"
                 style={{ backgroundColor: colorFor(index) }}
               />
-              <span className="text-xs font-semibold text-ink truncate flex-1">
-                {zone.zone_name}
-              </span>
-              <span className="font-mono text-[10px] text-ink-faint whitespace-nowrap">
-                {zone.polygon_coordinates?.length ?? 0} pts
-              </span>
-              {!readOnly && (
-                <button
-                  type="button"
-                  onClick={() => deleteZone(zone.zone_id)}
-                  aria-label={`Delete ${zone.zone_name}`}
-                  className="p-1 rounded text-ink-faint hover:text-accent transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+
+              {isEditing ? (
+                /* Inline, not a modal. Renaming a zone is a two-second
+                   correction and should not take over the screen. */
+                <>
+                  <input
+                    autoFocus
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveZoneEdit(zone.zone_id);
+                      if (e.key === 'Escape') setEditingZone(null);
+                    }}
+                    maxLength={80}
+                    className="flex-1 min-w-0 rounded bg-ground border border-field px-2 py-1 text-xs text-ink focus:outline-none focus:border-[color:var(--accent)]"
+                  />
+                  <select
+                    value={editType}
+                    onChange={(e) => setEditType(e.target.value)}
+                    className="rounded bg-ground border border-field px-1.5 py-1 text-[11px] text-ink focus:outline-none focus:border-[color:var(--accent)]"
+                  >
+                    {ZONE_TYPES.map((t) => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => saveZoneEdit(zone.zone_id)}
+                    aria-label="Save"
+                    className="p-1 rounded text-accent hover:brightness-125 transition-[filter]"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingZone(null)}
+                    aria-label="Cancel"
+                    className="p-1 rounded text-ink-faint hover:text-ink transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs font-semibold text-ink truncate flex-1">
+                    {zone.zone_name}
+                  </span>
+                  {/* The kind is shown, not hidden in an edit form. A zone
+                      drawn as the wrong type is invisible to the desk
+                      dropdown and to break counting, with nothing on screen
+                      explaining why. */}
+                  <span className={`font-mono text-[9.5px] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded whitespace-nowrap ${
+                    (zone.zone_type || 'WORKSTATION') === 'WORKSTATION'
+                      ? 'bg-accent-soft text-accent'
+                      : 'bg-ground text-ink-faint'
+                  }`}>
+                    {(zone.zone_type || 'WORKSTATION').slice(0, 4)}
+                  </span>
+                  <span className="font-mono text-[10px] text-ink-faint whitespace-nowrap">
+                    {zone.polygon_coordinates?.length ?? 0} pts
+                  </span>
+                  {!readOnly && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingZone(zone.zone_id);
+                          setEditName(zone.zone_name || '');
+                          setEditType(zone.zone_type || 'WORKSTATION');
+                        }}
+                        aria-label={`Rename ${zone.zone_name}`}
+                        className="p-1 rounded text-ink-faint hover:text-ink transition-colors"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteZone(zone.zone_id)}
+                        aria-label={`Delete ${zone.zone_name}`}
+                        className="p-1 rounded text-ink-faint hover:text-accent transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+                </>
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

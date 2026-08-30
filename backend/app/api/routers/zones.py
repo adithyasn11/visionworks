@@ -5,6 +5,7 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel
 from app.db.database import get_db
 from app.db.models import ZoneModel
 from app.db.schemas import ZoneCreate, ZoneResponse
@@ -15,7 +16,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _mirror_zone_to_postgres(org_id: str, camera_name: str, zone_id: str, polygon: list) -> None:
+# The kinds of space a zone can be, and what each one drives.
+#
+#   WORKSTATION — a desk. The employee desk dropdown lists only these, and the
+#                 seat prior binds an identity to whoever is assigned one.
+#   BREAK       — kitchen, lounge. `employee_aggregator` counts time here as
+#                 break time rather than absence.
+#   MEETING     — a room where somebody is working but not at their desk.
+#   TRANSIT     — corridors. Passed through, never dwelt in.
+#
+# Kept here rather than in the schema so the PATCH endpoint and the create
+# path validate against one list.
+VALID_ZONE_TYPES = {"WORKSTATION", "BREAK", "MEETING", "TRANSIT"}
+
+
+def _mirror_zone_to_postgres(org_id: str, camera_name: str, zone_id: str,
+                             polygon: list, zone_name: str = None) -> None:
     """
     Ensures a Postgres `zones` row exists NAMED `zone_id`, under the Postgres
     camera of name `camera_name`, in this org.
@@ -60,6 +76,10 @@ def _mirror_zone_to_postgres(org_id: str, camera_name: str, zone_id: str, polygo
         with urllib.request.urlopen(request, timeout=10) as response:
             return json.loads(response.read().decode("utf-8") or "[]")
 
+    # Callers that predate the rename support pass no label; the slug is the
+    # honest fallback, and the next edit through the editor corrects it.
+    zone_name = zone_name or zone_id
+
     try:
         cameras = get("cameras", {"select": "id", "orgId": f"eq.{org_id}", "name": f"eq.{camera_name}", "limit": "1"})
         if not cameras:
@@ -69,8 +89,42 @@ def _mirror_zone_to_postgres(org_id: str, camera_name: str, zone_id: str, polygo
             return
         camera_id = cameras[0]["id"]
 
-        existing = get("zones", {"select": "id", "cameraId": f"eq.{camera_id}", "name": f"eq.{zone_id}", "limit": "1"})
+        # Matched on the SLUG, which is the stable identifier, but the row
+        # stores the human name — see below.
+        existing = get("zones", {"select": "id,name", "cameraId": f"eq.{camera_id}",
+                                 "slug": f"eq.{zone_id}", "limit": "1"})
+        if not existing:
+            # Older rows were mirrored before `slug` existed and were matched
+            # by putting the slug in `name`. Find those too, so a rename
+            # updates them instead of creating a duplicate.
+            existing = get("zones", {"select": "id,name", "cameraId": f"eq.{camera_id}",
+                                     "name": f"eq.{zone_id}", "limit": "1"})
+
         if existing:
+            # Already mirrored. Update the name and polygon rather than
+            # returning early: a zone that is renamed or reshaped in the
+            # editor must not keep its old name in the desk dropdown.
+            if existing[0].get("name") == zone_name:
+                return
+            patch = json.dumps({
+                "name": zone_name,
+                # Legacy rows were matched by name-as-slug; stamp the real
+                # slug so the next lookup uses the fast, correct path.
+                "slug": zone_id,
+                "polygon": polygon,
+                "updatedAt": datetime.now(timezone.utc).isoformat(),
+            }).encode("utf-8")
+            request = urllib.request.Request(
+                f"{base}/rest/v1/zones?id=eq.{existing[0]['id']}",
+                data=patch,
+                headers={**headers, "Content-Type": "application/json",
+                         "Prefer": "return=minimal"},
+                method="PATCH",
+            )
+            with urllib.request.urlopen(request, timeout=10) as response:
+                if response.status not in (200, 204):
+                    logger.warning(
+                        f"Postgres zone rename returned {response.status} for '{zone_name}'")
             return
 
         # `polygon` is NOT NULL jsonb in Postgres; PostgREST wants the JSON
@@ -80,7 +134,16 @@ def _mirror_zone_to_postgres(org_id: str, camera_name: str, zone_id: str, polygo
         payload = json.dumps([{
             "orgId": org_id,
             "cameraId": camera_id,
-            "name": zone_id,
+            # THE NAME THE USER TYPED, not the generated slug.
+            #
+            # This mirrored `zone_id` — "zone_mtfirbfy" — so the employee desk
+            # dropdown listed machine-generated codes and there was no way to
+            # tell which desk was which. The slug is the stable key and lives
+            # in its own column; `name` is for people to read.
+            "name": zone_name,
+            # The stable key the next mirror call matches on (migration 023),
+            # so a rename updates this row instead of inserting a second one.
+            "slug": zone_id,
             "polygon": polygon,
             "updatedAt": datetime.now(timezone.utc).isoformat(),
         }]).encode("utf-8")
@@ -157,6 +220,76 @@ def get_zones_for_camera(
     return zones
 
 
+class ZoneUpdate(BaseModel):
+    """
+    What may be changed about an existing zone.
+
+    Only the label and the kind. The POLYGON is not editable here — reshaping
+    is what the editor's redraw is for, and allowing a shape change through a
+    rename endpoint would let a zone quietly move under a desk that had
+    already been assigned to somebody.
+    """
+    zone_name: Optional[str] = None
+    zone_type: Optional[str] = None
+
+
+@router.patch("/{zone_id}", response_model=ZoneResponse)
+def update_zone(
+    zone_id: str,
+    patch: ZoneUpdate,
+    db: Session = Depends(get_db),
+    org_id: str = Depends(require_zone_edit),
+):
+    """
+    Rename a zone, or change what kind of space it is.
+
+    WHY THIS DID NOT EXIST, AND WHY IT HAD TO
+
+    Zones could only be created and deleted. So correcting a typo meant
+    deleting the polygon and redrawing it — which breaks the desk assignment
+    pointing at it, because the replacement is a different zone with a
+    different id. A label mistake should not cost somebody their seat prior.
+
+    `zone_type` matters just as much: WORKSTATION is what the employee desk
+    dropdown filters on, and BREAK is what the aggregator counts as break
+    time. A zone drawn as the wrong kind is invisible to both, with no
+    indication of why.
+    """
+    zone = (
+        db.query(ZoneModel)
+        .filter(ZoneModel.zone_id == zone_id, ZoneModel.org_id == org_id)
+        .first()
+    )
+    if not zone:
+        raise HTTPException(status_code=404, detail=f"Zone '{zone_id}' not found")
+
+    if patch.zone_name is not None:
+        name = patch.zone_name.strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="A zone name is required.")
+        if len(name) > 80:
+            raise HTTPException(status_code=422,
+                                detail="Zone names are limited to 80 characters.")
+        zone.zone_name = name
+
+    if patch.zone_type is not None:
+        kind = patch.zone_type.strip().upper()
+        if kind not in VALID_ZONE_TYPES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Zone type must be one of: {', '.join(sorted(VALID_ZONE_TYPES))}.",
+            )
+        zone.zone_type = kind
+
+    db.commit()
+    db.refresh(zone)
+
+    # Keep Postgres in step, or the desk dropdown keeps showing the old label.
+    _mirror_zone_to_postgres(org_id, zone.camera_id, zone.zone_id,
+                             zone.polygon_coordinates, zone.zone_name)
+    return zone
+
+
 @router.delete("/{zone_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_zone(
     zone_id: str,
@@ -221,7 +354,8 @@ def create_or_update_zone(
         existing.homography_matrix = zone.homography_matrix
         db.commit()
         db.refresh(existing)
-        _mirror_zone_to_postgres(org_id, existing.camera_id, existing.zone_id, existing.polygon_coordinates)
+        _mirror_zone_to_postgres(org_id, existing.camera_id, existing.zone_id,
+                                 existing.polygon_coordinates, existing.zone_name)
         return existing
 
     # `zone_id` is the PRIMARY KEY of this table, so it is unique across the
@@ -250,5 +384,6 @@ def create_or_update_zone(
     db.add(db_zone)
     db.commit()
     db.refresh(db_zone)
-    _mirror_zone_to_postgres(org_id, db_zone.camera_id, db_zone.zone_id, db_zone.polygon_coordinates)
+    _mirror_zone_to_postgres(org_id, db_zone.camera_id, db_zone.zone_id,
+                             db_zone.polygon_coordinates, db_zone.zone_name)
     return db_zone

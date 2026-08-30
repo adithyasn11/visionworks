@@ -386,18 +386,32 @@ def camera_snapshot(
     frame = None
 
     if source == "webcam":
+        # OpenCV logs a MSMF backend warning to stderr for every failed read,
+        # and a camera held by another application fails every read. Measured:
+        # 130 warning lines from 58 snapshot calls, which buries anything
+        # worth seeing in the server log. The failure is already reported
+        # properly as a 503 below; the backend chatter adds nothing.
+        _prev_log = cv2.utils.logging.getLogLevel()
+        cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_SILENT)
         cap = cv2.VideoCapture(0)
         try:
             if cap.isOpened():
                 # Discard a few frames: most webcams hand back a black or
                 # badly exposed image for the first several reads while the
                 # sensor settles.
+                #
+                # Stops at the FIRST failure rather than trying all five. If
+                # the camera is held by a browser tab the first read already
+                # tells us that, and four more attempts only cost time and
+                # noise.
                 for _ in range(5):
                     ok, f = cap.read()
-                    if ok:
-                        frame = f
+                    if not ok:
+                        break
+                    frame = f
         finally:
             cap.release()
+            cv2.utils.logging.setLogLevel(_prev_log)
         if frame is None:
             raise HTTPException(
                 status_code=503,

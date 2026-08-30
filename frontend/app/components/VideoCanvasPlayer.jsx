@@ -11,6 +11,7 @@ import {
 // Backend origin and the token-attaching helpers. Every processing socket
 // carries the Supabase access token so the telemetry it produces is attributed
 // to the caller's organisation — see app/lib/backend.js.
+import { publishFrame, clearFrame } from '../lib/liveFrame';
 import { backendFetch, backendSocketUrl } from '../lib/backend';
 
 /* Detection-box colours, kept inside the red/black/white palette. The three
@@ -240,6 +241,15 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       drawHUD(ctx, canvas, entities, activeZones, enableBlur);
     };
     imgRef.current.src = data.frame_base64;
+
+    // Share the RAW frame with anything else that wants to see what the
+    // camera sees — the zone editor draws polygons over it, so "Turn On
+    // Camera" on this page gives you a live backdrop on the Zones page.
+    //
+    // The raw frame, deliberately, not the annotated canvas: the editor draws
+    // its own zone outlines, and shipping the HUD's bounding boxes over there
+    // would double up the overlay.
+    publishFrame(data.frame_base64);
   }, [activeZones, enableBlur, onFrameData]);
 
   // Connect WebSocket to video file processing session
@@ -295,6 +305,9 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     if (hiddenVideoRef.current) {
       hiddenVideoRef.current.srcObject = null;
     }
+    // Nothing is producing frames any more. Without this the zone editor keeps
+    // showing the last frame as though the camera were still on.
+    clearFrame();
     if (wsRef.current) {
       try {
         if (wsRef.current.readyState === WebSocket.OPEN) {
