@@ -78,6 +78,10 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState(null);
   const [frames, setFrames] = useState(0);
+  // Frames the pipeline actually returned. Shown next to the received count
+  // because the two diverging is the signature of frames being dropped, and
+  // that failure is otherwise completely invisible.
+  const [analysed, setAnalysed] = useState(0);
   const [busy, setBusy] = useState(false);
 
   const roomRef = useRef(null);     // socket to the pairing room
@@ -85,6 +89,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
   const canvasRef = useRef(null);
   const imgRef = useRef(null);
   const pollRef = useRef(null);
+  const pendingRef = useRef(false);  // a frame is with the GPU right now
 
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
   const isLoopback = ['localhost', '127.0.0.1', '::1'].includes(host);
@@ -108,7 +113,10 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
       try { roomRef.current.close(); } catch { /* already gone */ }
       roomRef.current = null;
     }
+    pendingRef.current = false;
     setStreaming(false);
+    setFrames(0);
+    setAnalysed(0);
     clearFrame();
   }, []);
 
@@ -117,7 +125,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
   /* ── the AI pipeline socket ─────────────────────────────────────────── */
 
   const openAiSocket = useCallback(async () => {
-    if (aiRef.current) return aiRef.current;
+    if (aiRef.current?.readyState === WebSocket.OPEN) return aiRef.current;
     const url = await backendSocketUrl(
       `/api/v1/video/process_webcam_frame?camera_id=${encodeURIComponent(cameraId)}`);
     const ws = new WebSocket(url);
@@ -126,7 +134,15 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
       let data;
       try { data = JSON.parse(event.data); } catch { return; }
       if (data.error) { setError(data.error); return; }
-      if (!data.frame_base64) return;
+      if (!data.frame_base64) {
+        // INIT and other non-frame messages still mean the pipeline is alive.
+        return;
+      }
+
+      // A frame came back, so the pipeline has finished with the last one and
+      // is ready for the next. See the comment on pendingRef.
+      pendingRef.current = false;
+      setAnalysed((n) => n + 1);
 
       // Paint the annotated frame, and publish it so the zone editor can use
       // it as a backdrop exactly as it does the laptop camera's.
@@ -145,8 +161,40 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
       if (onFrame) onFrame(data);
     };
 
-    ws.onclose = () => { aiRef.current = null; };
+    ws.onclose = (event) => {
+      aiRef.current = null;
+      pendingRef.current = false;
+      // 1008 is the policy-violation code the endpoint uses when the session
+      // lacks analysis.run. Without this the socket just vanishes and every
+      // frame is dropped in silence — the phone streams happily and nothing
+      // is ever detected, which is indistinguishable from a broken model.
+      if (event.code === 1008) {
+        setError(event.reason
+          || 'Your account is not allowed to run analysis, so the phone’s frames cannot be processed.');
+      }
+    };
+
     aiRef.current = ws;
+
+    // WAIT FOR THE HANDSHAKE BEFORE ANY FRAME ARRIVES
+    //
+    // `new WebSocket()` returns instantly in CONNECTING. Telling the phone to
+    // start at that moment means the first frames land while readyState is
+    // still CONNECTING, and the forwarder drops them. Whether ANY frame ever
+    // got through was a race against the handshake — which is why the feed
+    // looked live while nothing was ever analysed.
+    await new Promise((resolve, reject) => {
+      if (ws.readyState === WebSocket.OPEN) return resolve();
+      const timer = setTimeout(
+        () => reject(new Error('the analysis pipeline did not accept the connection')),
+        10000);
+      ws.addEventListener('open', () => { clearTimeout(timer); resolve(); }, { once: true });
+      ws.addEventListener('error', () => {
+        clearTimeout(timer);
+        reject(new Error('could not connect to the analysis pipeline'));
+      }, { once: true });
+    });
+
     return ws;
   }, [cameraId, onFrame]);
 
@@ -171,18 +219,28 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
         case 'frame': {
           // A frame from the phone. Forward it to the AI pipeline in the shape
           // that endpoint already expects from the laptop camera.
+          setFrames((n) => n + 1);
           const ai = aiRef.current;
-          if (ai?.readyState === WebSocket.OPEN) {
-            // `image_base64` is the key /process_webcam_frame reads — the same
-            // one the laptop camera sends. Checked against the handler rather
-            // than guessed: a wrong key is silently ignored there, so every
-            // frame would vanish with no error anywhere.
-            ai.send(JSON.stringify({
-              image_base64: msg.data,
-              captured_at: msg.t,
-            }));
-            setFrames((n) => n + 1);
-          }
+          if (ai?.readyState !== WebSocket.OPEN) break;
+
+          // ONE FRAME IN FLIGHT AT A TIME
+          //
+          // The phone streams on its own clock; the GPU takes as long as it
+          // takes. Without this the socket queues every frame the phone ever
+          // sent, and the overlay drifts further behind real time the longer
+          // it runs — the same reason the laptop path pipelines on ACK.
+          // Dropping the newest frame is right: a stale frame is worthless.
+          if (pendingRef.current) break;
+          pendingRef.current = true;
+
+          // `image_base64` is the key /process_webcam_frame reads — the same
+          // one the laptop camera sends. Checked against the handler rather
+          // than guessed: a wrong key is silently ignored there, so every
+          // frame would vanish with no error anywhere.
+          ai.send(JSON.stringify({
+            image_base64: msg.data,
+            captured_at: msg.t,
+          }));
           break;
         }
 
@@ -359,7 +417,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false }
             Phone paired
             {streaming && (
               <span className="ml-1 font-mono text-[11px] font-medium text-ink-faint">
-                · {frames} frames
+                · {analysed}/{frames} analysed
               </span>
             )}
           </div>
