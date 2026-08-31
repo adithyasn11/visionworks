@@ -627,7 +627,24 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
 
       {/* Main Canvas Player Display */}
       <div className="relative rounded-xl overflow-hidden border border-line bg-ground shadow-2xl group/canvas">
-        <canvas ref={canvasRef} width={960} height={540} className="w-full h-auto block" />
+        {/*
+          CAP THE HEIGHT, NOT JUST THE WIDTH.
+
+          `w-full h-auto` alone is fine for 16:9 laptop video, but a phone held
+          upright sends a PORTRAIT frame — the canvas takes its intrinsic size
+          from whatever arrives, so at full width that renders taller than the
+          screen and pushes every control below the fold.
+
+          object-contain keeps the whole frame visible and letterboxes the
+          remainder, rather than cropping people out of the edges of a feed
+          whose whole purpose is watching them.
+        */}
+        <canvas
+          ref={canvasRef}
+          width={960}
+          height={540}
+          className="w-full h-auto max-h-[70vh] object-contain block mx-auto"
+        />
 
         {/* Live Camera Badge Overlay */}
         {isWebcamActive && (

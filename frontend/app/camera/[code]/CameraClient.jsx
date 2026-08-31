@@ -94,6 +94,7 @@ export default function CameraClient({ code }) {
   const [message, setMessage] = useState('Connecting to your dashboard…');
   const [facing, setFacing] = useState('environment');
   const [framesSent, setFramesSent] = useState(0);
+  const [isPortrait, setIsPortrait] = useState(false);
   const [online, setOnline] = useState(true);
 
   /* ── the camera ─────────────────────────────────────────────────────── */
@@ -121,11 +122,36 @@ export default function CameraClient({ code }) {
     if (!video || !canvas || !ws || ws.readyState !== WebSocket.OPEN) return;
     if (!video.videoWidth) return;   // not ready yet
 
-    const scale = SEND_WIDTH / video.videoWidth;
+    // The VIDEO's shape, not the screen's: a phone can report a landscape
+    // window while the camera track is still delivering portrait frames, and
+    // it is the track that decides what the detector sees.
+    setIsPortrait(video.videoHeight > video.videoWidth);
+
+    // SEND A LANDSCAPE FRAME EVEN WHEN THE PHONE IS HELD UPRIGHT.
+    //
+    // A portrait phone reports 720x1280, so scaling by width alone sent a
+    // 640x1138 frame: taller than the laptop screen, and the wrong shape for
+    // a pipeline built around a wide CCTV view — a tall frame spends most of
+    // its pixels on ceiling and floor.
+    //
+    // So the frame is fitted into a 16:9 box: the whole camera view is kept
+    // (letterboxed, never cropped — cropping would cut people out at the
+    // edges) and every frame arrives the same size regardless of how the
+    // phone happens to be held. That also keeps zone polygons meaningful,
+    // since they are stored in this pixel space and would otherwise shift
+    // the moment the phone rotated.
+    const SEND_HEIGHT = Math.round(SEND_WIDTH * 9 / 16);
     canvas.width = SEND_WIDTH;
-    canvas.height = Math.round(video.videoHeight * scale);
+    canvas.height = SEND_HEIGHT;
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const fit = Math.min(SEND_WIDTH / video.videoWidth,
+                         SEND_HEIGHT / video.videoHeight);
+    const dw = video.videoWidth * fit;
+    const dh = video.videoHeight * fit;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, SEND_WIDTH, SEND_HEIGHT);
+    ctx.drawImage(video, (SEND_WIDTH - dw) / 2, (SEND_HEIGHT - dh) / 2, dw, dh);
 
     try {
       ws.send(JSON.stringify({
@@ -438,6 +464,18 @@ export default function CameraClient({ code }) {
                 Try again
               </button>
             )}
+          </div>
+        )}
+
+        {status === 'streaming' && isPortrait && (
+          // Frames are letterboxed into 16:9, so an upright phone fills only
+          // about a third of the width — the rest is black bars. Nothing
+          // breaks, but the detector gets far fewer pixels of the room, so
+          // it is worth one line telling the user how to fix it.
+          <div className="absolute bottom-3 left-3 right-3 rounded-lg bg-black/70 backdrop-blur px-3 py-2">
+            <p className="text-[12px] text-white/80 text-center">
+              Turn the phone sideways — a landscape view sees far more of the room.
+            </p>
           </div>
         )}
 

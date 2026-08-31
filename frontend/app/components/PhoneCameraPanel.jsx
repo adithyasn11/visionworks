@@ -438,7 +438,12 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
           </div>
 
           <div className="relative rounded-lg overflow-hidden bg-ground border border-line">
-            <canvas ref={canvasRef} className="w-full h-auto block" />
+            {/* Same portrait-frame cap as the main player canvas. This is a
+                side panel, so it gets a tighter ceiling. */}
+            <canvas
+              ref={canvasRef}
+              className="w-full h-auto max-h-[45vh] object-contain block mx-auto"
+            />
             {!streaming && (
               <div className="absolute inset-0 grid place-items-center px-6 text-center">
                 <p className="text-[12.5px] text-ink-muted font-medium">
