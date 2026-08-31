@@ -12,9 +12,26 @@ class CameraBase(BaseModel):
 class CameraCreate(CameraBase):
     pass
 
+
+class CameraUpdate(BaseModel):
+    """
+    What may be changed on an existing camera.
+
+    `role` is the whole reason this exists. A camera defaults to AREA, and
+    AREA cameras never run face matching — so without a way to mark one DOOR,
+    an enrolled face could never be recognised anywhere and the enrolment
+    screen led nowhere. Only these two fields: name and rtsp_url identify the
+    camera, and letting them drift would orphan the telemetry keyed to them.
+    """
+    role: Optional[str] = Field(default=None, example="DOOR")
+    inference_width: Optional[int] = Field(default=None, example=1280)
+
+
 class CameraResponse(CameraBase):
     status: str
     created_at: datetime
+    role: Optional[str] = None
+    inference_width: Optional[int] = None
 
     class Config:
         from_attributes = True
