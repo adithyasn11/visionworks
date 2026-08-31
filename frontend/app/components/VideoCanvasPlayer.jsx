@@ -5,7 +5,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   Eye, Upload, Play, Pause, RefreshCw, Shield,
   Sliders, CheckCircle2, Loader2, AlertCircle, Video,
-  RotateCcw, RotateCw, Cpu, Maximize2, Camera, CameraOff
+  RotateCcw, RotateCw, Cpu, Maximize2, Minimize2, Camera, CameraOff
 } from 'lucide-react';
 
 // Backend origin and the token-attaching helpers. Every processing socket
@@ -44,6 +44,7 @@ function formatTime(seconds) {
 export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = false, cameraId = 'live_webcam' }) => {
   const canvasRef   = useRef(null);
   const containerRef = useRef(null);
+  const stageRef = useRef(null);      // just the canvas + its overlays
   const fileInputRef = useRef(null);
   const hiddenVideoRef = useRef(null);
   const offscreenCanvasRef = useRef(null);
@@ -83,6 +84,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   const [deviceInfo, setDeviceInfo] = useState('GPU (CUDA)');
   const [isWebcamActive, setIsWebcamActive] = useState(false);
   const [stats, setStats] = useState({ detected: 0, sitting: 0, standing: 0, walking: 0 });
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const handleFrame = useCallback((data) => {
     if (!data.frame_base64) return;
@@ -479,14 +481,27 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     setEnableBlur(checked);
   };
 
+  // Fullscreen targets the CANVAS WRAPPER, not the whole panel: expanding the
+  // panel fills the screen with upload buttons and stat pills around a video
+  // that is still the same size, which is not what anyone means by fullscreen.
   const toggleFullScreen = () => {
-    if (!containerRef.current) return;
+    const el = stageRef.current;
+    if (!el) return;
     if (document.fullscreenElement) {
-      document.exitFullscreen();
+      document.exitFullscreen().catch(() => {});
     } else {
-      containerRef.current.requestFullscreen();
+      el.requestFullscreen?.().catch(() => {});
     }
   };
+
+  // The browser also exits fullscreen on Escape and on the F11 key, neither of
+  // which routes through the button — so the flag has to follow the DOM rather
+  // than the click, or the max-height cap stays lifted after leaving.
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
 
   // Initial canvas grid render
   useEffect(() => {
@@ -626,7 +641,14 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       )}
 
       {/* Main Canvas Player Display */}
-      <div className="relative rounded-xl overflow-hidden border border-line bg-ground shadow-2xl group/canvas">
+      <div
+        ref={stageRef}
+        className={`relative overflow-hidden bg-ground group/canvas ${
+          isFullscreen
+            ? 'flex items-center justify-center w-screen h-screen'
+            : 'rounded-xl border border-line shadow-2xl'
+        }`}
+      >
         {/*
           CAP THE HEIGHT, NOT JUST THE WIDTH.
 
@@ -643,8 +665,37 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           ref={canvasRef}
           width={960}
           height={540}
-          className="w-full h-auto max-h-[70vh] object-contain block mx-auto"
+          className={
+            isFullscreen
+              // The cap exists to stop a tall frame overflowing the PAGE. In
+              // fullscreen there is no page to overflow, and keeping it would
+              // pin the video to 70% of the screen — the one place the user
+              // explicitly asked for all of it.
+              ? 'max-w-full max-h-full w-auto h-auto object-contain block'
+              : 'w-full h-auto max-h-[70vh] object-contain block mx-auto'
+          }
         />
+
+        {/*
+          Fullscreen, on the video itself — where every video player puts it.
+          There is a second one in the controls bar below, but that row is
+          about scrubbing a FILE and is disabled during a live stream, so it
+          reads as unavailable exactly when a live feed most wants expanding.
+
+          Always visible rather than hover-only: a control you cannot see is
+          one you do not know exists, and this one had gone unnoticed.
+        */}
+        <button
+          type="button"
+          onClick={toggleFullScreen}
+          title={isFullscreen ? 'Exit full screen (Esc)' : 'Full screen'}
+          aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
+          className="absolute top-3 right-3 z-20 p-2 rounded-lg bg-black/55 hover:bg-black/75 text-white backdrop-blur-sm transition-colors"
+        >
+          {isFullscreen
+            ? <Minimize2 className="w-4 h-4" />
+            : <Maximize2 className="w-4 h-4" />}
+        </button>
 
         {/* Live Camera Badge Overlay */}
         {isWebcamActive && (

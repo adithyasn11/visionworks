@@ -279,7 +279,10 @@ export default function EnrollScreen({ orgName, initialRole, employee, viewer })
 
   return (
     <DashboardShell user={viewer} role={role}>
-      <div className="mx-auto max-w-3xl">
+      {/* Wider than the employees list it came from: that page is a single
+          column of rows, this one is two columns beside a camera preview, and
+          3xl would squeeze the preview to postcard size on a desktop. */}
+      <div className="mx-auto max-w-5xl">
 
         <Link
           href="/dashboard/employees"
@@ -330,157 +333,176 @@ export default function EnrollScreen({ orgName, initialRole, employee, viewer })
           </div>
         )}
 
-        {/* Progress */}
-        <section className="mb-6 rounded-xl border border-line bg-surface p-4 sm:p-5">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <h2 className="text-[15px] font-black tracking-tight text-ink flex items-center gap-2">
-              <ScanFace className="w-4 h-4 text-accent" />
-              {loading ? 'Loading…' : `${templates.length} of ${limits.max} photos`}
-            </h2>
-            {!loading && templates.length > 0 && (
-              <span className="font-mono text-[11px] text-ink-faint">
-                average quality {avg.toFixed(2)}
-              </span>
-            )}
-          </div>
+        {/*
+          TWO COLUMNS ON A WIDE SCREEN, ONE ON A NARROW ONE.
 
-          <div className="flex gap-1.5 mb-4" aria-hidden="true">
-            {Array.from({ length: limits.max }).map((_, i) => (
-              <div
-                key={i}
-                className={`h-1.5 flex-1 rounded-full ${
-                  i < templates.length
-                    ? 'bg-[color:var(--accent)]'
-                    : i < limits.min ? 'bg-surface-alt border border-line' : 'bg-surface-alt'
-                }`}
-              />
-            ))}
-          </div>
+          Stacked, the capture controls sat below a progress card that grows
+          with every photo — so the button you came here to press moved further
+          off screen the more you used the page, and the guidance ("face the
+          camera", "light in front of you") scrolled out of sight exactly when
+          the camera turned on and you needed it.
 
-          <p className="text-[12.5px] font-medium leading-relaxed mb-4">
-            {loading ? (
-              <span className="text-ink-faint">Checking what is already enrolled…</span>
-            ) : enrolled ? (
-              <span className="text-emerald-600 dark:text-emerald-400">
-                Enrolled. {employee.displayName} can be recognised at a door camera.
-                {templates.length < limits.max
-                  ? ` Adding up to ${limits.max - templates.length} more would make it more reliable.`
-                  : ''}
-              </span>
-            ) : (
-              <span className="text-ink-muted">
-                {limits.min - templates.length} more photo
-                {limits.min - templates.length === 1 ? '' : 's'} needed before this
-                person can be recognised.
-              </span>
-            )}
-          </p>
+          Capture leads because it is the task; the roster follows as context.
+          On mobile `order` puts the progress card first so a returning user
+          sees what is already enrolled before the controls.
+        */}
+        <div className={`grid gap-5 lg:items-start ${
+          // A VIEWER has no capture column at all, so keeping two would strand
+          // the progress card in the right half beside an empty left one.
+          canEdit ? 'lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]' : 'max-w-2xl mx-auto'
+        }`}>
+          {/* Capture — the whole column is conditional, so no inner guard. */}
+          {canEdit && (
+            <section className="order-2 lg:order-1 rounded-xl border border-line bg-surface p-4 sm:p-5">
+              <h2 className="text-[15px] font-black tracking-tight text-ink mb-1">
+                Add a photo
+              </h2>
+              <ul className="text-[12.5px] text-ink-muted font-medium leading-relaxed mb-4 space-y-0.5">
+                {GUIDANCE.map((g) => (
+                  <li key={g} className="flex gap-1.5">
+                    <span className="text-ink-faint">·</span>{g}
+                  </li>
+                ))}
+              </ul>
 
-          {loading ? (
-            <div className="py-6 flex justify-center">
-              <Loader2 className="w-5 h-5 animate-spin text-ink-faint" />
-            </div>
-          ) : templates.length === 0 ? (
-            <p className="text-[13px] text-ink-faint font-medium">No photos yet.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {templates.map((t, i) => (
-                <li key={t.id}
-                    className="flex items-center gap-3 rounded-lg border border-line bg-ground px-3 py-2">
-                  <span className="font-mono text-[11px] text-ink-faint w-6">#{i + 1}</span>
-                  <QualityPill quality={t.quality} />
-                  <span className="text-[12px] text-ink-muted flex-1 truncate">
-                    {formatDate(t.created_at)}
-                  </span>
-                  {canEdit && (
+              {full ? (
+                <p className="text-[13px] font-bold text-ink-muted">
+                  All {limits.max} photos are enrolled. Remove one to add another.
+                </p>
+              ) : camera ? (
+                <div className="flex flex-col gap-3">
+                  <div className="relative rounded-lg overflow-hidden bg-ground border border-line">
+                    {/* Mirrored, because an un-mirrored self-view is disorienting
+                        to aim. The CAPTURE is not mirrored — the canvas draws the
+                        raw frame, so the stored signature matches reality. */}
+                    <video
+                      ref={videoRef} playsInline muted
+                      className="w-full max-h-[52vh] object-contain scale-x-[-1]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
                     <button
-                      type="button"
-                      onClick={() => remove(t.id)}
-                      disabled={busy}
-                      title="Remove this photo"
-                      aria-label={`Remove photo ${i + 1}`}
-                      className="p-1.5 rounded-lg text-ink-muted hover:text-accent hover:bg-accent-soft transition-colors disabled:opacity-60"
+                      type="button" onClick={capture} disabled={busy}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent text-white font-bold text-[14px] hover:brightness-110 transition-[filter,opacity] disabled:opacity-60"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      {busy ? <Loader2 className="w-4 h-4 animate-spin" />
+                            : <Camera className="w-4 h-4" />}
+                      Capture
                     </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {/* Capture */}
-        {canEdit && (
-          <section className="rounded-xl border border-line bg-surface p-4 sm:p-5">
-            <h2 className="text-[15px] font-black tracking-tight text-ink mb-1">
-              Add a photo
-            </h2>
-            <ul className="text-[12.5px] text-ink-muted font-medium leading-relaxed mb-4 space-y-0.5">
-              {GUIDANCE.map((g) => (
-                <li key={g} className="flex gap-1.5">
-                  <span className="text-ink-faint">·</span>{g}
-                </li>
-              ))}
-            </ul>
-
-            {full ? (
-              <p className="text-[13px] font-bold text-ink-muted">
-                All {limits.max} photos are enrolled. Remove one to add another.
-              </p>
-            ) : camera ? (
-              <div className="flex flex-col gap-3">
-                <div className="relative rounded-lg overflow-hidden bg-ground border border-line">
-                  {/* Mirrored, because an un-mirrored self-view is disorienting
-                      to aim. The CAPTURE is not mirrored — the canvas draws the
-                      raw frame, so the stored signature matches reality. */}
-                  <video
-                    ref={videoRef} playsInline muted
-                    className="w-full max-h-[380px] object-contain scale-x-[-1]"
-                  />
+                    <button
+                      type="button" onClick={stopCamera} disabled={busy}
+                      className="px-4 py-2.5 rounded-lg border-2 border-field text-ink font-bold text-[14px] hover:border-field-hover transition-colors disabled:opacity-60"
+                    >
+                      Stop camera
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
                   <button
-                    type="button" onClick={capture} disabled={busy}
+                    type="button" onClick={startCamera} disabled={busy}
                     className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent text-white font-bold text-[14px] hover:brightness-110 transition-[filter,opacity] disabled:opacity-60"
                   >
-                    {busy ? <Loader2 className="w-4 h-4 animate-spin" />
-                          : <Camera className="w-4 h-4" />}
-                    Capture
+                    <Camera className="w-4 h-4" />
+                    Use the camera
                   </button>
                   <button
-                    type="button" onClick={stopCamera} disabled={busy}
-                    className="px-4 py-2.5 rounded-lg border-2 border-field text-ink font-bold text-[14px] hover:border-field-hover transition-colors disabled:opacity-60"
+                    type="button" onClick={() => fileRef.current?.click()} disabled={busy}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 border-field text-ink font-bold text-[14px] hover:border-field-hover transition-colors disabled:opacity-60"
                   >
-                    Stop camera
+                    {busy ? <Loader2 className="w-4 h-4 animate-spin" />
+                          : <Upload className="w-4 h-4" />}
+                    Upload a photo
                   </button>
+                  <input
+                    ref={fileRef} type="file" accept="image/*"
+                    onChange={onFile} className="hidden"
+                  />
                 </div>
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button" onClick={startCamera} disabled={busy}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent text-white font-bold text-[14px] hover:brightness-110 transition-[filter,opacity] disabled:opacity-60"
-                >
-                  <Camera className="w-4 h-4" />
-                  Use the camera
-                </button>
-                <button
-                  type="button" onClick={() => fileRef.current?.click()} disabled={busy}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 border-field text-ink font-bold text-[14px] hover:border-field-hover transition-colors disabled:opacity-60"
-                >
-                  {busy ? <Loader2 className="w-4 h-4 animate-spin" />
-                        : <Upload className="w-4 h-4" />}
-                  Upload a photo
-                </button>
-                <input
-                  ref={fileRef} type="file" accept="image/*"
-                  onChange={onFile} className="hidden"
+              )}
+            </section>
+          )}
+
+          {/* Progress */}
+          <section className="order-1 lg:order-2 lg:sticky lg:top-6 rounded-xl border border-line bg-surface p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h2 className="text-[15px] font-black tracking-tight text-ink flex items-center gap-2">
+                <ScanFace className="w-4 h-4 text-accent" />
+                {loading ? 'Loading…' : `${templates.length} of ${limits.max} photos`}
+              </h2>
+              {!loading && templates.length > 0 && (
+                <span className="font-mono text-[11px] text-ink-faint">
+                  average quality {avg.toFixed(2)}
+                </span>
+              )}
+            </div>
+
+            <div className="flex gap-1.5 mb-4" aria-hidden="true">
+              {Array.from({ length: limits.max }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`h-1.5 flex-1 rounded-full ${
+                    i < templates.length
+                      ? 'bg-[color:var(--accent)]'
+                      : i < limits.min ? 'bg-surface-alt border border-line' : 'bg-surface-alt'
+                  }`}
                 />
+              ))}
+            </div>
+
+            <p className="text-[12.5px] font-medium leading-relaxed mb-4">
+              {loading ? (
+                <span className="text-ink-faint">Checking what is already enrolled…</span>
+              ) : enrolled ? (
+                <span className="text-emerald-600 dark:text-emerald-400">
+                  Enrolled. {employee.displayName} can be recognised at a door camera.
+                  {templates.length < limits.max
+                    ? ` Adding up to ${limits.max - templates.length} more would make it more reliable.`
+                    : ''}
+                </span>
+              ) : (
+                <span className="text-ink-muted">
+                  {limits.min - templates.length} more photo
+                  {limits.min - templates.length === 1 ? '' : 's'} needed before this
+                  person can be recognised.
+                </span>
+              )}
+            </p>
+
+            {loading ? (
+              <div className="py-6 flex justify-center">
+                <Loader2 className="w-5 h-5 animate-spin text-ink-faint" />
               </div>
+            ) : templates.length === 0 ? (
+              <p className="text-[13px] text-ink-faint font-medium">No photos yet.</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {templates.map((t, i) => (
+                  <li key={t.id}
+                      className="flex items-center gap-3 rounded-lg border border-line bg-ground px-3 py-2">
+                    <span className="font-mono text-[11px] text-ink-faint w-6">#{i + 1}</span>
+                    <QualityPill quality={t.quality} />
+                    <span className="text-[12px] text-ink-muted flex-1 truncate">
+                      {formatDate(t.created_at)}
+                    </span>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => remove(t.id)}
+                        disabled={busy}
+                        title="Remove this photo"
+                        aria-label={`Remove photo ${i + 1}`}
+                        className="p-1.5 rounded-lg text-ink-muted hover:text-accent hover:bg-accent-soft transition-colors disabled:opacity-60"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
             )}
           </section>
-        )}
+        </div>
 
         <p className="mt-6 text-[12px] text-ink-faint font-medium leading-relaxed">
           Face matching runs only at a door camera, where somebody is close enough for it

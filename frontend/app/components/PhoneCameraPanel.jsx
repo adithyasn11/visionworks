@@ -32,7 +32,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Smartphone, QrCode, Loader2, CheckCircle2, AlertCircle, X,
-  Play, Square, RefreshCw, Wifi,
+  Play, Square, RefreshCw, Wifi, Maximize2, Minimize2,
 } from 'lucide-react';
 
 import { backendFetch, backendSocketUrl, BACKEND_HTTP } from '../lib/backend';
@@ -84,6 +84,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
   // that failure is otherwise completely invisible.
   const [analysed, setAnalysed] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const roomRef = useRef(null);     // socket to the pairing room
   const aiRef = useRef(null);       // socket to the AI pipeline
@@ -91,6 +92,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
   const imgRef = useRef(null);
   const pollRef = useRef(null);
   const pendingRef = useRef(false);  // a frame is with the GPU right now
+  const stageRef = useRef(null);     // the preview, for fullscreen
 
   const host = typeof window !== 'undefined' ? window.location.hostname : '';
   const isLoopback = ['localhost', '127.0.0.1', '::1'].includes(host);
@@ -101,6 +103,21 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
   const insecure = typeof window !== 'undefined'
     && window.location.protocol !== 'https:'
     && !isLoopback;
+
+  const toggleFullScreen = useCallback(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else el.requestFullscreen?.().catch(() => {});
+  }, []);
+
+  // Escape and F11 leave fullscreen without touching the button, so the flag
+  // follows the DOM rather than the click.
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
 
   /* ── teardown ───────────────────────────────────────────────────────── */
 
@@ -437,13 +454,37 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
             )}
           </div>
 
-          <div className="relative rounded-lg overflow-hidden bg-ground border border-line">
+          <div
+            ref={stageRef}
+            className={`relative overflow-hidden bg-ground ${
+              isFullscreen
+                ? 'flex items-center justify-center w-screen h-screen'
+                : 'rounded-lg border border-line'
+            }`}
+          >
             {/* Same portrait-frame cap as the main player canvas. This is a
-                side panel, so it gets a tighter ceiling. */}
+                side panel, so it gets a tighter ceiling — lifted in
+                fullscreen, where there is no layout left to protect. */}
             <canvas
               ref={canvasRef}
-              className="w-full h-auto max-h-[45vh] object-contain block mx-auto"
+              className={isFullscreen
+                ? 'max-w-full max-h-full w-auto h-auto object-contain block'
+                : 'w-full h-auto max-h-[45vh] object-contain block mx-auto'}
             />
+
+            {streaming && (
+              <button
+                type="button"
+                onClick={toggleFullScreen}
+                title={isFullscreen ? 'Exit full screen (Esc)' : 'Full screen'}
+                aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
+                className="absolute top-2 right-2 z-20 p-1.5 rounded-md bg-black/55 hover:bg-black/75 text-white backdrop-blur-sm transition-colors"
+              >
+                {isFullscreen
+                  ? <Minimize2 className="w-3.5 h-3.5" />
+                  : <Maximize2 className="w-3.5 h-3.5" />}
+              </button>
+            )}
             {!streaming && (
               <div className="absolute inset-0 grid place-items-center px-6 text-center">
                 <p className="text-[12.5px] text-ink-muted font-medium">
