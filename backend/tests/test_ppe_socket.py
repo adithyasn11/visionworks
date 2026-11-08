@@ -57,7 +57,7 @@ def upload():
 
 def play(sid, frames=FRAMES):
     got, started = [], time.time()
-    with client.websocket_connect(f"/api/v1/video/process/{sid}") as ws:
+    with client.websocket_connect(f"/api/v1/video/process/{sid}?realtime=false") as ws:
         while len(got) < frames:
             msg = ws.receive_json()
             if msg.get("type") == "FRAME":

@@ -56,11 +56,14 @@ app.dependency_overrides[video_upload.require_analysis_run] = lambda: PROBE_ORG
 client = TestClient(app)
 
 
-def upload(recorded_at=RECORDED_AT):
+def upload(recorded_at=RECORDED_AT, camera_id=None):
     body = open(CLIP, "rb").read()
+    form = {"recorded_at": recorded_at}
+    if camera_id:
+        form["camera_id"] = camera_id
     r = client.post("/api/v1/video/upload",
                     files={"file": ("zone_probe.avi", io.BytesIO(body), "video/x-msvideo")},
-                    data={"recorded_at": recorded_at})
+                    data=form)
     assert r.status_code == 200, r.text
     return r.json()["session_id"]
 
@@ -81,7 +84,7 @@ def add_zone(camera_id, zone_type):
 def play(sid, frames=FRAMES):
     """Play `frames` frames, then stop the session the way the app does (cancel) and wait for it to finish."""
     got = []
-    with client.websocket_connect(f"/api/v1/video/process/{sid}") as ws:
+    with client.websocket_connect(f"/api/v1/video/process/{sid}?realtime=false") as ws:
         while len(got) < frames:
             msg = ws.receive_json()
             if msg.get("type") == "FRAME":
@@ -189,8 +192,22 @@ try:
     check("people were detected", any(f["total_detected"] for f in frames2))
     check("no events for a GENERAL zone", rows2 == [] and not any("events" in f["safety"] for f in frames2), str(rows2[:2]))
 
+    # -- the camera the caller names, even if never registered -------------------
+    print("3. Zones drawn for a named (unregistered) camera apply to an upload")
+    named = f"probe_cam_{uuid.uuid4().hex[:6]}"
+    sid4 = upload(camera_id=named); sids.append(sid4)
+    zones.append(add_zone(named, "RESTRICTED"))
+    frames4 = play(sid4)
+    rows4 = events_for(sid4)
+    check("events were written for the zone drawn under the caller's camera name", len(rows4) > 0, str(len(rows4)))
+    check("they are stored under that camera and zone", all(r[7] == named and r[2] == zones[-1] for r in rows4))
+    other = upload(camera_id=f"probe_cam_{uuid.uuid4().hex[:6]}"); sids.append(other)
+    frames5 = play(other, 60)
+    check("a camera name with no zones of its own does not borrow another's",
+          not any("events" in f["safety"] for f in frames5))
+
     # -- safety off --------------------------------------------------------------
-    print("3. Safety off changes nothing")
+    print("4. Safety off changes nothing")
     os.environ.pop("SAFETY_ENABLED", None)
     sid3 = upload(); sids.append(sid3)
     zones.append(add_zone(f"upload_{sid3}", "RESTRICTED"))

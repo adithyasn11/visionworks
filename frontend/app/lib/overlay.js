@@ -85,12 +85,12 @@ function drawZones(ctx, canvas, zones) {
     const cy = pts.reduce((a, p) => a + p[1], 0) / pts.length * scale;
     const label = zoneCanvasLabel(zone, `Zone ${index + 1}`);
 
-    ctx.font = '600 11px Inter, sans-serif';
+    ctx.font = '600 13px Inter, sans-serif';
     const tw = ctx.measureText(label).width;
     ctx.fillStyle = 'rgba(11,10,12,0.72)';
-    ctx.fillRect(cx - tw / 2 - 5, cy - 9, tw + 10, 18);
+    ctx.fillRect(cx - tw / 2 - 6, cy - 11, tw + 12, 22);
     ctx.fillStyle = color;
-    ctx.fillText(label, cx - tw / 2, cy + 4);
+    ctx.fillText(label, cx - tw / 2, cy + 5);
   });
 }
 
@@ -121,12 +121,14 @@ export function drawHUD(ctx, canvas, entities, zones, enableBlur) {
     ctx.stroke();
 
     // Tag banner (top)
-    const bannerW = Math.max(150, w);
+    // Sized to be read at the size the canvas is shown, not at its pixel size.
+    ctx.font = '600 14px Inter, sans-serif';
+    const tag = `ID #${entity.track_id}  ${entity.posture}`;
+    const bannerW = Math.max(ctx.measureText(tag).width + 14, w);
     ctx.fillStyle = 'rgba(11,10,12,0.88)';
-    ctx.fillRect(x1, y1 - 28, bannerW, 24);
+    ctx.fillRect(x1, y1 - 30, bannerW, 26);
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '600 11px Inter, sans-serif';
-    ctx.fillText(`ID #${entity.track_id}  ${entity.posture}`, x1 + 6, y1 - 12);
+    ctx.fillText(tag, x1 + 7, y1 - 11);
 
     if (entity.ppe) drawPpeBadge(ctx, canvas, entity.ppe, x1, y2);
   });
@@ -144,17 +146,17 @@ function drawPpeBadge(ctx, canvas, ppe, x, bottom) {
   const fill = tone === 'ok' ? '#FFFFFF' : tone === 'alert' ? '#DC2626' : '#4B4850';
   const ink = tone === 'ok' ? '#0B0A0C' : '#FFFFFF';
 
-  ctx.font = '700 11px Inter, sans-serif';
-  const w = ctx.measureText(label).width + 14;
+  ctx.font = '700 14px Inter, sans-serif';
+  const w = ctx.measureText(label).width + 16;
   // Under the box, unless that would fall off the bottom of the frame.
-  const y = bottom + 4 + 18 > canvas.height ? bottom - 22 : bottom + 4;
+  const y = bottom + 4 + 24 > canvas.height ? bottom - 28 : bottom + 4;
   // Keep the whole pill on the canvas when the person is at the right-hand edge.
   x = Math.max(2, Math.min(x, canvas.width - w - 2));
   ctx.fillStyle = fill;
-  ctx.fillRect(x, y, w, 18);
+  ctx.fillRect(x, y, w, 24);
   ctx.strokeStyle = 'rgba(11,10,12,0.55)';
   ctx.lineWidth = 1;
-  ctx.strokeRect(x, y, w, 18);
+  ctx.strokeRect(x, y, w, 24);
   ctx.fillStyle = ink;
-  ctx.fillText(label, x + 7, y + 13);
+  ctx.fillText(label, x + 8, y + 17);
 }

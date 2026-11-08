@@ -102,6 +102,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   // Zone events from the safety layer, newest first. `safetyOn` is true once a
   // frame carries a `safety` block, i.e. the backend is running the safety layer;
   // with it off nothing here appears.
+  // Uploaded videos play at the speed they were filmed; switch off to process as
+  // fast as the machine can.
+  const [realtime, setRealtime] = useState(true);
+  const realtimeRef = useRef(true);
   const [zoneEvents, setZoneEvents] = useState([]);
   const [safetyOn, setSafetyOn] = useState(false);
   // The latest frame's people (for the PPE list) and, when the helmet/vest model
@@ -182,7 +186,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     if (wsRef.current) wsRef.current.close();
 
     const epoch = ++connectionEpochRef.current;
-    const ws = new WebSocket(await backendSocketUrl(`/api/v1/video/process/${sid}`));
+    const ws = new WebSocket(await backendSocketUrl(`/api/v1/video/process/${sid}${realtimeRef.current ? '' : '?realtime=false'}`));
     // A Reset or a second connect attempt during the await above must win —
     // otherwise this socket overwrites wsRef.current with a connection nothing
     // will ever close.
@@ -523,6 +527,16 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   // The local update is deliberately conditional on the send succeeding. Moving
   // the checkbox when no socket is open would claim a privacy state the server
   // never heard about, which is the one direction this control must never lie in.
+  // Real time on/off. Remembered for the next upload as well as sent to the live
+  // session, so the choice made before pressing Upload is the one that applies.
+  const toggleRealtime = (checked) => {
+    setRealtime(checked);
+    realtimeRef.current = checked;
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ action: 'set_realtime', enabled: checked }));
+    }
+  };
+
   const toggleBlur = (checked) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     wsRef.current.send(JSON.stringify({ action: 'set_privacy_blur', enabled: checked }));
@@ -868,6 +882,21 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
                 disabled={enableBlur === null}
                 onChange={(e) => toggleBlur(e.target.checked)}
                 className="accent-[color:var(--accent)] cursor-pointer disabled:cursor-not-allowed"
+              />
+            </label>
+
+            {/* Real time: an uploaded video plays at the speed it was filmed, so
+                labels can be read; off processes it as fast as the machine can. */}
+            <label
+              className="flex items-center gap-2 select-none text-xs text-ink-muted cursor-pointer"
+              title="Play an uploaded video at its own speed. Switch off to process it as fast as possible"
+            >
+              <span>Real time</span>
+              <input
+                type="checkbox"
+                checked={realtime}
+                onChange={(e) => toggleRealtime(e.target.checked)}
+                className="accent-[color:var(--accent)] cursor-pointer"
               />
             </label>
 

@@ -136,6 +136,23 @@ def resolve_registered_camera(camera_id: Optional[str], org_id: Optional[str]) -
 DEFAULT_INFERENCE_WIDTH = 640
 
 
+def zones_camera_for(requested: Optional[str], org_id: Optional[str], fallback: str) -> str:
+    """
+    The camera whose ZONES a session uses.
+
+    Zones belong to the organisation (load_zones_for_camera filters on org_id),
+    so a caller's own camera name is safe to look zones up by even when the
+    camera was never registered. Telemetry has to be mapped to a registered
+    camera to reach the dashboard, which is why `effective_camera_id` stays
+    strict; zones and safety events do not have that constraint, and a fresh
+    organisation (the dashboard's default camera "floor5" is not registered
+    until someone does it) must still see the zones it drew take effect.
+    Without an organisation there is no scoping, so the fallback is used.
+    """
+    name = (requested or "").strip()[:64]
+    return name if name and org_id else fallback
+
+
 def resolve_inference_width(camera_id: str, org_id: Optional[str] = None) -> int:
     """
     The frame width the pose model sees for a camera.
@@ -160,6 +177,21 @@ def resolve_inference_width(camera_id: str, org_id: Optional[str] = None) -> int
     finally:
         session.close()
     return DEFAULT_INFERENCE_WIDTH
+
+
+def resolve_initial_realtime(websocket) -> bool:
+    """
+    Whether an uploaded video starts playing at its own speed (True, the default)
+    or as fast as the machine can process it (`?realtime=false`).
+
+    A recording watched on screen has to move at the speed it was filmed at, or
+    a minute of footage is over in ten seconds and nobody can read a label. The
+    viewer can switch it off for a quick analysis run; the tests do.
+    """
+    raw = websocket.query_params.get("realtime")
+    if raw is not None and raw.strip().lower() in ("0", "false", "no", "off"):
+        return False
+    return True
 
 
 def resolve_initial_blur(websocket) -> bool:
@@ -503,6 +535,9 @@ async def upload_video_file(
         # guesses it can process against.
         "org_id": org_id,
         "camera_id": resolved_camera_id,
+        # The camera the caller named, registered or not: its zones and safety
+        # events are looked up and stored under that name (see zones_camera_for).
+        "requested_camera_id": (camera_id or "").strip()[:64] or None,
         "filename": safe_name,
         "path": save_path,
         "status": "READY",
@@ -604,7 +639,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         effective_camera_id = session.get("camera_id") or f"upload_{session_id}"
 
         pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
-        zones_config = load_zones_for_camera(effective_camera_id, org_id=org_id)
+        zones_camera_id = zones_camera_for(session.get("requested_camera_id"), org_id, effective_camera_id)
+        zones_config = load_zones_for_camera(zones_camera_id, org_id=org_id)
         spatial_engine = SpatialEngine(zones_config=zones_config)
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
@@ -644,7 +680,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         safety = await asyncio.to_thread(
             safety_session_for,
             fps=fps, recorded_at=session.get("recorded_at"), live=False,
-            camera_id=effective_camera_id, org_id=org_id, session_id=session_id,
+            camera_id=zones_camera_id, org_id=org_id, session_id=session_id,
             zones_config=zones_config)
     except Exception as e:
         logger.error(f"Safety clock init error: {e}")
@@ -664,7 +700,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
 
     control_state = {
         "paused": False,
-        "seek_frame": None
+        "seek_frame": None,
+        "realtime": resolve_initial_realtime(websocket),
     }
     # Starting state comes from PRIVACY_BLUR_DEFAULT (or this socket's ?blur=),
     # not from a hardcoded True: a face signal needs an unblurred face
@@ -686,6 +723,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                         control_state["paused"] = False
                     elif action == "set_privacy_blur":
                         privacy_state["blur"] = bool(data.get("enabled", privacy_state["blur"]))
+                    elif action == "set_realtime":
+                        control_state["realtime"] = bool(data.get("enabled", control_state["realtime"]))
                     elif action == "seek":
                         target_pct = data.get("pct")
                         if target_pct is not None:
@@ -727,6 +766,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                 await asyncio.sleep(0.1)
                 continue
 
+            frame_started = time.monotonic()
             ret, frame = cap.read()
             if not ret:
                 break
@@ -821,7 +861,13 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                 payload["safety"] = safety.payload(frame_time)
 
             await websocket.send_json(payload)
-            await asyncio.sleep(0.001)
+            if control_state["realtime"]:
+                # Play at the speed it was filmed: wait out what is left of this
+                # frame's slot. A frame that took longer than its slot is not
+                # hurried or skipped, it just means no wait.
+                await asyncio.sleep(max(0.001, (1.0 / max(fps, 1.0)) - (time.monotonic() - frame_started)))
+            else:
+                await asyncio.sleep(0.001)
 
         session["status"] = "DONE"
         logger.info(
@@ -909,7 +955,8 @@ async def live_webcam_websocket(websocket: WebSocket):
         from app.cv.anonymizer import PrivacyAnonymizer
 
         pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
-        zones_config = load_zones_for_camera(effective_camera_id, org_id=org_id)
+        zones_camera_id = zones_camera_for(requested_camera_id, org_id, effective_camera_id)
+        zones_config = load_zones_for_camera(zones_camera_id, org_id=org_id)
         spatial_engine = SpatialEngine(zones_config=zones_config)
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
@@ -967,7 +1014,7 @@ async def live_webcam_websocket(websocket: WebSocket):
     start_time = time.time()
     frame_idx = 0
     # Live source: the safety clock is seconds since now, monotonic.
-    safety = await _live_safety_session(effective_camera_id, org_id, zones_config)
+    safety = await _live_safety_session(zones_camera_id, org_id, zones_config)
 
     try:
         while not control_state["stop"]:
@@ -1093,7 +1140,8 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
         # ways of reaching the SAME "Live feed" the user draws zones against, so
         # they must share one id or zones drawn here would silently attribute to
         # DEFAULT_ZONES instead of what the user configured.
-        zones_config = load_zones_for_camera(effective_camera_id, org_id=org_id)
+        zones_camera_id = zones_camera_for(requested_camera_id, org_id, effective_camera_id)
+        zones_config = load_zones_for_camera(zones_camera_id, org_id=org_id)
         spatial_engine = SpatialEngine(zones_config=zones_config)
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
@@ -1117,7 +1165,7 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
     start_time = time.time()
     privacy_state = {"blur": resolve_initial_blur(websocket)}
     # Live source: the safety clock is seconds since now, monotonic.
-    safety = await _live_safety_session(effective_camera_id, org_id, zones_config)
+    safety = await _live_safety_session(zones_camera_id, org_id, zones_config)
 
     try:
         while True:

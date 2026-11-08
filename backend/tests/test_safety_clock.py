@@ -508,7 +508,7 @@ try:
 
     # -- safety OFF: the payload is exactly what it was ----------------------
     os.environ.pop("SAFETY_ENABLED", None)
-    with client.websocket_connect(f"/api/v1/video/process/{omitted.json()['session_id']}") as ws:
+    with client.websocket_connect(f"/api/v1/video/process/{omitted.json()['session_id']}?realtime=false") as ws:
         init, frames = frames_from(ws, 3)
     check("socket (safety off): frames arrive", len(frames) == 3)
     check("socket (safety off): no 'safety' key in any payload",
@@ -518,7 +518,7 @@ try:
     os.environ["SAFETY_ENABLED"] = "true"
 
     def one_run(sid, seek_to=None, want=18):
-        with client.websocket_connect(f"/api/v1/video/process/{sid}") as ws:
+        with client.websocket_connect(f"/api/v1/video/process/{sid}?realtime=false") as ws:
             init, frames = frames_from(ws, want)
             extra = []
             if seek_to is not None:
