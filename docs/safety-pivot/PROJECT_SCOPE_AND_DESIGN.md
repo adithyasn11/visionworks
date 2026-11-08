@@ -896,7 +896,7 @@ If a week slips, apply the cut order in §4 rather than compressing the evaluati
 
 ## 19. Stretch goal: cross-camera journeys
 
-**Dropped from the core, and the prototype was removed.** An earlier version had a pairwise hand-off module (a topology gate plus a weighted appearance score), a camera topology editor, the `camera_links` table and a simulated evaluation. All of it was deleted with the productivity product (migration 024 and the identity clean-up). It remains in git history (the `main` branch and the first `safety-core` commit) if it is ever wanted.
+**Dropped from the core, and the prototype was removed.** An earlier version had a pairwise hand-off module (a topology gate plus a weighted appearance score), a camera topology editor, the `camera_links` table and a simulated evaluation. All of it was deleted with the productivity product (migration 024 and the identity clean-up). It remains in git history (the commit `97706bb` and earlier) if it is ever wanted.
 
 **As future work**, a journey layer would have to be rebuilt: it could chain accepted hand-offs into a sequence (checkpoint camera → restricted-zone camera) and run R1 in `VIA_CHECKPOINT` mode across cameras. It would need: multi-hop confidence combination that does not collapse to near zero, ordering and timing checks, and `UNVERIFIABLE` whenever any hop is weak. It would be reported separately, with its own measured accept/reject/unverifiable rates, and the core project would not depend on it.
 
@@ -1043,7 +1043,7 @@ Which steps are required is defined by the **delivery tiers in §4** (T1 = Steps
 **Goal:** a clean place to build, with nothing able to break the existing system.
 
 **Do:**
-1. Commit the current clean-up and PPE module on a new branch `safety-core` (so the base is recoverable).
+1. Commit the current clean-up and PPE module on `main` (no feature branches; the commit before the safety work, `97706bb`, is the recoverable base).
 2. Create the package `backend/app/safety/` with `__init__.py`.
 3. Create `backend/app/safety/config.py`: one dataclass `SafetyConfig` holding every threshold in §12, each overridable by an env var (`SAFETY_ENTER_CONFIRM_S`, …), plus `safety_enabled()` that reads `SAFETY_ENABLED` the same way `identity_tracking_enabled()` reads its flag.
 4. Add the variables (commented, with defaults) to `backend/.env.example`.
