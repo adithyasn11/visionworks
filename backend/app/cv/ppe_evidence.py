@@ -230,5 +230,20 @@ class PpeEvidenceTracker:
         return {"status": overall, "items": items,
                 "observed_frames": len(fresh), "reason": "; ".join(reasons)}
 
+    def recent_seen(self, key, now, n):
+        """
+        How the LAST `n` clear, fresh frames read, as ({item: share that showed it}, how many frames).
+
+        The window verdict averages up to 30 frames; a worker who lost the item a
+        moment ago still scores well on it. This is the check that the newest
+        evidence agrees.
+        """
+        dq = self._obs.get(key)
+        last = [o for o in (dq or []) if now - o[0] <= self.stale_seconds and o[2]][-max(1, int(n)):]
+        if not last:
+            return {}, 0
+        return ({item: sum(1 for _, c, _ in last if c[item] >= PRESENT_CONF) / len(last) for item in self.required},
+                len(last))
+
     def drop(self, key):
         self._obs.pop(key, None)

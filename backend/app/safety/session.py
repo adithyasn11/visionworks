@@ -27,9 +27,12 @@ from typing import List, Optional
 
 from app.db.safety_writer import SafetyWriter, persist_safety
 from app.safety.clock import utc_iso
+from app.safety.compliance_engine import ComplianceEngine
 from app.safety.config import SafetyConfig, load_config
 from app.safety.engine import FrameTime, SafetyEngine, engine_for_session
 from app.safety.ppe_runner import PpeRunner, get_ppe_detector
+from app.safety.rules import load_rules
+from app.safety.schemas import Decision
 from app.safety.zone_events import ZoneEvent, ZoneEventTracker, rule_zone_ids
 
 _log = logging.getLogger(__name__)
@@ -46,7 +49,7 @@ def worker_key(track_id) -> str:
 
 class SafetySession:
     def __init__(self, engine: SafetyEngine, writer: SafetyWriter, config: Optional[SafetyConfig] = None,
-                 zones_config=None, ppe_runner: Optional[PpeRunner] = None):
+                 zones_config=None, ppe_runner: Optional[PpeRunner] = None, rules=None):
         """
         zones_config: the camera's zones. Only the ones safety rules can attach
         to (PPE_CHECKPOINT, APPROACH, RESTRICTED, EXIT) produce events; a person
@@ -63,6 +66,16 @@ class SafetySession:
             engine.register(ppe_runner)
         self._tracked_zones = None if zones_config is None else rule_zone_ids(zones_config)
         engine.register(self.tracker)
+        # The rule engine: judges entries into restricted zones from the zone events and
+        # the PPE evidence. Without a PPE runner there is nothing to judge with.
+        # `rules` are the organisation's rules (None: the built-in default).
+        self.compliance: Optional[ComplianceEngine] = None
+        if ppe_runner is not None:
+            self.rules = rules if rules is not None else load_rules(writer.org_id, zones_config)
+            self.compliance = ComplianceEngine(self.rules, ppe_runner, self.config)
+            engine.register(self.compliance)
+        self._frame_decisions: List[dict] = []
+        self._closed_decisions: List[Decision] = []
         self._last_frame: Optional[FrameTime] = None
         # (worker, zone) visits whose ENTERED_ZONE fell in replayed footage and so
         # was not written again. Their later events say so.
@@ -82,9 +95,11 @@ class SafetySession:
 
     def begin_frame(self, frame_index: Optional[int] = None) -> FrameTime:
         self._frame_events = []
+        self._frame_decisions = []
         frame_time = self.engine.begin_frame(frame_index)
         self._last_frame = frame_time
         self._closed_waiting.extend(r for r in frame_time.closed if isinstance(r, ZoneEvent))
+        self._closed_decisions.extend(r for r in frame_time.closed if isinstance(r, Decision))
         return frame_time
 
     def pose_input(self, original, working):
@@ -181,6 +196,7 @@ class SafetySession:
                     self._partial_fresh.add(pair)
 
         for event in events:
+            original = event
             if frame_time.replay:
                 # Footage already processed. The tracker keeps following people
                 # so its state is right when new footage begins, but nothing is
@@ -195,6 +211,39 @@ class SafetySession:
                     self._partial.discard((event.worker_key, event.zone_id))
                     self._partial_fresh.discard((event.worker_key, event.zone_id))
             self._write(event, frame_time)
+            if self.compliance is not None:
+                self._judge(lambda ev=original: self.compliance.on_event(ev, frame_time.video_time_s), frame_time)
+
+        if self.compliance is not None and not frame_time.replay:
+            self._judge(lambda: self.compliance.on_tick(frame_time.video_time_s), frame_time)
+
+    def _judge(self, ask, frame_time: FrameTime) -> None:
+        """
+        Run one step of the rule engine and write what it concluded. A failure here
+        is logged and skipped: a defect in the rules must never corrupt the zone
+        events beside them (a lost entry would leave an orphan exit).
+        """
+        try:
+            decisions = ask()
+        except Exception as e:
+            self._warn_once("rules", f"the rule engine skipped a step: {type(e).__name__}: {e}")
+            return
+        for decision in decisions:
+            self._write_decision(decision, frame_time)
+
+    def _write_decision(self, decision: Decision, reference: FrameTime) -> None:
+        try:
+            self.writer.add_decision(
+                decision.rule_type, decision.severity, decision.worker_key, decision.status, decision.reason,
+                decision.confidence, decision.evidence, decision.video_time_s,
+                self._observed_at(reference, decision.video_time_s),
+                zone_id=decision.zone_id, rule_id=decision.rule_id, thresholds=decision.thresholds,
+                decision_id=decision.id)
+        except Exception as e:
+            self._warn_once("decision", f"a decision was refused: {type(e).__name__}: {e}")
+            return
+        if len(self._frame_decisions) < _MAX_EVENTS_IN_PAYLOAD:
+            self._frame_decisions.append(decision.as_payload())
 
     def _write_closed(self, reference: FrameTime, extra=()) -> None:
         """
@@ -204,6 +253,11 @@ class SafetySession:
         reaching anything new describes footage the database already has, and
         writing it would leave an exit with no matching entry.
         """
+        # Decisions a jump closed ("the video jumped before they could be judged") are
+        # observations of what happened before it, so they are written.
+        decisions, self._closed_decisions = self._closed_decisions, []
+        for decision in decisions:
+            self._write_decision(decision, reference)
         waiting, self._closed_waiting = self._closed_waiting, []
         for record in [*waiting, *extra]:
             pair = (record.worker_key, record.zone_id)
@@ -255,6 +309,8 @@ class SafetySession:
             data["ppe_unavailable"] = self.ppe.unavailable_reason
         if self._frame_events:
             data["events"] = list(self._frame_events)
+        if self._frame_decisions:
+            data["decisions"] = list(self._frame_decisions)
         return data
 
     # ── the end ──────────────────────────────────────────────────────────────
@@ -268,9 +324,14 @@ class SafetySession:
         try:
             reference = self._last_frame
             if reference is not None:
-                self._closed_waiting.extend(r for r in self.engine.drain() if isinstance(r, ZoneEvent))
+                drained = self.engine.drain()
+                self._closed_waiting.extend(r for r in drained if isinstance(r, ZoneEvent))
+                self._closed_decisions.extend(r for r in drained if isinstance(r, Decision))
                 last = self.engine.last_seen_s
-                ending = self.tracker.close_all("SESSION_END", reference.video_time_s if last is None else last)
+                end_at = reference.video_time_s if last is None else last
+                ending = self.tracker.close_all("SESSION_END", end_at)
+                if self.compliance is not None:
+                    self._closed_decisions.extend(self.compliance.close(end_at))
                 self._write_closed(reference, ending)
         except Exception as e:
             self._warn_once("finish", f"closing the safety session failed: {type(e).__name__}: {e}")

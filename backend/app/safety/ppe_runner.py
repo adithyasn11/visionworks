@@ -115,6 +115,20 @@ class PpeRunner:
             return FAILING
         return None
 
+    def verdict(self, worker_key: str, t: float):
+        """
+        The evidence-based reading of one worker right now, as the evidence tracker
+        gives it ({"status", "items": {item: {state, why, clear_frames, ...}}, ...}),
+        or None when no verdicts can be given (no model, or the detector is failing).
+        """
+        if self.unavailable_reason:
+            return None
+        self._tracker.stale_seconds = self._stale_seconds()
+        out = self._tracker.status(worker_key, float(t))
+        seen, n = self._tracker.recent_seen(worker_key, float(t), self.config.ppe_min_clear_frames)
+        out["recent"] = {"frames": n, "seen_fraction": seen}
+        return out
+
     # ── per frame ────────────────────────────────────────────────────────────
 
     def process(self, persons: List[dict], ppe_frame, pose_shape, t: float) -> Dict[int, dict]:

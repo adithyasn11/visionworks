@@ -17,6 +17,8 @@ import { backendFetch, backendSocketUrl } from '../lib/backend';
 import { drawHUD } from '../lib/overlay';
 import ZoneActivity from './ZoneActivity';
 import PpeStatus from './PpeStatus';
+import DecisionFeed from './DecisionFeed';
+import { addDecisions } from '../lib/decisions';
 import { addZoneEvents } from '../lib/zoneEvents';
 
 /** mm:ss for the scrubber. */
@@ -107,6 +109,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   const [realtime, setRealtime] = useState(true);
   const realtimeRef = useRef(true);
   const [zoneEvents, setZoneEvents] = useState([]);
+  const [decisions, setDecisions] = useState([]);
   const [safetyOn, setSafetyOn] = useState(false);
   // The latest frame's people (for the PPE list) and, when the helmet/vest model
   // is not available, why.
@@ -147,6 +150,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       setSafetyOn(true);
       setPpeUnavailable(data.safety.ppe_unavailable || null);
       setPpeEntities(entities);
+      if (Array.isArray(data.safety.decisions) && data.safety.decisions.length > 0) {
+        const made = data.safety.decisions;
+        setDecisions((list) => addDecisions(list, made));
+      }
       const incoming = data.safety.events;
       if (Array.isArray(incoming) && incoming.length > 0) {
         const first = zoneEventIdRef.current;
@@ -261,6 +268,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     setStatusMsg('');
     setStats({ detected: 0, sitting: 0, standing: 0, walking: 0 });
     setZoneEvents([]);
+    setDecisions([]);
     setSafetyOn(false);
     setPpeEntities([]);
     setPpeUnavailable(null);
@@ -914,7 +922,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
 
       {/* Zone entries and exits, once the safety layer is running */}
       {safetyOn && (phase === 'processing' || phase === 'done' || isWebcamActive) && (
-        <ZoneActivity events={zoneEvents} zones={activeZones} />
+        <>
+          <DecisionFeed decisions={decisions} zones={activeZones} />
+          <ZoneActivity events={zoneEvents} zones={activeZones} />
+        </>
       )}
       {safetyOn && (phase === 'processing' || isWebcamActive) && (
         <PpeStatus entities={ppeEntities} unavailable={ppeUnavailable} />

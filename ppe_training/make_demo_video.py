@@ -112,6 +112,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", choices=["ppe6", "construction"], default="ppe6")
     ap.add_argument("--view", choices=["close", "wide"], default="close")
+    ap.add_argument("--gap", type=float, default=0.0, metavar="SECONDS",
+                    help="plain empty frames after each picture, long enough for the tracker to forget the worker, "
+                         "so every picture is a NEW worker walking in (default 0: pictures cut straight to each other)")
     args = ap.parse_args()
     if args.source == "ppe6" and args.view == "wide":
         sys.exit("the ppe6 images have no wide views; use --source construction --view wide")
@@ -124,6 +127,8 @@ def main():
         out = os.path.join(OUT_DIR, "ppe_demo_cctv_like.mp4" if args.view == "wide" else "ppe_demo_construction.mp4")
     if not order:
         sys.exit("no suitable images found (is the dataset downloaded?)")
+    if args.gap > 0:
+        out = out.replace(".mp4", "_gaps.mp4")
 
     os.makedirs(OUT_DIR, exist_ok=True)
     writer = cv2.VideoWriter(out, cv2.VideoWriter_fourcc(*"mp4v"), FPS, size)
@@ -136,8 +141,11 @@ def main():
         print(f"{key}  {os.path.basename(path)}")
         for _ in range(hold * FPS):
             writer.write(frame)
+        empty = np.full((size[1], size[0], 3), 24, dtype=np.uint8)
+        for _ in range(int(round(args.gap * FPS))):
+            writer.write(empty)
     writer.release()
-    print(f"wrote {out}  ({len(order) * hold} s, {size[0]}x{size[1]})")
+    print(f"wrote {out}  ({len(order) * (hold + args.gap):.0f} s, {size[0]}x{size[1]})")
 
 
 if __name__ == "__main__":
