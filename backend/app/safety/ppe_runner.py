@@ -51,9 +51,11 @@ from collections import deque
 from typing import Dict, List, Optional
 
 from app.cv.ppe_evidence import (
-    HELMET, VEST, UNVERIFIABLE, PpeEvidenceTracker, associate_frame,
+    HELMET, VEST, UNVERIFIABLE, PRESENT_CONF, WEAK_CONF, PpeEvidenceTracker, associate_frame,
 )
 from app.safety.config import SafetyConfig
+from app.safety.ppe_colour import hivis_fraction
+from app.safety.ppe_crops import needs_crop, person_crop
 
 _log = logging.getLogger(__name__)
 
@@ -93,6 +95,7 @@ class PpeRunner:
         self._prev_t: Optional[float] = None
         self._prev_detect_t: Optional[float] = None
         self.detections_run = 0                 # how many frames the model actually ran on
+        self.crops_run = 0                      # close-up checks of small, distant workers
 
     def _new_tracker(self) -> PpeEvidenceTracker:
         c = self.config
@@ -204,6 +207,7 @@ class PpeRunner:
             self._failures += 1
             self._warn(f"PPE detection failed: {type(e).__name__}: {e}")
             return
+        detections = list(detections) + self._close_ups(scaled, ppe_frame, small)
         self._failures = 0
         self.detections_run += 1
         if self._prev_detect_t is not None and t > self._prev_detect_t:
@@ -211,20 +215,89 @@ class PpeRunner:
         self._prev_detect_t = t
 
         seen = associate_frame(scaled, detections, small.shape)
+        self._colour_cue(seen, scaled, small)
         for p in persons:
             key = worker_key(p["track_id"])
             obs = seen[p["track_id"]]
             self._tracker.update(key, obs, t)
             self._last[key] = dict(obs)
 
+    def _colour_cue(self, seen, scaled, small) -> None:
+        """
+        Where no vest was found on someone whose torso is full of hi-vis colour,
+        do not let that read as "no vest": record a weak sighting (between the
+        evidence layer's "weak" and "present" lines), which it treats as "cannot
+        tell". See ppe_colour.py. Only ever softens an absence.
+        """
+        floor = float(self.config.ppe_hivis_min_fraction)
+        if floor <= 0:
+            return
+        # The evidence layer reads "ambiguous" between ITS weak and present lines (the
+        # module constants, which the tracker uses whatever the config says), so the
+        # cue is placed strictly between those, and can never reach "seen".
+        cue = min((WEAK_CONF + PRESENT_CONF) / 2.0, PRESENT_CONF - 0.01)
+        for p in scaled:
+            obs = seen.get(p["track_id"])
+            if obs is None or not obs.get("clear") or obs[VEST] >= WEAK_CONF:
+                continue
+            try:
+                frac = hivis_fraction(small, p["bbox"])
+            except Exception as e:                       # a cue that fails is simply absent
+                self._warn(f"colour cue failed: {type(e).__name__}: {e}", key="cue")
+                continue
+            if frac is not None and frac >= floor:
+                obs[VEST] = max(obs[VEST], cue)
+
+    def _close_ups(self, scaled, ppe_frame, small) -> list:
+        """
+        Helmets and vests found by looking at each small, distant worker up close.
+
+        Only people who are big enough to be judged at all (the clear-frame
+        height) but still small in the frame the model sees; the cut-out comes from
+        the ORIGINAL frame (all its pixels), enlarged, and what is found is mapped
+        back into `small`'s coordinates. They are added to the whole-frame
+        detections, so a close-up can only supply a sighting the first look
+        missed. A failing close-up adds nothing and is not counted as a failure:
+        the worker is then judged on the whole-frame look alone.
+        """
+        below = float(self.config.ppe_crop_below_px)
+        cap = int(self.config.ppe_max_crops)
+        if below <= 0 or cap <= 0 or ppe_frame is None:
+            return []
+        floor = float(self.config.ppe_min_person_height_px)
+        todo = [p for p in scaled if floor <= p["bbox"][3] - p["bbox"][1] and needs_crop(p["bbox"][3] - p["bbox"][1], below)]
+        todo.sort(key=lambda p: p["bbox"][3] - p["bbox"][1], reverse=True)       # the most judgeable first
+        oh, ow = ppe_frame.shape[:2]
+        sh, sw = small.shape[:2]
+        fx, fy = sw / float(ow), sh / float(oh)                                   # original -> small
+        out = []
+        for p in todo[:cap]:
+            try:
+                x1, y1, x2, y2 = p["bbox"]
+                crop = person_crop(ppe_frame, [x1 / fx, y1 / fy, x2 / fx, y2 / fy])
+                if crop is None:
+                    continue
+                found = self.detector.detect(crop.image, imgsz=self._imgsz(crop.image))
+                mapped = []
+                for d in crop.to_frame(found):
+                    b = d["bbox"]
+                    mapped.append({**d, "bbox": [b[0] * fx, b[1] * fy, b[2] * fx, b[3] * fy]})
+            except Exception as e:
+                self._warn(f"PPE close-up failed: {type(e).__name__}: {e}", key="closeup")
+                continue
+            self.crops_run += 1
+            out.extend(mapped)
+        return out
+
     def _prepare(self, ppe_frame, pose_shape):
         """The frame the PPE model will see, and the factors that map pose-frame pixels onto it."""
         h, w = ppe_frame.shape[:2]
         limit = int(self.config.ppe_max_width)
-        if w > limit:
+        if max(w, h) > limit:                     # the LONGER side, so a portrait phone frame is bounded too
             import cv2
-            new_w = limit
-            new_h = max(1, int(round(h * limit / float(w))))
+            k = limit / float(max(w, h))
+            new_w = max(1, int(round(w * k)))
+            new_h = max(1, int(round(h * k)))
             small = cv2.resize(ppe_frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
         else:
             small = ppe_frame

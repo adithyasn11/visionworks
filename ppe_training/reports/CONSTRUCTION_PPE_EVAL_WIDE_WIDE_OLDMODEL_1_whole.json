@@ -1,0 +1,29 @@
+{
+  "images": 1000,
+  "people": 734,
+  "clear_people": 349,
+  "items": {
+    "helmet": {
+      "labelled_present": 378,
+      "labelled_absent": 326,
+      "wrongly_read_absent_of_present": 183,
+      "absent_caught": 318,
+      "absent_missed_as_present": 1,
+      "clear_present": 236,
+      "clear_wrongly_read_absent": 59,
+      "clear_absent": 113,
+      "clear_absent_caught": 107
+    },
+    "vest": {
+      "labelled_present": 563,
+      "labelled_absent": 152,
+      "wrongly_read_absent_of_present": 264,
+      "absent_caught": 146,
+      "absent_missed_as_present": 3,
+      "clear_present": 307,
+      "clear_wrongly_read_absent": 74,
+      "clear_absent": 42,
+      "clear_absent_caught": 38
+    }
+  }
+}

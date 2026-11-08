@@ -268,16 +268,19 @@ def load_zones_for_camera(camera_id: str, org_id: str = None) -> list:
         session.close()
 
 
-async def _detect_poses(pose_engine, frame, motion_speeds, offload):
+async def _detect_poses(pose_engine, frame, motion_speeds, safety=None, original=None):
     """
     Run the pose model. With the safety layer on it runs in a worker thread so
     the event loop (other sockets, the writers) is not frozen for the length of a
-    frame; with it off it runs inline exactly as it always did.
+    frame, and it looks at the original, larger frame so distant workers are found
+    (see SafetySession.pose_input); with it off it runs inline on the working copy
+    exactly as it always did.
     """
-    if offload:
-        return await asyncio.to_thread(
-            pose_engine.process_frame_single_pass, frame, motion_speeds=motion_speeds, imgsz=480)
-    return pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
+    if safety is None:
+        return pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
+    pose_frame, imgsz, rescale = safety.pose_input(original if original is not None else frame, frame)
+    return await asyncio.to_thread(
+        pose_engine.process_frame_single_pass, pose_frame, motion_speeds=motion_speeds, imgsz=imgsz, rescale=rescale)
 
 
 async def _live_safety_session(camera_id, org_id, zones_config):
@@ -806,7 +809,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
 
             # Collect recent motion speeds per track ID to validate WALKING vs STANDING
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
-            detections = await _detect_poses(pose_engine, frame, motion_speeds, offload=safety is not None)
+            detections = await _detect_poses(pose_engine, frame, motion_speeds, safety=safety, original=ppe_frame)
 
             # Helmet / vest check, BEFORE process_detections blurs the head region
             # in place (the blur covers exactly where a helmet is).
@@ -1037,7 +1040,7 @@ async def live_webcam_websocket(websocket: WebSocket):
                 frame = cv2.resize(frame, (inference_width, int(h * scale)))
 
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
-            detections = await _detect_poses(pose_engine, frame, motion_speeds, offload=safety is not None)
+            detections = await _detect_poses(pose_engine, frame, motion_speeds, safety=safety, original=ppe_frame)
 
             # Helmet / vest check, BEFORE process_detections blurs the head region
             # in place (the blur covers exactly where a helmet is).
@@ -1206,7 +1209,7 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
                 frame = cv2.resize(frame, (inference_width, int(h * scale)))
 
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
-            detections = await _detect_poses(pose_engine, frame, motion_speeds, offload=safety is not None)
+            detections = await _detect_poses(pose_engine, frame, motion_speeds, safety=safety, original=ppe_frame)
 
             # Helmet / vest check, BEFORE process_detections blurs the head region
             # in place (the blur covers exactly where a helmet is).

@@ -62,6 +62,10 @@ class SafetyConfig:
     ppe_min_person_width_px: float = _ppe.MIN_PERSON_WIDTH_PX
     ppe_crowd_iou: float = _ppe.CROWD_IOU
     ppe_every_n_frames: int = 2                          # run the PPE model every Nth frame
+    ppe_crop_below_px: float = 360.0                     # a person shorter than this (in the PPE frame) is also checked up close; 0 = never
+    ppe_hivis_min_fraction: float = 0.10                 # hi-vis coloured share of a torso that stops 'no vest found' being read as 'no vest' (0 = off)
+    ppe_max_crops: int = 10                              # close-up checks per frame, most distant first dropped
+    pose_max_width: int = 1280                           # width the people detector sees (the original frame, shrunk only if wider)
     ppe_max_width: int = 1280                            # frame width the PPE model sees (a worker must be >= ppe_min_person_height_px tall in THIS frame)
 
     # ── Zone events (F7) ─────────────────────────────────────────────────────
@@ -123,6 +127,10 @@ _RANGES = {
     "ppe_crowd_iou": (0.0, 1.0),
     "ppe_every_n_frames": (1, 30),
     "ppe_max_width": (320, 3840),
+    "ppe_crop_below_px": (0.0, 4000.0),
+    "ppe_max_crops": (0, 50),
+    "ppe_hivis_min_fraction": (0.0, 1.0),
+    "pose_max_width": (320, 3840),
     "enter_confirm_s": (0.0, 30.0),
     "exit_confirm_s": (0.0, 30.0),
     "lost_grace_s": (0.0, 600.0),

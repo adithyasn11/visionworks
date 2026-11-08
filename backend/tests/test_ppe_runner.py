@@ -63,7 +63,7 @@ PERSON = {"track_id": 1, "bbox": [200.0, 100.0, 300.0, 400.0]}        # 300 px t
 # a helmet on the head, a vest on the torso, in the same pixel space
 HELMET = {"cls": "helmet", "conf": 0.9, "bbox": [225.0, 95.0, 275.0, 135.0]}
 VEST = {"cls": "safety_vest", "conf": 0.9, "bbox": [205.0, 190.0, 295.0, 290.0]}
-CFG = SafetyConfig()           # every 2nd frame, min 8 clear frames, window 30
+CFG = SafetyConfig(ppe_crop_below_px=0.0)           # every 2nd frame, min 8 clear frames, window 30
 
 
 def run_frames(runner, n, persons=(PERSON,), frame=FRAME, shape=SHAPE, start=0.0, dt=0.1):
@@ -110,11 +110,11 @@ r = PpeRunner(det, CFG)
 run_frames(r, 10)
 check("every 2nd frame by default: 5 model runs for 10 frames", len(det.calls) == 5, str(len(det.calls)))
 det = Fake([HELMET, VEST])
-r = PpeRunner(det, SafetyConfig(ppe_every_n_frames=1))
+r = PpeRunner(det, SafetyConfig(ppe_crop_below_px=0.0, ppe_every_n_frames=1))
 run_frames(r, 10)
 check("every_n=1: every frame", len(det.calls) == 10)
 det = Fake([HELMET, VEST])
-r = PpeRunner(det, SafetyConfig(ppe_every_n_frames=4))
+r = PpeRunner(det, SafetyConfig(ppe_crop_below_px=0.0, ppe_every_n_frames=4))
 run_frames(r, 10)
 check("every_n=4: frames 1, 5, 9", len(det.calls) == 3, str(len(det.calls)))
 det = Fake([HELMET, VEST])
@@ -166,7 +166,7 @@ r = PpeRunner(det, CFG)
 r.process([person_pose], big, pose_shape, 0.0)
 check("a 1080p frame reaches the model shrunk to 1280 wide, not 640", det.calls[0][0][:2] == (720, 1280), str(det.calls[0]))
 check("the model is told to work at that size (longest side, multiple of 32)", det.calls[0][1] == 1280, str(det.calls[0]))
-r = PpeRunner(Fake([]), SafetyConfig(ppe_max_width=640))
+r = PpeRunner(Fake([]), SafetyConfig(ppe_crop_below_px=0.0, ppe_max_width=640))
 d2 = r.detector
 r.process([person_pose], big, pose_shape, 0.0)
 check("ppe_max_width is honoured", d2.calls[0][0][:2] == (360, 640), str(d2.calls[0]))
@@ -192,7 +192,7 @@ check("...whereas with no larger frame to look at, the same worker stays UNVERIF
 # helmet found in 1280-space attaches to the person given in 640-space
 helmet_big = {"cls": "helmet", "conf": 0.88, "bbox": [210.0, 70.0, 270.0, 130.0]}   # 2x the pose-space head
 det = Fake([helmet_big])
-r = PpeRunner(det, SafetyConfig(ppe_every_n_frames=1))
+r = PpeRunner(det, SafetyConfig(ppe_crop_below_px=0.0, ppe_every_n_frames=1))
 out = r.process([person_pose], big, pose_shape, 0.0)
 check("a helmet detected at 1280-wide coordinates is matched to the person boxed at 640-wide coordinates",
       out[7]["helmet"] == 0.88, str(out[7]))
@@ -209,7 +209,7 @@ check("reset returns nothing to write (PPE evidence is not an event)", r.reset("
 
 # ── 6. Housekeeping ─────────────────────────────────────────────────────────
 print("6. Memory")
-r = PpeRunner(Fake([]), SafetyConfig(ppe_every_n_frames=1))
+r = PpeRunner(Fake([]), SafetyConfig(ppe_crop_below_px=0.0, ppe_every_n_frames=1))
 for i in range(50):
     r.process([{"track_id": 100 + i, "bbox": [200.0, 100.0, 300.0, 400.0]}], FRAME, SHAPE, i * 5.0)
 check("tracks not seen for a long time are dropped", len(r._last_seen) <= 8 and len(r._tracker._obs) <= 8, str((len(r._last_seen), len(r._tracker._obs))))
@@ -262,7 +262,7 @@ ensure_safety_tables(dbe)
 
 def make_session(runner):
     return SafetySession(SafetyEngine(FrameClock(fps=10.0, recorded_at="2026-11-08T04:00:00Z")),
-                         SafetyWriter("cam", engine=dbe, retry_interval_s=0.0), SafetyConfig(), ppe_runner=runner)
+                         SafetyWriter("cam", engine=dbe, retry_interval_s=0.0), SafetyConfig(ppe_crop_below_px=0.0), ppe_runner=runner)
 
 
 async def scenario():
@@ -276,7 +276,7 @@ async def scenario():
     got_down = await down.detect_ppe(ft, [PERSON], FRAME, SHAPE)
     pay_down = down.payload(ft)
 
-    live = make_session(PpeRunner(Fake([HELMET, VEST]), SafetyConfig(ppe_every_n_frames=1)))
+    live = make_session(PpeRunner(Fake([HELMET, VEST]), SafetyConfig(ppe_crop_below_px=0.0, ppe_every_n_frames=1)))
     for i in range(12):
         ft = live.begin_frame(i)
         got_live = await live.detect_ppe(ft, [PERSON, {"track_id": None, "bbox": [0, 0, 1, 1]}], FRAME, SHAPE)
@@ -380,12 +380,12 @@ odd = np.zeros((800, 1280, 3), dtype=np.uint8)          # PPE frame 1280x800, po
 person_pose2 = {"track_id": 9, "bbox": [100.0, 50.0, 200.0, 250.0]}
 x1, y1, x2, y2 = 100 * 2.0, 50 * (800 / 360.0), 200 * 2.0, 250 * (800 / 360.0)
 head = {"cls": "helmet", "conf": 0.8, "bbox": [(x1 + x2) / 2 - 25, y1 - 5, (x1 + x2) / 2 + 25, y1 + 40]}
-r = PpeRunner(Fake([head]), SafetyConfig(ppe_every_n_frames=1))
+r = PpeRunner(Fake([head]), SafetyConfig(ppe_crop_below_px=0.0, ppe_every_n_frames=1))
 out = r.process([person_pose2], odd, (360, 640, 3), 0.0)
 check("a helmet at the head of a person scaled by different x and y ratios is still matched", out[9]["helmet"] == 0.8, str(out[9]))
 
 print("13. Failures outside the detector count too")
-r = PpeRunner(Fake([HELMET, VEST]), SafetyConfig(ppe_every_n_frames=1))
+r = PpeRunner(Fake([HELMET, VEST]), SafetyConfig(ppe_crop_below_px=0.0, ppe_every_n_frames=1))
 for i in range(4):
     out = r.process([PERSON], None, SHAPE, i * 0.1)
 check("a step that raises returns UNVERIFIABLE and never raises", out[1]["status"] == "UNVERIFIABLE")
@@ -419,7 +419,7 @@ print("16. Settings")
 from app.safety.config import load_config                           # noqa: E402
 cfg = load_config({"SAFETY_PPE_CONF_FLOOR": "0.5"})
 check("a detector floor above the evidence layer's 'weak' line would hide weak sightings: refused",
-      cfg.ppe_conf_floor == 0.20 and cfg.ppe_weak_conf == SafetyConfig().ppe_weak_conf)
+      cfg.ppe_conf_floor == 0.20 and cfg.ppe_weak_conf == SafetyConfig(ppe_crop_below_px=0.0).ppe_weak_conf)
 check("a lower floor is fine", load_config({"SAFETY_PPE_CONF_FLOOR": "0.1"}).ppe_conf_floor == 0.1)
 
 print("17. A failed model load is retried after a while")

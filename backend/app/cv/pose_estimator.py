@@ -45,10 +45,15 @@ class PostureEstimator:
         cosine_angle = np.clip(cosine_angle, -1.0, 1.0)
         return float(np.degrees(np.arccos(cosine_angle)))
 
-    def process_frame_single_pass(self, frame: np.ndarray, motion_speeds: dict = None, imgsz: int = 480):
+    def process_frame_single_pass(self, frame: np.ndarray, motion_speeds: dict = None, imgsz: int = 480,
+                                  rescale=None):
         """
         Runs Person Detection + ByteTrack Tracking + 17 COCO Keypoint Extraction in ONE SINGLE GPU PASS at 60+ FPS.
         motion_speeds: dict mapping track_id -> recent_speed_pixels
+        rescale: None, or (sx, sy): the frame given here is a larger copy of the one the
+            rest of the pipeline works in, so every box and keypoint is multiplied by
+            these factors BEFORE posture is judged, and comes back in the working
+            frame's pixels. The tracker itself follows people in the larger frame.
         """
         if motion_speeds is None:
             motion_speeds = {}
@@ -86,6 +91,14 @@ class PostureEstimator:
                 keypoints_data = np.concatenate([keypoints_data, pad], axis=2)
         else:
             keypoints_data = [np.zeros((17, 3)) for _ in boxes]
+
+        if rescale is not None:
+            sx, sy = float(rescale[0]), float(rescale[1])
+            boxes = boxes * np.array([sx, sy, sx, sy], dtype=boxes.dtype)
+            if has_kpts:
+                keypoints_data = keypoints_data.copy()
+                keypoints_data[..., 0] *= sx
+                keypoints_data[..., 1] *= sy
 
         for i, (box, track_id, conf) in enumerate(zip(boxes, track_ids, confs)):
             x1, y1, x2, y2 = map(int, box)

@@ -52,6 +52,8 @@ from app.cv.ppe_evidence import (                                  # noqa: E402
 )
 from app.cv.ppe_detector import PpeDetector                        # noqa: E402
 from app.safety.config import SafetyConfig                         # noqa: E402
+from app.safety.ppe_crops import needs_crop, person_crop           # noqa: E402
+from app.safety.ppe_colour import hivis_fraction                   # noqa: E402
 
 ROOT = os.path.join(HERE, "datasets", "construction_ppe")
 CLS = {"helmet": 0, "vest": 2, "person": 5, "no_helmet": 6, "no_vest": 11}
@@ -110,6 +112,11 @@ def main():
     ap.add_argument("--weights", default=None, help="PPE weights to evaluate (default: the production model)")
     ap.add_argument("--only", default=None, help="text file listing image paths; only images with these file names are used")
     ap.add_argument("--tag", default="", help="suffix for the report file names")
+    ap.add_argument("--crops", type=float, default=0.0, metavar="BELOW_PX",
+                    help="also look at every person shorter than BELOW_PX (in the 1280-wide frame) up close, "
+                         "cut from the original image (0 = whole-frame detection only)")
+    ap.add_argument("--colour", type=float, default=0.0, metavar="MIN_FRACTION",
+                    help="where no vest is found but this share of the torso is hi-vis coloured, do not read it as absent (0 = off)")
     ap.add_argument("--wide", action="store_true",
                     help="only wide scenes: 3-8 people, all under 30%% of the image height (a camera over a site)")
     args = ap.parse_args()
@@ -132,6 +139,7 @@ def main():
 
     for n, path in enumerate(files, 1):
         img = cv2.imread(path)
+        original = img
         if img is None:
             continue
         h0, w0 = img.shape[:2]
@@ -151,7 +159,23 @@ def main():
         images_with_people += 1
 
         dets = detector.detect(img, imgsz=int(math.ceil(max(h, w) / 32.0) * 32))
+        if args.crops:
+            extra = []
+            for p in persons:
+                if SafetyConfig().ppe_min_person_height_px <= p["bbox"][3] - p["bbox"][1] and needs_crop(p["bbox"][3] - p["bbox"][1], args.crops):
+                    crop = person_crop(original, [v / scale for v in p["bbox"]])
+                    if crop is not None:
+                        found = detector.detect(crop.image, imgsz=int(math.ceil(max(crop.image.shape[:2]) / 32.0) * 32))
+                        extra += [{**d, "bbox": [v * scale for v in d["bbox"]]} for d in crop.to_frame(found)]
+            dets = dets + extra
         seen = associate_frame(persons, dets, img.shape)
+        if args.colour:
+            for p in persons:
+                o = seen[p["track_id"]]
+                if o["clear"] and o["safety_vest"] < WEAK_CONF:
+                    f = hivis_fraction(img, p["bbox"])
+                    if f is not None and f >= args.colour:
+                        o["safety_vest"] = (WEAK_CONF + PRESENT_CONF) / 2.0
         truth = {
             "helmet": gt_state(persons, boxes.get(CLS["helmet"], []), boxes.get(CLS["no_helmet"], []), "helmet"),
             "vest": gt_state(persons, boxes.get(CLS["vest"], []), boxes.get(CLS["no_vest"], []), "safety_vest"),

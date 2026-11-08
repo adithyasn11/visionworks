@@ -160,8 +160,14 @@ try:
 
     rows = events_for(sid)
     check("rows were written to the real safety_events table", len(rows) > 0)
-    check("each worker's first row is an ENTERED_ZONE flagged first_sighting (they were in view at the start)",
-          all(json.loads(r[5] or "{}").get("first_sighting") for r in rows if r[0] == "ENTERED_ZONE"))
+    first_seen = {}
+    for f in frames:
+        for e in f["tracked_entities"]:
+            first_seen.setdefault(f"trk-{e['track_id']}", f["safety"]["video_time_s"])
+    check("an ENTERED_ZONE is flagged first_sighting exactly when the worker's very first frame was already inside the zone",
+          all(bool(json.loads(r[5] or "{}").get("first_sighting")) == (abs(r[3] - first_seen[r[1]]) < 0.06)
+              for r in rows if r[0] == "ENTERED_ZONE"),
+          str([(r[1], r[3], first_seen.get(r[1])) for r in rows if r[0] == "ENTERED_ZONE"][:4]))
     check("worker keys are anonymous track keys", all(r[1].startswith("trk-") for r in rows))
     check("org and camera are on the row", all(r[6] == PROBE_ORG and r[7] == f"upload_{sid}" for r in rows))
     check("the zone is the one drawn", all(r[2] == zones[0] for r in rows))

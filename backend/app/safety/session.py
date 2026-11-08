@@ -69,6 +69,9 @@ class SafetySession:
         self._partial: set = set()
         self._warned: set = set()
         self._frame_events: List[dict] = []
+        # The size the people detector sees, fixed by the first frame: its tracker keeps
+        # ids across frames, and ids churn when the frame size changes mid-stream.
+        self._pose_size = None
         # Visits a jump closed, delivered with the next frame but not yet written.
         # Held here so that a frame that fails before after_frame() cannot lose them.
         self._closed_waiting: List[ZoneEvent] = []
@@ -83,6 +86,47 @@ class SafetySession:
         self._last_frame = frame_time
         self._closed_waiting.extend(r for r in frame_time.closed if isinstance(r, ZoneEvent))
         return frame_time
+
+    def pose_input(self, original, working):
+        """
+        What to show the people detector, and how to bring its boxes back.
+
+        `original` is the frame as the camera sent it, `working` the (usually 640
+        px wide) copy the rest of the pipeline uses. A distant worker is a few
+        pixels in the copy and is simply not found, so the detector is given the
+        ORIGINAL (shrunk only above `pose_max_width`) at a matching input size, and
+        its boxes are scaled back to `working`'s pixels so zones, overlays and
+        telemetry are unchanged.
+
+        Returns (frame, imgsz, rescale): rescale is None when no scaling is needed.
+        """
+        import math
+
+        wh, ww = working.shape[:2]
+        oh, ow = original.shape[:2]
+        limit = int(self.config.pose_max_width)
+        longest = max(ow, oh)
+        if original is working or (ow <= ww and oh <= wh):
+            frame, rescale = working, None
+        elif longest > limit:
+            # The limit is on the LONGER side, so a portrait phone frame is not
+            # handed to the model at 1920 px tall.
+            import cv2
+            k = limit / float(longest)
+            nw, nh = max(1, int(round(ow * k))), max(1, int(round(oh * k)))
+            frame = cv2.resize(original, (nw, nh), interpolation=cv2.INTER_AREA)
+            rescale = (ww / float(nw), wh / float(nh))
+        else:
+            frame, rescale = original, (ww / float(ow), wh / float(oh))
+        if self._pose_size is None:
+            self._pose_size = (frame.shape[1], frame.shape[0])
+        elif (frame.shape[1], frame.shape[0]) != self._pose_size:
+            import cv2
+            pw, ph = self._pose_size
+            frame = cv2.resize(frame, (pw, ph), interpolation=cv2.INTER_AREA)
+            rescale = (ww / float(pw), wh / float(ph))
+        imgsz = max(480, int(math.ceil(max(frame.shape[:2]) / 32.0) * 32))
+        return frame, imgsz, rescale
 
     async def detect_ppe(self, frame_time: FrameTime, detections, ppe_frame, pose_shape) -> Optional[dict]:
         """
