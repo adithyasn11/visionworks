@@ -20,6 +20,7 @@ The contract with the video loop: nothing in here may raise into it. A failure i
 the safety layer is logged (once, not per frame) and the video carries on.
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -28,6 +29,7 @@ from app.db.safety_writer import SafetyWriter, persist_safety
 from app.safety.clock import utc_iso
 from app.safety.config import SafetyConfig, load_config
 from app.safety.engine import FrameTime, SafetyEngine, engine_for_session
+from app.safety.ppe_runner import PpeRunner, get_ppe_detector
 from app.safety.zone_events import ZoneEvent, ZoneEventTracker, rule_zone_ids
 
 _log = logging.getLogger(__name__)
@@ -44,7 +46,7 @@ def worker_key(track_id) -> str:
 
 class SafetySession:
     def __init__(self, engine: SafetyEngine, writer: SafetyWriter, config: Optional[SafetyConfig] = None,
-                 zones_config=None):
+                 zones_config=None, ppe_runner: Optional[PpeRunner] = None):
         """
         zones_config: the camera's zones. Only the ones safety rules can attach
         to (PPE_CHECKPOINT, APPROACH, RESTRICTED, EXIT) produce events; a person
@@ -55,6 +57,10 @@ class SafetySession:
         self.writer = writer
         self.config = config or load_config()
         self.tracker = ZoneEventTracker(self.config)
+        # None: this session does no PPE checks (the payload then says nothing about PPE).
+        self.ppe = ppe_runner
+        if ppe_runner is not None:
+            engine.register(ppe_runner)
         self._tracked_zones = None if zones_config is None else rule_zone_ids(zones_config)
         engine.register(self.tracker)
         self._last_frame: Optional[FrameTime] = None
@@ -77,6 +83,23 @@ class SafetySession:
         self._last_frame = frame_time
         self._closed_waiting.extend(r for r in frame_time.closed if isinstance(r, ZoneEvent))
         return frame_time
+
+    async def detect_ppe(self, frame_time: FrameTime, detections, ppe_frame, pose_shape) -> Optional[dict]:
+        """
+        Helmet/vest verdicts for the people in this frame, {track_id: ppe dict},
+        or None when this session does no PPE checks. Call BEFORE the privacy
+        blur touches the frame. The model runs in a worker thread so the event
+        loop (other sockets, the writers) keeps going while it works.
+        """
+        if self.ppe is None:
+            return None
+        persons = [{"track_id": d["track_id"], "bbox": d["bbox"]} for d in detections
+                   if d.get("track_id") is not None]
+        try:
+            return await asyncio.to_thread(self.ppe.process, persons, ppe_frame, pose_shape, frame_time.video_time_s)
+        except Exception as e:
+            self._warn_once("ppe", f"PPE step skipped for a frame: {type(e).__name__}: {e}")
+            return None
 
     def reset(self, reason: str, frame_index: Optional[int] = None) -> None:
         self.engine.reset(reason, frame_index=frame_index)
@@ -184,6 +207,8 @@ class SafetySession:
     def payload(self, frame_time: FrameTime) -> dict:
         """The `safety` block of a frame payload: the clock, plus events raised on this frame."""
         data = frame_time.as_payload()
+        if self.ppe is not None and self.ppe.unavailable_reason:
+            data["ppe_unavailable"] = self.ppe.unavailable_reason
         if self._frame_events:
             data["events"] = list(self._frame_events)
         return data
@@ -225,6 +250,7 @@ def safety_session_for(
     org_id: Optional[str] = None,
     session_id: Optional[str] = None,
     zones_config=None,
+    with_ppe: bool = True,
 ) -> Optional[SafetySession]:
     """
     The safety session for one video, or None when SAFETY_ENABLED is off (the
@@ -235,4 +261,6 @@ def safety_session_for(
     if engine is None:
         return None
     writer = SafetyWriter(camera_id=camera_id, org_id=org_id, session_id=session_id)
-    return SafetySession(engine, writer, zones_config=zones_config)
+    config = load_config()
+    runner = PpeRunner(get_ppe_detector(config), config) if with_ppe else None
+    return SafetySession(engine, writer, config, zones_config=zones_config, ppe_runner=runner)

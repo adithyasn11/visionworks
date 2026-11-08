@@ -16,6 +16,7 @@ import PhoneCameraPanel from './PhoneCameraPanel';
 import { backendFetch, backendSocketUrl } from '../lib/backend';
 import { drawHUD } from '../lib/overlay';
 import ZoneActivity from './ZoneActivity';
+import PpeStatus from './PpeStatus';
 import { addZoneEvents } from '../lib/zoneEvents';
 
 /** mm:ss for the scrubber. */
@@ -103,6 +104,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   // with it off nothing here appears.
   const [zoneEvents, setZoneEvents] = useState([]);
   const [safetyOn, setSafetyOn] = useState(false);
+  // The latest frame's people (for the PPE list) and, when the helmet/vest model
+  // is not available, why.
+  const [ppeEntities, setPpeEntities] = useState([]);
+  const [ppeUnavailable, setPpeUnavailable] = useState(null);
   const zoneEventIdRef = useRef(0);
 
   const handleFrame = useCallback((data) => {
@@ -136,6 +141,8 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
 
     if (data.safety) {
       setSafetyOn(true);
+      setPpeUnavailable(data.safety.ppe_unavailable || null);
+      setPpeEntities(entities);
       const incoming = data.safety.events;
       if (Array.isArray(incoming) && incoming.length > 0) {
         const first = zoneEventIdRef.current;
@@ -251,6 +258,8 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     setStats({ detected: 0, sitting: 0, standing: 0, walking: 0 });
     setZoneEvents([]);
     setSafetyOn(false);
+    setPpeEntities([]);
+    setPpeUnavailable(null);
     // Forget the last session's privacy setting. The next session re-reads it
     // from the server, which may well have a different one (a door camera
     // opening with ?blur=false, or a changed PRIVACY_BLUR_DEFAULT).
@@ -877,6 +886,9 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       {/* Zone entries and exits, once the safety layer is running */}
       {safetyOn && (phase === 'processing' || phase === 'done' || isWebcamActive) && (
         <ZoneActivity events={zoneEvents} zones={activeZones} />
+      )}
+      {safetyOn && (phase === 'processing' || isWebcamActive) && (
+        <PpeStatus entities={ppeEntities} unavailable={ppeUnavailable} />
       )}
 
       {/* Real-time Detection Statistics Pills */}

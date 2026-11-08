@@ -45,6 +45,7 @@ def process_detections(
     zones_config,
     blur_enabled,
     ground_point_zones=False,
+    ppe_by_track=None,
 ):
     """
     Turn one frame's raw detections into the wire format, updating telemetry
@@ -65,6 +66,11 @@ def process_detections(
                              the box. Safety zones are drawn on the floor, and a tall
                              person standing outside a floor polygon still has a box
                              centre above it.
+        ppe_by_track:        {track_id: ppe dict} from the safety layer's PPE step, which
+                             runs BEFORE this function (so before the blur below, which
+                             covers exactly the region a helmet is in). None (default):
+                             entities carry no `ppe` key and the output is exactly as
+                             before.
 
     Workers are identified only by `track_id`, the tracker's anonymous id within
     one camera view. Nobody is named and no appearance signature is computed.
@@ -116,7 +122,7 @@ def process_detections(
         # array once the loop is done.
         anonymizer.blur_face_region(frame, bbox, blur_enabled=blur_enabled)
 
-        tracked_entities.append({
+        entity = {
             "track_id": track_id,
             "bbox": bbox,
             "posture": posture,
@@ -125,6 +131,9 @@ def process_detections(
             "dwell_duration_seconds": dwell_seconds,
             "floor_point": [round(floor_point[0], 1), round(floor_point[1], 1)],
             "floor_size": [SpatialEngine.FLOOR_WIDTH, SpatialEngine.FLOOR_HEIGHT]
-        })
+        }
+        if ppe_by_track is not None and track_id in ppe_by_track:
+            entity["ppe"] = ppe_by_track[track_id]
+        tracked_entities.append(entity)
 
     return tracked_entities, zone_summary

@@ -236,15 +236,27 @@ def load_zones_for_camera(camera_id: str, org_id: str = None) -> list:
         session.close()
 
 
-def _live_safety_session(camera_id, org_id, zones_config):
+async def _detect_poses(pose_engine, frame, motion_speeds, offload):
+    """
+    Run the pose model. With the safety layer on it runs in a worker thread so
+    the event loop (other sockets, the writers) is not frozen for the length of a
+    frame; with it off it runs inline exactly as it always did.
+    """
+    if offload:
+        return await asyncio.to_thread(
+            pose_engine.process_frame_single_pass, frame, motion_speeds=motion_speeds, imgsz=480)
+    return pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
+
+
+async def _live_safety_session(camera_id, org_id, zones_config):
     """
     The safety session for a live camera socket, or None when safety is off or
     could not start. A live feed must keep working without it, so a failure here
     is logged and the camera runs as it did before the safety layer.
     """
     try:
-        return safety_session_for(live=True, camera_id=camera_id, org_id=org_id,
-                                  zones_config=zones_config)
+        return await asyncio.to_thread(
+            safety_session_for, live=True, camera_id=camera_id, org_id=org_id, zones_config=zones_config)
     except Exception as e:
         logger.error(f"Safety layer could not start for camera '{camera_id}': {e}")
         return None
@@ -627,7 +639,10 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
     # when SAFETY_ENABLED is off, which leaves the pipeline and the payload
     # exactly as they were.
     try:
-        safety = safety_session_for(
+        # In a worker thread: building the session may load the helmet/vest
+        # model, which takes seconds and must not freeze the other sockets.
+        safety = await asyncio.to_thread(
+            safety_session_for,
             fps=fps, recorded_at=session.get("recorded_at"), live=False,
             camera_id=effective_camera_id, org_id=org_id, session_id=session_id,
             zones_config=zones_config)
@@ -741,6 +756,9 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
 
             # Resized to the camera's inference width (640 unless registered
             # otherwise) before the pose model sees it.
+            # The original frame, for the PPE model, which needs the pixels the
+            # shrink below throws away. Not blurred: the blur happens later.
+            ppe_frame = frame
             h, w = frame.shape[:2]
             if w > inference_width:
                 scale = inference_width / float(w)
@@ -748,7 +766,12 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
 
             # Collect recent motion speeds per track ID to validate WALKING vs STANDING
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
-            detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
+            detections = await _detect_poses(pose_engine, frame, motion_speeds, offload=safety is not None)
+
+            # Helmet / vest check, BEFORE process_detections blurs the head region
+            # in place (the blur covers exactly where a helmet is).
+            ppe_by_track = (await safety.detect_ppe(frame_time, detections, ppe_frame, frame.shape)
+                            if safety is not None else None)
 
             # One shared implementation — see cv/frame_pipeline.py — so the
             # three sockets cannot drift apart.
@@ -761,6 +784,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                 zones_config,
                 blur_enabled=privacy_state["blur"],
                 ground_point_zones=safety is not None,
+                ppe_by_track=ppe_by_track,
             )
 
             # Persist sampled telemetry. Runs off the event loop and swallows its
@@ -943,7 +967,7 @@ async def live_webcam_websocket(websocket: WebSocket):
     start_time = time.time()
     frame_idx = 0
     # Live source: the safety clock is seconds since now, monotonic.
-    safety = _live_safety_session(effective_camera_id, org_id, zones_config)
+    safety = await _live_safety_session(effective_camera_id, org_id, zones_config)
 
     try:
         while not control_state["stop"]:
@@ -957,13 +981,21 @@ async def live_webcam_websocket(websocket: WebSocket):
 
             # Resized to the camera's inference width (640 unless registered
             # otherwise) before the pose model sees it.
+            # The original frame, for the PPE model, which needs the pixels the
+            # shrink below throws away. Not blurred: the blur happens later.
+            ppe_frame = frame
             h, w = frame.shape[:2]
             if w > inference_width:
                 scale = inference_width / float(w)
                 frame = cv2.resize(frame, (inference_width, int(h * scale)))
 
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
-            detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
+            detections = await _detect_poses(pose_engine, frame, motion_speeds, offload=safety is not None)
+
+            # Helmet / vest check, BEFORE process_detections blurs the head region
+            # in place (the blur covers exactly where a helmet is).
+            ppe_by_track = (await safety.detect_ppe(frame_time, detections, ppe_frame, frame.shape)
+                            if safety is not None else None)
 
             # One shared implementation — see cv/frame_pipeline.py — so the
             # three sockets cannot drift apart.
@@ -976,6 +1008,7 @@ async def live_webcam_websocket(websocket: WebSocket):
                 zones_config,
                 blur_enabled=privacy_state["blur"],
                 ground_point_zones=safety is not None,
+                ppe_by_track=ppe_by_track,
             )
 
             await persist_frame(activity_writer, tracked_entities)
@@ -1084,7 +1117,7 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
     start_time = time.time()
     privacy_state = {"blur": resolve_initial_blur(websocket)}
     # Live source: the safety clock is seconds since now, monotonic.
-    safety = _live_safety_session(effective_camera_id, org_id, zones_config)
+    safety = await _live_safety_session(effective_camera_id, org_id, zones_config)
 
     try:
         while True:
@@ -1116,13 +1149,21 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
 
             # Resized to the camera's inference width (640 unless registered
             # otherwise) before the pose model sees it.
+            # The original frame, for the PPE model, which needs the pixels the
+            # shrink below throws away. Not blurred: the blur happens later.
+            ppe_frame = frame
             h, w = frame.shape[:2]
             if w > inference_width:
                 scale = inference_width / float(w)
                 frame = cv2.resize(frame, (inference_width, int(h * scale)))
 
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
-            detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
+            detections = await _detect_poses(pose_engine, frame, motion_speeds, offload=safety is not None)
+
+            # Helmet / vest check, BEFORE process_detections blurs the head region
+            # in place (the blur covers exactly where a helmet is).
+            ppe_by_track = (await safety.detect_ppe(frame_time, detections, ppe_frame, frame.shape)
+                            if safety is not None else None)
 
             # One shared implementation — see cv/frame_pipeline.py — so the
             # three sockets cannot drift apart.
@@ -1135,6 +1176,7 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
                 zones_config,
                 blur_enabled=privacy_state["blur"],
                 ground_point_zones=safety is not None,
+                ppe_by_track=ppe_by_track,
             )
 
             await persist_frame(activity_writer, tracked_entities)

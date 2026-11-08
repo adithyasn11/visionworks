@@ -40,10 +40,16 @@ class PpeDetector:
         self.imgsz = imgsz
         self.names = self.model.names
 
-    def detect(self, frame):
-        """[{"cls", "conf", "bbox"}] for helmets and vests in a BGR frame."""
+    def detect(self, frame, imgsz: int = None):
+        """
+        [{"cls", "conf", "bbox"}] for helmets and vests in a BGR frame.
+
+        `imgsz` (the longest side the model works at) defaults to the one the
+        detector was built with; a caller feeding wider frames raises it so the
+        extra pixels are not thrown away.
+        """
         res = self.model.predict(frame, conf=self.conf_floor, iou=0.6,
-                                 imgsz=self.imgsz, device=self.device,
+                                 imgsz=int(imgsz or self.imgsz), device=self.device,
                                  verbose=False)[0]
         out = []
         if res.boxes is None or len(res.boxes) == 0:

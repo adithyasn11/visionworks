@@ -20,6 +20,7 @@ const POSTURE_COLORS = {
 };
 
 import { zoneTypeColor, zoneCanvasLabel } from './zoneTypes';
+import { describePpe } from './ppe';
 
 /* A zone's colour comes from its type, from the same module the ZoneEditor
    uses: a zone must be the same colour where it is drawn and where it is
@@ -126,5 +127,34 @@ export function drawHUD(ctx, canvas, entities, zones, enableBlur) {
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '600 11px Inter, sans-serif';
     ctx.fillText(`ID #${entity.track_id}  ${entity.posture}`, x1 + 6, y1 - 12);
+
+    if (entity.ppe) drawPpeBadge(ctx, canvas, entity.ppe, x1, y2);
   });
+}
+
+/**
+ * The helmet / vest verdict, as a pill under the person's box.
+ *
+ * Told apart by words as well as colour (white = OK, red = something not seen,
+ * grey = cannot tell), so it reads the same in greyscale and for anyone who
+ * cannot tell the colours apart. Kept inside the product's red / white / grey.
+ */
+function drawPpeBadge(ctx, canvas, ppe, x, bottom) {
+  const { label, tone } = describePpe(ppe);
+  const fill = tone === 'ok' ? '#FFFFFF' : tone === 'alert' ? '#DC2626' : '#4B4850';
+  const ink = tone === 'ok' ? '#0B0A0C' : '#FFFFFF';
+
+  ctx.font = '700 11px Inter, sans-serif';
+  const w = ctx.measureText(label).width + 14;
+  // Under the box, unless that would fall off the bottom of the frame.
+  const y = bottom + 4 + 18 > canvas.height ? bottom - 22 : bottom + 4;
+  // Keep the whole pill on the canvas when the person is at the right-hand edge.
+  x = Math.max(2, Math.min(x, canvas.width - w - 2));
+  ctx.fillStyle = fill;
+  ctx.fillRect(x, y, w, 18);
+  ctx.strokeStyle = 'rgba(11,10,12,0.55)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, w, 18);
+  ctx.fillStyle = ink;
+  ctx.fillText(label, x + 7, y + 13);
 }

@@ -62,6 +62,7 @@ class SafetyConfig:
     ppe_min_person_width_px: float = _ppe.MIN_PERSON_WIDTH_PX
     ppe_crowd_iou: float = _ppe.CROWD_IOU
     ppe_every_n_frames: int = 2                          # run the PPE model every Nth frame
+    ppe_max_width: int = 1280                            # frame width the PPE model sees (a worker must be >= ppe_min_person_height_px tall in THIS frame)
 
     # ── Zone events (F7) ─────────────────────────────────────────────────────
     enter_confirm_s: float = 0.7
@@ -121,6 +122,7 @@ _RANGES = {
     "ppe_min_person_width_px": (1.0, 4000.0),
     "ppe_crowd_iou": (0.0, 1.0),
     "ppe_every_n_frames": (1, 30),
+    "ppe_max_width": (320, 3840),
     "enter_confirm_s": (0.0, 30.0),
     "exit_confirm_s": (0.0, 30.0),
     "lost_grace_s": (0.0, 600.0),
@@ -146,6 +148,7 @@ _RANGES = {
 # If violated, BOTH fields go back to their defaults — keeping one override and
 # not the other could still leave an inconsistent pair.
 _ORDERED_PAIRS = [
+    ("ppe_conf_floor", "ppe_weak_conf", False),   # the detector must report everything the evidence layer calls "weak"
     ("ppe_weak_conf", "ppe_present_conf", True),
     ("ppe_min_clear_frames", "ppe_window_frames", False),
     ("lost_grace_s", "lost_ttl_s", False),
