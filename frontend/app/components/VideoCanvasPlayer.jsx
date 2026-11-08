@@ -15,6 +15,8 @@ import { publishFrame, clearFrame } from '../lib/liveFrame';
 import PhoneCameraPanel from './PhoneCameraPanel';
 import { backendFetch, backendSocketUrl } from '../lib/backend';
 import { drawHUD } from '../lib/overlay';
+import ZoneActivity from './ZoneActivity';
+import { addZoneEvents } from '../lib/zoneEvents';
 
 /** mm:ss for the scrubber. */
 function formatTime(seconds) {
@@ -96,6 +98,12 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   const [isWebcamActive, setIsWebcamActive] = useState(false);
   const [stats, setStats] = useState({ detected: 0, sitting: 0, standing: 0, walking: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Zone events from the safety layer, newest first. `safetyOn` is true once a
+  // frame carries a `safety` block, i.e. the backend is running the safety layer;
+  // with it off nothing here appears.
+  const [zoneEvents, setZoneEvents] = useState([]);
+  const [safetyOn, setSafetyOn] = useState(false);
+  const zoneEventIdRef = useRef(0);
 
   const handleFrame = useCallback((data) => {
     if (!data.frame_base64) return;
@@ -125,6 +133,16 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       if (e.posture === 'WALKING')  newStats.walking++;
     });
     setStats(newStats);
+
+    if (data.safety) {
+      setSafetyOn(true);
+      const incoming = data.safety.events;
+      if (Array.isArray(incoming) && incoming.length > 0) {
+        const first = zoneEventIdRef.current;
+        zoneEventIdRef.current += incoming.length;
+        setZoneEvents((list) => addZoneEvents(list, incoming, first));
+      }
+    }
 
     if (onFrameData) onFrameData(data);
 
@@ -231,6 +249,8 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     setIsPaused(false);
     setStatusMsg('');
     setStats({ detected: 0, sitting: 0, standing: 0, walking: 0 });
+    setZoneEvents([]);
+    setSafetyOn(false);
     // Forget the last session's privacy setting. The next session re-reads it
     // from the server, which may well have a different one (a door camera
     // opening with ?blur=false, or a changed PRIVACY_BLUR_DEFAULT).
@@ -813,7 +833,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
             </button>
 
             <span className="text-xs text-ink-muted font-mono ml-2">
-              {isWebcamActive ? '🔴 WEBCAM LIVE (GPU AI)' : isPaused ? 'PAUSED' : phase === 'processing' ? 'PLAYING (GPU AI)' : 'IDLE'}
+              {isWebcamActive ? '🔴 WEBCAM LIVE' : isPaused ? 'PAUSED' : phase === 'processing' ? 'PLAYING' : 'IDLE'}
             </span>
           </div>
 
@@ -853,6 +873,11 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           </div>
         </div>
       </div>
+
+      {/* Zone entries and exits, once the safety layer is running */}
+      {safetyOn && (phase === 'processing' || phase === 'done' || isWebcamActive) && (
+        <ZoneActivity events={zoneEvents} zones={activeZones} />
+      )}
 
       {/* Real-time Detection Statistics Pills */}
       {(phase === 'processing' || isWebcamActive) && (

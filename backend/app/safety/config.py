@@ -68,6 +68,7 @@ class SafetyConfig:
     exit_confirm_s: float = 1.0
     lost_grace_s: float = 5.0        # unseen this long inside a zone -> LOST_IN_ZONE
     lost_ttl_s: float = 8.0          # unseen this long -> visit closed (EXITED, reason LOST)
+    zone_gap_tolerance_s: float = 0.5   # a missed detection this short does not restart a timed zone change
 
     # ── Decisions (F9, R1-R4) ────────────────────────────────────────────────
     entry_evidence_wait_s: float = 4.0
@@ -124,6 +125,7 @@ _RANGES = {
     "exit_confirm_s": (0.0, 30.0),
     "lost_grace_s": (0.0, 600.0),
     "lost_ttl_s": (0.0, 3600.0),
+    "zone_gap_tolerance_s": (0.0, 5.0),
     "entry_evidence_wait_s": (0.0, 60.0),
     "continuous_ppe_grace_s": (0.0, 60.0),
     "dwell_warn_fraction": (0.1, 1.0),

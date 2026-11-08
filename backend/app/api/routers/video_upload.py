@@ -31,7 +31,7 @@ from app.cv.frame_pipeline import process_detections
 from app.db.activity_writer import ActivityLogWriter, persist_frame
 from app.db.minute_aggregator import aggregate_after_session
 from app.safety.clock import parse_recorded_at
-from app.safety.engine import engine_for_session
+from app.safety.session import safety_session_for
 from app.api.deps import extract_token, resolve_org_role
 from app.api.permissions import can, denial_message
 
@@ -234,6 +234,20 @@ def load_zones_for_camera(camera_id: str, org_id: str = None) -> list:
         return DEFAULT_ZONES
     finally:
         session.close()
+
+
+def _live_safety_session(camera_id, org_id, zones_config):
+    """
+    The safety session for a live camera socket, or None when safety is off or
+    could not start. A live feed must keep working without it, so a failure here
+    is logged and the camera runs as it did before the safety layer.
+    """
+    try:
+        return safety_session_for(live=True, camera_id=camera_id, org_id=org_id,
+                                  zones_config=zones_config)
+    except Exception as e:
+        logger.error(f"Safety layer could not start for camera '{camera_id}': {e}")
+        return None
 
 
 def _purge_orphaned_uploads(max_age_seconds: int = ORPHAN_UPLOAD_MAX_AGE_SECONDS):
@@ -613,8 +627,10 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
     # when SAFETY_ENABLED is off, which leaves the pipeline and the payload
     # exactly as they were.
     try:
-        safety_engine = engine_for_session(
-            fps=fps, recorded_at=session.get("recorded_at"), live=False)
+        safety = safety_session_for(
+            fps=fps, recorded_at=session.get("recorded_at"), live=False,
+            camera_id=effective_camera_id, org_id=org_id, session_id=session_id,
+            zones_config=zones_config)
     except Exception as e:
         logger.error(f"Safety clock init error: {e}")
         await websocket.send_json({"error": f"Failed to start the safety clock: {e}"})
@@ -688,8 +704,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                 # window) spans footage that no longer connects, so close it
                 # and start clean; rewound frames are flagged as replays so
                 # nothing is raised twice.
-                if safety_engine is not None:
-                    safety_engine.reset("SEEK", frame_index=target_f)
+                if safety is not None:
+                    safety.reset("SEEK", frame_index=target_f)
                 just_sought = True
 
             if control_state["paused"]:
@@ -720,8 +736,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             # target_f, the frame the seek asked for. (The payload's
             # `frame_index` stays 1-based, as it always was; the safety clock's
             # `video_time_s` is the 0-based position, so the first frame is t=0.)
-            frame_time = (safety_engine.begin_frame(frame_idx - 1)
-                          if safety_engine is not None else None)
+            frame_time = (safety.begin_frame(frame_idx - 1)
+                          if safety is not None else None)
 
             # Resized to the camera's inference width (640 unless registered
             # otherwise) before the pose model sees it.
@@ -744,11 +760,14 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                 anonymizer,
                 zones_config,
                 blur_enabled=privacy_state["blur"],
+                ground_point_zones=safety is not None,
             )
 
             # Persist sampled telemetry. Runs off the event loop and swallows its
             # own failures, so it cannot stall or break the video stream.
             await persist_frame(activity_writer, tracked_entities)
+            if safety is not None:
+                await safety.after_frame(frame_time, tracked_entities)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
@@ -774,8 +793,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
 
             # Steps 4+ read this; the dashboard may show it. Absent when safety
             # is off, so the payload is unchanged.
-            if frame_time is not None:
-                payload["safety"] = frame_time.as_payload()
+            if safety is not None:
+                payload["safety"] = safety.payload(frame_time)
 
             await websocket.send_json(payload)
             await asyncio.sleep(0.001)
@@ -822,6 +841,12 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             asyncio.create_task(
                 aggregate_after_session(activity_writer.camera_id, activity_writer.org_id)
             )
+
+        # Close any zone visit still open when the video ends and make the last
+        # attempt to store the session's events. Last, so a slow or cancelled
+        # flush can never leave the upload on disk or skip the telemetry roll-up.
+        if safety is not None:
+            await safety.finish()
 
 
 @router.websocket("/live_webcam")
@@ -918,7 +943,7 @@ async def live_webcam_websocket(websocket: WebSocket):
     start_time = time.time()
     frame_idx = 0
     # Live source: the safety clock is seconds since now, monotonic.
-    safety_engine = engine_for_session(live=True)
+    safety = _live_safety_session(effective_camera_id, org_id, zones_config)
 
     try:
         while not control_state["stop"]:
@@ -928,7 +953,7 @@ async def live_webcam_websocket(websocket: WebSocket):
                 continue
 
             frame_idx += 1
-            frame_time = safety_engine.begin_frame() if safety_engine is not None else None
+            frame_time = safety.begin_frame() if safety is not None else None
 
             # Resized to the camera's inference width (640 unless registered
             # otherwise) before the pose model sees it.
@@ -950,9 +975,12 @@ async def live_webcam_websocket(websocket: WebSocket):
                 anonymizer,
                 zones_config,
                 blur_enabled=privacy_state["blur"],
+                ground_point_zones=safety is not None,
             )
 
             await persist_frame(activity_writer, tracked_entities)
+            if safety is not None:
+                await safety.after_frame(frame_time, tracked_entities)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
@@ -973,8 +1001,8 @@ async def live_webcam_websocket(websocket: WebSocket):
 
             # Steps 4+ read this; the dashboard may show it. Absent when safety
             # is off, so the payload is unchanged.
-            if frame_time is not None:
-                payload["safety"] = frame_time.as_payload()
+            if safety is not None:
+                payload["safety"] = safety.payload(frame_time)
 
             await websocket.send_json(payload)
             await asyncio.sleep(0.001)
@@ -985,6 +1013,8 @@ async def live_webcam_websocket(websocket: WebSocket):
         listen_task.cancel()
         if cap:
             cap.release()
+        if safety is not None:
+            await safety.finish()
         logger.info("Live webcam released.")
 
 
@@ -1054,7 +1084,7 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
     start_time = time.time()
     privacy_state = {"blur": resolve_initial_blur(websocket)}
     # Live source: the safety clock is seconds since now, monotonic.
-    safety_engine = engine_for_session(live=True)
+    safety = _live_safety_session(effective_camera_id, org_id, zones_config)
 
     try:
         while True:
@@ -1082,7 +1112,7 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
                 continue
 
             frame_idx += 1
-            frame_time = safety_engine.begin_frame() if safety_engine is not None else None
+            frame_time = safety.begin_frame() if safety is not None else None
 
             # Resized to the camera's inference width (640 unless registered
             # otherwise) before the pose model sees it.
@@ -1104,9 +1134,12 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
                 anonymizer,
                 zones_config,
                 blur_enabled=privacy_state["blur"],
+                ground_point_zones=safety is not None,
             )
 
             await persist_frame(activity_writer, tracked_entities)
+            if safety is not None:
+                await safety.after_frame(frame_time, tracked_entities)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
@@ -1127,8 +1160,8 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
 
             # Steps 4+ read this; the dashboard may show it. Absent when safety
             # is off, so the payload is unchanged.
-            if frame_time is not None:
-                payload["safety"] = frame_time.as_payload()
+            if safety is not None:
+                payload["safety"] = safety.payload(frame_time)
 
             await websocket.send_json(payload)
 
@@ -1136,3 +1169,6 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
         logger.info("Browser webcam client disconnected")
     except Exception as e:
         logger.error(f"Browser webcam error: {e}")
+    finally:
+        if safety is not None:
+            await safety.finish()

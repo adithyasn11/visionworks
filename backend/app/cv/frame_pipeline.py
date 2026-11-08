@@ -44,6 +44,7 @@ def process_detections(
     anonymizer,
     zones_config,
     blur_enabled,
+    ground_point_zones=False,
 ):
     """
     Turn one frame's raw detections into the wire format, updating telemetry
@@ -57,6 +58,13 @@ def process_detections(
         anonymizer:          `PrivacyAnonymizer`
         zones_config:        the camera's zones, used to seed the occupancy tally
         blur_enabled:        this session's privacy state, already resolved
+        ground_point_zones:  False (default): a person is "in" the zone that contains
+                             the CENTRE of their box, as the workplace analytics always
+                             did, so those numbers do not change. True (the safety layer
+                             on): the zone that contains their feet, the bottom-centre of
+                             the box. Safety zones are drawn on the floor, and a tall
+                             person standing outside a floor polygon still has a box
+                             centre above it.
 
     Workers are identified only by `track_id`, the tracker's anonymous id within
     one camera view. Nobody is named and no appearance signature is computed.
@@ -82,7 +90,8 @@ def process_detections(
         posture = det["posture"]
 
         centroid = [(bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0]
-        zone_id = spatial_engine.check_zone_containment(centroid)
+        zone_id = spatial_engine.check_zone_containment(
+            SpatialEngine.ground_point(bbox) if ground_point_zones else centroid)
 
         if zone_id in zone_summary:
             zone_summary[zone_id] += 1

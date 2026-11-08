@@ -99,6 +99,11 @@ class SafetyEngine:
         """Attach something with `reset(reason, last_seen_s, resume_at_s)`."""
         self.components.append(component)
 
+    @property
+    def last_seen_s(self) -> Optional[float]:
+        """The last video time a frame was actually processed at (None before the first)."""
+        return self._last_seen
+
     # ── per frame ────────────────────────────────────────────────────────────
 
     def begin_frame(self, frame_index: Optional[int] = None) -> FrameTime:
