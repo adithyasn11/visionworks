@@ -14,9 +14,15 @@ numbers suggest — measure on your own footage (ppe_training/eval_ppe_footage.p
 
 import os
 
-DEFAULT_WEIGHTS = os.path.abspath(os.path.join(
-    os.path.dirname(__file__), "..", "..", "..",
-    "ppe_training", "runs", "ppe_yolov8m_v1", "weights", "best.pt"))
+_RUNS = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", "ppe_training", "runs"))
+_BASE_WEIGHTS = os.path.join(_RUNS, "ppe_yolov8m_v1", "weights", "best.pt")
+# Fine-tuned on Construction-PPE plus a sample of the original data (see
+# ppe_training/finetune_ppe.py and reports/FINETUNE_COMPARISON.md): on held-out
+# images it wrongly reads a worn helmet/vest as absent about 6x less often.
+# Used when present; otherwise the original model. PPE_MODEL_PATH overrides both.
+_TUNED_WEIGHTS = os.path.join(_RUNS, "ppe_yolov8m_ft1", "weights", "best.pt")
+DEFAULT_WEIGHTS = _TUNED_WEIGHTS if os.path.isfile(_TUNED_WEIGHTS) else _BASE_WEIGHTS
 
 # Low floor on purpose: the evidence layer needs to see weak (0.20-0.45)
 # detections to tell "ambiguous" from "nothing there".

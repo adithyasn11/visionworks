@@ -107,18 +107,24 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--split", default="all", choices=["all", "train", "val"])
+    ap.add_argument("--weights", default=None, help="PPE weights to evaluate (default: the production model)")
+    ap.add_argument("--only", default=None, help="text file listing image paths; only images with these file names are used")
+    ap.add_argument("--tag", default="", help="suffix for the report file names")
     ap.add_argument("--wide", action="store_true",
                     help="only wide scenes: 3-8 people, all under 30%% of the image height (a camera over a site)")
     args = ap.parse_args()
 
     splits = ["train", "val"] if args.split == "all" else [args.split]
     files = sorted(f for s in splits for f in glob.glob(os.path.join(ROOT, "images", s, "*.jpg")))
+    if args.only:
+        wanted = {os.path.basename(line.strip()) for line in open(args.only, encoding="utf-8") if line.strip()}
+        files = [f for f in files if os.path.basename(f) in wanted]
     if args.limit:
         files = files[:args.limit]
     if not files:
         sys.exit("no images; run download_construction_ppe.py first")
 
-    detector = PpeDetector()
+    detector = PpeDetector(weights=args.weights)
     # item -> condition -> Counter(GT state, reading)
     table = collections.defaultdict(lambda: collections.defaultdict(collections.Counter))
     persons_total = clear_total = 0
@@ -211,7 +217,7 @@ def main():
 
     report = "\n".join(lines) + "\n"
     os.makedirs(os.path.join(HERE, "reports"), exist_ok=True)
-    base = os.path.join(HERE, "reports", "CONSTRUCTION_PPE_EVAL" + ("_WIDE" if args.wide else ""))
+    base = os.path.join(HERE, "reports", "CONSTRUCTION_PPE_EVAL" + ("_WIDE" if args.wide else "") + args.tag)
     open(base + ".md", "w", encoding="utf-8").write(report)
     json.dump({"images": len(files), "people": persons_total, "clear_people": clear_total, "items": summary},
               open(base + ".json", "w", encoding="utf-8"), indent=2)
