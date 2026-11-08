@@ -8,19 +8,19 @@ from reportlab.lib import colors
 
 class AnalyticsReportGenerator:
     """
-    Generates executive CSV and PDF reports summarizing physical workplace activity telemetry,
-    posture health ratios, and workstation utilization metrics.
+    Generates CSV and PDF reports of the site's detection records: how many
+    records were captured and the posture mix. Counts only; no names or video.
     """
     @staticmethod
     def generate_csv_report(data_logs: list, output_filepath: str) -> str:
-        """Exports raw activity telemetry logs to CSV format"""
+        """Exports the raw detection records to CSV format"""
         df = pd.DataFrame(data_logs)
         df.to_csv(output_filepath, index=False)
         return output_filepath
 
     @staticmethod
     def generate_pdf_report(summary_stats: dict, output_filepath: str) -> str:
-        """Generates an executive PDF report summarizing workplace utilization"""
+        """Generates a PDF summary of the site's detection records"""
         doc = SimpleDocTemplate(output_filepath, pagesize=letter)
         story = []
         styles = getSampleStyleSheet()
@@ -41,15 +41,14 @@ class AnalyticsReportGenerator:
             spaceAfter=20
         )
 
-        story.append(Paragraph("Vision-Based Workplace Activity Analytics Report", title_style))
-        story.append(Paragraph("Executive Summary • Physical Space & Ergonomic Utilization Telemetry", subtitle_style))
+        story.append(Paragraph("VisionWorks Site Report", title_style))
+        story.append(Paragraph("Detections and posture mix • counts only, no names or video", subtitle_style))
         story.append(Spacer(1, 10))
 
         # Metrics Summary Table
         table_data = [
             ["Metric Name", "Observed Value"],
-            ["Total Telemetry Logs Recorded", str(summary_stats.get("total_logs", 0))],
-            ["Average Activity Score Index", f"{summary_stats.get('average_activity_score', 0)} / 100"],
+            ["Detection Records", str(summary_stats.get("total_logs", 0))],
             ["Sitting Posture Ratio", f"{summary_stats.get('posture_distribution', {}).get('sitting_percentage', 0)}%"],
             ["Standing Posture Ratio", f"{summary_stats.get('posture_distribution', {}).get('standing_percentage', 0)}%"],
             ["Walking / Movement Ratio", f"{summary_stats.get('posture_distribution', {}).get('walking_percentage', 0)}%"]

@@ -101,8 +101,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Vision-Based Workplace Activity Analytics System API",
-    description="Real-time CCTV AI analytics, posture detection, and zone occupancy metrics backend.",
+    title="VisionWorks Workplace Safety Compliance API",
+    description="Camera-based workplace safety compliance: detection, tracking, zones and PPE verdicts.",
     version="1.0.0",
     lifespan=lifespan,
 )

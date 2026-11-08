@@ -1,6 +1,6 @@
 # d:\major project\run_system.py
 """
-Unified System Launcher — Workplace Activity Analytics
+Unified System Launcher — VisionWorks safety compliance monitoring
 Starts FastAPI (port 8001) and Next.js (port 3000).
 Keeps running until Ctrl+C. Kills children on exit.
 
@@ -222,7 +222,7 @@ def main():
     RESET  = "\033[0m"
 
     print(f"{CYAN}{'='*72}{RESET}")
-    print(f"{CYAN} >>> VISION-BASED WORKPLACE ACTIVITY ANALYTICS — LAUNCHER <<<{RESET}")
+    print(f"{CYAN} >>> VISIONWORKS — WORKPLACE SAFETY COMPLIANCE — LAUNCHER <<<{RESET}")
     print(f"{CYAN}{'='*72}{RESET}\n")
 
     scheme = "https" if args.https else "http"
