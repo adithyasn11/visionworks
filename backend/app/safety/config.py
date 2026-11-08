@@ -90,6 +90,15 @@ class SafetyConfig:
     evidence_retention_days: int = 7
     snapshot_unverifiable: bool = False
 
+    # ── Local database retention ─────────────────────────────────────────────
+    # Rows already copied to Postgres are deleted from the local file after this
+    # many days; Postgres holds the durable copy.
+    local_synced_retention_days: int = 7
+    # Standalone mode only (no Supabase to sync to, so nothing will ever mark a
+    # row as synced): rows older than this are deleted so the file cannot grow
+    # for ever. With a service key configured, unsynced rows are NEVER deleted.
+    local_standalone_retention_days: int = 30
+
     def as_dict(self) -> dict:
         """Plain dict of every threshold, stored with each decision."""
         return asdict(self)
@@ -127,6 +136,8 @@ _RANGES = {
     "occupancy_window_s": (0.1, 60.0),
     "occupancy_min_clear_fraction": (0.0, 1.0),
     "evidence_retention_days": (1, 365),
+    "local_synced_retention_days": (1, 365),
+    "local_standalone_retention_days": (1, 3650),
 }
 
 # Pairs that must hold between fields: (smaller, larger, strictly_less).

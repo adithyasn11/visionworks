@@ -24,6 +24,8 @@ frontend/.env.local
 # ─── Database ────────────────────────────────────────────────────────────────
 # Local SQLite databases are generated at runtime — do not commit
 *.db
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 

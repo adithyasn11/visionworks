@@ -87,6 +87,28 @@ async def lifespan(app: FastAPI):
     _silence_proactor_disconnects()
 
     ensure_bucket_table()
+
+    # The safety layer's local tables (events, decisions), plus housekeeping so
+    # the file cannot grow for ever. Created on every start, which is cheap and
+    # means nothing has to remember to run a migration. Housekeeping must never
+    # stop the server from starting.
+    try:
+        from app.db.minute_aggregator import service_role_configured
+        from app.db.safety_models import ensure_safety_tables, purge_local
+        from app.safety.config import load_config
+
+        ensure_safety_tables()
+        cfg = load_config()
+        removed = purge_local(
+            synced_days=cfg.local_synced_retention_days,
+            # Only with nowhere to sync to are unsynced rows ever deleted.
+            unsynced_days=None if service_role_configured() else cfg.local_standalone_retention_days,
+        )
+        if any(removed.values()):
+            logging.getLogger(__name__).info(f"Local safety housekeeping removed {removed}")
+    except Exception as e:
+        logging.getLogger(__name__).error(f"Safety tables could not be prepared: {e}")
+
     task = asyncio.create_task(run_aggregator_loop())
     try:
         yield
