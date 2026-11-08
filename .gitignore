@@ -103,3 +103,6 @@ ppe_training/runs/
 # Safety evidence snapshots: blurred images of flagged events. Personal data
 # with a retention limit — never committed.
 backend/evidence/
+
+# Ultralytics Construction-PPE export (signed, expiring image links); the images live in ppe_training/datasets/ (ignored)
+construction-ppe.ndjson
