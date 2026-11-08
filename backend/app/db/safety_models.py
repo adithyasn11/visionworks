@@ -149,7 +149,7 @@ def purge_local(
     if synced_days < 1 or (unsynced_days is not None and unsynced_days < 1):
         raise ValueError("retention must be at least one day")
 
-    moment = now or datetime.now(timezone.utc)
+    moment = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     synced_cutoff = (moment - timedelta(days=synced_days)).isoformat(timespec="milliseconds")
     unsynced_cutoff = (
         (moment - timedelta(days=unsynced_days)).isoformat(timespec="milliseconds")

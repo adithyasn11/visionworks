@@ -51,6 +51,7 @@ import asyncio
 import json
 import logging
 import math
+import numbers
 import threading
 import time
 import uuid
@@ -59,7 +60,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import text
-from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError
+from sqlalchemy.exc import OperationalError
 
 from app.db.database import engine as _default_engine
 from app.db.safety_models import (
@@ -67,6 +68,11 @@ from app.db.safety_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Evidence/details are stored as JSON text. A runaway payload (a bug dumping a
+# frame array into `evidence`) would bloat the file and the sync, so refuse it.
+MAX_JSON_BYTES = 64 * 1024
+_MAX_DEPTH = 20
 
 MAX_PENDING_EVENTS = 20_000
 MAX_PENDING_DECISIONS = 5_000
@@ -102,35 +108,72 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
 
 
-def _clean(value):
+def _clean(value, _seen=None, _depth=0):
     """
     Make a value JSON-safe: numpy scalars and arrays, datetimes, sets, and the
     floats JSON cannot hold (NaN, ±inf become null, because Postgres JSONB
     rejects the bare word NaN and one such value would poison a whole sync).
+
+    A structure that contains itself, or nests absurdly deep, is cut off with a
+    marker instead of recursing until Python gives up.
     """
-    if value is None or isinstance(value, (bool, int, str)):
+    if value is None or isinstance(value, (bool, int)):
+        return value
+    if isinstance(value, str):
+        _encodable(value, "a text value")
         return value
     if isinstance(value, float):
         return value if math.isfinite(value) else None
-    if isinstance(value, dict):
-        return {str(k): _clean(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_clean(v) for v in value]
-    if isinstance(value, (set, frozenset)):
-        return sorted((_clean(v) for v in value), key=str)
+    if _depth > _MAX_DEPTH:
+        return "<too deep>"
+    seen = _seen if _seen is not None else set()
+    if isinstance(value, (dict, list, tuple, set, frozenset)):
+        if id(value) in seen:
+            return "<circular>"
+        seen = seen | {id(value)}
+        if isinstance(value, dict):
+            return {str(k): _clean(v, seen, _depth + 1) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [_clean(v, seen, _depth + 1) for v in value]
+        return sorted((_clean(v, seen, _depth + 1) for v in value), key=str)
     if isinstance(value, datetime):
         return value.isoformat()
     if hasattr(value, "tolist"):                      # numpy array or scalar
-        return _clean(value.tolist())
+        return _clean(value.tolist(), seen, _depth + 1)
     if hasattr(value, "item"):
-        return _clean(value.item())
-    return str(value)
+        return _clean(value.item(), seen, _depth + 1)
+    return _encodable(str(value), "a text value")
 
 
-def _json(value) -> Optional[str]:
+def _json(value, what: str = "payload") -> Optional[str]:
+    """JSON text for a payload, or ValueError (never anything else) if it cannot be stored."""
     if value is None:
         return None
-    return json.dumps(_clean(value), separators=(",", ":"), allow_nan=False)
+    try:
+        text_ = json.dumps(_clean(value), separators=(",", ":"), allow_nan=False)
+    except ValueError:
+        raise
+    except Exception as e:                            # RecursionError, TypeError, ...
+        raise ValueError(f"{what} cannot be stored as JSON ({type(e).__name__})") from None
+    if len(text_.encode("utf-8")) > MAX_JSON_BYTES:
+        raise ValueError(f"{what} is larger than {MAX_JSON_BYTES} bytes; store a summary, not raw data")
+    return text_
+
+
+def _encodable(value: str, what: str) -> str:
+    """A string SQLite can store: a lone surrogate cannot be encoded and would poison a batch."""
+    try:
+        value.encode("utf-8")
+    except UnicodeError:
+        raise ValueError(f"{what} contains characters that cannot be stored") from None
+    return value
+
+
+def _opt_text(value, what: str) -> Optional[str]:
+    """None, or the value as a storable string (a UUID or Path object is fine; it becomes its text)."""
+    if value is None:
+        return None
+    return _encodable(str(value), what)
 
 
 def _uuid(value, what: str) -> str:
@@ -141,16 +184,27 @@ def _uuid(value, what: str) -> str:
         raise ValueError(f"{what} must be a UUID, got {value!r}") from None
 
 
+def _number(value, what: str) -> float:
+    """A finite real number. numpy scalars (float32, int64, ...) count: the pipeline passes them."""
+    if isinstance(value, bool) or not isinstance(value, numbers.Real):
+        raise ValueError(f"{what} must be a number, got {value!r}")
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"{what} must be finite, got {value!r}")
+    return number
+
+
 def _time(value, what: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+    number = _number(value, what)
+    if number < 0:
         raise ValueError(f"{what} must be a finite number of seconds >= 0, got {value!r}")
-    return float(value)
+    return number
 
 
 def _text(value, what: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{what} must be a non-empty string, got {value!r}")
-    return value
+    return _encodable(value, what)
 
 
 def _iso(value, what: str) -> str:
@@ -189,8 +243,8 @@ class SafetyWriter:
         monotonic=time.monotonic,
     ):
         self.camera_id = _text(camera_id, "camera_id")
-        self.org_id = org_id
-        self.session_id = session_id
+        self.org_id = _opt_text(org_id, "org_id")
+        self.session_id = _opt_text(session_id, "session_id")
         self._engine = engine or _default_engine
         self._max_events = int(max_pending_events)
         self._max_decisions = int(max_pending_decisions)
@@ -231,13 +285,13 @@ class SafetyWriter:
             "event_uid": _uuid(event_uid, "event_uid") if event_uid else str(uuid.uuid4()),
             "org_id": self.org_id,
             "camera_id": self.camera_id,
-            "zone_id": zone_id,
+            "zone_id": _opt_text(zone_id, "zone_id"),
             "worker_key": _text(worker_key, "worker_key"),
             "session_key": self.session_id,
             "event_type": event_type,
             "video_time_s": _time(video_time_s, "video_time_s"),
             "observed_at": _iso(observed_at, "observed_at"),
-            "details": _json(details),
+            "details": _json(details, "details"),
             "created_at": _now_iso(),
         }
         with self._lock:
@@ -269,8 +323,8 @@ class SafetyWriter:
             raise ValueError(f"severity must be one of {SEVERITIES}, got {severity!r}")
         if status not in DECISION_STATUSES:
             raise ValueError(f"status must be one of {DECISION_STATUSES}, got {status!r}")
-        if (isinstance(confidence, bool) or not isinstance(confidence, (int, float))
-                or not math.isfinite(confidence) or not 0.0 <= confidence <= 1.0):
+        confidence = _number(confidence, "confidence")
+        if not 0.0 <= confidence <= 1.0:
             raise ValueError(f"confidence must be a number from 0 to 1, got {confidence!r}")
         if status == "UNVERIFIABLE" and confidence != 0:
             # No claim, so no confidence — never quietly coerced, because a
@@ -282,7 +336,7 @@ class SafetyWriter:
             "id": _uuid(decision_id, "decision_id") if decision_id else str(uuid.uuid4()),
             "org_id": self.org_id,
             "camera_id": self.camera_id,
-            "zone_id": zone_id,
+            "zone_id": _opt_text(zone_id, "zone_id"),
             "rule_id": _uuid(rule_id, "rule_id") if rule_id else None,
             "rule_type": rule_type,
             "severity": severity,
@@ -291,9 +345,9 @@ class SafetyWriter:
             "status": status,
             "reason": _text(reason, "reason"),
             "confidence": float(confidence),
-            "evidence": _json(evidence),
-            "thresholds": _json(thresholds),
-            "snapshot_ref": snapshot_ref,
+            "evidence": _json(evidence, "evidence"),
+            "thresholds": _json(thresholds, "thresholds"),
+            "snapshot_ref": _opt_text(snapshot_ref, "snapshot_ref"),
             "video_time_s": _time(video_time_s, "video_time_s"),
             "observed_at": _iso(observed_at, "observed_at"),
             "created_at": _now_iso(),
@@ -375,19 +429,19 @@ class SafetyWriter:
             self.events_written += n_events
             self.decisions_written += n_decisions
             return
-        except IntegrityError:
-            # One refused row must not hold up the good ones: isolate it.
-            self._write_individually(events, decisions, written)
-            return
         except OperationalError as e:
+            # Busy, locked, disk trouble: the rows are fine and the database
+            # will come back. Keep them and try again.
             self._requeue(events, decisions)
             self._fail(f"database busy or unavailable ({e.orig})")
             return
-        except DBAPIError as e:
-            # Unclassified database error: assume it may pass. Rows are safe in
-            # the buffer, which is bounded.
-            self._requeue(events, decisions)
-            self._fail(f"database error ({type(e.orig).__name__}: {e.orig})")
+        except Exception:
+            # Anything else (a constraint, a value SQLite cannot bind, bad
+            # text) is about a ROW, not the database, and retrying the same
+            # batch can never fix it. Isolate the offender so the good rows
+            # behind it are written; a bad row must not block every decision
+            # that comes after it.
+            self._write_individually(events, decisions, written)
             return
 
     def _write_batch(self, events: list, decisions: list):
@@ -421,11 +475,12 @@ class SafetyWriter:
                     else:
                         written["decisions"] += stored
                         self.decisions_written += stored
-                except IntegrityError as e:
+                except OperationalError:
+                    bucket.append(row)          # busy: this row is fine, keep it
+                except Exception as e:
                     self.rejected += 1
-                    logger.error(f"safety row {row.get(key)} rejected by the database and dropped: {e.orig}")
-                except DBAPIError:
-                    bucket.append(row)          # transient: keep it
+                    logger.error(f"safety row {row.get(key)} rejected and dropped "
+                                 f"({type(e).__name__}: {getattr(e, 'orig', e)})")
         if retry_events or retry_decisions:
             self._requeue(retry_events, retry_decisions)
             self._fail("database busy while isolating a rejected row")

@@ -43,6 +43,8 @@ from app.db.safety_writer import SafetyWriter, persist_safety            # noqa:
 
 FAILS = []
 TMP = tempfile.mkdtemp(prefix="vw_safety_writer_")
+import atexit, shutil
+atexit.register(shutil.rmtree, TMP, True)
 NOW = "2026-11-08T04:00:00.000+00:00"
 
 
@@ -460,17 +462,82 @@ engine2 = create_engine(f"sqlite:///{path}")
 configure_sqlite(engine2)
 with engine2.connect() as c:
     check("the default timeout is 5 s", c.exec_driver_sql("PRAGMA busy_timeout").scalar() == 5000)
-# a reader is not blocked by a writer in WAL mode
+# In WAL mode a writer can COMMIT while another connection holds a read open. In
+# the old rollback-journal mode that commit is refused ("database is locked"),
+# so this fails if WAL is not really on.
 engine, path = new_db(busy_ms=150)
 ensure_safety_tables(engine)
 raw(path, "INSERT INTO safety_events (event_uid,camera_id,worker_key,event_type,video_time_s,observed_at,created_at) VALUES ('a','c','t','ENTERED_ZONE',1,'x','y')")
-writer_conn = sqlite3.connect(path, timeout=0, isolation_level=None)
-writer_conn.execute("BEGIN IMMEDIATE")
-writer_conn.execute("INSERT INTO safety_events (event_uid,camera_id,worker_key,event_type,video_time_s,observed_at,created_at) VALUES ('b','c','t','ENTERED_ZONE',1,'x','y')")
+reader = sqlite3.connect(path, timeout=0, isolation_level=None)
+reader.execute("BEGIN")
+reader.execute("SELECT count(*) FROM safety_events").fetchall()         # a read transaction is now open
 try:
-    check("a reader is not blocked while a writer holds the file (WAL)", count(path, "safety_events") == 1)
+    wtr = writer(engine, retry_interval_s=0.0)
+    good_decision(wtr)
+    out = wtr.flush_sync()
+    check("a writer commits while a reader holds a read open (only possible in WAL)",
+          out["decisions"] == 1 and count(path, "safety_decisions") == 1, str(out))
 finally:
-    writer_conn.execute("ROLLBACK"); writer_conn.close()
+    reader.execute("ROLLBACK"); reader.close()
+
+# ── 11b. Inputs that must not poison the buffer ──────────────────────────────
+print("11b. Poison inputs")
+import pathlib
+engine, path = new_db()
+w = SafetyWriter("gate_1", org_id=uuid.uuid4(), session_id=pathlib.Path("s1"), engine=engine, retry_interval_s=0.0)
+check("org_id and session_id given as objects are stored as text",
+      isinstance(w.org_id, str) and isinstance(w.session_id, str))
+good_decision(w, zone_id=uuid.uuid4(), snapshot_ref=pathlib.Path("a/b.jpg"), video_time_s=1.0)
+check("zone_id / snapshot_ref given as UUID / Path objects are coerced", w.pending_decisions == 1)
+for what, kw in (("a lone surrogate in reason", dict(reason="a\ud800b")),
+                 ("a lone surrogate in worker_key", dict(worker_key="trk-\udfff")),
+                 ("a lone surrogate in zone_id", dict(zone_id="z\ud800")),
+                 ("a lone surrogate inside evidence", dict(evidence={"k": "v\ud800"}))):
+    check(f"{what} is refused at add time and queues nothing",
+          raises(lambda k=kw: good_decision(w, **k)) and w.pending_decisions == 1)
+good_decision(w, video_time_s=2.0)
+out = w.flush_sync()
+check("good decisions around the refused ones are all written", out["decisions"] == 2 and w.pending_decisions == 0, str(out))
+
+# a row that gets past validation but cannot be bound must be isolated, not retried for ever
+w = writer(engine, retry_interval_s=0.0)
+good_decision(w, video_time_s=3.0)
+w._decisions[0]["org_id"] = object()                                    # sqlite cannot bind this
+w._decisions.append(dict(w._decisions[0], id=str(uuid.uuid4()), org_id="org-1"))   # a good one behind it
+out = w.flush_sync()
+check("an un-bindable row is rejected and the good row behind it is written",
+      out["decisions"] == 1 and w.rejected == 1 and w.pending_decisions == 0, str(out))
+w = writer(engine, retry_interval_s=0.0)
+good_decision(w, video_time_s=4.0)
+w._decisions[0]["reason"] = "x\ud800y"                                  # unencodable text that slipped past
+out = w.flush_sync()
+check("unencodable text that slipped past is rejected, not retried for ever",
+      w.rejected == 1 and w.pending_decisions == 0, str(out))
+
+print("11c. numpy scalars, cycles and size")
+w = writer(engine, retry_interval_s=0.0)
+check("numpy float32 / int64 times and a float32 confidence are accepted (the pipeline passes them)",
+      bool(good_decision(w, video_time_s=np.float32(1.5), confidence=np.float32(0.5)))
+      and bool(good_event(w, video_time_s=np.int64(7))))
+check("numpy bool is not a number", raises(lambda: good_event(w, video_time_s=np.bool_(True))))
+check("a numpy NaN time is refused", raises(lambda: good_event(w, video_time_s=np.float32("nan"))))
+loop = {}
+loop["me"] = loop
+before = w.pending_decisions
+check("evidence that contains itself is stored with a marker, not an endless recursion",
+      bool(good_decision(w, evidence=loop)) and w.pending_decisions == before + 1)
+deep = cur = {}
+for _ in range(500):
+    cur["n"] = {}
+    cur = cur["n"]
+check("absurdly deep evidence is cut off, not a RecursionError", bool(good_decision(w, evidence=deep)))
+check("an oversized payload is refused with a ValueError",
+      raises(lambda: good_decision(w, evidence={"blob": "x" * 200_000})))
+check("...and so are details", raises(lambda: good_event(w, details={"blob": "x" * 200_000})))
+out = w.flush_sync()
+check("all the accepted rows were stored", out["decisions"] == 3 and out["events"] == 1, str(out))
+stored = raw(path, "SELECT evidence FROM safety_decisions WHERE evidence LIKE '%circular%'")
+check("the cycle was marked in the stored JSON", len(stored) == 1 and json.loads(stored[0][0]) == {"me": "<circular>"})
 
 # ── 12. The real app ─────────────────────────────────────────────────────────
 print("12. The real app creates the tables on start")
