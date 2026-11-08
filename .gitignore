@@ -97,3 +97,7 @@ certs/
 # PPE detector training assets (large, regenerable; weights are already ignored via *.pt)
 ppe_training/datasets/
 ppe_training/runs/
+
+# Safety evidence snapshots: blurred images of flagged events. Personal data
+# with a retention limit — never committed.
+backend/evidence/

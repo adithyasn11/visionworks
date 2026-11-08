@@ -643,7 +643,7 @@ What counts as "minimum" is defined once, by the delivery tiers in §4; this lis
 
 ## 12. Configuration and thresholds
 
-All of these live in one config module/env section with the defaults below, are recorded with every decision (so a decision can be reproduced), and are the knobs we tune on real footage.
+All of these live in `backend/app/safety/config.py` (env override `SAFETY_<NAME>`, listed in `backend/.env.example`) with the defaults below, are recorded with every decision (so a decision can be reproduced), and are the knobs we tune on real footage.
 
 | Setting | Default | Used by |
 |---|---|---|
@@ -658,12 +658,18 @@ All of these live in one config module/env section with the defaults below, are 
 | Min person size for evidence | 90×28 px | F4 |
 | Crowd overlap (IoU) | 0.30 | F4 |
 | Enter / exit confirm | 0.7 s / 1.0 s | F7 |
-| Lost-track grace | 5 s | F7 |
+| Lost-track grace (→ `LOST_IN_ZONE`) | 5 s | F7 |
+| Lost-track TTL (→ visit closed, reason `LOST`) | 8 s | F7 |
+| PPE model run every Nth frame | 2 | F3 |
+| Re-alert gap for the same rule / zone / worker | 60 s | F10 |
 | Entry evidence wait | 4 s | F9 |
 | Continuous-PPE grace (R2) | 3 s | F9 |
 | Dwell warning fraction | 0.8 | R3 |
 | Man-down angle / duration | 60° / 5 s | F17 |
-| Lone-worker / occupancy grace | 10 s | F18 |
+| Man-down: `SITTING` ignored only below torso angle | 45° | F17 |
+| Man-down "still" speed | 0.15 person-heights/s | F17 |
+| Lone-worker / occupancy grace / median window | 10 s / 2 s | F18 |
+| Occupancy: min clear fraction (else `UNVERIFIABLE`) | 0.6 | F18 |
 | Evidence retention | 7 days | F11 |
 | Alert cooldown | per rule | F10 |
 
