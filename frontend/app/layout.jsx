@@ -7,8 +7,8 @@ import RouteProgress from './components/RouteProgress';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'Vision-Based Workplace Activity Analytics System',
-  description: 'Real-time CCTV AI analytics, posture detection, and zone occupancy metrics dashboard.',
+  title: 'VisionWorks — Workplace Safety Compliance Monitoring',
+  description: 'Camera-based safety compliance: PPE checks, zone rules and human-reviewed verdicts that say how sure they are.',
 };
 
 // Runs before first paint so the correct theme is already applied and the page

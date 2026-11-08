@@ -22,7 +22,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Building2, Clock, ShieldAlert, Trash2, Loader2, AlertCircle, Info,
+  Building2, ShieldAlert, Trash2, Loader2, AlertCircle, Info,
 } from 'lucide-react';
 
 import { Field, Banner } from '../../components/AuthFormBits';
@@ -81,8 +81,6 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
       timezone: res.organisation.timezone ?? 'UTC',
       dataRetentionDays: String(res.organisation.dataRetentionDays ?? 90),
       purgeVideoAfterProcessing: Boolean(res.organisation.purgeVideoAfterProcessing),
-      defaultSedentaryThresholdMinutes: String(res.organisation.defaultSedentaryThresholdMinutes ?? 60),
-      defaultUtilisationFloorPct: String(res.organisation.defaultUtilisationFloorPct ?? 30),
     });
   }, []);
 
@@ -200,7 +198,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
             Organisation
           </h1>
           <p className="text-[14px] text-ink-muted font-medium leading-relaxed max-w-xl">
-            Identity, data retention, and the defaults every new zone inherits.
+            Identity and data retention.
           </p>
         </header>
 
@@ -248,8 +246,8 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
                   ).map((tz) => <option key={tz} value={tz}>{tz}</option>)}
                 </select>
                 <p className="text-[12px] text-ink-faint font-medium">
-                  Buckets are stored in UTC and read in this zone, so “peak hour” means your
-                  local peak.
+                  Times are stored in UTC and shown in this zone, so the times on alerts and
+                  reports match your site’s clock.
                 </p>
               </div>
             </div>
@@ -259,12 +257,12 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
           <Section
             icon={ShieldAlert}
             title="Privacy & retention"
-            description="How long measurements are kept, and what happens to uploaded video."
+            description="How long records are kept, and what happens to uploaded video."
           >
             <div className="flex flex-col gap-4">
               <Field
                 id="retention"
-                label="Keep measurements for"
+                label="Keep records for"
                 type="number"
                 min="1"
                 max="730"
@@ -272,7 +270,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
                 onChange={(e) => set('dataRetentionDays')(e.target.value)}
                 disabled={!canEdit}
                 error={errors.dataRetentionDays}
-                hint="Days, 1–730. A nightly job permanently deletes minute buckets older than this."
+                hint="Days, 1–730. A nightly job permanently deletes detection records older than this."
               />
 
               {retentionWarning && (
@@ -281,12 +279,12 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-accent" />
                     <div>
                       <p className="text-[13px] font-black text-accent">
-                        This permanently deletes {retentionWarning.atRisk.toLocaleString()} minute
+                        This permanently deletes {retentionWarning.atRisk.toLocaleString()} record
                         {retentionWarning.atRisk === 1 ? '' : 's'} of history
                       </p>
                       <p className="text-[12.5px] text-ink-muted font-medium mt-1 leading-relaxed">
                         Shortening retention from {retentionWarning.from} to{' '}
-                        {retentionWarning.days} days puts every bucket recorded before{' '}
+                        {retentionWarning.days} days puts every record made before{' '}
                         <strong className="text-ink">
                           {new Date(retentionWarning.cutoff).toLocaleDateString()}
                         </strong>{' '}
@@ -331,43 +329,11 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
                     Delete uploaded video after processing
                   </span>
                   <span className="text-[12px] text-ink-faint font-medium leading-snug">
-                    Recommended. The frames are the sensitive artefact; the buckets are not.
-                    Turning this off keeps footage on disk.
+                    Recommended. The footage is the sensitive part; the detection records are
+                    not. Turning this off keeps footage on disk.
                   </span>
                 </span>
               </label>
-            </div>
-          </Section>
-
-          {/* ── Defaults ── */}
-          <Section
-            icon={Clock}
-            title="Zone defaults"
-            description="Inherited by every new zone, so policy is set once rather than per zone."
-          >
-            <div className="grid sm:grid-cols-2 gap-4">
-              <Field
-                id="sedentary"
-                label="Sedentary threshold"
-                type="number"
-                min="1"
-                max="1440"
-                value={form.defaultSedentaryThresholdMinutes}
-                onChange={(e) => set('defaultSedentaryThresholdMinutes')(e.target.value)}
-                disabled={!canEdit}
-                hint="Minutes of sustained sitting before a zone is flagged."
-              />
-              <Field
-                id="floor"
-                label="Utilisation floor"
-                type="number"
-                min="0"
-                max="100"
-                value={form.defaultUtilisationFloorPct}
-                onChange={(e) => set('defaultUtilisationFloorPct')(e.target.value)}
-                disabled={!canEdit}
-                hint="Percent. Below this across a window, a zone reads as underused."
-              />
             </div>
           </Section>
 
@@ -396,7 +362,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
             <Section
               icon={Trash2}
               title="Delete this organisation"
-              description="Members lose access immediately. Measurements and audit history are kept for a grace period, so this can be reversed by support — but nobody in your team will be able to reach the data."
+              description="Members lose access immediately. Records and audit history are kept for a grace period, so this can be reversed by support — but nobody in your organisation will be able to reach the data."
               danger
             >
               <div className="flex flex-col gap-3">

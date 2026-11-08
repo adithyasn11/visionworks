@@ -8,7 +8,7 @@
 // would fill them, because "0 cameras" and "we could not read cameras" are
 // different support situations and must not look alike.
 //
-// DELIBERATELY ABSENT: occupancy, utilisation, posture, alerts, reports. Those
+// DELIBERATELY ABSENT: detections, verdicts, posture, alerts, reports. Those
 // are not omitted by the UI — no RLS policy grants a platform operator access to
 // the measurement tables, so the queries are not even attempted.
 
@@ -20,7 +20,7 @@ import { ArrowLeft, AlertCircle, Building2 } from 'lucide-react';
 import { getOrganisationDetail, orgHealth } from '../../../lib/platform/queries';
 import {
   MembersSection, SitesSection, CamerasSection, ZonesSection, SessionsSection,
-  OccupancyNotice,
+  SafetyDataNotice,
 } from '../../components/OrgSections';
 import OrgActions from '../../components/OrgActions';
 
@@ -141,7 +141,7 @@ export default async function OrganisationDetailPage({ params }) {
       <SessionsSection sessions={sessions} error={sectionErrors.sessions} />
 
       <OrgActions org={org} />
-      <OccupancyNotice orgName={org.name} />
+      <SafetyDataNotice orgName={org.name} />
     </div>
   );
 }

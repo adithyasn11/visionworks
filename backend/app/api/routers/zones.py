@@ -16,18 +16,48 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# The kinds of space a zone can be, and what each one drives.
+# The kinds of zone, and what each one drives.
 #
-#   WORKSTATION — a desk. The employee desk dropdown lists only these, and the
-#                 seat prior binds an identity to whoever is assigned one.
-#   BREAK       — kitchen, lounge. `employee_aggregator` counts time here as
-#                 break time rather than absence.
-#   MEETING     — a room where somebody is working but not at their desk.
-#   TRANSIT     — corridors. Passed through, never dwelt in.
+# Safety zones (what the product offers and what rules attach to):
+#
+#   PPE_CHECKPOINT — where helmet and vest are inspected before entry.
+#   APPROACH       — the walkway between the checkpoint and the hazard.
+#   RESTRICTED     — the hazardous area the safety rules protect.
+#   EXIT           — the required exit after the restricted area.
+#   GENERAL        — an ordinary area. No rule attaches to it.
+#
+# Legacy types are still ACCEPTED so zones drawn before the safety types
+# existed keep loading and can be patched without a 422. They carry no safety
+# meaning and the editor shows them as General.
 #
 # Kept here rather than in the schema so the PATCH endpoint and the create
-# path validate against one list.
-VALID_ZONE_TYPES = {"WORKSTATION", "BREAK", "MEETING", "TRANSIT"}
+# path validate against one list. The frontend list is in lib/zoneTypes.js and
+# must stay in step with SAFETY_ZONE_TYPES.
+SAFETY_ZONE_TYPES = {"PPE_CHECKPOINT", "APPROACH", "RESTRICTED", "EXIT", "GENERAL"}
+LEGACY_ZONE_TYPES = {"WORKSTATION", "BREAK", "MEETING", "TRANSIT"}
+VALID_ZONE_TYPES = SAFETY_ZONE_TYPES | LEGACY_ZONE_TYPES
+DEFAULT_ZONE_TYPE = "GENERAL"
+
+
+def normalise_zone_type(value: Optional[str]) -> str:
+    """
+    The canonical form of a zone type, or a 422.
+
+    A missing value becomes GENERAL — the one type no rule attaches to — so a
+    zone whose type was forgotten can never be treated as a restricted area.
+    An UNKNOWN value is rejected rather than silently stored: a typo such as
+    "RESTRICED" would otherwise save fine and leave a hazardous area with no
+    rules, with nothing to say why.
+    """
+    if value is None or not str(value).strip():
+        return DEFAULT_ZONE_TYPE
+    kind = str(value).strip().upper()
+    if kind not in VALID_ZONE_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Zone type must be one of: {', '.join(sorted(SAFETY_ZONE_TYPES))}.",
+        )
+    return kind
 
 
 def _mirror_zone_to_postgres(org_id: str, camera_name: str, zone_id: str,
@@ -226,8 +256,8 @@ class ZoneUpdate(BaseModel):
 
     Only the label and the kind. The POLYGON is not editable here — reshaping
     is what the editor's redraw is for, and allowing a shape change through a
-    rename endpoint would let a zone quietly move under a desk that had
-    already been assigned to somebody.
+    rename endpoint would let a zone quietly move out from under the rules
+    that already point at it.
     """
     zone_name: Optional[str] = None
     zone_type: Optional[str] = None
@@ -250,10 +280,9 @@ def update_zone(
     pointing at it, because the replacement is a different zone with a
     different id. A label mistake should not cost somebody their seat prior.
 
-    `zone_type` matters just as much: WORKSTATION is what the employee desk
-    dropdown filters on, and BREAK is what the aggregator counts as break
-    time. A zone drawn as the wrong kind is invisible to both, with no
-    indication of why.
+    `zone_type` matters just as much: it decides which safety rules can
+    attach to the zone. A zone drawn as the wrong kind has the wrong rules (or
+    none), with no indication of why.
     """
     zone = (
         db.query(ZoneModel)
@@ -273,18 +302,12 @@ def update_zone(
         zone.zone_name = name
 
     if patch.zone_type is not None:
-        kind = patch.zone_type.strip().upper()
-        if kind not in VALID_ZONE_TYPES:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Zone type must be one of: {', '.join(sorted(VALID_ZONE_TYPES))}.",
-            )
-        zone.zone_type = kind
+        zone.zone_type = normalise_zone_type(patch.zone_type)
 
     db.commit()
     db.refresh(zone)
 
-    # Keep Postgres in step, or the desk dropdown keeps showing the old label.
+    # Keep Postgres in step, or the dashboard keeps showing the old label.
     _mirror_zone_to_postgres(org_id, zone.camera_id, zone.zone_id,
                              zone.polygon_coordinates, zone.zone_name)
     return zone
@@ -324,7 +347,7 @@ def create_or_update_zone(
     db: Session = Depends(get_db),
     org_id: str = Depends(require_zone_edit),
 ):
-    """Creates or updates a workstation ROI polygon boundary"""
+    """Creates or updates a zone polygon boundary"""
     # Shapely needs at least three points to build a polygon; anything less is
     # rejected here rather than being written and then silently skipped by the
     # spatial engine at load time.
@@ -339,6 +362,11 @@ def create_or_update_zone(
             detail="Each polygon point must be an [x, y] pair.",
         )
 
+    # Validate the type BEFORE anything is written, on both the create and the
+    # update path. `zone_type` was previously stored unchecked here, so only the
+    # PATCH endpoint ever refused an unknown type.
+    zone_type = normalise_zone_type(zone.zone_type)
+
     # Look the zone up within this organisation only. Matching on zone_id alone
     # would let one tenant overwrite another's polygon by reusing its id —
     # likely rather than exotic, because ids like "workstation_01" are the
@@ -352,6 +380,11 @@ def create_or_update_zone(
         existing.zone_name = zone.zone_name
         existing.polygon_coordinates = zone.polygon_coordinates
         existing.homography_matrix = zone.homography_matrix
+        # Only when the caller actually sent one: re-saving a shape from a
+        # client that does not know about types must not reset a restricted
+        # area to the default.
+        if "zone_type" in zone.model_fields_set:
+            existing.zone_type = zone_type
         db.commit()
         db.refresh(existing)
         _mirror_zone_to_postgres(org_id, existing.camera_id, existing.zone_id,
@@ -380,7 +413,7 @@ def create_or_update_zone(
         )
 
     # org_id comes from the verified token, never from the request body.
-    db_zone = ZoneModel(**zone.model_dump(), org_id=org_id)
+    db_zone = ZoneModel(**{**zone.model_dump(), "zone_type": zone_type}, org_id=org_id)
     db.add(db_zone)
     db.commit()
     db.refresh(db_zone)

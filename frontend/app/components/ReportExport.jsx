@@ -98,7 +98,7 @@ export const ReportExport = ({ hours = DEFAULT_WINDOW_HOURS, rangeLabel }) => {
 
       const anchor = document.createElement('a');
       anchor.href = objectUrl;
-      anchor.download = filenameFrom(res, `workplace_report.${kind}`);
+      anchor.download = filenameFrom(res, `site_report.${kind}`);
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -125,7 +125,7 @@ export const ReportExport = ({ hours = DEFAULT_WINDOW_HOURS, rangeLabel }) => {
 
       <p className="text-[11.5px] text-ink-muted leading-relaxed">
         Exports contain counts, postures, zones and timestamps only — never video or
-        identity.
+        names.
       </p>
 
       {/* Each format states its OWN window, because they genuinely differ and

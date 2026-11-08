@@ -42,23 +42,14 @@ CAPABILITIES = {
     "reports.export": ("ADMIN", "MANAGER", "VIEWER"),
     "zones.view": ("ADMIN", "MANAGER", "VIEWER"),
     "members.view": ("ADMIN", "MANAGER", "VIEWER"),
-    # enforcedBy: employee_select — membership-based, like every other roster.
-    "employees.view": ("ADMIN", "MANAGER", "VIEWER"),
-    # enforcedBy: employee_day_stat_select (migration 022) — other people's
-    # measured figures go to manage_org_ids() only. A VIEWER sees their own.
-    "team.compare": ("ADMIN", "MANAGER"),
 
-    # Configuring the space — enforced by manage_org_ids().
+    # Configuring the site — enforced by manage_org_ids().
     "zones.edit": ("ADMIN", "MANAGER"),
     "cameras.edit": ("ADMIN", "MANAGER"),
     "sites.edit": ("ADMIN", "MANAGER"),
     # Running analysis WRITES telemetry, so it is a configuration act rather
     # than a read. A VIEWER watching a live feed would be creating data.
     "analysis.run": ("ADMIN", "MANAGER"),
-    # enforcedBy: employee_insert/update and soft_delete_employee(). Also gates
-    # face enrolment, which is the act that makes a named person recognisable
-    # by camera — the most consequential write in the product.
-    "employees.edit": ("ADMIN", "MANAGER"),
 
     # Governing the organisation — enforced by admin_org_ids().
     "members.invite": ("ADMIN",),

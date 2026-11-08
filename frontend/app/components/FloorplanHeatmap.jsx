@@ -2,7 +2,7 @@
 
 // frontend/app/components/FloorplanHeatmap.jsx
 //
-// Top-down occupancy heatmap, rendered from real homography-projected positions.
+// Top-down presence map, rendered from real homography-projected positions.
 //
 // The CV pipeline projects each detected person's GROUND point (the bottom edge
 // of their bounding box — the only part of them actually on the floor plane)
@@ -37,14 +37,6 @@ const GRADIENT = {
   '0.80': 'rgba(220,38,38,0.78)',
   '1.0':  '#DC2626',
 };
-
-/** Zone guides drawn under the heat layer, purely as spatial reference. */
-const FLOOR_GUIDES = [
-  'Workstation Zone A',
-  'Workstation Zone B',
-  'Collaborative Desk',
-  'Break Lounge',
-];
 
 function Overlay({ kind, message }) {
   const { Icon, cls } = {
@@ -179,11 +171,11 @@ export const FloorplanHeatmap = () => {
   }, [hasPoints]);
 
   const overlay =
-    state.status === 'loading' ? { kind: 'loading', message: 'Loading floorplan telemetry…' }
+    state.status === 'loading' ? { kind: 'loading', message: 'Loading site positions…' }
     : state.status === 'error' ? { kind: 'error', message: state.error }
     : !hasPoints ? {
         kind: 'empty',
-        message: 'No positions recorded yet. Process a video or start the live camera — detected people appear here as floor density.',
+        message: 'No positions recorded yet. Process a video or start the live camera — detected people appear here as where they spend time.',
       }
     : null;
 
@@ -194,7 +186,7 @@ export const FloorplanHeatmap = () => {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-ink font-bold text-[13.5px] tracking-tight">
           <MapPin className="w-4 h-4 text-accent" />
-          <span>Top-Down Occupancy Heatmap</span>
+          <span>Top-Down Presence Map</span>
         </div>
         <span className="text-[11px] text-ink-muted font-mono whitespace-nowrap">
           {samples > 0 ? `${samples.toLocaleString()} samples · ${WINDOW_HOURS}h` : `last ${WINDOW_HOURS}h`}
@@ -202,17 +194,9 @@ export const FloorplanHeatmap = () => {
       </div>
 
       <div className="relative w-full h-72 rounded-xl bg-ground border border-line overflow-hidden">
-        {/* Zone guides sit beneath the heat layer as spatial reference. */}
-        <div className="absolute inset-0 p-4 grid grid-cols-2 gap-4 pointer-events-none">
-          {FLOOR_GUIDES.map((label) => (
-            <div
-              key={label}
-              className="border border-line rounded-lg p-2 text-[10px] text-ink-faint font-mono"
-            >
-              {label}
-            </div>
-          ))}
-        </div>
+        {/* No invented zone labels under the heat layer: they used to name
+            areas that did not exist, which is worse than an empty map. The
+            real zones are outlined on the Live feed and in the Zones editor. */}
 
         {/* heatmap.js appends its canvas here and positions it absolutely. */}
         <div ref={containerRef} className="absolute inset-0" />

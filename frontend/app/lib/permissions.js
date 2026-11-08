@@ -53,33 +53,14 @@ const CAPABILITIES = {
   'reports.export':   ['ADMIN', 'MANAGER', 'VIEWER'],
   'zones.view':       ['ADMIN', 'MANAGER', 'VIEWER'],
   'members.view':     ['ADMIN', 'MANAGER', 'VIEWER'],
-  // enforcedBy: employee_select — "orgId IN user_org_ids()", the same
-  // membership-based read every other roster gets. The employee list is a
-  // colleague list; what a VIEWER does not get is the editing controls.
-  'employees.view':   ['ADMIN', 'MANAGER', 'VIEWER'],
-  // Step 16's team comparison — everyone's measured figures in one table.
-  //
-  // enforcedBy: employee_day_stat_select (migration 022), which returns other
-  // people's rows only to `manage_org_ids()` — ADMIN and MANAGER. A VIEWER
-  // sees exactly one employee's figures: their own.
-  //
-  // So this capability is not the security boundary, the policy is; it exists
-  // so a VIEWER is not shown a link to a table that would render with one row
-  // and look broken. Hiding the link is a courtesy, not a control.
-  'team.compare':     ['ADMIN', 'MANAGER'],
 
-  // ── Configuring the space. ──
+  // ── Configuring the site. ──
   // enforcedBy: manage_org_ids() — zone_insert/update/delete,
   // camera_insert/update/delete, site_insert/update.
-  // A VIEWER is read-only by definition; a MANAGER runs the space.
+  // A VIEWER is read-only by definition; a MANAGER runs the site.
   'zones.edit':       ['ADMIN', 'MANAGER'],
   'cameras.edit':     ['ADMIN', 'MANAGER'],
   'sites.edit':       ['ADMIN', 'MANAGER'],
-  // enforcedBy: employee_insert/update (manage_org_ids()) and
-  // soft_delete_employee(), which re-checks ADMIN-or-MANAGER inside the
-  // definer context. Naming who works here is configuring the space, exactly
-  // like naming its zones.
-  'employees.edit':   ['ADMIN', 'MANAGER'],
   // Running analysis writes telemetry, so it is a configuration act, not a
   // read. A VIEWER watching a live feed would be creating data.
   'analysis.run':     ['ADMIN', 'MANAGER'],

@@ -138,7 +138,7 @@ export async function getOrganisationSettings() {
       // section, which reads it through getViewerRole() — one source, subject
       // to the same ACTIVE-membership check as the role. Selecting it here too
       // would be a second reader of the same value with different filtering.
-      .select('id, name, slug, timezone, dataRetentionDays, purgeVideoAfterProcessing, defaultSedentaryThresholdMinutes, defaultUtilisationFloorPct, createdAt')
+      .select('id, name, slug, timezone, dataRetentionDays, purgeVideoAfterProcessing, createdAt')
       .eq('id', orgId)
       .maybeSingle(),
     supabase
@@ -197,8 +197,6 @@ export async function updateOrganisationSettings(formData) {
   const timezone = String(formData.get('timezone') ?? '').trim();
   const retentionRaw = String(formData.get('dataRetentionDays') ?? '').trim();
   const purge = String(formData.get('purgeVideoAfterProcessing') ?? '') === 'true';
-  const sedentaryRaw = String(formData.get('defaultSedentaryThresholdMinutes') ?? '').trim();
-  const floorRaw = String(formData.get('defaultUtilisationFloorPct') ?? '').trim();
 
   if (!name) return fail('Enter your organisation’s name.');
   if (name.length > 160) return fail('That name is too long — 160 characters at most.');
@@ -211,21 +209,11 @@ export async function updateOrganisationSettings(formData) {
     return fail('Retention must be between 1 and 730 days.');
   }
 
-  const sedentary = Number(sedentaryRaw);
-  if (!Number.isInteger(sedentary) || sedentary < 1 || sedentary > 1440) {
-    return fail('The sedentary threshold must be between 1 and 1440 minutes.');
-  }
-
-  const floor = Number(floorRaw);
-  if (!Number.isFinite(floor) || floor < 0 || floor > 100) {
-    return fail('The utilisation floor must be between 0 and 100 percent.');
-  }
-
   // Read the current row first, so the audit entry can record what changed
   // rather than only what it became.
   const { data: before } = await supabase
     .from('organisations')
-    .select('name, timezone, dataRetentionDays, purgeVideoAfterProcessing, defaultSedentaryThresholdMinutes, defaultUtilisationFloorPct')
+    .select('name, timezone, dataRetentionDays, purgeVideoAfterProcessing')
     .eq('id', orgId)
     .maybeSingle();
 
@@ -236,8 +224,6 @@ export async function updateOrganisationSettings(formData) {
       timezone,
       dataRetentionDays: retention,
       purgeVideoAfterProcessing: purge,
-      defaultSedentaryThresholdMinutes: sedentary,
-      defaultUtilisationFloorPct: floor,
       updatedAt: new Date().toISOString(),
     })
     .eq('id', orgId)
@@ -258,10 +244,6 @@ export async function updateOrganisationSettings(formData) {
       timezone: before?.timezone !== timezone ? { from: before?.timezone, to: timezone } : undefined,
       purgeVideoAfterProcessing: before?.purgeVideoAfterProcessing !== purge
         ? { from: before?.purgeVideoAfterProcessing, to: purge } : undefined,
-      defaultSedentaryThresholdMinutes: before?.defaultSedentaryThresholdMinutes !== sedentary
-        ? { from: before?.defaultSedentaryThresholdMinutes, to: sedentary } : undefined,
-      defaultUtilisationFloorPct: before?.defaultUtilisationFloorPct !== floor
-        ? { from: before?.defaultUtilisationFloorPct, to: floor } : undefined,
     },
   });
 

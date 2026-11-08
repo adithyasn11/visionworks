@@ -113,27 +113,6 @@ enum SessionKind {
   LIVE_RTSP
 }
 
-enum AlertType {
-  SEDENTARY /// seated occupancy sustained beyond a threshold
-  OVERCROWDING /// occupancy above Zone.capacity
-  UNDERUTILISATION /// zone below a utilisation floor across a window
-  ZONE_EMPTY /// booked-but-empty; the real-estate insight
-  CAMERA_OFFLINE /// operational, not occupancy-derived
-}
-
-enum AlertSeverity {
-  INFO
-  WARNING
-  CRITICAL
-}
-
-enum AlertState {
-  OPEN
-  ACKNOWLEDGED
-  RESOLVED /// condition no longer true
-  MUTED /// deliberately silenced by an operator
-}
-
 enum ReportKind {
   UTILISATION_SUMMARY
   ZONE_COMPARISON
@@ -264,19 +243,9 @@ model Organisation {
   zones       Zone[]
   minuteStats ZoneMinuteStat[]
   sessions    AnalysisSession[]
-  alertRules  AlertRule[]
-  alerts      Alert[]
   reports     Report[]
   auditLogs   AuditLog[]
   profiles    Profile[]
-
-  // Per-employee identity (020). Kept separate from the anonymous analytics
-  // above: `minuteStats` cannot identify anyone, these deliberately can.
-  employees      Employee[]
-  identityEvents IdentityEvent[]
-  employeeDays   EmployeeDayStat[]
-  employeeHours  EmployeeHourStat[]
-  cameraLinks    CameraLink[]
 
   @@index([deletedAt])
   @@map("organisations")
@@ -335,18 +304,11 @@ model Profile {
   memberships       Membership[]
   invitesSent       Membership[]      @relation("MembershipInviter")
   sessionsStarted   AnalysisSession[]
-  alertsAcked       Alert[]           @relation("AlertAcknowledgedBy")
-  alertsResolved    Alert[]           @relation("AlertResolvedBy")
-  alertRulesCreated AlertRule[]
   reportsRequested  Report[]
   auditLogs         AuditLog[]
   zonesCreated      Zone[]
   platformAdmin     PlatformAdmin?
   platformGrants    PlatformAdmin[]   @relation("PlatformAdminGrantedBy")
-  /// The employee record this login IS, at most one (migration 022). Optional
-  /// on both sides: most logins are not measured, and most measured people do
-  /// not have a login.
-  employeeRecord    Employee?
 
   @@index([currentOrgId])
   @@map("profiles")
@@ -550,15 +512,6 @@ model Camera {
   zones       Zone[]
   sessions    AnalysisSession[]
   minuteStats ZoneMinuteStat[]
-  alertRules  AlertRule[]
-  alerts      Alert[]
-
-  /// Per-employee identity (020). The two CameraLink sides are named relations
-  /// because a single model holds two FKs to this one — Prisma cannot infer
-  /// which is which without the names.
-  identityEvents IdentityEvent[]
-  linksFrom      CameraLink[]    @relation("CameraLinkFrom")
-  linksTo        CameraLink[]    @relation("CameraLinkTo")
 
   @@unique([orgId, name])
   @@index([orgId, status])
@@ -613,13 +566,6 @@ model Zone {
   site        Site?            @relation(fields: [siteId], references: [id], onDelete: SetNull)
   createdBy   Profile?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
   minuteStats ZoneMinuteStat[]
-  alertRules  AlertRule[]
-  alerts      Alert[]
-
-  /// Employees whose desk this zone is (020). SetNull on delete — removing a
-  /// zone unassigns the seat, it does not remove the person.
-  employees      Employee[]
-  identityEvents IdentityEvent[]
 
   @@unique([cameraId, name])
   @@index([orgId, deletedAt])
@@ -814,115 +760,6 @@ model AnalysisSession {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  ALERTS
-// ═══════════════════════════════════════════════════════════════════════════
-
-/// A condition to watch for. Scope widens as the optional targets are left
-/// null: a rule with no zone and no camera applies org-wide.
-model AlertRule {
-  id    String @id @default(uuid()) @db.Uuid
-  orgId String @db.Uuid
-
-  name     String        @db.VarChar(160)
-  type     AlertType
-  severity AlertSeverity @default(WARNING)
-  isEnabled Boolean      @default(true)
-
-  zoneId   String? @db.Uuid
-  cameraId String? @db.Uuid
-
-  /// Compared against the measure implied by `type`: minutes for SEDENTARY,
-  /// a person count for OVERCROWDING, a percentage for UNDERUTILISATION.
-  /// One nullable numeric beats five type-specific columns that are null
-  /// most of the time.
-  thresholdValue Float
-  /// The condition must hold this long before firing. Stops a rule flapping
-  /// on one noisy frame.
-  sustainedMinutes Int @default(5)
-
-  /// Suppression window: once fired, this rule stays quiet for this many
-  /// minutes. Without it, a crowded room emits an alert every minute and the
-  /// feed becomes unreadable — the failure mode that makes people mute
-  /// alerting entirely.
-  cooldownMinutes Int @default(30)
-
-  /// Only evaluate inside the site's working hours.
-  onlyDuringWorkHours Boolean @default(true)
-
-  notifyEmail Boolean @default(false)
-
-  createdById String? @db.Uuid
-  createdAt   DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
-  deletedAt   DateTime? @db.Timestamptz(6)
-
-  org       Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  zone      Zone?        @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-  camera    Camera?      @relation(fields: [cameraId], references: [id], onDelete: Cascade)
-  createdBy Profile?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  alerts    Alert[]
-
-  @@index([orgId, isEnabled])
-  @@index([zoneId])
-  @@index([cameraId])
-  @@index([createdById])
-  @@map("alert_rules")
-}
-
-/// A fired instance of a rule.
-model Alert {
-  id     String @id @default(uuid()) @db.Uuid
-  orgId  String @db.Uuid
-  ruleId String @db.Uuid
-
-  zoneId   String? @db.Uuid
-  cameraId String? @db.Uuid
-
-  state    AlertState    @default(OPEN)
-  severity AlertSeverity
-
-  /// Measured value at trigger time, and the threshold it crossed. Both are
-  /// copied rather than read through the rule, so editing the rule later does
-  /// not rewrite history.
-  triggeredValue Float
-  thresholdValue Float
-
-  /// Human-readable summary, composed at trigger time.
-  message String @db.VarChar(500)
-
-  triggeredAt DateTime  @default(now()) @db.Timestamptz(6)
-  /// When the condition stopped holding. Null while still true.
-  clearedAt   DateTime? @db.Timestamptz(6)
-
-  acknowledgedAt   DateTime? @db.Timestamptz(6)
-  acknowledgedById String?   @db.Uuid
-  resolvedAt       DateTime? @db.Timestamptz(6)
-  resolvedById     String?   @db.Uuid
-  /// Operator note — "known issue, contractors on site".
-  resolutionNote   String?   @db.VarChar(1000)
-
-  org            Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  rule           AlertRule    @relation(fields: [ruleId], references: [id], onDelete: Cascade)
-  zone           Zone?        @relation(fields: [zoneId], references: [id], onDelete: SetNull)
-  camera         Camera?      @relation(fields: [cameraId], references: [id], onDelete: SetNull)
-  acknowledgedBy Profile?     @relation("AlertAcknowledgedBy", fields: [acknowledgedById], references: [id], onDelete: SetNull)
-  resolvedBy     Profile?     @relation("AlertResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
-
-  /// The alerts feed: newest first, scoped to the org.
-  @@index([orgId, triggeredAt])
-  /// The unacknowledged badge count.
-  @@index([orgId, state, triggeredAt])
-  /// Cooldown lookup: "when did this rule last fire?"
-  @@index([ruleId, triggeredAt])
-  /// Per-zone alert history, plus FK indexes for the cascades.
-  @@index([zoneId, triggeredAt])
-  @@index([cameraId])
-  @@index([acknowledgedById])
-  @@index([resolvedById])
-  @@map("alerts")
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 //  REPORTS & ACCOUNTABILITY
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1051,9 +888,6 @@ model PlatformAuditLog {
   @@map("platform_audit_logs")
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  PER-EMPLOYEE IDENTITY  ·  migration 020_identity.sql
-// ═══════════════════════════════════════════════════════════════════════════
 //
 // These five models are the ONLY part of the schema that can name a person, and
 // they exist alongside the anonymous path rather than replacing it. Rule 2 at
@@ -1065,237 +899,3 @@ model PlatformAuditLog {
 // constraints, the partial unique indexes, and the `updatedAt` triggers. Prisma
 // describes the shape; the SQL file is what makes it true.
 
-/// A person the system is permitted to identify.
-model Employee {
-  id    String @id @default(uuid()) @db.Uuid
-  orgId String @db.Uuid
-
-  /// Unique within the organisation, and REUSABLE after a soft delete — the
-  /// unique index is partial on `deletedAt IS NULL`, so a departed employee
-  /// does not hold their code forever (the bug 019 fixed for org slugs).
-  employeeCode String @db.VarChar(64)
-  displayName  String @db.VarChar(160)
-
-  /// The seat prior: the strongest identity signal in a fixed-desk office and
-  /// the only one that needs no biometrics at all.
-  ///
-  /// At most ONE ACTIVE employee may hold a given zone, enforced by the partial
-  /// unique index `employees_one_active_per_zone`. Step 7's binding rule reads
-  /// "exactly one employee has assignedZoneId == Z" — if two shared a desk that
-  /// rule would silently never fire, and desk time would stop being attributed
-  /// with no visible error.
-  assignedZoneId String? @db.Uuid
-
-  active Boolean @default(true)
-
-  createdAt DateTime  @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
-  /// Soft delete. Identity history must survive someone leaving, or last
-  /// quarter's reports change retroactively.
-  ///
-  /// Set through the `soft_delete_employee()` RPC, never a direct update: a row
-  /// that makes itself invisible to `employee_select` cannot be written by the
-  /// session that owns it. Same constraint, and same solution, as organisations.
-  deletedAt DateTime? @db.Timestamptz(6)
-
-  /// The login this employee IS, if any. NULL for people who are measured but
-  /// have no account — the common case.
-  ///
-  /// Drives per-person visibility of measured data (migration 022): a VIEWER
-  /// reads only the day/hour stats of the employee row pointing at them, while
-  /// ADMIN and MANAGER read the whole team.
-  profileId String? @db.Uuid
-
-  org      Organisation      @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  /// SetNull, not Cascade: deleting a zone must not delete the person who sat there.
-  zone     Zone?             @relation(fields: [assignedZoneId], references: [id], onDelete: SetNull)
-  /// SetNull for the same reason: losing an account must not erase the
-  /// employment record or the history attached to it.
-  profile  Profile?          @relation(fields: [profileId], references: [id], onDelete: SetNull)
-  faces    FaceTemplate[]
-  events   IdentityEvent[]
-  dayStats EmployeeDayStat[]
-  hourStats EmployeeHourStat[]
-
-  @@unique([orgId, employeeCode])
-  /// One login cannot be two employees. Partial on NOT NULL so the many
-  /// account-less people do not collide.
-  @@unique([profileId])
-  @@index([orgId, active])
-  @@index([assignedZoneId])
-  @@map("employees")
-}
-
-/// Enrolment templates — EMBEDDINGS ONLY, never photographs.
-///
-/// The `embedding` column is revoked from `authenticated` at the column level,
-/// so no browser session can read a face vector even as an ADMIN. Only the
-/// service role can. Writes are still permitted: enrolment stores a vector it
-/// can never read back, the same write-without-read asymmetry 004 gives the
-/// RTSP credential.
-model FaceTemplate {
-  id         String @id @default(uuid()) @db.Uuid
-  employeeId String @db.Uuid
-
-  /// 512-d ArcFace vector. Plain float array rather than pgvector so the
-  /// migration carries no extension dependency; the per-org gallery is small
-  /// enough that brute-force cosine in the backend is the right call.
-  embedding Float[]
-  /// Detector confidence at capture, in [0,1]. The quality gate exists because
-  /// a blurry enrolment makes that person unmatchable for the whole project.
-  quality   Float
-
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-
-  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@index([employeeId])
-  @@map("face_templates")
-}
-
-/// Raw per-observation attributions. High volume, 7-day retention.
-///
-/// `employeeId = NULL` is not missing data — it is the system correctly
-/// declining to guess. A CHECK constraint keeps that honest in both columns:
-/// a NULL employee and `method = "unknown"` must agree.
-model IdentityEvent {
-  id         String  @id @default(uuid()) @db.Uuid
-  orgId      String  @db.Uuid
-  employeeId String? @db.Uuid
-  cameraId   String  @db.Uuid
-  zoneId     String? @db.Uuid
-
-  /// ByteTrack's id — a FRAGMENT, not a person. It restarts at 0 every video,
-  /// so it is only meaningful together with `identityId`.
-  trackId    Int
-  /// The stitched, session-namespaced identity that survives occlusion.
-  identityId String @db.VarChar(64)
-
-  posture    Posture
-  /// The fusion score that produced this attribution, in [0,1].
-  confidence Float
-  /// face | fusion | seat | handoff | unknown — constrained in SQL.
-  method     String @db.VarChar(24)
-
-  observedAt DateTime @db.Timestamptz(6)
-
-  org      Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  /// Cascade, not SetNull: a NULLed `employeeId` beside `method = "fusion"`
-  /// violates the honesty constraint, and would be indistinguishable from a
-  /// genuine UNKNOWN — silently inflating the abstention rate Step 17 measures.
-  employee Employee?    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  camera   Camera       @relation(fields: [cameraId], references: [id], onDelete: Cascade)
-  zone     Zone?        @relation(fields: [zoneId], references: [id], onDelete: SetNull)
-
-  @@index([orgId, observedAt])
-  @@index([employeeId, observedAt])
-  @@index([identityId])
-  @@index([cameraId])
-  @@index([zoneId])
-  @@map("identity_events")
-}
-
-/// Daily rollup — one row per employee per day. What the UI reads.
-model EmployeeDayStat {
-  id         String   @id @default(uuid()) @db.Uuid
-  orgId      String   @db.Uuid
-  employeeId String   @db.Uuid
-  statDate   DateTime @db.Date
-
-  firstSeenAt       DateTime? @db.Timestamptz(6)
-  lastSeenAt        DateTime? @db.Timestamptz(6)
-  presentMinutes    Int       @default(0)
-  deskMinutes       Int       @default(0)
-  seatedMinutes     Int       @default(0)
-  awayFromDeskCount Int       @default(0)
-  breakMinutes      Int       @default(0)
-  longestFocusBlock Int       @default(0)
-  fragmentationIdx  Float     @default(0)
-
-  /// Mean fusion confidence across the day. Below 0.6 the UI must present the
-  /// row as low-confidence rather than as fact.
-  bindingConfidence Float @default(0)
-  /// Observed but unattributable time. The honest residue — it must never be
-  /// folded into the nearest employee's total.
-  unknownMinutes    Int   @default(0)
-
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @db.Timestamptz(6)
-
-  org      Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  employee Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@unique([employeeId, statDate])
-  @@index([orgId, statDate])
-  @@map("employee_day_stats")
-}
-
-/// Per-employee HOURLY rollup — one level finer than EmployeeDayStat, and what
-/// the Step 15 daily timeline reads.
-///
-/// The raw per-observation stream (IdentityEvent) holds the same shape, but at
-/// a sample every five seconds that is ~11.5k rows per person per day. The
-/// aggregation happens where the data already is; 24 rows cross the network.
-///
-/// Written only by the pipeline through the service role. There is no
-/// INSERT/UPDATE/DELETE policy at all: a figure about somebody's working day
-/// that a manager could quietly adjust would be worth nothing.
-model EmployeeHourStat {
-  id         String   @id @default(uuid()) @db.Uuid
-  orgId      String   @db.Uuid
-  employeeId String   @db.Uuid
-  statDate   DateTime @db.Date
-  /// 0-23. A BUCKET, not an instant: "hour 14" means 14:00-14:59.
-  hour       Int      @db.SmallInt
-
-  presentMinutes    Int @default(0)
-  deskMinutes       Int @default(0)
-  seatedMinutes     Int @default(0)
-  /// Observed but unattributable time, preserved at hour resolution so the
-  /// timeline can show WHEN the system was unsure, not only how much.
-  unknownMinutes    Int @default(0)
-  awayFromDeskCount Int @default(0)
-
-  /// Mean confidence for THIS hour, deliberately not inherited from the day.
-  /// An hour at 0.95 and an hour at 0.55 averaged into a daily 0.75 hides that
-  /// half the day is unreliable.
-  bindingConfidence Float @default(0)
-
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @db.Timestamptz(6)
-
-  org      Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  employee Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-
-  @@unique([employeeId, statDate, hour])
-  @@index([employeeId, statDate, hour])
-  @@index([orgId, statDate])
-  @@map("employee_hour_stats")
-}
-
-/// Physical topology: which camera exits lead to which entries, and how long
-/// the walk plausibly takes. Powers the cross-camera handoff check.
-model CameraLink {
-  id           String @id @default(uuid()) @db.Uuid
-  orgId        String @db.Uuid
-  fromCameraId String @db.Uuid
-  toCameraId   String @db.Uuid
-
-  /// The plausible walk window. `maxSeconds >= minSeconds >= 0`, and a camera
-  /// may not link to itself — both constrained in SQL, because a degenerate
-  /// window makes the Step 13 plausibility test accept everything.
-  minSeconds Int
-  maxSeconds Int
-
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-
-  org        Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  fromCamera Camera       @relation("CameraLinkFrom", fields: [fromCameraId], references: [id], onDelete: Cascade)
-  toCamera   Camera       @relation("CameraLinkTo", fields: [toCameraId], references: [id], onDelete: Cascade)
-
-  @@unique([fromCameraId, toCameraId])
-  @@index([orgId])
-  @@index([fromCameraId])
-  @@index([toCameraId])
-  @@map("camera_links")
-}

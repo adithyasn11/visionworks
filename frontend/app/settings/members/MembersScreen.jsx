@@ -459,7 +459,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
           </h1>
           <p className="text-[14px] text-ink-muted font-medium leading-relaxed max-w-xl">
             Everyone who can reach this organisation’s data. Roles decide what they can
-            change — measurements are visible to every member, and to nobody outside.
+            change — safety data is visible to every member, and to nobody outside.
           </p>
         </header>
 
@@ -495,7 +495,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
                 type="email"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setFieldError(null); }}
-                placeholder="colleague@company.com"
+                placeholder="name@company.com"
                 autoComplete="off"
                 maxLength={320}
                 error={fieldError}
@@ -550,7 +550,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-ink-faint" />
             <p className="text-[12.5px] text-ink-muted font-medium leading-relaxed">
               Only an administrator can invite people or change roles. You can see who is in{' '}
-              {orgName}, which is your colleague list.
+              {orgName}.
             </p>
           </div>
         )}

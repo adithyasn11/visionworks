@@ -29,16 +29,7 @@ import numpy as np
 from app.cv.anonymizer import privacy_blur_default
 from app.cv.frame_pipeline import process_detections
 from app.db.activity_writer import ActivityLogWriter, persist_frame
-from app.db.identity_writer import IdentityEventWriter, persist_identity_frame
-from app.cv.appearance import get_extractor
-from app.cv.identity_tracker import IdentityTracker
-from app.cv.face_identifier import FaceIdentifier, resolve_camera_role
-from app.cv.signature_registry import get_registry
-from app.cv.handoff import get_handoff_registry
 from app.db.minute_aggregator import aggregate_after_session
-from app.db.employee_aggregator import (
-    aggregate_after_session as aggregate_employees_after_session,
-)
 from app.api.deps import extract_token, resolve_org_role
 from app.api.permissions import can, denial_message
 
@@ -81,18 +72,20 @@ ORPHAN_UPLOAD_MAX_AGE_SECONDS = 6 * 3600
 
 # Used when a camera has no zones drawn yet, so a first-time user still sees
 # zone attribution working instead of everything falling into TRANSIT_ZONE.
+# GENERAL, so no safety rule can ever attach to a placeholder: a made-up area
+# must not be mistaken for a restricted one.
 DEFAULT_ZONES = [
     {
-        "zone_id": "workstation_01",
-        "zone_name": "Workstation 1",
+        "zone_id": "zone_default_1",
+        "zone_name": "Zone 1",
         "polygon": [[100, 60], [480, 60], [480, 480], [100, 480]],
-        "zone_type": "WORKSTATION",
+        "zone_type": "GENERAL",
     },
     {
-        "zone_id": "workstation_02",
-        "zone_name": "Workstation 2",
+        "zone_id": "zone_default_2",
+        "zone_name": "Zone 2",
         "polygon": [[500, 60], [900, 60], [900, 480], [500, 480]],
-        "zone_type": "WORKSTATION",
+        "zone_type": "GENERAL",
     },
 ]
 
@@ -138,89 +131,33 @@ def resolve_registered_camera(camera_id: Optional[str], org_id: Optional[str]) -
         session.close()
 
 
-def load_seat_map(org_id: Optional[str], zones_config: list) -> dict:
+DEFAULT_INFERENCE_WIDTH = 640
+
+
+def resolve_inference_width(camera_id: str, org_id: Optional[str] = None) -> int:
     """
-    zone_id -> [employee_id, ...] for Step 7's seat binding.
+    The frame width the pose model sees for a camera.
 
-    Read from Postgres, because that is where the Employees page writes. The
-    local SQLite mirror has no employees table — the roster is configuration a
-    human maintains, not telemetry the pipeline produces.
-
-    Zones are matched BY NAME, the same bridge `minute_aggregator._resolve_ids`
-    already uses: SQLite telemetry carries `zone_id = 'workstation_01'` while
-    Postgres carries a UUID, and `zones.name` is what connects them.
-
-    Returns {} on any failure — no org, no service key, no network. An empty
-    seat map means the tracker simply never names anyone, which is the correct
-    degradation: unnamed identities are still tracked and still recorded as
-    UNKNOWN.
+    Read from the camera's registration (`cameras.inference_width`), else 640,
+    the width the whole pipeline is tuned for. Never raises: a camera that is
+    not registered, or a database that cannot be read, simply gets the default.
     """
-    if not org_id:
-        return {}
-    base = (os.getenv("SUPABASE_URL") or "").rstrip("/")
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-    if not base or not key or key.startswith("your-"):
-        return {}
+    from app.db.database import SessionLocal
+    from app.db.models import CameraModel
 
-    import json
-    import urllib.parse
-    import urllib.request
-
-    def get(table, params):
-        url = f"{base}/rest/v1/{table}?" + urllib.parse.urlencode(params)
-        request = urllib.request.Request(url, headers={
-            "apikey": key, "Authorization": f"Bearer {key}",
-            "Accept": "application/json",
-        })
-        with urllib.request.urlopen(request, timeout=10) as response:
-            return json.loads(response.read().decode("utf-8") or "[]")
-
+    session = SessionLocal()
     try:
-        employees = get("employees", {
-            "select": "id,assignedZoneId", "orgId": f"eq.{org_id}",
-            "active": "is.true", "assignedZoneId": "not.is.null",
-        })
-        if not employees:
-            return {}
-
-        # Postgres zone UUID -> the local text zone_id the pipeline emits.
-        wanted = {e["assignedZoneId"] for e in employees}
-        zone_rows = get("zones", {"select": "id,name", "orgId": f"eq.{org_id}"})
-        local_names = {z["zone_id"] for z in zones_config}
-        uuid_to_local = {
-            z["id"]: z["name"] for z in zone_rows
-            if z["id"] in wanted and z["name"] in local_names
-        }
-
-        seat_map: dict = {}
-        for e in employees:
-            local = uuid_to_local.get(e["assignedZoneId"])
-            if local:
-                seat_map.setdefault(local, []).append(e["id"])
-
-        if seat_map:
-            logger.info(f"seat map for org {org_id}: "
-                        f"{ {z: len(v) for z, v in seat_map.items()} }")
-        return seat_map
+        query = session.query(CameraModel).filter(CameraModel.camera_id == camera_id)
+        if org_id is not None:
+            query = query.filter(CameraModel.org_id == org_id)
+        row = query.first()
+        if row is not None and row.inference_width:
+            return int(row.inference_width)
     except Exception as e:
-        logger.warning(f"could not load seat map ({e}); identities stay UNKNOWN.")
-        return {}
-
-
-def identity_tracking_enabled() -> bool:
-    """
-    Whether to run appearance extraction and fragment stitching (Steps 5-6).
-
-    On by default. Set IDENTITY_TRACKING=false to turn the whole identity path
-    off — the pipeline then behaves exactly as it did after Step 4, still
-    writing UNKNOWN identity_events, just without OSNet in the loop. That is
-    the switch to reach for on a machine with no GPU headroom, or for a
-    deployment that does not want per-person tracking at all.
-    """
-    raw = os.getenv("IDENTITY_TRACKING")
-    if raw is None:
-        return True
-    return raw.strip().lower() not in ("0", "false", "no", "off")
+        logger.debug(f"could not resolve inference width for {camera_id}: {e}")
+    finally:
+        session.close()
+    return DEFAULT_INFERENCE_WIDTH
 
 
 def resolve_initial_blur(websocket) -> bool:
@@ -282,10 +219,9 @@ def load_zones_for_camera(camera_id: str, org_id: str = None) -> list:
                 "zone_id": row.zone_id,
                 "zone_name": row.zone_name,
                 "polygon": row.polygon_coordinates,
-                # Needed by the employee aggregator (Step 8) to tell a BREAK
-                # area from a desk: time in a break zone is a break, time
-                # anywhere else away from your desk is a chair exit.
-                "zone_type": (row.zone_type or "WORKSTATION").upper(),
+                # The safety layer attaches rules by zone type, and the older
+                # aggregators still read BREAK from it.
+                "zone_type": (row.zone_type or "GENERAL").upper(),
             }
             for row in rows
             if row.polygon_coordinates and len(row.polygon_coordinates) >= 3
@@ -630,49 +566,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         # Telemetry for this session is attributed to the uploaded file, so rows
         # from different videos stay distinguishable in activity_logs.
         activity_writer = ActivityLogWriter(camera_id=effective_camera_id, org_id=org_id)
-        # The per-person analogue, written alongside the anonymous path
-        # rather than replacing it. Step 4 writes every row as UNKNOWN;
-        # Steps 5-14 fill in employee_id without changing this wiring.
-        identity_writer = IdentityEventWriter(
-            camera_id=effective_camera_id, org_id=org_id, session_id=session_id
-        )
-
-        # Steps 5-6: appearance signatures and fragment stitching. The
-        # extractor is process-wide (the model is stateless); the tracker
-        # is per session, so its identity namespace and its gallery cannot
-        # leak between concurrent videos.
-        identity_on = identity_tracking_enabled()
-        appearance_extractor = get_extractor() if identity_on else None
-        identity_tracker = (
-            IdentityTracker(session_id=session_id) if identity_on else None
-        )
-        # Steps 10-11. A camera is AREA unless somebody deliberately marked it
-        # DOOR, so face matching is off by default in every deployment.
-        camera_role, inference_width = resolve_camera_role(effective_camera_id, org_id)
-        face_identifier = (
-            FaceIdentifier(org_id=org_id)
-            if identity_on and camera_role == "DOOR" else None
-        )
-        if face_identifier is not None:
-            face_identifier.load_gallery()
-            logger.info(
-                f"{effective_camera_id} is a DOOR camera: face matching on, "
-                f"inference width {inference_width}, "
-                f"{face_identifier.gallery_size} enrolled employee(s)")
-
-        if identity_tracker is not None:
-            # Step 7 needs to know who sits where before it can name
-            # anybody. An empty map is fine: nothing gets named.
-            identity_tracker.set_seat_map(load_seat_map(org_id, zones_config))
-            # Step 11: the day's signatures, shared across every session in
-            # this process. A DOOR session writes to it; an AREA session reads.
-            identity_tracker.set_registry(get_registry(org_id), camera_role)
-            # Step 13: cross-camera handoff. Shared across every camera's
-            # session in this process, so camera A can publish a departure
-            # that camera B reads a few seconds later.
-            handoff_registry = get_handoff_registry(org_id)
-            handoff_registry.load_links()
-            identity_tracker.set_handoff(handoff_registry, effective_camera_id)
+        # Frame width for the pose model, from the camera's registration.
+        inference_width = resolve_inference_width(effective_camera_id, org_id)
 
     except Exception as e:
         logger.error(f"AI init error: {e}")
@@ -706,7 +601,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         "seek_frame": None
     }
     # Starting state comes from PRIVACY_BLUR_DEFAULT (or this socket's ?blur=),
-    # not from a hardcoded True: the identity pipeline needs an unblurred face
+    # not from a hardcoded True: a face signal needs an unblurred face
     # signal in development, while a deployment that wants privacy-by-default
     # sets the env var. The set_privacy_blur control below still overrides this
     # at any point in the session.
@@ -777,9 +672,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
             detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
 
-            # One shared implementation — see cv/frame_pipeline.py. Identity
-            # resolution (Steps 5-14) goes inside that function, once, rather
-            # than in three places that could drift apart.
+            # One shared implementation — see cv/frame_pipeline.py — so the
+            # three sockets cannot drift apart.
             tracked_entities, zone_summary = process_detections(
                 detections,
                 frame,
@@ -788,15 +682,11 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                 anonymizer,
                 zones_config,
                 blur_enabled=privacy_state["blur"],
-                appearance_extractor=appearance_extractor,
-                identity_tracker=identity_tracker,
-                face_identifier=face_identifier,
             )
 
             # Persist sampled telemetry. Runs off the event loop and swallows its
             # own failures, so it cannot stall or break the video stream.
             await persist_frame(activity_writer, tracked_entities)
-            await persist_identity_frame(identity_writer, tracked_entities)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
@@ -826,22 +716,13 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         session["status"] = "DONE"
         logger.info(
             f"Session {session_id}: {processed_count} frames processed, "
-            f"{activity_writer.rows_written} telemetry rows, "
-            f"{identity_writer.rows_written} identity rows written. "
-            f"stitching: {identity_tracker.stats() if identity_tracker else 'off'} "
-            f"door: {face_identifier.stats() if face_identifier else 'n/a'} "
-            f"handoff: {identity_tracker.stats().get('handoffs_in') if identity_tracker else 0}"
+            f"{activity_writer.rows_written} telemetry rows written."
         )
         await websocket.send_json({
             "type": "COMPLETE",
             "message": f"Video analysis complete. Processed {processed_count} frames.",
             "total_processed": processed_count,
             "telemetry_rows_written": activity_writer.rows_written,
-            "identity_rows_written": identity_writer.rows_written,
-            # The Step 6 stitch-rate metric, surfaced to the client so the
-            # dashboard can show how fragmented the tracking was.
-            "identity_stats": identity_tracker.stats() if identity_tracker else None,
-            "door_stats": face_identifier.stats() if face_identifier else None
         })
 
     except WebSocketDisconnect:
@@ -874,15 +755,6 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             asyncio.create_task(
                 aggregate_after_session(activity_writer.camera_id, activity_writer.org_id)
             )
-            # Step 8: the per-EMPLOYEE rollup, alongside the anonymous one and
-            # never instead of it. Only meaningful once the seat binding has
-            # named somebody, and it swallows its own failures for the same
-            # reason the writers do — a rollup problem must not surface as a
-            # broken video session.
-            if identity_tracker is not None:
-                asyncio.create_task(
-                    aggregate_employees_after_session(activity_writer.org_id)
-                )
 
 
 @router.websocket("/live_webcam")
@@ -926,49 +798,8 @@ async def live_webcam_websocket(websocket: WebSocket):
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
         activity_writer = ActivityLogWriter(camera_id=effective_camera_id, org_id=org_id)
-        # The per-person analogue, written alongside the anonymous path
-        # rather than replacing it. Step 4 writes every row as UNKNOWN;
-        # Steps 5-14 fill in employee_id without changing this wiring.
-        identity_writer = IdentityEventWriter(
-            camera_id=effective_camera_id, org_id=org_id, session_id=None
-        )
-
-        # Steps 5-6: appearance signatures and fragment stitching. The
-        # extractor is process-wide (the model is stateless); the tracker
-        # is per session, so its identity namespace and its gallery cannot
-        # leak between concurrent videos.
-        identity_on = identity_tracking_enabled()
-        appearance_extractor = get_extractor() if identity_on else None
-        identity_tracker = (
-            IdentityTracker(session_id=None) if identity_on else None
-        )
-        # Steps 10-11. A camera is AREA unless somebody deliberately marked it
-        # DOOR, so face matching is off by default in every deployment.
-        camera_role, inference_width = resolve_camera_role(effective_camera_id, org_id)
-        face_identifier = (
-            FaceIdentifier(org_id=org_id)
-            if identity_on and camera_role == "DOOR" else None
-        )
-        if face_identifier is not None:
-            face_identifier.load_gallery()
-            logger.info(
-                f"{effective_camera_id} is a DOOR camera: face matching on, "
-                f"inference width {inference_width}, "
-                f"{face_identifier.gallery_size} enrolled employee(s)")
-
-        if identity_tracker is not None:
-            # Step 7 needs to know who sits where before it can name
-            # anybody. An empty map is fine: nothing gets named.
-            identity_tracker.set_seat_map(load_seat_map(org_id, zones_config))
-            # Step 11: the day's signatures, shared across every session in
-            # this process. A DOOR session writes to it; an AREA session reads.
-            identity_tracker.set_registry(get_registry(org_id), camera_role)
-            # Step 13: cross-camera handoff. Shared across every camera's
-            # session in this process, so camera A can publish a departure
-            # that camera B reads a few seconds later.
-            handoff_registry = get_handoff_registry(org_id)
-            handoff_registry.load_links()
-            identity_tracker.set_handoff(handoff_registry, effective_camera_id)
+        # Frame width for the pose model, from the camera's registration.
+        inference_width = resolve_inference_width(effective_camera_id, org_id)
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
@@ -1041,9 +872,8 @@ async def live_webcam_websocket(websocket: WebSocket):
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
             detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
 
-            # One shared implementation — see cv/frame_pipeline.py. Identity
-            # resolution (Steps 5-14) goes inside that function, once, rather
-            # than in three places that could drift apart.
+            # One shared implementation — see cv/frame_pipeline.py — so the
+            # three sockets cannot drift apart.
             tracked_entities, zone_summary = process_detections(
                 detections,
                 frame,
@@ -1052,13 +882,9 @@ async def live_webcam_websocket(websocket: WebSocket):
                 anonymizer,
                 zones_config,
                 blur_enabled=privacy_state["blur"],
-                appearance_extractor=appearance_extractor,
-                identity_tracker=identity_tracker,
-                face_identifier=face_identifier,
             )
 
             await persist_frame(activity_writer, tracked_entities)
-            await persist_identity_frame(identity_writer, tracked_entities)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
@@ -1136,49 +962,8 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
         activity_aggregator = ActivityAggregator()
         anonymizer = PrivacyAnonymizer()
         activity_writer = ActivityLogWriter(camera_id=effective_camera_id, org_id=org_id)
-        # The per-person analogue, written alongside the anonymous path
-        # rather than replacing it. Step 4 writes every row as UNKNOWN;
-        # Steps 5-14 fill in employee_id without changing this wiring.
-        identity_writer = IdentityEventWriter(
-            camera_id=effective_camera_id, org_id=org_id, session_id=None
-        )
-
-        # Steps 5-6: appearance signatures and fragment stitching. The
-        # extractor is process-wide (the model is stateless); the tracker
-        # is per session, so its identity namespace and its gallery cannot
-        # leak between concurrent videos.
-        identity_on = identity_tracking_enabled()
-        appearance_extractor = get_extractor() if identity_on else None
-        identity_tracker = (
-            IdentityTracker(session_id=None) if identity_on else None
-        )
-        # Steps 10-11. A camera is AREA unless somebody deliberately marked it
-        # DOOR, so face matching is off by default in every deployment.
-        camera_role, inference_width = resolve_camera_role(effective_camera_id, org_id)
-        face_identifier = (
-            FaceIdentifier(org_id=org_id)
-            if identity_on and camera_role == "DOOR" else None
-        )
-        if face_identifier is not None:
-            face_identifier.load_gallery()
-            logger.info(
-                f"{effective_camera_id} is a DOOR camera: face matching on, "
-                f"inference width {inference_width}, "
-                f"{face_identifier.gallery_size} enrolled employee(s)")
-
-        if identity_tracker is not None:
-            # Step 7 needs to know who sits where before it can name
-            # anybody. An empty map is fine: nothing gets named.
-            identity_tracker.set_seat_map(load_seat_map(org_id, zones_config))
-            # Step 11: the day's signatures, shared across every session in
-            # this process. A DOOR session writes to it; an AREA session reads.
-            identity_tracker.set_registry(get_registry(org_id), camera_role)
-            # Step 13: cross-camera handoff. Shared across every camera's
-            # session in this process, so camera A can publish a departure
-            # that camera B reads a few seconds later.
-            handoff_registry = get_handoff_registry(org_id)
-            handoff_registry.load_links()
-            identity_tracker.set_handoff(handoff_registry, effective_camera_id)
+        # Frame width for the pose model, from the camera's registration.
+        inference_width = resolve_inference_width(effective_camera_id, org_id)
 
     except Exception as e:
         await websocket.send_json({"error": f"Failed to initialize AI models: {str(e)}"})
@@ -1235,9 +1020,8 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
             motion_speeds = {tid: activity_aggregator.get_recent_motion_speed(tid) for tid in activity_aggregator.track_history}
             detections = pose_engine.process_frame_single_pass(frame, motion_speeds=motion_speeds, imgsz=480)
 
-            # One shared implementation — see cv/frame_pipeline.py. Identity
-            # resolution (Steps 5-14) goes inside that function, once, rather
-            # than in three places that could drift apart.
+            # One shared implementation — see cv/frame_pipeline.py — so the
+            # three sockets cannot drift apart.
             tracked_entities, zone_summary = process_detections(
                 detections,
                 frame,
@@ -1246,13 +1030,9 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
                 anonymizer,
                 zones_config,
                 blur_enabled=privacy_state["blur"],
-                appearance_extractor=appearance_extractor,
-                identity_tracker=identity_tracker,
-                face_identifier=face_identifier,
             )
 
             await persist_frame(activity_writer, tracked_entities)
-            await persist_identity_frame(identity_writer, tracked_entities)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')

@@ -19,10 +19,11 @@ const POSTURE_COLORS = {
   UNKNOWN:  '#8B8792',
 };
 
-/* Matches ZONE_COLORS in ZoneEditor: a zone must be the same colour where it
-   is drawn and where it is watched, or the two screens look like they are
-   showing different things. */
-const ZONE_OUTLINE_COLORS = ['#DC2626', '#F0736F', '#8C1A1A', '#F7B4B0', '#B02525'];
+import { zoneTypeColor } from './zoneTypes';
+
+/* A zone's colour comes from its type, from the same module the ZoneEditor
+   uses: a zone must be the same colour where it is drawn and where it is
+   watched, or the two screens look like they are showing different things. */
 
 /** The space zone polygons are stored in — see ZoneEditor's FRAME_W. */
 const ZONE_FRAME_W = 640;
@@ -57,7 +58,7 @@ function drawZones(ctx, canvas, zones) {
     const pts = zone.polygon_coordinates;
     if (!Array.isArray(pts) || pts.length < 3) return;
 
-    const color = ZONE_OUTLINE_COLORS[index % ZONE_OUTLINE_COLORS.length];
+    const color = zoneTypeColor(zone.zone_type);
 
     ctx.beginPath();
     ctx.moveTo(pts[0][0] * scale, pts[0][1] * scale);
@@ -91,7 +92,7 @@ export function drawHUD(ctx, canvas, entities, zones, enableBlur) {
   // Zones first, so the person boxes sit on top of them.
   drawZones(ctx, canvas, zones);
 
-  // Then person annotations (bounding boxes, track IDs, posture, scores).
+  // Then person annotations (bounding boxes, track IDs, posture).
   entities.forEach((entity) => {
     const [x1, y1, x2, y2] = entity.bbox;
     const w = x2 - x1;
@@ -114,18 +115,11 @@ export function drawHUD(ctx, canvas, entities, zones, enableBlur) {
     ctx.stroke();
 
     // Tag banner (top)
-    const bannerW = Math.max(180, w);
+    const bannerW = Math.max(150, w);
     ctx.fillStyle = 'rgba(11,10,12,0.88)';
     ctx.fillRect(x1, y1 - 28, bannerW, 24);
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '600 11px Inter, sans-serif';
     ctx.fillText(`ID #${entity.track_id}  ${entity.posture}`, x1 + 6, y1 - 12);
-
-    // Score pill
-    ctx.fillStyle = color;
-    ctx.fillRect(x1 + bannerW - 44, y1 - 24, 40, 16);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '700 10px Inter, sans-serif';
-    ctx.fillText(`${Math.round(entity.activity_score)}`, x1 + bannerW - 35, y1 - 12);
   });
 }

@@ -53,7 +53,7 @@ export default async function OrganisationsPage({ searchParams }) {
           <p className="mt-1.5 text-[13.5px] text-ink-muted max-w-xl leading-relaxed">
             {total === 0
               ? 'No customers yet.'
-              : `${total} organisation${total === 1 ? '' : 's'} on the platform. Configuration and health only — occupancy stays with the customer.`}
+              : `${total} organisation${total === 1 ? '' : 's'} on the platform. Configuration and health only — safety data stays with the customer.`}
           </p>
         </div>
       </header>

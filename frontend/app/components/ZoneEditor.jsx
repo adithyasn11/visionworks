@@ -2,14 +2,14 @@
 
 // frontend/app/components/ZoneEditor.jsx
 //
-// Draw-your-own zone polygons over the camera frame.
+// Draw-your-own safety zones over the camera frame.
 //
-// This is the interactive half of "Custom Zone Mapping": the user clicks points
-// on a frame to outline a workstation, meeting area or corridor, and the shape
-// is saved through POST /api/v1/zones. The CV pipeline reads those same rows on
-// its next run (see load_zones_for_camera in video_upload.py), so a zone drawn
-// here changes how occupancy and dwell time are attributed — it is not a
-// display-only annotation.
+// The user clicks points on a frame to outline a PPE checkpoint, a restricted
+// area or an exit, gives it a type, and the shape is saved through
+// POST /api/v1/zones. The CV pipeline reads those same rows on its next run
+// (see load_zones_for_camera in video_upload.py), and the safety rules attach
+// to a zone by its type — so a zone drawn here changes what is checked, it is
+// not a display-only annotation.
 //
 // COORDINATE SPACE
 //
@@ -22,6 +22,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { backendFetch } from '../lib/backend';
 import { subscribeToFrames, getLatestFrame } from '../lib/liveFrame';
+import { ZONE_TYPES, zoneTypeMeta, zoneTypeColor } from '../lib/zoneTypes';
 import {
   Shapes, Plus, Trash2, Check, X, Undo2, Loader2, AlertCircle, MousePointerClick, Eye,
   RefreshCw, Pencil,
@@ -34,31 +35,8 @@ const FRAME_H = 360;
 
 const MIN_POINTS = 3;
 
-/**
- * What a zone can BE, and what each kind actually drives.
- *
- * These are not labels. WORKSTATION is what the employee desk dropdown filters
- * on, so a desk drawn as anything else can never be assigned to anybody;
- * BREAK is what the day aggregator counts as break time rather than absence.
- * Choosing wrong produces no error — the zone simply never appears where it
- * is expected — so the choice is offered explicitly with its consequence
- * written next to it.
- *
- * Must stay in step with VALID_ZONE_TYPES in backend/app/api/routers/zones.py.
- */
-const ZONE_TYPES = [
-  { value: 'WORKSTATION', label: 'Desk', hint: 'A seat that can be assigned to an employee' },
-  { value: 'BREAK',       label: 'Break', hint: 'Kitchen or lounge — counted as break time' },
-  { value: 'MEETING',     label: 'Meeting', hint: 'Working, but away from their desk' },
-  { value: 'TRANSIT',     label: 'Transit', hint: 'A corridor — passed through, not occupied' },
-];
-
-/* Zone outlines, cycled so adjacent areas stay distinguishable while staying
-   inside the red/black/white palette. Separation comes from lightness along one
-   red ramp rather than from competing hues. */
-const ZONE_COLORS = ['#DC2626', '#F0736F', '#8C1A1A', '#F7B4B0', '#B02525'];
-
-const colorFor = (index) => ZONE_COLORS[index % ZONE_COLORS.length];
+/* A zone's outline colour comes from its TYPE (see lib/zoneTypes.js), so the
+   same zone is the same colour here and over the live feed. */
 
 /** Draws saved zones plus the polygon currently being drawn. */
 function paint(canvas, zones, draft, hoverPoint) {
@@ -68,7 +46,7 @@ function paint(canvas, zones, draft, hoverPoint) {
   zones.forEach((zone, index) => {
     const pts = zone.polygon_coordinates;
     if (!pts || pts.length < 3) return;
-    const color = colorFor(index);
+    const color = zoneTypeColor(zone.zone_type);
 
     ctx.beginPath();
     ctx.moveTo(pts[0][0], pts[0][1]);
@@ -152,10 +130,10 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
 
   // THE PICTURE BEHIND THE CANVAS.
   //
-  // Without it this editor asked people to outline desks on a black
+  // Without it this editor asked people to outline areas on a black
   // rectangle. Drawing a polygon you cannot see is not a workflow — it is a
-  // guess, and a wrong guess silently mis-attributes somebody's desk time for
-  // as long as the zone exists.
+  // guess, and a wrong guess silently moves a restricted area for as long as
+  // the zone exists.
   //
   // `snapshot` is an object URL for a JPEG from GET /video/snapshot. It is
   // revoked on replacement so a long editing session does not leak blobs.
@@ -168,13 +146,12 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
   // Inline rename / retype of an existing zone.
   const [editingZone, setEditingZone] = useState(null);
   const [editName, setEditName] = useState('');
-  const [editType, setEditType] = useState('WORKSTATION');
+  const [editType, setEditType] = useState('GENERAL');
 
-  // The kind of the zone currently being drawn. Defaults to Desk because that
-  // is what most zones are, but it is CHOSEN rather than assumed — every zone
-  // used to be created as WORKSTATION with no way to say otherwise, so a
-  // break room was counted as somebody's desk.
-  const [newType, setNewType] = useState('WORKSTATION');
+  // The kind of the zone currently being drawn. Defaults to General, which no
+  // rule attaches to, so a zone whose type was forgotten can never be treated
+  // as a restricted area by accident.
+  const [newType, setNewType] = useState('GENERAL');
 
   /* ── data ──────────────────────────────────────────────────────────────── */
 
@@ -385,12 +362,11 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
   };
 
   /**
-   * Rename a zone, or change what kind of space it is.
+   * Rename a zone, or change what kind of zone it is.
    *
    * A PATCH rather than delete-and-redraw. Redrawing produces a NEW zone with
-   * a new id, which orphans any employee already assigned to it — so
-   * correcting a typo would silently cost somebody their desk assignment and
-   * the seat prior that depends on it.
+   * a new id, which orphans every rule and past record pointing at the old
+   * one — so correcting a typo would silently detach them.
    */
   const saveZoneEdit = async (zoneId) => {
     const name = editName.trim();
@@ -608,7 +584,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
               <MousePointerClick className="w-6 h-6 text-accent mx-auto mb-1.5" strokeWidth={1.8} />
               <p className="text-[12px] text-ink-muted leading-relaxed">
                 <span className="text-ink font-bold">Click “Draw zone”</span>, then
-                click each corner of a desk. Click the first point again, or press
+                click each corner of the area. Click the first point again, or press
                 Finish, to close the shape.
               </p>
             </div>
@@ -634,7 +610,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
             >
               <span
                 className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ backgroundColor: colorFor(index) }}
+                style={{ backgroundColor: zoneTypeColor(zone.zone_type) }}
               />
 
               {isEditing ? (
@@ -684,15 +660,17 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
                     {zone.zone_name}
                   </span>
                   {/* The kind is shown, not hidden in an edit form. A zone
-                      drawn as the wrong type is invisible to the desk
-                      dropdown and to break counting, with nothing on screen
-                      explaining why. */}
-                  <span className={`font-mono text-[9.5px] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded whitespace-nowrap ${
-                    (zone.zone_type || 'WORKSTATION') === 'WORKSTATION'
-                      ? 'bg-accent-soft text-accent'
-                      : 'bg-ground text-ink-faint'
-                  }`}>
-                    {(zone.zone_type || 'WORKSTATION').slice(0, 4)}
+                      drawn as the wrong type has the wrong rules attached,
+                      with nothing on screen explaining why. */}
+                  <span
+                    title={zoneTypeMeta(zone.zone_type).hint}
+                    className={`font-mono text-[9.5px] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded whitespace-nowrap ${
+                      zoneTypeMeta(zone.zone_type).value === 'RESTRICTED'
+                        ? 'bg-accent-soft text-accent'
+                        : 'bg-ground text-ink-faint'
+                    }`}
+                  >
+                    {zoneTypeMeta(zone.zone_type).badge}
                   </span>
                   <span className="font-mono text-[10px] text-ink-faint whitespace-nowrap">
                     {zone.polygon_coordinates?.length ?? 0} pts
@@ -704,7 +682,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
                         onClick={() => {
                           setEditingZone(zone.zone_id);
                           setEditName(zone.zone_name || '');
-                          setEditType(zone.zone_type || 'WORKSTATION');
+                          setEditType(zoneTypeMeta(zone.zone_type).value);
                         }}
                         aria-label={`Rename ${zone.zone_name}`}
                         className="p-1 rounded text-ink-faint hover:text-ink transition-colors"

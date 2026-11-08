@@ -44,11 +44,11 @@ import { createOrganisation, updateSite, createCamera, finishOnboarding } from '
 
 const ASIDE = {
   eyebrow: 'step 1 of 3 // ~2 min',
-  headline: 'One organisation, then the space it measures.',
-  sub: 'Your organisation is the boundary every measurement lives inside. Nobody outside it can read your occupancy data — not even us.',
+  headline: 'One organisation, then the site you monitor.',
+  sub: 'Your organisation is the boundary every record lives inside. Nobody outside it can read your safety data — not even us.',
   facts: [
     { term: 'isolation', detail: 'Enforced in Postgres, not in the interface' },
-    { term: 'timezone',  detail: 'Decides what “peak hour” means for your reports' },
+    { term: 'timezone',  detail: 'Sets the times shown on alerts and reports' },
     { term: 'later',     detail: 'Sites and cameras can wait — only step 1 is required' },
   ],
 };
@@ -169,7 +169,6 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
   // Step 2 — seeded with the same default the schema uses (09:00–18:00, Mon–Fri)
   // so the common case is a single click.
   const [siteName, setSiteName] = useState('Main site');
-  const [capacity, setCapacity] = useState('');
   const [startTime, setStartTime] = useState(fromMinutes(540));
   const [endTime, setEndTime] = useState(fromMinutes(1080));
   const [workdays, setWorkdays] = useState([1, 2, 3, 4, 5]);
@@ -283,12 +282,6 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
     const next = {};
     if (!name) next.siteName = 'Enter a name for this site.';
 
-    if (capacity !== '') {
-      const n = Number(capacity);
-      if (!Number.isInteger(n) || n < 1) next.capacity = 'A whole number of 1 or more.';
-      else if (n > 32767) next.capacity = 'That is larger than this field allows.';
-    }
-
     const start = toMinutes(startTime);
     const end = toMinutes(endTime);
     if (Number.isNaN(start) || Number.isNaN(end)) next.hours = 'Choose valid working hours.';
@@ -304,7 +297,6 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
       const fd = new FormData();
       fd.set('siteId', ids.siteId ?? '');
       fd.set('name', name);
-      fd.set('totalCapacity', capacity.trim());
       fd.set('workdayStartMinute', String(start));
       fd.set('workdayEndMinute', String(end));
       fd.set('workdays', workdays.join(','));
@@ -435,7 +427,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                       label="Organisation name"
                       value={orgName}
                       onChange={(e) => { setOrgName(e.target.value); setErrors({}); }}
-                      placeholder="Acme Facilities"
+                      placeholder="Acme Manufacturing"
                       autoComplete="organization"
                       maxLength={160}
                       error={errors.orgName}
@@ -465,8 +457,8 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                         ))}
                       </select>
                       <p className="text-[12px] text-ink-faint font-medium">
-                        Buckets are stored in UTC and read in this zone — so “peak hour”
-                        means your local peak.
+                        Times are stored in UTC and shown in this zone, so alerts and reports
+                        match your site’s clock.
                       </p>
                     </div>
 
@@ -491,11 +483,11 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                       tabIndex={-1}
                       className="text-2xl sm:text-3xl font-black tracking-tight text-ink leading-[1.15] pb-1 outline-none"
                     >
-                      Describe the space
+                      Describe the site
                     </h1>
                     <p className="text-[14px] text-ink-muted font-medium leading-relaxed">
-                      A site is a building or a floor. Its capacity and hours are what every
-                      utilisation percentage is measured against.
+                      A site is a building, plant or work area. Its working hours tell the
+                      system when people are expected to be there.
                     </p>
                   </header>
 
@@ -507,23 +499,9 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                       label="Site name"
                       value={siteName}
                       onChange={(e) => { setSiteName(e.target.value); setErrors((s) => ({ ...s, siteName: undefined })); }}
-                      placeholder="HQ — Level 4"
+                      placeholder="Plant 1 — Assembly hall"
                       maxLength={160}
                       error={errors.siteName}
-                    />
-
-                    <Field
-                      id="capacity"
-                      label="Desk capacity"
-                      type="number"
-                      min="1"
-                      max="32767"
-                      inputMode="numeric"
-                      value={capacity}
-                      onChange={(e) => { setCapacity(e.target.value); setErrors((s) => ({ ...s, capacity: undefined })); }}
-                      placeholder="60"
-                      error={errors.capacity}
-                      hint="Optional. The denominator for “this floor runs at 71%”."
                     />
 
                     <div className="flex flex-col gap-1.5">
@@ -549,8 +527,8 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                         <p className="text-[12px] font-bold text-accent">{errors.hours}</p>
                       ) : (
                         <p className="text-[12px] text-ink-faint font-medium">
-                          Buckets outside these hours are excluded — a cleaner at 03:00
-                          shouldn’t look like underuse.
+                          Detections outside these hours are left out of the site overview, so a
+                          night patrol doesn’t skew the daytime picture.
                         </p>
                       )}
                     </div>
@@ -624,7 +602,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                       label="Camera name"
                       value={cameraName}
                       onChange={(e) => { setCameraName(e.target.value); setErrors((s) => ({ ...s, cameraName: undefined })); }}
-                      placeholder="Floor 4 — North"
+                      placeholder="Gate 1 — Entrance"
                       maxLength={160}
                       error={errors.cameraName}
                     />

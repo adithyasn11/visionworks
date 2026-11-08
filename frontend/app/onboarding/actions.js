@@ -207,10 +207,8 @@ export async function createOrganisation(formData) {
  * collide with `sites_orgId_name_key` if the names matched. The site id comes
  * back from step 1 for exactly this reason.
  *
- * Working hours are load-bearing, not decoration: analytics excludes
- * out-of-hours buckets, so a cleaner walking through at 03:00 does not depress
- * the utilisation figure. Capacity is the denominator of every percentage the
- * product reports.
+ * Working hours are load-bearing, not decoration: the site overview excludes
+ * out-of-hours detections, so a night patrol does not skew the daytime picture.
  */
 export async function updateSite(formData) {
   const { supabase, error: authError } = await requireUser();
@@ -218,7 +216,6 @@ export async function updateSite(formData) {
 
   const siteId = String(formData.get('siteId') ?? '').trim();
   const name = String(formData.get('name') ?? '').trim();
-  const capacityRaw = String(formData.get('totalCapacity') ?? '').trim();
   const startRaw = String(formData.get('workdayStartMinute') ?? '').trim();
   const endRaw = String(formData.get('workdayEndMinute') ?? '').trim();
   const workdaysRaw = String(formData.get('workdays') ?? '').trim();
@@ -226,18 +223,6 @@ export async function updateSite(formData) {
   if (!siteId) return fail('Missing site. Please restart onboarding.');
   if (!name) return fail('Enter a name for this site.');
   if (name.length > 160) return fail('That site name is too long — 160 characters at most.');
-
-  // Capacity is nullable; blank means "not declared yet", which is different
-  // from zero and must not become 0 — `sites_capacity_positive` rejects 0, and
-  // a zero denominator would make every utilisation percentage infinite.
-  let totalCapacity = null;
-  if (capacityRaw !== '') {
-    const n = Number(capacityRaw);
-    if (!Number.isInteger(n) || n < 1) return fail('Capacity must be a whole number of 1 or more.');
-    // smallint column — anything larger overflows in Postgres, not in JS.
-    if (n > 32767) return fail('Capacity must be 32,767 or fewer.');
-    totalCapacity = n;
-  }
 
   const start = Number(startRaw);
   const end = Number(endRaw);
@@ -266,7 +251,6 @@ export async function updateSite(formData) {
     .from('sites')
     .update({
       name,
-      totalCapacity,
       workdayStartMinute: start,
       workdayEndMinute: end,
       workdays,

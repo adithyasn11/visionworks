@@ -8,15 +8,19 @@ logger = logging.getLogger(__name__)
 
 class SpatialEngine:
     """
-    Spatial Intelligence Engine managing polygon workstation ROIs
-    and Homography perspective transformations for 2D floorplan mapping.
+    Spatial Intelligence Engine managing polygon zones (PPE checkpoint,
+    restricted area, exit, ...) and Homography perspective transformations for
+    2D floorplan mapping.
     """
     def __init__(self, zones_config: list = None, homography_matrix=None):
         """
         zones_config: List of dicts, e.g.:
         [
-            {"zone_id": "desk_01", "zone_name": "Workstation 1", "polygon": [[100, 100], [300, 100], [300, 300], [100, 300]]}
+            {"zone_id": "restricted_01", "zone_name": "Press line", "zone_type": "RESTRICTED",
+             "polygon": [[100, 100], [300, 100], [300, 300], [100, 300]]}
         ]
+        `zone_type` is optional and defaults to GENERAL, the one type that no
+        safety rule attaches to.
         homography_matrix: optional 3x3 camera->floorplan matrix. When absent,
             project_to_floor() falls back to a proportional frame mapping.
         """
@@ -37,9 +41,23 @@ class SpatialEngine:
                 self.zones.append({
                     "zone_id": z["zone_id"],
                     "zone_name": z.get("zone_name", z["zone_id"]),
+                    "zone_type": (z.get("zone_type") or "GENERAL").upper(),
                     "polygon": Polygon(poly_pts),
                     "raw_pts": np.array(poly_pts, dtype=np.int32)
                 })
+
+    def zone_type_of(self, zone_id: str):
+        """
+        The type of a loaded zone, or None for an unknown id.
+
+        TRANSIT_ZONE — what check_zone_containment() returns for a point outside
+        every polygon — is not a drawn zone and has no type, so it is None too.
+        Callers must treat None as "no rule applies here".
+        """
+        for zone in self.zones:
+            if zone["zone_id"] == zone_id:
+                return zone["zone_type"]
+        return None
 
     def check_zone_containment(self, centroid: list) -> str:
         """

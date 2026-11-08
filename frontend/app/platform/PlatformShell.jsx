@@ -120,7 +120,7 @@ export default function PlatformShell({ children, operator }) {
       <div className="mx-3 mb-3 rounded-lg border border-line bg-surface-alt px-3 py-2.5">
         <p className="text-[11px] leading-relaxed text-ink-faint">
           <span className="font-bold text-ink-muted">Metadata only.</span>{' '}
-          Occupancy measurements are not accessible to platform operators.
+          Safety data is not accessible to platform operators.
         </p>
       </div>
 

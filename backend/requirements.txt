@@ -15,20 +15,6 @@ websockets>=12.0
 jinja2>=3.1.0
 reportlab>=4.1.0
 pandas>=2.2.0
-onnxruntime>=1.17.0
 supabase>=2.3.0
 python-multipart>=0.0.9
 python-dotenv>=1.0.0
-
-# ── Per-employee identity (IDENTITY_TRACKING_PLAN.md Phase B) ────────────────
-# OSNet person re-identification. `gdown` and `tensorboard` are transitive:
-# torchreid's package __init__ imports its whole training stack, so both are
-# needed even though only the inference model is used.
-torchreid>=0.2.5
-gdown>=4.7.0
-tensorboard>=2.14.0
-
-# ── Face enrolment (Phase C, Step 9) ─────────────────────────────────────────
-# SCRFD detection + ArcFace embedding, via the buffalo_l pack. Models download
-# once (~300 MB) into ~/.insightface on first use and are cached from then on.
-insightface>=0.7.3

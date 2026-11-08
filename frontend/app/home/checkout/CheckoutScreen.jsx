@@ -322,7 +322,7 @@ export default function CheckoutScreen({
                 <ShieldCheck className="w-[18px] h-[18px] text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="text-[12.5px] font-medium leading-relaxed opacity-70">
                   <span className="font-black opacity-100">Change or cancel any time.</span>{' '}
-                  Your plan can be switched from the workspace whenever you need a different
+                  Your plan can be switched from the dashboard whenever you need a different
                   tier.
                 </p>
               </div>

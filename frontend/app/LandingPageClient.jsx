@@ -45,7 +45,7 @@ export default function LandingPageClient() {
             </h1>
             
             <p className="text-lg text-ink-muted mb-8 max-w-md font-medium leading-relaxed relative z-10">
-              Understand how your physical space is being used. Track foot traffic, improve safety, and get instant alerts—all without compromising privacy.
+              Check that people follow the safety procedure: helmets and vests worn, restricted areas respected, nobody down and left alone. Every alert shows its reasons, and weak evidence is never turned into an accusation.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-5 relative z-10 mb-8">
@@ -65,10 +65,10 @@ export default function LandingPageClient() {
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 relative z-10 text-sm font-bold text-ink-muted">
               <div className="flex items-center gap-2 group/check hover:text-emerald-500 transition-colors cursor-default">
-                <CheckCircle2 className="w-5 h-5 opacity-70 group-hover/check:text-emerald-500 group-hover/check:scale-110 transition-all" /> No hardware required
+                <CheckCircle2 className="w-5 h-5 opacity-70 group-hover/check:text-emerald-500 group-hover/check:scale-110 transition-all" /> Uses your existing cameras
               </div>
               <div className="flex items-center gap-2 group/check hover:text-emerald-500 transition-colors cursor-default">
-                <CheckCircle2 className="w-5 h-5 opacity-70 group-hover/check:text-emerald-500 group-hover/check:scale-110 transition-all" /> Setup in 5 minutes
+                <CheckCircle2 className="w-5 h-5 opacity-70 group-hover/check:text-emerald-500 group-hover/check:scale-110 transition-all" /> A person confirms every flag
               </div>
             </div>
           </div>
@@ -82,8 +82,8 @@ export default function LandingPageClient() {
             >
               <Cpu className="w-10 h-10 text-accent mb-4 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-300" />
               <div>
-                <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2 group-hover:text-accent transition-colors">Instant</h3>
-                <p className="font-bold text-ink-muted uppercase tracking-widest text-[10px]">Alerts & insights</p>
+                <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2 group-hover:text-accent transition-colors">Explainable</h3>
+                <p className="font-bold text-ink-muted uppercase tracking-widest text-[10px]">Every verdict shows why</p>
               </div>
             </div>
             
@@ -94,8 +94,8 @@ export default function LandingPageClient() {
             >
               <Video className="w-10 h-10 text-white mb-4 group-hover:scale-110 group-hover:-rotate-12 transition-transform duration-300" />
               <div>
-                <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2">Universal</h3>
-                <p className="font-bold text-red-50 uppercase tracking-widest text-[10px]">Camera Support</p>
+                <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2">Any camera</h3>
+                <p className="font-bold text-red-50 uppercase tracking-widest text-[10px]">RTSP, webcam or phone</p>
               </div>
             </div>
             
@@ -107,10 +107,10 @@ export default function LandingPageClient() {
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
-                  <span className="font-extrabold text-[10px] tracking-widest uppercase text-ink-muted">System Setup</span>
+                  <span className="font-extrabold text-[10px] tracking-widest uppercase text-ink-muted">Review loop</span>
                 </div>
-                <h3 className="text-lg font-black text-ink tracking-tight mb-2 group-hover:text-accent transition-colors">Plug and play</h3>
-                <p className="text-ink-muted font-medium text-[14px]">No complicated hardware required.</p>
+                <h3 className="text-lg font-black text-ink tracking-tight mb-2 group-hover:text-accent transition-colors">People decide</h3>
+                <p className="text-ink-muted font-medium text-[14px]">A supervisor confirms or dismisses every flag.</p>
               </div>
               <Activity className="w-16 h-16 text-ink-muted/30 group-hover:text-accent group-hover:scale-110 transition-all duration-500 hidden sm:block" />
             </div>
@@ -123,10 +123,10 @@ export default function LandingPageClient() {
             sections beneath. */}
         <div className="mt-2 mb-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-ink-muted animate-fade-in-up" style={{ animationDelay: '500ms' }}>
           <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ink-faint">
-            Built for the workplace
+            Built for safety teams
           </span>
           <span className="hidden sm:block w-px h-4 bg-[color:var(--line)]" aria-hidden="true"></span>
-          {['Runs on your hardware', 'No footage retained', 'Live in minutes'].map((t) => (
+          {['Runs on your hardware', 'No continuous video stored', 'Workers stay anonymous'].map((t) => (
             <span key={t} className="flex items-center gap-2 text-[13px] font-bold">
               <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
               {t}
@@ -147,9 +147,9 @@ export default function LandingPageClient() {
                 <div className="w-12 h-12 bg-surface-alt text-ink border border-line rounded-xl flex items-center justify-center mb-6 group-hover:bg-accent group-hover:text-white transition-colors duration-300">
                   <BarChart className="w-6 h-6 group-hover:scale-110 transition-transform" />
                 </div>
-                <h3 className="text-xl sm:text-2xl font-black text-ink tracking-tight mb-4 group-hover:translate-x-2 transition-transform duration-300">See how your space is used</h3>
+                <h3 className="text-xl sm:text-2xl font-black text-ink tracking-tight mb-4 group-hover:translate-x-2 transition-transform duration-300">Rules that follow your procedure</h3>
                 <p className="text-ink-muted font-medium text-[15px] leading-relaxed max-w-md group-hover:text-ink transition-colors">
-                  Draw zones on your camera feed to instantly see which areas are busy, how long people stay, and when foot traffic peaks.
+                  Draw zones on your camera feed, then set the rules that apply to them: helmet and vest before the restricted area, a time limit inside, the right exit afterwards.
                 </p>
               </div>
               {/* Graphic element */}
@@ -167,11 +167,11 @@ export default function LandingPageClient() {
                 </div>
                 <h3 className="text-3xl font-black tracking-tight mb-4 text-white group-hover:text-accent transition-colors">Privacy first.</h3>
                 <p className="opacity-70 font-medium text-[15px] leading-relaxed mb-8 group-hover:opacity-90 transition-colors">
-                  We process the video to count people and movement, then instantly discard it. No raw footage is ever stored or saved to the cloud.
+                  Video is analysed on your own hardware and then discarded. Workers are tracked as anonymous IDs, never named, and nothing continuous is saved.
                 </p>
               </div>
               <ul className="space-y-4 relative z-10">
-                {['Local processing', 'No footage saved', 'Fully encrypted'].map((item, i) => (
+                {['Local processing', 'Faces can be blurred', 'No names stored'].map((item, i) => (
                   <li key={i} className="flex items-center gap-3 font-bold text-sm opacity-70 group-hover:translate-x-2 transition-transform" style={{ transitionDelay: `${i * 100}ms` }}>
                     <CheckCircle2 className="w-5 h-5 text-red-500" />
                     {item}
@@ -189,7 +189,7 @@ export default function LandingPageClient() {
             >
               <Activity className="w-10 h-10 text-accent mb-4 group-hover:scale-125 group-hover:rotate-12 transition-transform duration-300" />
               <h3 className="text-2xl font-black text-ink tracking-tight mb-2 group-hover:text-accent transition-colors">Safety alerts</h3>
-              <p className="text-ink-muted font-medium text-[14px] leading-relaxed">Get notified automatically when unsafe postures or movements are detected.</p>
+              <p className="text-ink-muted font-medium text-[14px] leading-relaxed">Get notified when someone enters a restricted area without a helmet or vest, or stays past the time limit.</p>
             </div>
             
             {/* Feature 4 */}
@@ -199,7 +199,7 @@ export default function LandingPageClient() {
             >
               <Clock className="w-10 h-10 text-white mb-4 group-hover:scale-125 group-hover:-rotate-12 transition-transform duration-300" />
               <h3 className="text-2xl font-black tracking-tight mb-2 group-hover:text-black transition-colors">Export data</h3>
-              <p className="text-red-50 font-medium text-sm leading-relaxed group-hover:text-white transition-colors">Download your activity logs to share reports with your team.</p>
+              <p className="text-red-50 font-medium text-sm leading-relaxed group-hover:text-white transition-colors">Download safety reports that count confirmed, dismissed and unverifiable cases separately.</p>
             </div>
 
           </div>
@@ -215,7 +215,7 @@ export default function LandingPageClient() {
           
           <h2 className="text-2xl sm:text-3xl font-black text-ink tracking-tight mb-4 relative z-10 group-hover:scale-105 transition-transform duration-500">Ready to get started?</h2>
           <p className="text-ink-muted font-medium text-[15px] max-w-xl mx-auto mb-8 relative z-10 group-hover:text-ink transition-colors duration-300">
-            Connect your cameras today and see how your space is actually being used.
+            Connect your cameras and see whether your safety procedures are actually being followed.
           </p>
           <Link 
             href="/signup"

@@ -3,39 +3,47 @@
 // frontend/app/components/AuthAside.jsx
 // Left-hand panel for the sign-in / sign-up screens.
 //
-// The visual is a top-down floorplan: tracked figures walk between two
-// workstation zones and the transit corridor, exactly the way the real
-// pipeline reports them (track id -> zone -> posture). The counters below it
-// are driven by the simulation, so what you read always matches what moved.
+// The visual is a top-down site plan: tracked figures walk from a PPE
+// checkpoint into a restricted zone and out through an exit, and each carries
+// the verdict the real pipeline would give it (track id -> zone -> verdict).
+// The counters below it are driven by the simulation, so what you read always
+// matches what moved. It is an illustration, not live data.
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 
 /* ── Simulation ──────────────────────────────────────────────────────────── */
 
 const ZONES = [
-  { id: 'workstation_01', label: 'Workstation 01', x: 0.06, y: 0.10, w: 0.40, h: 0.46 },
-  { id: 'workstation_02', label: 'Workstation 02', x: 0.54, y: 0.10, w: 0.40, h: 0.46 },
-  { id: 'transit',        label: 'Transit',        x: 0.06, y: 0.68, w: 0.88, h: 0.22 },
+  { id: 'checkpoint', label: 'PPE checkpoint', x: 0.06, y: 0.10, w: 0.40, h: 0.46 },
+  { id: 'restricted', label: 'Restricted',     x: 0.54, y: 0.10, w: 0.40, h: 0.46 },
+  { id: 'exit',       label: 'Exit',           x: 0.06, y: 0.68, w: 0.88, h: 0.22 },
 ];
 
-// Waypoints roughly at desk seats and corridor stops.
+// Waypoints inside each zone: where a figure pauses before its next leg.
 const SEATS = [
   { x: 0.16, y: 0.30, zone: 0 }, { x: 0.34, y: 0.36, zone: 0 },
   { x: 0.64, y: 0.30, zone: 1 }, { x: 0.84, y: 0.36, zone: 1 },
   { x: 0.20, y: 0.79, zone: 2 }, { x: 0.50, y: 0.79, zone: 2 }, { x: 0.80, y: 0.79, zone: 2 },
 ];
 
-const POSTURES = ['SITTING', 'STANDING', 'WALKING'];
+// A figure keeps one verdict for the whole leg: compliant, flagged for a
+// reviewer, or unverifiable (the system declines to guess).
+const VERDICTS = ['COMPLIANT', 'FLAGGED', 'UNVERIFIABLE'];
+
+function pickVerdict() {
+  const r = Math.random();
+  return r < 0.6 ? 0 : r < 0.8 ? 1 : 2;
+}
 
 function makeAgents() {
   // Fixed ids so the labels read like real track ids from the tracker.
   return [
     { id: 4,  at: 0, to: 4, t: 0.0,  speed: 0.0042, posture: 0, dwell: 0, hold: 40 },
     { id: 7,  at: 2, to: 5, t: 0.35, speed: 0.0035, posture: 0, dwell: 0, hold: 0 },
-    { id: 11, at: 5, to: 3, t: 0.6,  speed: 0.0050, posture: 1, dwell: 0, hold: 0 },
+    { id: 11, at: 5, to: 3, t: 0.6,  speed: 0.0050, posture: 2, dwell: 0, hold: 0 },
     { id: 13, at: 1, to: 6, t: 0.15, speed: 0.0038, posture: 1, dwell: 0, hold: 210 },
     { id: 18, at: 3, to: 0, t: 0.75, speed: 0.0031, posture: 0, dwell: 0, hold: 0 },
-    { id: 22, at: 6, to: 2, t: 0.48, speed: 0.0044, posture: 1, dwell: 0, hold: 300 },
+    { id: 22, at: 6, to: 2, t: 0.48, speed: 0.0044, posture: 0, dwell: 0, hold: 300 },
   ];
 }
 
@@ -43,7 +51,7 @@ function Floorplan() {
   const canvasRef = useRef(null);
   const agentsRef = useRef(makeAgents());
   const rafRef = useRef(0);
-  const [counts, setCounts] = useState({ workstation_01: 2, workstation_02: 1, transit: 1 });
+  const [counts, setCounts] = useState({ checkpoint: 2, restricted: 1, exit: 1 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -77,7 +85,7 @@ function Floorplan() {
         const x = z.x * w, y = z.y * h, zw = z.w * w, zh = z.h * h;
         ctx.strokeStyle = 'rgba(255,255,255,0.14)';
         ctx.lineWidth = 1;
-        ctx.setLineDash(z.id === 'transit' ? [4, 4] : []);
+        ctx.setLineDash(z.id === 'exit' ? [4, 4] : []);
         ctx.strokeRect(x, y, zw, zh);
         ctx.setLineDash([]);
 
@@ -87,15 +95,15 @@ function Floorplan() {
       });
 
       const agents = agentsRef.current;
-      const tally = { workstation_01: 0, workstation_02: 0, transit: 0 };
+      const tally = { checkpoint: 0, restricted: 0, exit: 0 };
       const placed = [];
 
       agents.forEach((a) => {
         const from = SEATS[a.at], to = SEATS[a.to];
 
-        // Hold at the waypoint so the figure reads as seated/standing before
-        // the next leg — otherwise every agent is permanently WALKING and the
-        // accent colour stops meaning anything.
+        // Hold at the waypoint between legs so the verdict is readable —
+        // otherwise every figure is always in motion and the accent colour
+        // stops meaning anything.
         if (a.hold > 0) {
           if (!reduced) a.hold -= 1;
         } else if (!reduced) {
@@ -113,7 +121,7 @@ function Floorplan() {
             next = Math.floor(Math.random() * SEATS.length);
           }
           a.to = next;
-          a.posture = SEATS[a.at].zone === 2 ? 1 : Math.random() > 0.4 ? 0 : 1;
+          a.posture = SEATS[a.at].zone === 2 ? 0 : pickVerdict();
           a.hold = 130 + Math.floor(Math.random() * 190); // ~2-5s at 60fps
           a.dwell = 0;
         }
@@ -128,8 +136,9 @@ function Floorplan() {
         a.dwell += 1 / 60;
 
         const moving = a.hold <= 0 && a.t > 0.02 && a.t < 0.98;
-        const posture = moving ? 'WALKING' : POSTURES[a.posture];
-        const hot = posture === 'WALKING';
+        const verdict = VERDICTS[a.posture];
+        // Only a flagged worker takes the accent; unverifiable stays quiet.
+        const hot = verdict === 'FLAGGED';
 
         // Trail behind moving figures.
         if (moving) {
@@ -151,7 +160,7 @@ function Floorplan() {
 
         // Track label — pushed down when another label already sits nearby,
         // so overlapping figures stay readable.
-        const label = `#${a.id} ${posture}`;
+        const label = `#${a.id} ${verdict}`;
         ctx.font = '600 9px ui-monospace, SFMono-Regular, Menlo, monospace';
         let ly = py + 3;
         const lx = px + box / 2 + 5;
@@ -180,7 +189,7 @@ function Floorplan() {
     <div className="flex flex-col gap-3 min-h-0 flex-1">
       <div className="flex items-baseline justify-between">
         <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
-          cam_floor_01 · top-down
+          cam_gate_01 · top-down
         </span>
         <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/40 flex items-center gap-1.5">
           <span className="w-1 h-1 rounded-full bg-emerald-400" />
@@ -192,14 +201,14 @@ function Floorplan() {
         ref={canvasRef}
         className="w-full block flex-1 min-h-[130px] max-h-[250px]"
         role="img"
-        aria-label="Animated top-down floorplan showing tracked people moving between two workstation zones and a transit corridor."
+        aria-label="Animated top-down site plan showing tracked workers moving from a PPE checkpoint into a restricted zone and out through an exit, each labelled compliant, flagged or unverifiable."
       />
 
-      {/* Occupancy read out of the same simulation that drives the canvas. */}
+      {/* Zone counts read out of the same simulation that drives the canvas. */}
       <div className="grid grid-cols-3 font-mono text-[10px] uppercase tracking-[0.12em] border-t border-white/10 pt-3">
         {ZONES.map((z) => (
           <div key={z.id} className="flex flex-col gap-1">
-            <span className="text-white/40">{z.id === 'transit' ? 'transit' : z.id.replace('workstation_', 'ws ')}</span>
+            <span className="text-white/40">{z.id}</span>
             <span className="text-lg font-sans font-black tracking-tight tabular-nums text-white">
               {counts[z.id]}
             </span>

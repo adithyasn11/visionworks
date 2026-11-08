@@ -8,7 +8,7 @@
 // be able to work top to bottom and stop when the sections turn green.
 //
 // Every value is read from the database. Nothing here is mocked, and no section
-// touches occupancy: statuses, counts, timestamps and error strings only.
+// touches safety data: statuses, counts, timestamps and error strings only.
 
 import React from 'react';
 import Link from 'next/link';
@@ -64,7 +64,7 @@ export default async function PlatformHealthPage() {
           </h1>
           <p className="mt-1.5 text-[13.5px] text-ink-muted max-w-xl leading-relaxed">
             Triage across all {orgCount} organisation{orgCount === 1 ? '' : 's'}, most
-            urgent first. Statuses and error messages only — never occupancy.
+            urgent first. Statuses and error messages only — never safety data.
           </p>
         </div>
 

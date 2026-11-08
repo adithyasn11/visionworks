@@ -14,12 +14,11 @@ def privacy_blur_default() -> bool:
     """
     The blur setting a new session starts with, from `PRIVACY_BLUR_DEFAULT`.
 
-    Defaults to False. Blur destroys the face signal, and the identity pipeline
-    (the door camera in particular) needs that signal to exist at all — a
-    development default of ON means every face experiment silently measures
-    blurred pixels. Deployments that want privacy-by-default set
-    PRIVACY_BLUR_DEFAULT=true, which is the one line the deployment docs call
-    out; the runtime toggle is unaffected either way.
+    Defaults to False for development, where the raw picture is what you are
+    debugging. Deployments that want privacy-by-default set
+    PRIVACY_BLUR_DEFAULT=true; the runtime toggle is unaffected either way. (The
+    safety layer forces blur on for its evidence snapshots regardless of this
+    setting — see the design doc, Step 9.)
     """
     raw = os.getenv("PRIVACY_BLUR_DEFAULT")
     if raw is None:

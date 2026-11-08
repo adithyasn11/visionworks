@@ -8,9 +8,9 @@ import LandingFooter from '../components/LandingFooter';
 import { StatsBand, HowItWorks, FAQ } from '../components/LandingSections';
 
 const STATS = [
-  { value: '0',        label: 'Frames stored', note: 'Video is discarded after inference' },
-  { value: 'On-site',  label: 'Processing',    note: 'Inference runs on your hardware' },
-  { value: 'TLS 1.3',  label: 'In transit',    note: 'Encrypted metadata, nothing else' },
+  { value: '0',        label: 'Video stored',  note: 'Only blurred snapshots of flagged events are kept' },
+  { value: 'On-site',  label: 'Processing',    note: 'Analysis runs on your hardware' },
+  { value: 'TLS 1.3',  label: 'In transit',    note: 'Encrypted results, never video' },
   { value: 'Row-level',label: 'Isolation',     note: 'Tenants can only read their own data' },
 ];
 
@@ -20,31 +20,31 @@ const STEPS = [
     body: 'A frame is pulled from the camera and handed straight to the local model. It is never written to disk.',
   },
   {
-    title: 'Only numbers come out',
-    body: 'The model returns coordinates, a posture label and a track ID. The image itself is dropped immediately.',
+    title: 'Only results come out',
+    body: 'The models return positions, a track ID and whether a helmet and vest were seen. The image itself is dropped immediately, apart from a blurred snapshot when something is flagged.',
   },
   {
-    title: 'Metadata syncs',
-    body: 'Those numbers travel to your dashboard over TLS 1.3 and land in a database partitioned per organisation.',
+    title: 'Results sync',
+    body: 'Verdicts travel to your dashboard over TLS 1.3 and land in a database partitioned per organisation.',
   },
 ];
 
 const FAQ_ITEMS = [
   {
     q: 'Is any video saved or uploaded?',
-    a: 'No. Frames are analysed in memory and released as soon as the model has read them. What leaves the machine is numerical telemetry — coordinates, posture labels, dwell times — never imagery.',
+    a: 'No continuous video. Frames are analysed in memory and released as soon as the models have read them. What leaves the machine is data: positions, track IDs, verdicts and times. The one exception is a snapshot of a flagged event, with faces blurred, kept for a limited time and visible only to authorised reviewers.',
   },
   {
     q: 'Can VisionWorks identify specific people?',
-    a: 'No. There is no face recognition and no biometric matching. Each person gets a temporary track ID that lets the system follow them across frames in a single session; it carries no identity and is not reused later.',
+    a: 'No. Workers are followed as anonymous track IDs within a single camera view, so a verdict is about “a worker”, never a named person. The ID lets the system follow someone across frames; it carries no identity and is not reused later.',
   },
   {
     q: 'Who can see our data?',
     a: 'Only your organisation. Row Level Security policies are enforced in the database itself, so a query from one tenant cannot return another tenant’s rows even if the application layer were compromised.',
   },
   {
-    q: 'Do we need to tell staff they are being analysed?',
-    a: 'Requirements vary by jurisdiction, so treat this as a prompt rather than legal advice — check with your own counsel. Most workplace privacy regimes expect clear notice of monitoring, and the fact that no footage is retained is usually central to that conversation.',
+    q: 'Do we need to tell workers they are being monitored?',
+    a: 'Yes — treat notice as a requirement, not an option. Rules vary by jurisdiction (in India, the Digital Personal Data Protection Act, 2023 applies), so check with your own counsel rather than relying on this page. Tell workers what is checked and why, and keep safety data for safety.',
   },
 ];
 
@@ -70,11 +70,11 @@ export default function SecurityPage() {
           </div>
           {/* leading-[1.15] + pb-1 keeps descenders from clipping. */}
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-ink mb-6 leading-[1.15] pb-1 text-balance">
-            Enterprise privacy.{' '}
-            <span className="text-accent">Built in.</span>
+            Safety monitoring.{' '}
+            <span className="text-accent">Privacy built in.</span>
           </h1>
           <p className="text-lg sm:text-xl text-ink-muted font-medium leading-relaxed max-w-2xl mx-auto text-balance">
-            Understanding how a workspace is used shouldn&apos;t cost your team their privacy. Everything is processed on site, and the raw video never leaves the building.
+            Checking that people follow safety rules shouldn&apos;t cost them their privacy. Everything is processed on site, and no continuous video ever leaves the building.
           </p>
 
           <div className="mt-9 flex flex-col sm:flex-row gap-3.5 justify-center">
@@ -110,7 +110,7 @@ export default function SecurityPage() {
               </div>
               <h3 className="text-xl sm:text-2xl font-black tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors">Local edge processing</h3>
               <p className="opacity-70 font-medium text-[15px] leading-relaxed mb-6">
-                Frames are analysed on your own hardware. The model extracts coordinates and posture labels, then drops the image from memory before the next frame arrives.
+                Frames are analysed on your own hardware. The models extract positions, track IDs and PPE detections, then drop the image from memory before the next frame arrives.
               </p>
             </div>
             <div className="relative z-10 bg-white/5 p-5 rounded-2xl border border-white/10 flex items-center justify-between gap-4 group-hover:border-[color:var(--accent)] transition-colors">
@@ -140,13 +140,13 @@ export default function SecurityPage() {
               <div className="w-11 h-11 bg-surface-alt text-ink rounded-xl flex items-center justify-center mb-6 group-hover:bg-accent group-hover:text-white transition-colors duration-300">
                 <EyeOff className="w-5 h-5" />
               </div>
-              <h3 className="text-xl sm:text-2xl font-black text-ink tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors duration-300">Zero video retention</h3>
+              <h3 className="text-xl sm:text-2xl font-black text-ink tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors duration-300">No continuous video</h3>
               <p className="text-ink-muted font-medium text-[15px] leading-relaxed mb-6">
-                Nothing is written to disk and nothing is streamed off-site. What persists is encrypted numerical telemetry — and only that.
+                Nothing continuous is written to disk and nothing is streamed off-site. What persists is encrypted data about what was detected, plus short-lived blurred snapshots of flagged events.
               </p>
             </div>
             <ul className="flex flex-col gap-3">
-              {['No cloud video storage', 'No face recognition', 'No personally identifiable data'].map((item, i) => (
+              {['No cloud video storage', 'Workers known by anonymous ID only', 'Faces blurred in snapshots'].map((item, i) => (
                 <li key={i} className="flex items-center gap-3 font-bold text-[13px] text-ink-faint group-hover:translate-x-1 transition-transform" style={{ transitionDelay: `${i * 100}ms` }}>
                   <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
                   {item}
@@ -168,9 +168,9 @@ export default function SecurityPage() {
                <Lock className="w-72 h-72" />
             </div>
             <div className="relative z-10">
-              <h3 className="text-xl sm:text-2xl font-black tracking-tight mb-3 leading-[1.15] pb-1">Bank-level encryption</h3>
+              <h3 className="text-xl sm:text-2xl font-black tracking-tight mb-3 leading-[1.15] pb-1">Encrypted in transit</h3>
               <p className="text-red-50 font-medium text-[15px] leading-relaxed">
-                Every measurement sent from the local inference engine to your dashboard travels over TLS 1.3. Nothing moves in the clear.
+                Every result sent from the local analysis engine to your dashboard travels over TLS 1.3. Nothing moves in the clear.
               </p>
             </div>
           </div>
@@ -204,9 +204,9 @@ export default function SecurityPage() {
           className="bg-surface border border-line rounded-3xl p-10 sm:p-14 text-center animate-fade-in-up flex flex-col items-center justify-center group hover:-translate-y-1 hover:border-[color:var(--accent)] transition-all duration-500 relative overflow-hidden"
           style={{ animationDelay: '650ms' }}
         >
-          <h2 className="text-2xl sm:text-3xl font-black text-ink tracking-tight mb-3 relative z-10 leading-[1.15] pb-1">Secure your workspace.</h2>
+          <h2 className="text-2xl sm:text-3xl font-black text-ink tracking-tight mb-3 relative z-10 leading-[1.15] pb-1">Monitor safety responsibly.</h2>
           <p className="text-ink-muted font-medium text-[15px] max-w-md mx-auto mb-7 relative z-10">
-            Run activity analytics without giving up privacy or compliance.
+            Run safety checks without giving up privacy or compliance.
           </p>
           <Link
             href="/dashboard"

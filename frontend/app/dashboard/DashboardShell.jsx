@@ -15,9 +15,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Video, Shapes, FileDown,
-  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard, ContactRound,
-  UsersRound, FlaskConical,
-  Waypoints,
+  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard,
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import { supabase } from '../lib/supabase/browser';
@@ -163,26 +161,19 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
       </div>
 
       {/* ONE SCROLL REGION FOR BOTH NAV GROUPS.
-          
-          `Workspace` and `Account` used to be siblings: the first had
-          `flex-1 overflow-y-auto`, the second did not shrink. So as Account
-          grew — Employees, Team, Accuracy, Camera layout, Members,
-          Organisation — it squeezed Workspace until only part of it fitted,
-          and a scrollbar appeared in the MIDDLE of the sidebar with plenty of
-          empty space below it. Measured: the nav was cut to 156px while
-          needing 238px, with a 251px Account block underneath.
-          
-          Wrapping both in one scroller means the whole list scrolls as one
-          thing, at the sidebar's own edge, and only when the list is genuinely
-          taller than the space. `overscroll-contain` stops a scroll that
-          reaches the end of the list from continuing into the page behind it. */}
+
+          `Workspace` and `Account` sit in one scroller so the whole list
+          scrolls as a single thing at the sidebar's own edge, and only when
+          it is genuinely taller than the space. `overscroll-contain` stops a
+          scroll that reaches the end of the list from continuing into the page
+          behind it. */}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain nav-scroll pb-1">
       <nav className="px-3 pt-3.5 space-y-0.5" aria-label="Dashboard sections">
         {/* Group label. Five unlabelled items and two more below the rule read
             as one long undifferentiated list; naming the groups is what makes
             "where am I" answerable at a glance. */}
         <p className="px-3 pb-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-ink-faint">
-          Workspace
+          Monitor
         </p>
         {VIEWS.filter((v) => !v.capability || can(role, v.capability)).map((v) => (
           <NavItem
@@ -210,89 +201,6 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
         <p className="px-3 pb-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-ink-faint">
           Account
         </p>
-        {/* Employees. A routed page like Members, and shown on the same terms:
-            `employee_select` returns the roster to every member of the org, so
-            hiding the link would hide what the database willingly returns. The
-            add/edit controls inside are gated on `employees.edit`. */}
-        {can(role, 'employees.view') && (
-          <Link
-            href="/dashboard/employees"
-            onClick={() => setOpen(false)}
-            className={`${NAV_ROW} ${
-              pathname === '/dashboard/employees' ? NAV_ROW_ACTIVE : NAV_ROW_IDLE
-            }`}
-          >
-            {pathname === '/dashboard/employees' && (
-              <span aria-hidden="true" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[color:var(--accent)]" />
-            )}
-            <ContactRound className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
-            <span className="truncate">Employees</span>
-          </Link>
-        )}
-
-        {/* Team (Step 16). Directly under Employees because it is the same
-            people, measured rather than listed.
-
-            Gated on `team.compare` — ADMIN and MANAGER. Unlike the links
-            around it, hiding this one withholds nothing the database would
-            return: employee_day_stat_select (022) already gives a VIEWER only
-            their own figures, so the page would render as a single row. The
-            link is hidden so it does not read as an empty team. */}
-        {can(role, 'team.compare') && (
-          <Link
-            href="/dashboard/team"
-            onClick={() => setOpen(false)}
-            className={`${NAV_ROW} ${
-              pathname === '/dashboard/team' ? NAV_ROW_ACTIVE : NAV_ROW_IDLE
-            }`}
-          >
-            {pathname === '/dashboard/team' && (
-              <span aria-hidden="true" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[color:var(--accent)]" />
-            )}
-            <UsersRound className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
-            <span className="truncate">Team</span>
-          </Link>
-        )}
-
-        {/* Evaluation (Step 17). Open to every member, deliberately.
-
-            This is the page that says how far the other pages can be trusted,
-            and restricting it would mean the people whose time is being
-            measured cannot see the accuracy of the measurement. It contains no
-            personal data — only aggregate rates and failure counts. */}
-        <Link
-          href="/dashboard/evaluation"
-          onClick={() => setOpen(false)}
-          className={`${NAV_ROW} ${
-            pathname === '/dashboard/evaluation' ? NAV_ROW_ACTIVE : NAV_ROW_IDLE
-          }`}
-        >
-          {pathname === '/dashboard/evaluation' && (
-            <span aria-hidden="true" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[color:var(--accent)]" />
-          )}
-          <FlaskConical className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
-          <span className="truncate">Accuracy</span>
-        </Link>
-
-        {/* Camera layout (Step 12). Beside Employees because both describe
-            the space rather than measure it, and both are read by every
-            member while only managers may change them. */}
-        {can(role, 'cameras.edit') && (
-          <Link
-            href="/dashboard/cameras/topology"
-            onClick={() => setOpen(false)}
-            className={`${NAV_ROW} ${
-              pathname === '/dashboard/cameras/topology' ? NAV_ROW_ACTIVE : NAV_ROW_IDLE
-            }`}
-          >
-            {pathname === '/dashboard/cameras/topology' && (
-              <span aria-hidden="true" className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[color:var(--accent)]" />
-            )}
-            <Waypoints className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
-            <span className="truncate">Camera layout</span>
-          </Link>
-        )}
-
         <Link
           href="/settings/members"
           onClick={() => setOpen(false)}
@@ -331,27 +239,16 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
       )}
 
       {/* The privacy boundary, stated in the chrome rather than buried in a doc,
-          so it is on screen whenever the product is being demonstrated.
-
-          INSIDE the scroll region, at the end of the list, and no longer a
-          boxed panel. As a bordered card it was 75px and read as a third nav
-          group — a thing to click — competing with the items above it. As
-          quiet text under a rule it is 40px, reads as a footnote, and gives
-          the list back the room it needed: measured, the sidebar overflowed
-          by 71px and this is most of it.
-
-          The full sentence lives in `title`, and the visible text is short
-          enough to survive the clip. On a short screen the previous wording
-          was cut mid-phrase at the fold — "Frames are discarded" with the rest
-          below the edge — which reads as a rendering fault rather than as
-          something you can scroll to. A promise about privacy is the last
-          thing that should look broken. */}
+          so it is on screen whenever the product is being demonstrated. Quiet
+          text under a rule, inside the scroll region: it is a footnote, not a
+          thing to click. The full sentence lives in `title` so the visible text
+          can stay short enough to survive the clip. */}
       <p
-        title="No footage is stored. Frames are discarded after inference; only counts and postures are kept."
+        title="No continuous video is stored. Frames are discarded after analysis; workers are identified only by an anonymous track, never by name."
         className="mx-3 mt-3 mb-1 pt-2.5 border-t border-line text-[10.5px] leading-snug text-ink-faint"
       >
-        <span className="font-semibold text-ink-muted">No footage stored.</span>{' '}
-        Only counts and postures are kept.
+        <span className="font-semibold text-ink-muted">No video stored.</span>{' '}
+        Workers stay anonymous.
       </p>
       </div>{/* end of the single scroll region */}
 
@@ -439,7 +336,7 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
           </button>
           <span className="font-extrabold text-[15px] tracking-tight">VisionWorks</span>
           <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-accent">
-            Workspace
+            Safety
           </span>
         </div>
 

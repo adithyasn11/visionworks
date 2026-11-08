@@ -43,8 +43,8 @@ export default async function PlatformOverviewPage() {
             Every organisation, at a glance
           </h1>
           <p className="mt-1.5 text-[13.5px] text-ink-muted max-w-xl leading-relaxed">
-            Configuration and health across the whole platform. Occupancy
-            measurements stay with the organisations that produced them.
+            Configuration and health across the whole platform. Safety data
+            stays with the organisations that produced it.
           </p>
         </div>
 
@@ -164,14 +164,14 @@ export default async function PlatformOverviewPage() {
             <div className="flex items-center gap-2 mb-2">
               <PauseCircle className="w-4 h-4 text-ink-faint" strokeWidth={2.2} />
               <h3 className="text-[13px] font-bold tracking-tight text-ink">
-                Occupancy not accessible
+                Safety data not accessible
               </h3>
             </div>
             <p className="text-[11.5px] leading-relaxed text-ink-muted">
               Platform operators can read configuration and health — never
-              measurements. Enforced by row-level security in Postgres, not by
-              this interface. A query for occupancy data from this session
-              returns no rows.
+              detections, verdicts or alerts. Enforced by row-level security in
+              Postgres, not by this interface. A query for safety data from this
+              session returns no rows.
             </p>
           </div>
         </div>

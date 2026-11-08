@@ -2,14 +2,14 @@
 
 // frontend/app/dashboard/page.jsx
 //
-// The manager's workspace.
+// The safety officer's workspace.
 //
 // Four sections behind one sidebar, matching the founder console's shell so the
 // customer and operator halves of the product read as one application:
 //
-//   Overview   what happened in the space — the home screen
-//   Live feed  the camera, with detection and posture overlays
-//   Zones      define the areas occupancy is attributed to
+//   Overview   what was detected on site — the home screen
+//   Live feed  the camera, with detection and tracking overlays
+//   Zones      define the areas that rules and measurements attach to
 //   Reports    export what was recorded
 //
 // Sections are view state rather than routes on purpose: they share one polling
@@ -33,7 +33,6 @@ import { backendFetch } from '../lib/backend';
 import { getViewerRole } from '../lib/session';
 import { getOverview, getDataCoverage } from '../lib/analytics/queries';
 import RangePicker from './RangePicker';
-import AlertsPanel from './AlertsPanel';
 import { can, denialMessage } from '../lib/permissions';
 
 // Must match a camera actually registered for this org — both in the local
@@ -281,7 +280,7 @@ function DashboardInner() {
           const id = c.camera_id || c.id || c.name;
           return (
             <option key={id} value={id}>
-              {c.name || id}{c.role === 'DOOR' ? ' · door' : ''}
+              {c.name || id}
             </option>
           );
         })}
@@ -324,9 +323,9 @@ function DashboardInner() {
       {view === 'overview' && (
         <div className="space-y-6">
           <PageHeader
-            eyebrow="Workspace overview"
-            title={`Your space, ${rangeLabel}`}
-            subtitle="Occupancy, posture and dwell time measured from the camera feed. No footage or identity is stored."
+            eyebrow="Site overview"
+            title={`Your site, ${rangeLabel}`}
+            subtitle="People detected, how long they stay in each zone and their posture, measured from the camera feed. No video or names are stored."
             action={overviewActions}
           />
 
@@ -336,11 +335,6 @@ function DashboardInner() {
             error={overview.error}
             hours={rangeDays * 24}
           />
-
-          {/* Alerts sit directly under the tiles: the tiles say what the space
-              did, alerts say what needs doing about it. Anything further down
-              would be below the fold on a laptop. */}
-          <AlertsPanel role={role} />
 
           {/* Trends sit below the headline numbers: the tiles answer "what is
               true now", the charts answer "how did it get there". */}
@@ -360,7 +354,7 @@ function DashboardInner() {
           Hiding it with CSS keeps the component alive: the stream, the
           socket and the processed frames all survive a trip to Zones and
           back. The cleanup still fires when the DASHBOARD unmounts, so
-          leaving for /dashboard/employees or signing out still releases the
+          leaving for another page or signing out still releases the
           camera properly. */}
       <div className={view === 'live' ? 'block' : 'hidden'} aria-hidden={view !== 'live'}>
         <div className="space-y-6">
@@ -369,8 +363,8 @@ function DashboardInner() {
             title="Camera & detection"
             subtitle={
               can(role, 'analysis.run')
-                ? 'Upload a recording or start the camera. Detection, tracking and posture run on your own hardware. Zones drawn for this camera are outlined on the frame.'
-                : 'Live detection and posture, as recorded by your team. Starting an analysis writes new measurements, which your role does not permit.'
+                ? 'Upload a recording or start the camera. People are detected and tracked on your own hardware, and the zones drawn for this camera are outlined on the frame.'
+                : 'Live detection and tracking, as recorded for your organisation. Starting an analysis writes new measurements, which your role does not permit.'
             }
             action={cameraPicker}
           />
@@ -392,11 +386,11 @@ function DashboardInner() {
         <div className="space-y-6">
           <PageHeader
             eyebrow="Zones"
-            title="Define your spaces"
+            title="Define your zones"
             subtitle={
               can(role, 'zones.edit')
-                ? 'Draw the areas you want measured, on the camera they belong to. A zone is a region of ONE camera’s view — it means nothing in another’s.'
-                : 'The areas being measured. Occupancy and dwell time are attributed to whichever zone a person is standing in.'
+                ? 'Draw the areas you want monitored, on the camera they belong to. A zone is a region of ONE camera’s view — it means nothing in another’s.'
+                : 'The areas being monitored. Each person is attributed to whichever zone they are standing in.'
             }
             action={cameraPicker}
           />
@@ -469,8 +463,8 @@ function DashboardInner() {
         <div className="space-y-6">
           <PageHeader
             eyebrow="Reports"
-            title="Export activity"
-            subtitle="Download recorded telemetry as raw data or an executive summary. Exports contain counts and postures only."
+            title="Export site data"
+            subtitle="Download recorded detections as raw data or a summary. Exports contain counts and postures only."
             action={
               <RangePicker
                 value={rangeDays}
@@ -501,9 +495,9 @@ function DashboardInner() {
 
               <dl className="flex flex-col gap-3">
                 {[
-                  ['Per-zone occupancy', 'Headcount per zone per minute, across the selected window.'],
+                  ['People per zone', 'Headcount per zone per minute, across the selected window.'],
                   ['Posture breakdown', 'Sitting, standing and walking totals — as counts, never per person.'],
-                  ['Dwell time', 'How long the zone was occupied, aggregated per minute bucket.'],
+                  ['Time in zone', 'How long each zone was occupied, aggregated per minute bucket.'],
                 ].map(([term, detail]) => (
                   <div key={term} className="flex gap-3">
                     <Check className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={3} aria-hidden="true" />

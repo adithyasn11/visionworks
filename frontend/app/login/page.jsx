@@ -11,13 +11,13 @@ import AuthAside from '../components/AuthAside';
 import { GoogleButton, Divider, Field, PasswordField, Banner, SubmitButton } from '../components/AuthFormBits';
 
 const ASIDE = {
-  eyebrow: 'cam_floor_01 // live',
-  headline: 'Every person counted. No face ever stored.',
-  sub: 'Detection, tracking and posture run on your own hardware. What leaves the machine is a number, not a frame.',
+  eyebrow: 'cam_gate_01 // live',
+  headline: 'Every worker checked. Nobody named.',
+  sub: 'Detection, tracking and PPE checks run on your own hardware. What leaves the machine is a verdict, not a frame.',
   facts: [
-    { term: 'model',     detail: 'YOLOv8m-pose, 17-point COCO skeleton' },
-    { term: 'posture',   detail: 'Sitting / standing / walking, smoothed across frames' },
-    { term: 'retention', detail: 'Frames dropped from memory after inference' },
+    { term: 'model',     detail: 'YOLOv8m-pose for people, YOLOv8m for helmets and vests' },
+    { term: 'verdicts',  detail: 'Compliant, potential violation or unverifiable' },
+    { term: 'retention', detail: 'Frames dropped from memory after analysis' },
   ],
 };
 
@@ -268,7 +268,7 @@ function LoginForm() {
                   Sign in
                 </h1>
                 <p className="text-[14px] text-ink-muted font-medium leading-relaxed">
-                  Pick up where you left off with your live activity dashboard.
+                  Pick up where you left off with your live safety dashboard.
                 </p>
               </header>
 

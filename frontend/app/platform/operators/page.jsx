@@ -74,7 +74,7 @@ export default async function PlatformOperatorsPage() {
         <p className="mt-1.5 text-[13.5px] text-ink-muted max-w-2xl leading-relaxed">
           People who can reach this console. Platform access is separate from
           organisation roles — an operator belongs to no customer and sees
-          configuration and health only, never occupancy.
+          configuration and health only, never safety data.
         </p>
       </header>
 
@@ -302,9 +302,9 @@ export default async function PlatformOperatorsPage() {
               cannot see
             </p>
             <ul className="space-y-1 text-[12px] text-ink-muted leading-relaxed">
-              <li>Occupancy counts or utilisation</li>
-              <li>Posture data of any kind</li>
-              <li>Alerts and generated reports</li>
+              <li>Detections or worker counts</li>
+              <li>Verdicts, flags and review decisions</li>
+              <li>Alerts, snapshots and generated reports</li>
               <li>A customer&rsquo;s own audit log</li>
             </ul>
           </div>

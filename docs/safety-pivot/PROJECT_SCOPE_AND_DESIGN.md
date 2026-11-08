@@ -134,7 +134,7 @@ A first version of the new idea (`PROJECT_PIVOT_PROPOSAL.md`) was built around *
 ### Explicitly out of scope
 
 - Measuring productivity, performance or "how hard someone works".
-- Recognising or naming individuals as part of the safety decision (identity is an optional, secondary feature; verdicts are about "a worker", not a named person, unless the existing optional enrolment is used).
+- Recognising or naming individuals. Face recognition, enrolment and appearance-based re-identification were **removed** with the productivity product; workers are anonymous ByteTrack ids within one camera view, and verdicts are about "a worker", never a named person.
 - Storing continuous video.
 - Detecting PPE other than helmet and vest in the safety rules (the model also detects gloves, boots, mask, but these are not used in rules — see §8.3).
 - Legal/compliance certification. This is a decision-support system for a supervisor, not an automated enforcement system.
@@ -225,7 +225,7 @@ Order matters:
 1. Read and resize the frame (640 px wide normally).
 2. **Person detection + tracking + pose** — one pass, returns boxes, ByteTrack ids, 17 keypoints, posture.
 3. **PPE detection** on the **unblurred** frame — helmets and vests only.
-4. **Identity** (optional) — appearance signatures from the unblurred frame; stitches fragmented track ids into a stable `identity_id`.
+4. **Worker key** — the anonymous ByteTrack id (`trk-<id>`) within this camera view. No appearance signature is computed and nobody is named.
 5. **PPE association and evidence** — each helmet/vest is given to at most one person; per-worker rolling evidence updated.
 6. **Zone containment** — which zone each person is in.
 7. **Zone events** — enter / exit / dwell transitions with debounce.
@@ -258,7 +258,7 @@ Each feature below lists: **purpose, how it works, inputs/outputs, depends on, e
 
 - **Purpose:** find every person and give each a stable id within one camera.
 - **How:** `PostureEstimator.process_frame_single_pass` (`backend/app/cv/pose_estimator.py`) runs `yolov8m-pose.pt` with `bytetrack.yaml` in a single GPU pass: box, confidence, track id, 17 keypoints, smoothed posture (sitting/standing/walking/unknown).
-- **Limit:** ByteTrack ids are local to one camera and reset after about 30 frames of occlusion. The optional identity tracker (`identity_tracker.py`, OSNet appearance re-identification, cosine ≥ 0.65, 120 s gallery) stitches fragments into one `identity_id` per session. The safety state machine keys on `identity_id` when identity tracking is on, otherwise on `track_id`.
+- **Limit:** ByteTrack ids are local to one camera and reset after about 30 frames of occlusion. The earlier OSNet identity tracker that stitched fragments was removed, so the safety state machine keys on `track_id` alone. A worker lost for longer than the track survives therefore becomes a new worker; the zone-event layer handles that by closing the old visit as `LOST` and treating the verdict as `UNVERIFIABLE` rather than guessing (§8.7).
 - **Used by:** F4–F9, F17, F18.
 
 ### 8.3 F3 — PPE detection
@@ -342,7 +342,7 @@ Each feature below lists: **purpose, how it works, inputs/outputs, depends on, e
 - **File (new):** `backend/app/safety/zone_events.py`.
 - **State kept per worker:** current zone, time entered, time last seen in it, pending candidate zone (for debounce).
 - **Debounce:** a worker only "enters" a new zone after being continuously inside it for `ENTER_CONFIRM_SECONDS` (default 0.7 s); only "exits" after being continuously outside for `EXIT_CONFIRM_SECONDS` (default 1.0 s). This stops a person standing on a polygon edge from generating dozens of events.
-- **Track loss:** if a worker disappears while inside a zone, the zone is held open for `LOST_GRACE_SECONDS` (default 5 s). If they reappear (same `identity_id`) the visit continues; otherwise an exit is recorded with reason `LOST` (which rules treat carefully — see F8 R4).
+- **Track loss:** if a worker disappears while inside a zone, the zone is held open for `LOST_GRACE_SECONDS` (default 5 s). If they reappear under the same `track_id` the visit continues; otherwise an exit is recorded with reason `LOST` (which rules treat carefully — see F8 R4).
 - **Event types:**
 
   ```
@@ -351,7 +351,7 @@ Each feature below lists: **purpose, how it works, inputs/outputs, depends on, e
   PPE_VERDICT_CHANGED
   ```
 
-  Each event has: org, camera, zone, worker key (`identity_id` or `track_id`), event type, video timestamp, wall-clock time, details JSON.
+  Each event has: org, camera, zone, worker key (`trk-<track_id>`), event type, video timestamp, wall-clock time, details JSON.
 - **Duplicate suppression:** identical consecutive events for the same worker/zone are dropped.
 - **Depends on:** F2, F6.
 - **Tested:** synthetic walks across polygons, boundary jitter, occlusion gaps, re-entry.
@@ -418,7 +418,7 @@ Each feature below lists: **purpose, how it works, inputs/outputs, depends on, e
 - **Confidence:** for PPE-based decisions it is the fraction of clear frames that support the conclusion, combined with the mean detection confidence of the supporting frames. It is reported alongside the numbers; the *threshold for naming a violation is the 90%/60% rule in F5*, not a tuned score. Decisions below `min_evidence_confidence` are downgraded to `UNVERIFIABLE`.
 - **Why `UNVERIFIABLE` is a first-class result:** it appears in the dashboard, in reports and in the evaluation, so we can report an honest abstention rate instead of hiding it.
 - **Depends on:** F5, F7, F8.
-- **Tested:** scripted scenarios (§14) driven through the real engine with synthetic detections, in the style of `backend/tests/test_handoff.py` and `test_confidence.py`.
+- **Tested:** scripted scenarios (§14) driven through the real engine with synthetic detections, in the style of `backend/tests/test_ppe_evidence.py` and `test_zone_types.py`.
 
 ### 8.10 F17 — Man-down detection *(TO BUILD)*
 
@@ -443,7 +443,7 @@ Each feature below lists: **purpose, how it works, inputs/outputs, depends on, e
   - Over capacity: count above `max_people` for longer than the grace → `POTENTIAL_VIOLATION` (`OVER_CAPACITY`).
   - `UNVERIFIABLE` if the zone is crowded/overlapped enough that detections are unreliable (average clear-frame fraction below a threshold), or the zone just became empty (leaving is not a lone-worker case).
 - **Depends on:** F2, F6, F8.
-- **Reuse:** the existing `OVERCROWDING` alert logic in `backend/app/db/alerts_engine.py` is the pattern for sustained-condition + cooldown.
+- **Reuse:** the idea of a sustained condition with a cooldown (the old `alerts_engine.py`, now removed, used it); the safety engine implements it for decisions (Step 10).
 
 ### 8.12 O1 — Unsafe movement *(optional)*
 
@@ -453,9 +453,8 @@ Each feature below lists: **purpose, how it works, inputs/outputs, depends on, e
 
 ### 8.13 F10 — Alerts and notifications *(extend existing)*
 
-- **Exists:** `backend/app/db/alerts_engine.py` evaluates minute-bucket rules (SEDENTARY, OVERCROWDING, UNDERUTILISATION, CAMERA_OFFLINE) with thresholds, sustained duration, cooldown, open-alert suppression and acknowledgement; UI in `frontend/app/dashboard/AlertsPanel.jsx`.
-- **Limit of the existing engine:** it evaluates aggregated minutes, so it is too slow for safety events that need to fire within seconds.
-- **TO BUILD:** an **event-driven path**. In the safety product an **alert is a `POTENTIAL_VIOLATION` decision that is still `PENDING` review** — the legacy `alerts` table is not used for it, because that table requires an `alert_rules` row and a fixed `AlertType` enum built for occupancy rules. One source of truth (the decision), one alert per rule/worker/visit (or per episode for continuous rules), acknowledged by being reviewed. The existing alerts panel gets a "Safety" tab that reads decisions. See Step 10 in §23.
+- **Removed:** the occupancy alert engine (`alerts_engine.py`), its `alerts` / `alert_rules` tables and `AlertsPanel.jsx` were deleted with the productivity product (migration 024). They evaluated aggregated minutes (sedentary, overcrowded, under-used), which is both the wrong idea and too slow for safety events that must fire within seconds.
+- **TO BUILD:** an **event-driven path**. In the safety product an **alert is a `POTENTIAL_VIOLATION` decision that is still `PENDING` review**. One source of truth (the decision), one alert per rule/worker/visit (or per episode for continuous rules), acknowledged by being reviewed. A new alerts panel reads decisions. See Step 10 in §23.
 - **Alert kinds** (rule type + reason): missing PPE at entry, PPE lost while inside, dwell exceeded, required exit missing, lone worker, over capacity, man-down; `UNVERIFIABLE` events are informational and not alerts; a camera-coverage-lost warning can reuse the existing `CAMERA_OFFLINE` alert.
 - **Each alert carries:** severity, rule name, camera, zone, time, reason, confidence, worker reference (anonymous key), snapshot link, review state.
 - **Where it shows:** live banner on the dashboard, the alerts list, the event timeline.
@@ -486,7 +485,7 @@ Each feature below lists: **purpose, how it works, inputs/outputs, depends on, e
 
 ### 8.16 F13 — Safety dashboard *(TO BUILD, reusing the dashboard shell)*
 
-New area under `frontend/app/dashboard/safety/`, reusing `DashboardShell`, `AlertsPanel`, the zone editor, the live canvas player and the charts.
+New area under `frontend/app/dashboard/safety/`, reusing `DashboardShell`, the zone editor, the live canvas player and the charts.
 
 | Screen | Content |
 |---|---|
@@ -517,7 +516,7 @@ The existing three-layer pattern applies to each screen (hide controls, server r
 ### 8.19 F16 — Evaluation harness *(partly built)*
 
 - **Built:** `ppe_training/eval_ppe_model.py` (per-class precision/recall on dataset splits), `ppe_training/eval_ppe_footage.py` (PPE chain on our own labelled video), `ppe_training/recompute_confusion.py`.
-- **TO BUILD:** a safety scenario evaluator in the style of `backend/eval/` that drives scripted scenarios through the rule engine and reports per-rule confusion (see §14).
+- **TO BUILD:** a safety scenario evaluator (`backend/eval/safety_scenarios.py`, new — the old identity evaluation harness was removed) that drives scripted scenarios through the rule engine and reports per-rule confusion (see §14).
 
 ---
 
@@ -533,7 +532,7 @@ Created at startup the same way `ensure_identity_table()` creates the identity t
 |---|---|
 | id | autoincrement |
 | org_id, camera_id, zone_id | text, same bridging as telemetry |
-| worker_key | `identity_id` or `track_id` (never a name) |
+| worker_key | `trk-<track_id>` (never a name) |
 | event_type | ENTERED_ZONE, EXITED_ZONE, DWELL_WARNING, DWELL_EXCEEDED, LOST_IN_ZONE, REAPPEARED, PPE_VERDICT_CHANGED |
 | video_time_s, observed_at | video clock and wall clock |
 | details | JSON |
@@ -563,7 +562,7 @@ A `CHECK` constraint keeps `status` and the evidence honest in the same spirit a
 - **`zones.safetyType`** — a new nullable `VARCHAR + CHECK` column (`PPE_CHECKPOINT | APPROACH | RESTRICTED | EXIT | GENERAL`). The existing `ZoneType` enum is left untouched; the safety type is a separate column so the dashboard can show and filter it.
 - **`sessionKey`** on events and decisions — the pipeline's session id, so results can be grouped per video run.
 - **`ReportKind`** gains `SAFETY_SUMMARY`, so safety reports reuse the existing `reports` table.
-- The legacy `Alert` / `AlertRule` tables are left untouched (alerts are decisions — §8.13).
+- The legacy `alerts` / `alert_rules` tables were dropped by `024_retire_productivity_tables.sql` (alerts are decisions — §8.13).
 - Snapshots are files referenced by `snapshotRef`; no separate evidence table.
 
 All carry `orgId`, with RLS written per table from that row alone (same rule the schema already follows), SQL in `frontend/prisma/sql/` as new numbered migrations.
@@ -619,7 +618,7 @@ Plain-language dependencies:
 - **Rules** need zones and zone events; **R1/R2** additionally need PPE verdicts.
 - **Man-down** needs only pose; **lone-worker** needs only person counts per zone. They do not depend on PPE, so they can be built and demoed independently.
 - **Alerts, snapshots, review, dashboard, reports** all consume *decisions*, so the decision record (F9) is the central interface — get its schema right first.
-- **Identity stitching** is optional: without it the state machine keys on `track_id` and a long occlusion can split a worker's visit (which is why lost-track handling in F7 and the `UNVERIFIABLE` outcomes exist).
+- **There is no identity stitching** (removed): the state machine keys on `track_id`, so a long occlusion can split a worker's visit. That is why lost-track handling in F7 and the `UNVERIFIABLE` outcomes exist.
 
 ### 11.2 Build order
 
@@ -682,7 +681,7 @@ All of these live in `backend/app/safety/config.py` (env override `SAFETY_<NAME>
 - **Blurring.** The existing blur (`anonymizer.py`) covers the top 25% of each person box at full width and is **off by default** (`PRIVACY_BLUR_DEFAULT`). That region is exactly where the helmet is, so a reviewer could not check a "no helmet" flag. For the safety product: blur is **on** whenever `SAFETY_ENABLED=true`, and it blurs the **face only**, located from the nose / eye / ear keypoints the pose model already gives, leaving the helmet crown and the vest visible (Step 9). If face keypoints are too weak, the old head-box blur is used and the snapshot is marked "helmet region obscured".
 - No continuous video is stored; only flagged-event snapshots, with a retention limit and audited access.
 - Safety decisions refer to an anonymous worker key, not a name.
-- **Face enrolment is disabled in safety mode.** The platform still contains face enrolment and door-camera matching from the earlier project. When `SAFETY_ENABLED=true` the enrolment and identity-naming endpoints are refused and identity stitching (if used) runs on appearance only, with no names. The safety product therefore ships no face recognition.
+- **No face recognition exists.** Face enrolment, door-camera matching and appearance re-identification were deleted from the code base (backend modules, API routes, tables and screens), so the safety product ships no biometric matching at all.
 - Platform operators cannot read an organisation's safety data.
 
 **Consent and data handling (for our own recordings and the demo)**
@@ -843,7 +842,7 @@ If a week slips, apply the cut order in §4 rather than compressing the evaluati
 |---|---|---|---|
 | R1 | PPE model weaker on our cameras than on public images | Medium | Measure early with own footage (§14.A); fine-tune with a few hundred of our own frames; the verdict logic abstains rather than accuses |
 | R2 | Spurious helmet/vest detections cause false compliance | Medium | 60% presence rule over many frames; association to a person's head/torso region; measured |
-| R3 | Zone-boundary flicker or occlusion splits visits | Medium | Debounce, lost-track grace, optional identity stitching, `UNVERIFIABLE` on lost workers |
+| R3 | Zone-boundary flicker or occlusion splits visits | Medium | Debounce, lost-track grace, `UNVERIFIABLE` on lost workers (identity stitching was removed, so splits are expected and handled, not hidden) |
 | R4 | Man-down false alarms from sitting/bending | Medium | Duration requirement, posture exclusions, hard-negative evaluation, `UNVERIFIABLE` on weak keypoints |
 | R5 | Running PPE + pose + identity together is too slow | Low–medium on a GPU, **high on CPU** | A GPU is required for live use; inference moved off the event loop (Step 5); PPE ≈14 ms/image on the project GPU; identity can be turned off (`IDENTITY_TRACKING=false`); PPE can run every second frame since evidence is windowed |
 | R6 | Schema and permission drift between Python and JS | Low | Same pattern as today (mirrored tables, RLS is the truth); tests for capability parity |
@@ -883,7 +882,7 @@ If a week slips, apply the cut order in §4 rather than compressing the evaluati
 
 **How do you know it works?** Per-class precision/recall on held-out images, scenario tests on the rule engine, and — most importantly — evaluation on our own footage with false accusation and false compliance counted separately.
 
-**Why not use cross-camera tracking?** We built and tested the building blocks, but matching people across cameras by appearance is the least reliable part (our own estimate 60–75% per hop, tested only in simulation). A safety system should not rest on its weakest component, so it is an optional extension.
+**Why not use cross-camera tracking?** We built and tested a prototype earlier, but matching people across cameras by appearance is the least reliable part (our own estimate 60–75% per hop, tested only in simulation) and it needs biometric-style appearance signatures. A safety system should not rest on its weakest component, so the prototype was removed and cross-camera journeys are future work.
 
 **Why not badges/RFID?** They answer different questions and work best together: RFID or a badge reader says reliably *who* entered and *when*; a camera says whether PPE is actually *worn* and what happened inside. A real deployment could use a badge reader for entry identity and this system for PPE and behaviour. We use cameras alone because that is the part a badge cannot do.
 
@@ -897,13 +896,9 @@ If a week slips, apply the cut order in §4 rather than compressing the evaluati
 
 ## 19. Stretch goal: cross-camera journeys
 
-**Dropped from the core.** The following exists and is kept, unused by default:
+**Dropped from the core, and the prototype was removed.** An earlier version had a pairwise hand-off module (a topology gate plus a weighted appearance score), a camera topology editor, the `camera_links` table and a simulated evaluation. All of it was deleted with the productivity product (migration 024 and the identity clean-up). It remains in git history (the `main` branch and the first `safety-core` commit) if it is ever wanted.
 
-- `backend/app/cv/handoff.py` — pairwise hand-off: topology gate (declared camera links with min/max walk time), then a weighted score (0.40 seat, 0.30 OSNet, 0.20 colour, 0.10 height), accepted at ≥ 0.75 with a 0.05 margin over the runner-up.
-- Camera topology editor: `frontend/app/dashboard/cameras/topology/`.
-- Simulated evaluation in `backend/eval/`.
-
-**If time remains**, a journey layer could chain accepted hand-offs into a sequence (checkpoint camera → restricted-zone camera) and run R1 in `VIA_CHECKPOINT` mode across cameras. It would need: multi-hop confidence combination that does not collapse to near zero, ordering and timing checks, and `UNVERIFIABLE` whenever any hop is weak. It would be reported separately, with its own measured accept/reject/unverifiable rates, and the core project would not depend on it.
+**As future work**, a journey layer would have to be rebuilt: it could chain accepted hand-offs into a sequence (checkpoint camera → restricted-zone camera) and run R1 in `VIA_CHECKPOINT` mode across cameras. It would need: multi-hop confidence combination that does not collapse to near zero, ordering and timing checks, and `UNVERIFIABLE` whenever any hop is weak. It would be reported separately, with its own measured accept/reject/unverifiable rates, and the core project would not depend on it.
 
 ---
 
@@ -917,13 +912,13 @@ The original workplace-analytics platform provides roughly the whole non-safety 
 | Person detection, tracking, pose, posture | `pose_estimator.py` |
 | Polygon zones, containment, floor mapping | `spatial_engine.py`, `ZoneEditor.jsx`, `zones.py` |
 | Per-track dwell and motion | `activity_aggregator.py` |
-| Appearance identity stitching (optional) | `appearance.py`, `identity_tracker.py`, `signature_registry.py` |
+| ~~Appearance identity stitching~~ | removed (the safety product does not identify or re-identify people) |
 | Head blurring | `anonymizer.py` |
 | Local telemetry and minute aggregation, sync to Postgres | `activity_writer.py`, `minute_aggregator.py` |
-| Alerts with cooldown and acknowledgement | `alerts_engine.py`, `AlertsPanel.jsx` |
+| ~~Alerts with cooldown and acknowledgement~~ | removed (migration 024); rebuilt on decisions in Step 10 |
 | Dashboard shell, charts, heatmap, reports | `frontend/app/dashboard/`, `components/` |
 | Auth, organisations, roles, RLS, audit, retention, plans | Supabase + `frontend/prisma/` |
-| Evaluation harness pattern | `backend/eval/` |
+| ~~Evaluation harness~~ | the identity harness was removed; the safety scenario suite is new work (Step 17) |
 | Test style | `backend/tests/` |
 
 **Repositioned, not removed:** occupancy, posture, heatmaps and the existing analytics stay as a secondary "site analytics" view. The desk/seat identity binding and employee desk-time features remain in the code but are not part of the safety product and make no productivity claims.
@@ -937,16 +932,16 @@ Existing (after the clean-up) plus **new** items marked ★.
 ```
 backend/
   app/
-    api/routers/        cameras, zones, analytics, video_upload, websocket, enrolment, pairing
+    api/routers/        cameras, zones, analytics, video_upload, websocket, pairing
                         ★ safety.py
     cv/                 pose_estimator, spatial_engine, frame_pipeline, activity_aggregator,
-                        appearance, identity_tracker, handoff, anonymizer, ...
+                        anonymizer, posture_diagnostics, ...
                         ✔ ppe_detector.py, ppe_evidence.py      (built)
     safety/             ★ zone_events.py, rules.py, schemas.py, worker_state.py,
                         ★ compliance_engine.py, man_down.py, occupancy.py, snapshots.py
-    db/                 ... alerts_engine, activity_writer, identity_writer
+    db/                 ... activity_writer, minute_aggregator
                         ★ safety_models.py, safety_writer.py, safety_sync.py
-  eval/                 identity evaluation (existing) ★ safety scenarios
+  eval/                 ★ safety scenarios (new)
   tests/                existing tests, ✔ test_ppe_evidence.py
                         ★ test_zone_events.py, test_rules.py, test_compliance.py,
                         ★ test_man_down.py, test_occupancy.py
@@ -994,12 +989,13 @@ Sections 23 and 24 turn the design above into an ordered, step-by-step build pla
 
 1. **Order matters.** Steps are ordered so each one produces something runnable and testable. Do not start a step before the previous step's "Done when" is true.
 2. **Feature flag.** All safety code is behind `SAFETY_ENABLED` (env var, default `false`). With it off, the pipeline must behave exactly as it does today — same payload, same writes. This is the same trick `IDENTITY_TRACKING` already uses, and it means we can never break the existing system by working on the new one.
-3. **Tests first for logic.** Anything with decision logic (zone events, rules, man-down, occupancy) gets a test file in the style of `backend/tests/test_handoff.py`: plain script, `check(name, ok, detail)`, prints PASS/FAIL, exit code 1 on failure, runnable with `venv\Scripts\python.exe backend\tests\<file>.py`.
+3. **Tests first for logic.** Anything with decision logic (zone events, rules, man-down, occupancy) gets a test file in the style of `backend/tests/test_zone_types.py`: plain script, `check(name, ok, detail)`, prints PASS/FAIL, exit code 1 on failure, runnable with `venv\Scripts\python.exe backend\tests\<file>.py`.
 4. **Never break existing tests.** After each step run all existing test files; they must still pass.
 5. **Never decide on a single frame, never accuse on weak evidence.** Every step that produces a verdict must be able to return `UNVERIFIABLE`.
 6. **Video time, not wall clock.** Every new function that reasons about time takes an explicit timestamp argument.
 7. **One commit per step** (or per sub-step) with a message that says what became possible.
-8. **Database changes are additive.** New tables only; the only edits to existing tables are two nullable/defaulted columns (`zones.safetyType`, `organisations.safetyEvidenceEnabled`) and one enum value (`ReportKind.SAFETY_SUMMARY`), all in `024_safety.sql`.
+8. **Every feature ships with its screen.** A step that adds something a person uses also adds (or changes) the frontend for it in the same step, in the app's existing theme (red accent, Inter, the CSS tokens in `globals.css`). No step is "done" with a backend only. All visible wording is about safety; nothing from the productivity product may remain on screen.
+9. **Database changes are additive.** New tables only; the only edits to existing tables are two nullable/defaulted columns (`zones.safetyType`, `organisations.safetyEvidenceEnabled`) and one enum value (`ReportKind.SAFETY_SUMMARY`), all in `025_safety.sql`.
 
 ### 23.1 Overview of the steps
 
@@ -1072,12 +1068,13 @@ Which steps are required is defined by the **delivery tiers in §4** (T1 = Steps
 3. `frontend/app/components/ZoneEditor.jsx`: add the five types to the type dropdown, give each a distinct colour (restricted = red, checkpoint = blue, exit = green, approach = amber, general = grey), and show a short label on the polygon.
 4. `video_upload.py` already passes `zone_type` from the local database into `zones_config`; verify it reaches `SpatialEngine`.
 5. Fix the existing gaps in `zones.py` that the new types expose: the create path does not validate `zone_type`, and the POST path for an existing zone ignores a changed `zone_type` (`zones.py:351-359`). Validate against `VALID_ZONE_TYPES` on every write path.
-6. **Zone hit point for safety:** the pipeline tests the box *centre* (`frame_pipeline.py:152`). For floor-drawn safety zones use the person's ground point (`SpatialEngine.ground_point`, bottom-centre of the box) when `SAFETY_ENABLED`; analytics keep the centre so old numbers do not change.
+6. **Zone hit point for safety** moves to Step 4, where the zone-event generator first consumes it: the pipeline tests the box *centre* (`frame_pipeline.py:152`); for floor-drawn safety zones use the person's ground point (`SpatialEngine.ground_point`, bottom-centre) when `SAFETY_ENABLED`, so analytics numbers do not change.
+7. **Frontend (done with this step):** new shared module `frontend/app/lib/zoneTypes.js` (the five types, labels, hints, colours); `ZoneEditor.jsx` offers only the safety types, defaults a new zone to General, shows a type badge per zone, and colours outlines by type; the live overlay (`lib/overlay.js`) uses the same colours. Legacy types are shown as General. Colours stay inside the app's red / white / grey palette.
 
 **Files:** `zones.py`, `spatial_engine.py`, `frame_pipeline.py`, `ZoneEditor.jsx`.
 **Database:** SQLite `zones.zone_type` is already a free `String(32)` — no change. The pipeline reads the type from SQLite. The Postgres mirror is extended in Step 7, once the column exists: `_mirror_zone_to_postgres` gains a `zone_type` argument and loses its early return when the name is unchanged (`zones.py:107-108`), otherwise a PATCH that changes only the type never reaches Postgres. Until 024 is applied the mirror must **not** send `safetyType` (PostgREST would reject the whole request with 400 and the name/polygon update would be lost too) — gate it on a `SAFETY_PG_SCHEMA_READY` setting or a one-time column check.
-**Tests:** extend `test_zone_isolation.py` or add `test_zone_types.py` — create and PATCH accept each new type and reject unknown ones; a type-only PATCH is persisted; the engine returns the type for a zone id; ground point vs centre is used according to the flag.
-**Done when:** you can draw a zone, pick `RESTRICTED`, reload, and it persists; legacy zones still load.
+**Tests:** `test_zone_types.py` (built) — create and PATCH accept each safety type and reject unknown ones; a re-save without a type keeps the existing type; a type-only PATCH is persisted; the engine returns the type for a zone id; placeholder zones are GENERAL.
+**Done when:** you can draw a zone, pick `RESTRICTED`, reload, and it persists with its badge and colour; legacy zones still load. *(Backend, tests and editor built; the Postgres mirror of the type is Step 7.)*
 
 ---
 
@@ -1088,9 +1085,9 @@ Which steps are required is defined by the **delivery tiers in §4** (T1 = Steps
 **Do:**
 1. New `backend/app/safety/clock.py`: `FrameClock(fps, recorded_at=None, live=False)` with `tick(frame_index) -> (video_time_s, observed_at_iso)`. For uploaded files `video_time_s = frame_index / fps` and `observed_at = recorded_at + video_time` (or now-based if no recording time). For live sources `video_time_s` is monotonic seconds since start and `observed_at` is the wall clock.
 2. `video_upload.py` (all three sockets): create a `FrameClock` per session; pass `video_time_s` to the safety layer.
-3. **Do not** pass video time into the identity tracker. `assign(now)` forwards `now` to `resolve_from_registry`, `HandoffRegistry.find_handoff` and `record_departure` (`identity_tracker.py:594, 625, 650`), which compare it with wall-clock `left_at` (`handoff.py:240-261, 332-365`); mixing 0…N s video time with epoch time would break departure expiry and hand-off gaps. The identity tracker stays on wall time; the safety layer uses only its own `FrameClock`. (Identity is optional for safety anyway — the worker key falls back to `trk-<id>`.)
+3. The safety layer uses only its own `FrameClock`. (The identity tracker and hand-off registry that compared against wall-clock times were removed, so nothing else reads the clock.)
 4. **Seek and rewind:** a seek sets `frame_idx = target_f` (`video_upload.py:750-754`), so video time can jump backwards. On any seek while safety is on, call `safety_engine.reset(reason="SEEK")`: open visits are closed as `UNVERIFIABLE`, evidence windows and zone state are cleared, and the clock restarts from the new position. Test: seek back 10 s produces no duplicate decisions and no negative dwell.
-5. **Stable worker key per visit:** the key can switch from `trk-N` to an `identity_id` mid-visit when identity resolves late. The engine keys state on `track_id` internally and records the best-known `worker_key` on each event/decision, so a late identity does not split evidence or a visit.
+5. **Worker key:** always `trk-<track_id>`. There is no identity that can appear mid-visit, so the key cannot change under a visit.
 6. Upload endpoint: accept an optional `recorded_at` form field (ISO time) so events land on the correct wall-clock time.
 
 **Files:** new `safety/clock.py`; modify `video_upload.py`.
@@ -1145,7 +1142,7 @@ a worker seen again while lost_emitted and within lost_ttl:           emit REAPP
 
 **Key design points:**
 - Events carry `worker_key`, `zone_id`, `video_time_s`, `observed_at`, `details` (e.g. `{"reason": "LOST"}`).
-- The worker key is `identity_id` when the identity tracker produced one, else `f"trk-{track_id}"`.
+- The worker key is `f"trk-{track_id}"`.
 - The tracker is pure logic: no database, no camera, no clock — takes `t` as an argument.
 
 **Files:** new `safety/zone_events.py`.
@@ -1162,7 +1159,7 @@ a worker seen again while lost_emitted and within lost_ttl:           emit REAPP
 **Do:**
 1. New `backend/app/safety/ppe_runner.py`: `PpeRunner(detector, evidence_tracker, every_n_frames=2)`. On each call: if it is a detection frame, run `PpeDetector.detect(frame)` on the **unblurred** frame; associate with `associate_frame(persons, ppe_dets, frame.shape)`; update the `PpeEvidenceTracker` per worker key with the current time; return per-worker `{status, helmet_conf, vest_conf, clear}`.
    - Running every second frame is deliberate: evidence is windowed, so detection at ~half the frame rate is enough and halves the cost. `every_n_frames` is configurable.
-2. Integrate into `frame_pipeline.process_detections` through a new optional parameter `safety_context=None` (same pattern as `identity_tracker=None`): when `None`, behaviour is byte-for-byte unchanged. When present, the PPE step runs **before** the head-blur loop (blur is in-place, so anything needing real pixels must run first — the same reason appearance extraction is placed before the blur loop today).
+2. Integrate into `frame_pipeline.process_detections` through a new optional parameter `safety_context=None` (the earlier optional identity parameters were removed, so this is the only extension point): when `None`, behaviour is byte-for-byte unchanged. When present, the PPE step runs **before** the head-blur loop (blur is in-place, so anything needing real pixels must run first — the blur is in place, so anything needing real pixels runs first).
 3. Entities gain a `ppe` object: `{"status": "COMPLIANT|NON_COMPLIANT|UNVERIFIABLE", "helmet": 0.91, "vest": 0.0, "clear": true}`.
 4. `video_upload.py`: when `safety_enabled()`, construct the detector once per process (like `get_extractor()`), a tracker per session, and the `safety_context`. If the weights file is missing (`*.pt` and `ppe_training/runs/` are git-ignored, so a fresh clone has none) log one clear error and run with PPE **unavailable** — every PPE verdict is `UNVERIFIABLE` with reason "PPE model not loaded" — instead of letting `FileNotFoundError` abort the session.
 6. **Resolution:** frames are shrunk to `inference_width` (640 px) before pose (`video_upload.py:771-774`), but a worker must be ≥ 90 px tall to count as clear (`ppe_evidence.py:52`). At CCTV distance most people would then never be "clear" and every verdict would be `UNVERIFIABLE`. Keep a reference to the full-resolution frame, run the PPE model on it (or on a 1280-px copy), and scale person boxes up to match. Measure the clear-frame rate at near/mid/far distance in E2.
@@ -1208,7 +1205,7 @@ a worker seen again while lost_emitted and within lost_ttl:           emit REAPP
 **Goal:** production tables the dashboard can read safely, with the browser unable to forge or alter a decision.
 
 **Do:**
-1. Write `frontend/prisma/sql/024_safety.sql` (full text in §24.4): tables `safety_rules`, `safety_events`, `safety_decisions`, `corrective_actions`; the `zones.safetyType` column; the `SAFETY_SUMMARY` report kind; CHECK constraints; indexes; `updatedAt` triggers; RLS policies; grants; the `review_safety_decision()` function; `purge_safety_data()`.
+1. Write `frontend/prisma/sql/025_safety.sql` (full text in §24.4): tables `safety_rules`, `safety_events`, `safety_decisions`, `corrective_actions`; the `zones.safetyType` column; the `SAFETY_SUMMARY` report kind; CHECK constraints; indexes; `updatedAt` triggers; RLS policies; grants; the `review_safety_decision()` function; `purge_safety_data()`.
 2. Add the four models and the `Zone.safetyType` field to `frontend/prisma/schema.prisma` (§24.5) plus the back-relations on `Organisation`, `Camera`, `Zone`, `Profile`; confirm that `Zone.slug` (added by migration 023) is in the Prisma model, add it if missing; run `npx prisma generate`.
 3. Apply the SQL to the development Supabase project (the repo applies numbered SQL files by hand after `prisma migrate`).
 4. Verify RLS by measurement, as migration 003 did: using real VIEWER / MANAGER / ADMIN sessions —
@@ -1219,7 +1216,7 @@ a worker seen again while lost_emitted and within lost_ttl:           emit REAPP
    - a user from another organisation sees nothing.
 5. Record the matrix in `frontend/prisma/README.md` (or the migration header) the way earlier migrations do.
 
-**Files:** new `024_safety.sql`; modify `schema.prisma`, `prisma/README.md`.
+**Files:** new `025_safety.sql`; modify `schema.prisma`, `prisma/README.md`.
 **Database:** §24.4.
 **Tests:** `backend/tests/test_safety_rls.py` (live-database script like `test_zone_isolation.py`, skips with a clear message when no Supabase is configured).
 **Done when:** the matrix in §24.12 passes.
@@ -1258,7 +1255,7 @@ a worker seen again while lost_emitted and within lost_ttl:           emit REAPP
    - Draw overlays: person box, helmet/vest boxes with confidences, zone outline, and a text banner (rule, status, time).
    - JPEG quality ~75, path `backend/evidence/<org_id>/<decision_id>.jpg`; `ref` is the relative path stored in `snapshot_ref`.
 2. Only for `POTENTIAL_VIOLATION` (and man-down in Step 14); `UNVERIFIABLE` events optionally (`SAFETY_SNAPSHOT_UNVERIFIABLE`, default off).
-3. Organisation switch: `organisations."safetyEvidenceEnabled"` (created by `024_safety.sql`, default true; read by the pipeline when the session's organisation is resolved); when off, no file is written and `snapshot_ref` is null.
+3. Organisation switch: `organisations."safetyEvidenceEnabled"` (created by `025_safety.sql`, default true; read by the pipeline when the session's organisation is resolved); when off, no file is written and `snapshot_ref` is null.
 4. Retention: `purge_evidence(days)` deletes expired files, nulls `snapshot_ref` locally, and — because the decision sync uses `ignore-duplicates` and will never update an existing row — sends one explicit service-role `PATCH /safety_decisions?id=in.(...)` setting `snapshotRef = null` in Postgres. The snapshot endpoint also returns 410 Gone when the file no longer exists, so a stale reference is harmless. Scheduled from the aggregator loop (default 7 days).
 5. Serving: `GET /api/v1/safety/decisions/{id}/snapshot` (Step 11) checks org membership + `safety.evidence.view`, streams the file with `Cache-Control: no-store`, and writes an audit row.
 
@@ -1273,7 +1270,7 @@ a worker seen again while lost_emitted and within lost_ttl:           emit REAPP
 
 **Goal:** a violation appears on screen within seconds, once, and stays until a person acts on it.
 
-**Design decision:** in the safety product an **alert is a `POTENTIAL_VIOLATION` decision that is still `PENDING` review**; we do not push these through the legacy `alerts` table because that table requires an `alert_rules` row (`ruleId` is mandatory) and a fixed `AlertType` enum built for occupancy rules. Using decisions keeps one source of truth. The dashboard's alerts panel gets a "Safety" tab that reads decisions.
+**Design decision:** in the safety product an **alert is a `POTENTIAL_VIOLATION` decision that is still `PENDING` review**. The occupancy `alerts` / `alert_rules` tables and the old alerts panel no longer exist (migration 024), so there is one source of truth: the decision. The new alerts panel reads decisions.
 
 **Do:**
 1. **De-duplication:** a decision is created once per `(rule, worker, visit)`. Continuous rules (R2, R5, R6) use an *episode*: one decision per continuous condition, with a minimum gap (`SAFETY_REALERT_AFTER_S`, default 60 s) before a new one for the same `(rule, zone, worker)`. Implemented in the engine, not in the database.
@@ -1281,7 +1278,7 @@ a worker seen again while lost_emitted and within lost_ttl:           emit REAPP
 3. **Open count** for the header badge comes from the API (Step 11) — decisions with `status='POTENTIAL_VIOLATION' AND reviewState='PENDING'`.
 4. Severity comes from the rule (`INFO | WARNING | CRITICAL`); man-down is always `CRITICAL`.
 
-**Files:** modify `safety/engine.py`, `video_upload.py`, `frontend/app/dashboard/AlertsPanel.jsx`, live player.
+**Files:** modify `safety/engine.py`, `video_upload.py`, live player; new `frontend/app/dashboard/SafetyAlertsPanel.jsx` (shown on the overview).
 **Database:** none beyond §24.
 **Tests:** `test_alert_dedup.py` — standing in a zone for a minute yields one decision; leaving and re-entering yields a second; episode re-alert only after the gap.
 **Done when:** one violation produces one banner, and the count in the header goes up by exactly one.
@@ -1297,7 +1294,7 @@ a worker seen again while lost_emitted and within lost_ttl:           emit REAPP
 2. New `backend/app/api/routers/safety.py` (prefix `/api/v1/safety`, registered in `main.py`) with the endpoints of §10. Organisation always comes from `resolve_org_role(token)` — never a parameter. Reads that the dashboard can do directly through Supabase (rules, decisions) stay in the Next.js server queries; the Python router exists for what only the backend can do (snapshot streaming, summary aggregates, export, rule validation).
 3. Rule validation endpoint `POST /rules/validate`: dry-run a rule against the camera's zones and return errors before saving.
 4. Audit rows for evidence views and exports. **New work:** the Python backend has never written to `audit_logs` (today only Next.js server actions do), so add a small `write_audit(org, actor, action, target)` helper that inserts through PostgREST with the service key. Rule create/update audit rows are written by the Next.js server actions (existing pattern); rule delete is audited inside `soft_delete_safety_rule()`.
-5. **Safety mode turns off face naming:** when `SAFETY_ENABLED=true`, the enrolment router and the door-camera face matching return 403 / are skipped, and the dashboard hides the enrolment screens (§13). Test: with the flag on, an enrolment call is refused.
+5. **No face naming to turn off:** the enrolment router, door-camera matching and enrolment screens no longer exist (§13). Test: the OpenAPI paths contain no `employees` or `enrol` route.
 
 **Files:** new `routers/safety.py`; modify `permissions.py`, `permissions.js`, `main.py`.
 **Database:** reads §24 tables; audit rows into the existing `audit_logs`.
@@ -1408,13 +1405,13 @@ State machine per worker: `UP → CANDIDATE_DOWN` when `is_down_pose and is_stil
 
 **Do:**
 1. **Own-footage test, baselines and sweep:** already produced by evaluation tracks E1–E3 (weeks 1–5, see §23.1). Here they are re-run once on the final code and written up: §14.A table with N and rule-of-three bounds, §14.G baseline table and error-vs-coverage plot. Store in `ppe_training/reports/` and `docs/SAFETY_EVALUATION.md`.
-2. **Scenario suite:** `backend/eval/safety_scenarios.py` driving S1–S10 through the real engine with scripted detections (the same approach as `backend/eval/simulate.py`), output `backend/eval/results/safety_evaluation.json`, and an HTML/MD summary like `FAILURE_CASES.md` (`docs/SAFETY_EVALUATION.md`).
+2. **Scenario suite:** `backend/eval/safety_scenarios.py` driving S1–S10 through the real engine with scripted detections (scripted detections fed to the real engine), output `backend/eval/results/safety_evaluation.json`, and an MD summary (`docs/SAFETY_EVALUATION.md`).
 3. **Man-down and occupancy** measurements per §14.C and §14.D.
 4. **System:** FPS and alert latency per §14.E.
 5. **Review loop:** run the staged clips, have someone confirm/dismiss every flag in the UI, and compute human-judged precision and dismissal reasons (§14.F).
-6. Extend `frontend/app/dashboard/evaluation/EvaluationScreen.jsx` with the safety metrics.
+6. Build a new Evaluation screen under `frontend/app/dashboard/evaluation/` showing the safety metrics.
 
-**Files:** new `backend/eval/safety_scenarios.py`, `docs/SAFETY_EVALUATION.md`; modify `EvaluationScreen.jsx`.
+**Files:** new `backend/eval/safety_scenarios.py`, `docs/SAFETY_EVALUATION.md`, and a new `frontend/app/dashboard/evaluation/` screen (the old Accuracy screen was deleted).
 **Database:** reads the decisions created by the runs.
 **Done when:** every metric in §14 has a recorded number and the document says plainly where the system is wrong or abstains.
 
@@ -1449,9 +1446,9 @@ State machine per worker: `UP → CANDIDATE_DOWN` when `is_down_pose and is_stil
 1. **Two stores, one id.** The pipeline writes SQLite; the dashboard reads Postgres. Every event and decision carries a UUID created at the source, so syncing is idempotent.
 2. **Measured data is read-only to browsers.** `safety_events` and `safety_decisions` have SELECT policies only. They are written by the pipeline through the service role. A browser cannot fabricate or alter a decision.
 3. **Review is the one human write, and it goes through one function.** `review_safety_decision()` updates only the review columns, checks the caller's role, and writes the audit row in the same transaction. There is no UPDATE policy on decisions at all.
-4. **Configuration is writable by managers.** `safety_rules` follows the same policy shape as `camera_links` / `employees`.
-5. **Honesty is enforced by constraints**, as with `identity_events`: a `COMPLIANT` decision cannot require review; a reviewed decision must say who and when; confidence stays in 0–1; status/event vocabularies are CHECK-constrained.
-6. **Vocabularies are `VARCHAR + CHECK`, not Postgres enums**, so adding a rule type later is a one-line constraint change instead of `ALTER TYPE` (the precedent is `identity_events.method`).
+4. **Configuration is writable by managers.** `safety_rules` follows the same policy shape as `cameras` / `zones` (manager-writable, org-readable).
+5. **Honesty is enforced by constraints**, as in the older identity tables: a `COMPLIANT` decision cannot require review; a reviewed decision must say who and when; confidence stays in 0–1; status/event vocabularies are CHECK-constrained.
+6. **Vocabularies are `VARCHAR + CHECK`, not Postgres enums**, so adding a rule type later is a one-line constraint change instead of `ALTER TYPE` (the precedent is the `method` column of the older identity table).
 7. **Tenancy on every table** (`"orgId"` present even where reachable by a join) so policies are decided from the row alone — the rule at the top of `schema.prisma`.
 8. **No names, no biometrics, no images in the database.** Workers are `workerKey`s; snapshots are files referenced by path.
 
@@ -1484,7 +1481,7 @@ CREATE TABLE IF NOT EXISTS safety_events (
     org_id        TEXT,
     camera_id     TEXT    NOT NULL,
     zone_id       TEXT,                              -- local slug, e.g. 'zone_ab12cd'
-    worker_key    TEXT    NOT NULL,                  -- identity_id or 'trk-<id>'
+    worker_key    TEXT    NOT NULL,                  -- 'trk-<id>'
     session_key   TEXT,                              -- the pipeline's session_id for this video run
     event_type    TEXT    NOT NULL,
     video_time_s  REAL    NOT NULL,
@@ -1536,9 +1533,9 @@ CREATE INDEX IF NOT EXISTS ix_sd_unsynced     ON safety_decisions (created_at) W
 
 Notes: `zone_id` / `camera_id` are the pipeline's text identifiers; the sync resolves them to UUIDs by name/slug. `evidence` is JSON because its shape differs by rule type.
 
-### 24.4 Postgres migration `024_safety.sql`
+### 24.4 Postgres migration `025_safety.sql`
 
-Idempotent (IF NOT EXISTS / DROP POLICY IF EXISTS), applied after `023_zone_slug.sql`, in the style of `020_identity.sql`. Verify helper names against 003/020 before applying (`public.user_org_ids()`, `public.manage_org_ids()`, `public.touch_updated_at()`, `public.audit_logs` columns).
+Idempotent (IF NOT EXISTS / DROP POLICY IF EXISTS), applied after `024_retire_productivity_tables.sql`, in the style of `020_identity.sql`. Verify helper names against 003/020 before applying (`public.user_org_ids()`, `public.manage_org_ids()`, `public.touch_updated_at()`, `public.audit_logs` columns).
 
 ```sql
 -- ═══ TABLES ═════════════════════════════════════════════════════════════
@@ -1882,7 +1879,7 @@ Design points worth being able to explain:
 ### 24.5 Prisma models (added to `schema.prisma`)
 
 ```prisma
-/// What to check. Writable by ADMIN/MANAGER (024_safety.sql).
+/// What to check. Writable by ADMIN/MANAGER (025_safety.sql).
 model SafetyRule {
   id        String  @id @default(uuid()) @db.Uuid
   orgId     String  @db.Uuid
@@ -2107,7 +2104,7 @@ No names, no face vectors and no continuous video are stored by any safety table
 | Camera | `camera_id` text name | `cameras.id` UUID | `(orgId, name)` |
 | Zone | `zone_id` text slug | `zones.id` UUID | `(cameraId, slug)` (migration 023) |
 | Rule | rule UUID (or NULL for default) | `safety_rules.id` | identical |
-| Worker | `worker_key` (`identity_id` or `trk-<n>`) | `workerKey` | identical; never a person |
+| Worker | `worker_key` (`trk-<n>`) | `workerKey` | identical; never a person |
 | Event | `event_uid` | `eventUid` | identical |
 | Decision | `id` | `id` | identical |
 | Video run | `session_key` (pipeline `session_id`) | `sessionKey` | identical; a label, not a foreign key |
@@ -2116,7 +2113,7 @@ No names, no face vectors and no continuous video are stored by any safety table
 ### 24.11 Migration and rollout checklist
 
 1. Back up the Supabase project (or work on the development project first).
-2. Apply `024_safety.sql` (idempotent), then `npx prisma generate`.
+2. Apply `025_safety.sql` (idempotent), then `npx prisma generate`.
 3. Run `backend/tests/test_safety_rls.py` (matrix below).
 4. Confirm the pipeline can insert through the service role and that a browser session cannot.
 5. Confirm `EXPLAIN` of the review queue and the overview queries uses the new indexes with realistic row counts (seed ~100k events) — the same discipline as migrations 009 and 012.

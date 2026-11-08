@@ -2,12 +2,12 @@
 
 // frontend/app/dashboard/OverviewSection.jsx
 //
-// The manager's home screen: what happened in the space over the last 24 hours,
-// answered in the order a manager actually asks it — how many people, how busy,
-// where, and is anyone sitting too long.
+// The home screen: what was detected on site over the chosen window, answered
+// in the order a safety officer asks it — how many people, where, and for how
+// long.
 //
-// Restraint is the design here. The temptation on an analytics home screen is to
-// show every number the schema can produce; this shows six, because a tile that
+// Restraint is the design here. The temptation on a home screen is to show
+// every number the schema can produce; this shows five, because a tile that
 // nobody acts on is noise competing with the tiles that matter.
 //
 // Every value is measured. Nothing is estimated, projected or placeholder — when
@@ -16,7 +16,7 @@
 
 import React from 'react';
 import {
-  Users, Activity, MapPin, Armchair, Clock, Radio,
+  Users, MapPin, Footprints, Clock, Radio,
   AlertCircle, Inbox, Loader2,
 } from 'lucide-react';
 
@@ -86,7 +86,7 @@ function PostureBar({ sitting, standing, walking }) {
     <div className="glass-panel px-4 sm:px-5 py-4 themed">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
-          <Armchair className="w-4 h-4 text-ink-faint" strokeWidth={2.2} />
+          <Footprints className="w-4 h-4 text-ink-faint" strokeWidth={2.2} />
           <h3 className="text-[13.5px] font-bold tracking-tight text-ink">Posture mix</h3>
         </div>
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
@@ -125,11 +125,11 @@ function EmptyState() {
   return (
     <div className="glass-panel px-6 py-14 text-center themed">
       <Inbox className="w-8 h-8 mx-auto text-ink-faint mb-3" strokeWidth={1.7} />
-      <p className="text-[14px] font-bold text-ink">No activity recorded yet</p>
+      <p className="text-[14px] font-bold text-ink">No detections recorded yet</p>
       <p className="text-[12.5px] text-ink-faint mt-1.5 max-w-md mx-auto leading-relaxed">
         Open <span className="font-semibold text-ink-muted">Live feed</span> and process a
-        video or start the camera. Occupancy, posture and dwell time appear here as
-        people are detected.
+        video or start the camera. People, the zones they are in and how long they
+        stay appear here as they are detected.
       </p>
     </div>
   );
@@ -140,7 +140,7 @@ export default function OverviewSection({ data, status, error, hours }) {
     return (
       <div className="glass-panel px-6 py-14 text-center themed">
         <Loader2 className="w-6 h-6 mx-auto text-accent animate-spin" />
-        <p className="text-[12.5px] text-ink-muted mt-3">Loading activity…</p>
+        <p className="text-[12.5px] text-ink-muted mt-3">Loading detections…</p>
       </div>
     );
   }
@@ -153,7 +153,7 @@ export default function OverviewSection({ data, status, error, hours }) {
       >
         <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-accent" />
         <p className="text-[13px] leading-relaxed">
-          <span className="font-bold text-accent">Could not load activity.</span>{' '}
+          <span className="font-bold text-accent">Could not load detections.</span>{' '}
           <span className="text-ink-muted">{error}</span>
         </p>
       </div>
@@ -162,29 +162,17 @@ export default function OverviewSection({ data, status, error, hours }) {
 
   if (!data?.has_data) return <EmptyState />;
 
-  // Long unbroken sitting is the one number on this page that is actionable
-  // rather than descriptive, so it is the only tile allowed to turn red.
-  const SEDENTARY_MINUTES = 45;
-  const sedentary = data.longest_dwell_minutes >= SEDENTARY_MINUTES;
-
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
         <StatTile
-          label="People seen"
+          label="People detected"
           value={data.people}
           hint={`over the last ${hours}h`}
           icon={Users}
         />
         <StatTile
-          label="Activity index"
-          value={data.avg_activity}
-          suffix="/100"
-          hint="movement & posture change"
-          icon={Activity}
-        />
-        <StatTile
-          label="Zones active"
+          label="Zones in use"
           value={data.zones_active}
           hint={data.zones_active ? 'with recorded presence' : 'none yet'}
           icon={MapPin}
@@ -196,12 +184,11 @@ export default function OverviewSection({ data, status, error, hours }) {
           icon={Users}
         />
         <StatTile
-          label="Longest sitting"
+          label="Longest stay"
           value={data.longest_dwell_minutes}
           suffix="min"
-          hint={sedentary ? 'break recommended' : 'within healthy range'}
+          hint="in a single zone"
           icon={Clock}
-          tone={sedentary ? 'warn' : 'default'}
         />
         <StatTile
           label="Last detection"

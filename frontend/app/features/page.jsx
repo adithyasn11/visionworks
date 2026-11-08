@@ -7,25 +7,27 @@ import LandingNavbar from '../components/LandingNavbar';
 import LandingFooter from '../components/LandingFooter';
 import { StatsBand, HowItWorks, FAQ } from '../components/LandingSections';
 
+// Every figure here is measured and says on what. The PPE numbers come from
+// public test images, not from your cameras, which is why the note says so.
 const STATS = [
-  { value: '99%',    label: 'Accuracy',  note: 'Person detection on clear feeds' },
-  { value: '60 FPS', label: 'Real-time', note: 'Single-pass inference on RTX 4060' },
-  { value: '17',     label: 'Keypoints', note: 'Full COCO skeleton per person' },
-  { value: '3',      label: 'Postures',  note: 'Sitting, standing and walking' },
+  { value: '95%',   label: 'Helmet recall', note: 'On 213 public test images' },
+  { value: '88%',   label: 'Vest recall',   note: 'On the same test images' },
+  { value: '14 ms', label: 'PPE detection', note: 'Per image on the project GPU' },
+  { value: '3',     label: 'Verdicts',      note: 'Compliant, potential violation, unverifiable' },
 ];
 
 const STEPS = [
   {
     title: 'Connect a feed',
-    body: 'Point VisionWorks at an RTSP camera, upload a recording, or use a webcam. No extra hardware to install.',
+    body: 'Point VisionWorks at an RTSP camera, upload a recording, or use a webcam or phone. No extra hardware to install.',
   },
   {
     title: 'Draw your zones',
-    body: 'Outline desks, walkways or meeting rooms directly on the video. Zones can be redrawn at any time.',
+    body: 'Mark the PPE checkpoint, the restricted area and the exit directly on the video. Zones can be redrawn at any time.',
   },
   {
-    title: 'Read the insights',
-    body: 'Occupancy, dwell time and posture balance appear on the dashboard as the footage is processed.',
+    title: 'Review the verdicts',
+    body: 'Each worker gets a verdict with its reasons. Flagged cases wait for a supervisor to confirm or dismiss them.',
   },
 ];
 
@@ -36,15 +38,15 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Do I need a dedicated GPU?',
-    a: 'A CUDA GPU gives you real-time throughput — roughly 60 FPS on an RTX 4060. Without one the pipeline falls back to CPU automatically; it still works, just slower.',
+    a: 'A CUDA GPU gives you real-time throughput for detecting people and PPE. Without one the pipeline falls back to CPU automatically; recorded files still work, just slower than real time.',
   },
   {
-    q: 'How does it tell sitting from standing?',
-    a: 'It reads the full 17-point skeleton and weighs several signals together: knee and hip angles, how far the thighs drop relative to the torso, and body span against the bounding box. A rolling vote across frames keeps the label from flickering.',
+    q: 'What happens when the picture is unclear?',
+    a: 'The system says so. A worker who is far away, partly hidden or overlapped gets an unverifiable verdict instead of a guess. A violation needs sustained evidence across many clear frames, and a supervisor confirms every flag.',
   },
   {
-    q: 'Can it track more than one person?',
-    a: 'Yes. Every person gets a persistent track ID, so dwell time and activity are measured per individual even as people move between zones.',
+    q: 'Does it know who the worker is?',
+    a: 'No. Workers are followed as anonymous track IDs within one camera view, so a verdict is about a worker, never a named person.',
   },
 ];
 
@@ -71,10 +73,10 @@ export default function FeaturesPage() {
           {/* leading-[1.15] + pb-1 keeps descenders from clipping. */}
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-ink mb-6 leading-[1.15] pb-1 text-balance">
             Everything you need to{' '}
-            <span className="text-accent">understand your space.</span>
+            <span className="text-accent">check safety compliance.</span>
           </h1>
           <p className="text-lg sm:text-xl text-ink-muted font-medium leading-relaxed max-w-2xl mx-auto text-balance">
-            VisionWorks turns passive camera feeds into activity data you can act on — foot traffic, dwell time, posture and occupancy, updated live.
+            VisionWorks turns passive camera feeds into safety decisions you can audit — PPE before entry, time limits, workers down and lone-worker rules, each with its reasons.
           </p>
 
           <div className="mt-9 flex flex-col sm:flex-row gap-3.5 justify-center">
@@ -96,7 +98,7 @@ export default function FeaturesPage() {
         {/* STATS */}
         <StatsBand stats={STATS} delay={150} />
 
-        {/* FEATURE 1: SPATIAL ANALYTICS */}
+        {/* FEATURE 1: SAFETY ZONES */}
         <section className="flex flex-col lg:flex-row gap-5 items-stretch">
 
           <div
@@ -106,12 +108,12 @@ export default function FeaturesPage() {
             <div className="w-12 h-12 bg-accent text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-red-600/30 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-300">
               <Maximize className="w-6 h-6" />
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-ink tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors duration-300">Custom zone mapping</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-ink tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors duration-300">Safety zones</h2>
             <p className="text-[15px] text-ink-muted font-medium leading-relaxed mb-6">
-              Draw polygonal zones straight onto your video feed. VisionWorks reports activity only within those boundaries, so you can watch checkout lines, machinery areas or individual workstations without noise from the rest of the frame.
+              Draw polygonal zones straight onto your video feed and give each one a meaning: PPE checkpoint, restricted area or exit. Rules attach to zones, so VisionWorks checks only what matters and ignores the rest of the frame.
             </p>
             <ul className="flex flex-col gap-3">
-              {['Unlimited zones per camera', 'Live coordinate mapping', 'Drag-and-drop boundary editing'].map((item, i) => (
+              {['Unlimited zones per camera', 'Checkpoint, restricted and exit zones', 'Drag-and-drop boundary editing'].map((item, i) => (
                 <li key={i} className="flex items-center gap-3 font-bold text-[13px] text-ink-faint group-hover:translate-x-1 transition-transform" style={{ transitionDelay: `${i * 100}ms` }}>
                   <div className="w-1.5 h-1.5 rounded-full bg-accent shrink-0"></div>
                   {item}
@@ -127,8 +129,8 @@ export default function FeaturesPage() {
             >
               <BarChart className="w-8 h-8 text-accent mb-4 group-hover:scale-110 transition-all duration-300" />
               <div>
-                <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2 leading-[1.15] group-hover:text-accent transition-colors">Dwell time tracking</h3>
-                <p className="opacity-70 font-medium text-[14px] leading-relaxed">See exactly how long people stay in each zone, so you can spot bottlenecks and the spots that actually get used.</p>
+                <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2 leading-[1.15] group-hover:text-accent transition-colors">Time limits</h3>
+                <p className="opacity-70 font-medium text-[14px] leading-relaxed">See exactly how long a worker stays in a zone, with a warning before the limit is reached and a flag when it is passed.</p>
               </div>
             </div>
 
@@ -138,15 +140,15 @@ export default function FeaturesPage() {
             >
               <Layers className="w-8 h-8 text-white mb-4 group-hover:scale-110 group-hover:-rotate-12 transition-transform duration-300" />
               <div>
-                <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2 leading-[1.15]">Live heatmaps</h3>
-                <p className="text-red-50 font-medium text-[14px] leading-relaxed">Foot-traffic intensity drawn over your floorplan, so layout problems show up at a glance.</p>
+                <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2 leading-[1.15]">Evidence you can review</h3>
+                <p className="text-red-50 font-medium text-[14px] leading-relaxed">Every flag keeps its reason, the numbers behind it and a snapshot, so a supervisor can check it in seconds.</p>
               </div>
             </div>
           </div>
 
         </section>
 
-        {/* FEATURE 2: SAFETY & ERGONOMICS */}
+        {/* FEATURE 2: PPE AND PROCEDURE CHECKS */}
         <section className="flex flex-col lg:flex-row-reverse gap-5 items-stretch">
 
           <div
@@ -156,12 +158,12 @@ export default function FeaturesPage() {
             <div className="w-12 h-12 bg-inverse text-inverse rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-accent group-hover:text-white transition-all duration-300">
               <Activity className="w-6 h-6" />
             </div>
-            <h2 className="text-xl sm:text-2xl font-black text-ink tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors duration-300">Ergonomic safety</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-ink tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors duration-300">PPE and procedure checks</h2>
             <p className="text-[15px] text-ink-muted font-medium leading-relaxed mb-6">
-              Skeletal pose estimation picks up awkward lifting, slumped desk posture and long sedentary stretches — and flags them before they turn into injuries.
+              Helmet and vest detection is combined across many frames, so one missed detection can never create a violation. When the evidence is weak the answer is unverifiable, not guilty.
             </p>
             <ul className="flex flex-col gap-3">
-              {['Real-time skeletal tracking', 'Configurable thresholds', 'Automated anomaly alerts'].map((item, i) => (
+              {['Evidence over time, not single frames', 'Three-way verdicts', 'Human review of every flag'].map((item, i) => (
                 <li key={i} className="flex items-center gap-3 font-bold text-[13px] text-ink-faint group-hover:translate-x-1 transition-transform" style={{ transitionDelay: `${i * 100}ms` }}>
                   <div className="w-1.5 h-1.5 rounded-full bg-ink shrink-0"></div>
                   {item}
@@ -174,9 +176,9 @@ export default function FeaturesPage() {
              {/* Decorative only: centred behind the text, never intercepts clicks. */}
              <Zap className="w-20 h-20 text-accent opacity-10 group-hover:scale-150 transition-all duration-700 absolute inset-0 m-auto pointer-events-none" aria-hidden="true" />
              <div className="relative z-10">
-               <h3 className="text-4xl sm:text-5xl font-black text-ink tracking-tight leading-[1.15] pb-1 mb-2 tabular-nums">99%</h3>
-               <p className="font-bold text-ink-faint uppercase tracking-[0.12em] text-[11px] mb-3">Detection accuracy</p>
-               <p className="text-ink-muted font-medium text-[14px] max-w-xs mx-auto leading-relaxed">Built on YOLOv8 detection with persistent multi-object tracking, running fast enough to keep up with live video.</p>
+               <h3 className="text-4xl sm:text-5xl font-black text-ink tracking-tight leading-[1.15] pb-1 mb-2 tabular-nums">95%</h3>
+               <p className="font-bold text-ink-faint uppercase tracking-[0.12em] text-[11px] mb-3">Helmet recall</p>
+               <p className="text-ink-muted font-medium text-[14px] max-w-xs mx-auto leading-relaxed">Measured on 213 public test images with a YOLOv8 model. Your own cameras are measured separately before you rely on it.</p>
              </div>
           </div>
 
@@ -185,8 +187,8 @@ export default function FeaturesPage() {
         {/* HOW IT WORKS */}
         <HowItWorks
           steps={STEPS}
-          heading="From camera to insight in three steps"
-          intro="No rewiring and no new hardware. Most teams are looking at live numbers the same afternoon they start."
+          heading="From camera to verdict in three steps"
+          intro="No rewiring and no new hardware. Draw the zones, set the rules, and verdicts appear as soon as people are in view."
           delay={650}
         />
 
@@ -198,9 +200,9 @@ export default function FeaturesPage() {
           className="bg-surface border border-line rounded-3xl p-10 sm:p-14 text-center animate-fade-in-up flex flex-col items-center justify-center group hover:-translate-y-1 hover:border-[color:var(--accent)] transition-all duration-500 relative overflow-hidden"
           style={{ animationDelay: '750ms' }}
         >
-          <h2 className="text-2xl sm:text-3xl font-black text-ink tracking-tight mb-3 relative z-10 leading-[1.15] pb-1">Transform your workspace.</h2>
+          <h2 className="text-2xl sm:text-3xl font-black text-ink tracking-tight mb-3 relative z-10 leading-[1.15] pb-1">Make safety checks routine.</h2>
           <p className="text-ink-muted font-medium text-[15px] max-w-md mx-auto mb-7 relative z-10">
-            Get occupancy and ergonomics analytics running in minutes.
+            Set up PPE and procedure checks on the cameras you already have.
           </p>
           <Link
             href="/dashboard"

@@ -29,7 +29,7 @@ const PRODUCT = [
   { href: '/features', label: 'Features' },
   { href: '/security', label: 'Security' },
   { href: '/home#pricing', label: 'Plans' },
-  { href: '/home', label: 'Your workspace' },
+  { href: '/home', label: 'Your dashboard' },
 ];
 
 export default function LandingFooter() {
@@ -50,9 +50,9 @@ export default function LandingFooter() {
               </span>
             </Link>
             <p className="opacity-70 font-medium text-[14px] leading-relaxed max-w-sm mb-6">
-              Workplace activity analytics that measures how a space is used — occupancy,
-              posture and dwell time per zone — without keeping the footage or identifying
-              anyone in it.
+              Safety compliance monitoring that checks whether procedures are followed —
+              PPE before entry, time limits, workers down — with verdicts that say how
+              sure they are, and a person who confirms every flag.
             </p>
             <div className="flex items-center gap-3">
               <span className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse" aria-hidden="true" />
@@ -86,11 +86,11 @@ export default function LandingFooter() {
           <div className="rounded-3xl border border-white/10 bg-white/5 p-7 flex flex-col justify-between gap-5 group/cta hover:border-red-500/40 hover:bg-white/[0.07] transition-all duration-500">
             <div>
               <h4 className="text-xl font-black tracking-tight mb-2 group-hover/cta:text-red-500 transition-colors">
-                Measure your space
+                Check one entrance
               </h4>
               <p className="opacity-65 font-medium text-[13.5px] leading-relaxed">
-                Point a camera at one room and see whether the numbers match what you
-                already believe.
+                Point a camera at one entrance and see whether the verdicts match what
+                you already know.
               </p>
             </div>
             <Link
@@ -105,10 +105,10 @@ export default function LandingFooter() {
 
         <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="opacity-55 font-bold text-[12px]">
-            &copy; {new Date().getFullYear()} VisionWorks Analytics.
+            &copy; {new Date().getFullYear()} VisionWorks.
           </p>
           <p className="opacity-45 font-bold text-[11px] tracking-wide text-center sm:text-right">
-            Workplace analytics · privacy by design
+            Workplace safety compliance · privacy by design
           </p>
         </div>
       </div>

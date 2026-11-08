@@ -134,9 +134,6 @@ def register_camera(
     return db_camera
 
 
-VALID_CAMERA_ROLES = {"AREA", "DOOR"}
-
-
 @router.patch("/{camera_id}", response_model=CameraResponse)
 def update_camera(
     camera_id: str,
@@ -145,16 +142,10 @@ def update_camera(
     org_id: str = Depends(require_camera_edit),
 ):
     """
-    Change a camera's role, and with it whether faces are matched on it.
+    Change the frame width the pose model sees for a camera.
 
-    WHY THIS ENDPOINT EXISTS
-
-    Face matching runs only on a DOOR camera (see resolve_camera_role: a camera
-    nobody marked as the door is AREA, because the failure mode of guessing
-    DOOR is running face recognition on a camera the user never consented to).
-    But nothing could set the role — POST does not accept one and there was no
-    PATCH — so every camera stayed AREA forever and an enrolled face could
-    never be recognised anywhere. The enrolment screen led nowhere.
+    Only `inference_width`: name and rtsp_url identify the camera, and letting
+    them drift would orphan the telemetry keyed to them.
 
     Same org filter as delete_camera: 404 covers "not yours" as well as "does
     not exist", so this cannot be used to probe which ids exist elsewhere.
@@ -166,20 +157,6 @@ def update_camera(
     )
     if camera is None:
         raise HTTPException(status_code=404, detail="Camera not found.")
-
-    if payload.role is not None:
-        role = payload.role.strip().upper()
-        if role not in VALID_CAMERA_ROLES:
-            raise HTTPException(
-                status_code=422,
-                detail=f"role must be one of {sorted(VALID_CAMERA_ROLES)}.",
-            )
-        camera.role = role
-        # A DOOR camera keeps 1280 unless told otherwise: downscaling is what
-        # destroys the face signal that camera exists to capture. Only applied
-        # when the caller did not ask for a specific width.
-        if payload.inference_width is None:
-            camera.inference_width = 1280 if role == "DOOR" else 640
 
     if payload.inference_width is not None:
         if not (320 <= payload.inference_width <= 3840):

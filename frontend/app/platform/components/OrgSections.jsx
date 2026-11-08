@@ -178,14 +178,13 @@ export function SitesSection({ sites, error }) {
       count={String(sites.length)}
       error={error}
       empty={sites.length === 0 ? 'No sites' : null}
-      emptyHint="A site is created during onboarding and groups the cameras on one floor or building."
+      emptyHint="A site is created during onboarding and groups the cameras in one building or work area."
     >
       <div className="overflow-x-auto">
         <table className="w-full text-[13px] border-collapse">
           <thead>
             <tr className="border-b border-line">
               <Th>Site</Th>
-              <Th align="right">Capacity</Th>
               <Th>Working hours</Th>
               <Th>Days</Th>
             </tr>
@@ -199,11 +198,6 @@ export function SitesSection({ sites, error }) {
                     {s.location || '—'}
                     {s.timezone ? ` · ${s.timezone}` : ''}
                   </div>
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums">
-                  {s.capacity == null
-                    ? <span className="text-ink-faint">not set</span>
-                    : <span className="font-semibold text-ink">{s.capacity}</span>}
                 </td>
                 <td className="px-4 py-3 font-mono text-[12px] text-ink-muted whitespace-nowrap">
                   {fmtMinute(s.workdayStartMinute)}–{fmtMinute(s.workdayEndMinute)}
@@ -322,7 +316,7 @@ export function ZonesSection({ zones, error }) {
       count={String(zones.length)}
       error={error}
       empty={zones.length === 0 ? 'No zones drawn' : null}
-      emptyHint="Without zones the pipeline runs but produces nothing — every detection falls outside every area. This is the most common reason a customer sees no data."
+      emptyHint="Without zones the pipeline runs but no rule can apply — every detection falls outside every area. This is the most common reason a customer sees no verdicts."
     >
       <div className="overflow-x-auto">
         <table className="w-full text-[13px] border-collapse">
@@ -330,7 +324,6 @@ export function ZonesSection({ zones, error }) {
             <tr className="border-b border-line">
               <Th>Zone</Th>
               <Th>Type</Th>
-              <Th align="right">Capacity</Th>
               <Th>Camera</Th>
             </tr>
           </thead>
@@ -348,19 +341,9 @@ export function ZonesSection({ zones, error }) {
                     />
                     <span className="font-semibold text-ink truncate">{z.name}</span>
                   </div>
-                  {z.excludeFromUtilisation && (
-                    <div className="font-mono text-[10px] text-ink-faint mt-0.5 pl-4.5">
-                      excluded from utilisation
-                    </div>
-                  )}
                 </td>
                 <td className="px-4 py-3 text-[12.5px] font-semibold text-ink-muted">
                   {z.zoneType}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums">
-                  {z.capacity == null
-                    ? <span className="text-ink-faint">n/a</span>
-                    : <span className="font-semibold text-ink">{z.capacity}</span>}
                 </td>
                 <td className="px-4 py-3 font-mono text-[11.5px] text-ink-muted truncate">
                   {z.cameraName ?? '—'}
@@ -459,20 +442,20 @@ export function SessionsSection({ sessions, error }) {
 
 /* ── The boundary ─────────────────────────────────────────────────────────── */
 
-export function OccupancyNotice({ orgName }) {
+export function SafetyDataNotice({ orgName }) {
   return (
     <div className="rounded-xl border border-line bg-surface-alt px-4 sm:px-5 py-4 themed">
       <div className="flex items-center gap-2 mb-2">
         <CircleDot className="w-4 h-4 text-ink-faint" strokeWidth={2.2} />
         <h2 className="text-[13.5px] font-bold tracking-tight text-ink">
-          Occupancy not accessible
+          Safety data not accessible
         </h2>
       </div>
       <p className="text-[12px] leading-relaxed text-ink-muted max-w-2xl">
-        This page shows configuration and health only. {orgName}&rsquo;s occupancy
-        counts, utilisation, alerts and reports are not readable from a platform
+        This page shows configuration and health only. {orgName}&rsquo;s
+        detections, verdicts, alerts and reports are not readable from a platform
         session — no row-level-security policy grants a platform operator access
-        to the measurement tables, so those queries return nothing regardless of
+        to the safety tables, so those queries return nothing regardless of
         what this interface asks for.
       </p>
     </div>

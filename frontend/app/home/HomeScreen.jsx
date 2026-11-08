@@ -62,17 +62,17 @@ const STEPS = [
   {
     icon: Building2,
     title: 'Create your organisation',
-    body: 'The boundary every measurement lives inside. Nobody outside it can read your occupancy data — enforced in Postgres, not in the interface.',
+    body: 'The boundary every record lives inside. Nobody outside it can read your safety data — enforced in Postgres, not in the interface.',
   },
   {
     icon: Video,
-    title: 'Point it at a space',
-    body: 'Upload a recording, use a webcam, or connect an RTSP camera. Draw zones over the frame to mark desks, walkways and meeting areas.',
+    title: 'Point it at a site',
+    body: 'Upload a recording, use a webcam, or connect an RTSP camera. Draw zones over the frame to mark the PPE checkpoint, the restricted area and the exit.',
   },
   {
     icon: LayoutDashboard,
-    title: 'Read the numbers',
-    body: 'Occupancy, posture and dwell time per zone per minute — with the identifying frames discarded. What remains after the people are gone.',
+    title: 'Review the verdicts',
+    body: 'Each worker’s entry is checked and given a verdict with its reasons — with the identifying frames discarded. A person confirms every flag.',
   },
 ];
 
@@ -315,15 +315,15 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-ink mb-6 leading-[1.15] pb-1 relative z-10 group-hover:translate-x-2 transition-transform duration-500">
               Let’s set up<br />
               <span className="text-accent relative inline-block">
-                your space.
+                your site.
                 <span aria-hidden="true" className="absolute bottom-1 left-0 w-full h-2 bg-accent/20 -z-10 group-hover:h-full transition-all duration-300" />
               </span>
             </h1>
 
             <p className="text-lg text-ink-muted mb-8 max-w-md font-medium leading-relaxed relative z-10">
-              Measure how a space is actually used — occupancy, posture and dwell time per
-              zone — without keeping the footage or identifying anyone in it. Choose a plan
-              to get started.
+              Check that safety procedures are followed — PPE before entry, time limits,
+              workers down — without keeping the footage or naming anyone in it. Choose a
+              plan to get started.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 relative z-10 mb-8">
@@ -348,11 +348,11 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 relative z-10 text-sm font-bold text-ink-muted">
               <div className="flex items-center gap-2 group/check hover:text-emerald-500 transition-colors cursor-default">
                 <CheckCircle2 className="w-5 h-5 opacity-70 group-hover/check:text-emerald-500 group-hover/check:scale-110 transition-all" aria-hidden="true" />
-                No hardware required
+                Uses your existing cameras
               </div>
               <div className="flex items-center gap-2 group/check2 hover:text-emerald-500 transition-colors cursor-default">
                 <CheckCircle2 className="w-5 h-5 opacity-70 group-hover/check2:text-emerald-500 group-hover/check2:scale-110 transition-all" aria-hidden="true" />
-                Setup in 5 minutes
+                A person confirms every flag
               </div>
             </div>
           </div>
@@ -405,7 +405,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
                   Live in minutes
                 </h3>
                 <p className="text-ink-muted font-medium text-[14px]">
-                  Pick a plan, name your organisation, and point it at a space.
+                  Pick a plan, name your organisation, and point it at a site.
                 </p>
               </div>
               <Activity className="w-16 h-16 text-ink-muted/30 group-hover:text-accent group-hover:scale-110 transition-all duration-500 hidden sm:block" aria-hidden="true" />
@@ -477,7 +477,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
               Plans
             </span>
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink max-w-2xl leading-[1.1]">
-              Priced by how much space you measure.
+              Priced by how much you monitor.
             </h2>
             <p className="text-[15px] text-ink-muted font-medium max-w-xl leading-relaxed">
               Every plan includes the full analysis pipeline and the same privacy guarantees.

@@ -521,7 +521,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     ctx.fillStyle = '#334155';
     ctx.font = '600 16px Inter, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Turn on Camera or Upload video for GPU AI analytics', 480, 270);
+    ctx.fillText('Turn on Camera or Upload video to start monitoring', 480, 270);
     ctx.textAlign = 'left';
   }, []);
 
@@ -551,7 +551,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-ink font-semibold text-sm">
           <Eye className="w-4 h-4 text-accent" />
-          <span>CCTV Video AI Analytics — HUD Feed</span>
+          <span>Live Camera Feed — Detection View</span>
           <span className="ml-2 px-2 py-0.5 rounded bg-accent/10 border border-line text-[10px] text-accent font-mono font-bold flex items-center gap-1">
             <Cpu className="w-3 h-3" />
             <span>NVIDIA RTX 4060 (CUDA) • YOLOv8m Medium</span>

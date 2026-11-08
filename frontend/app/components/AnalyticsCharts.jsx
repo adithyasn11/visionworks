@@ -2,7 +2,7 @@
 
 // frontend/app/components/AnalyticsCharts.jsx
 //
-// The dashboard's three analytics charts, read from the live telemetry API.
+// The dashboard's three charts, read from the live detection records.
 //
 // Every value here comes from `activity_logs`, which the CV pipeline writes as
 // it processes a video or a live camera (see backend/app/db/activity_writer.py).
@@ -97,7 +97,7 @@ function ChartState({ kind, height, message }) {
 }
 
 const EMPTY_HINT =
-  'No telemetry yet. Upload a video or start the live camera above — occupancy and posture data appear here as people are detected.';
+  'No detections yet. Upload a video or start the live camera above — people and the zones they are in appear here as they are detected.';
 
 /* ── data hook ────────────────────────────────────────────────────────────── */
 
@@ -177,7 +177,7 @@ function toClockLabel(value) {
 function buildTimeline(historical) {
   return historical.map((row) => ({
     time: toClockLabel(row.time),
-    score: Number(row.avg_activity_score) || 0,
+    score: Number(row.people) || 0,
   }));
 }
 
@@ -280,10 +280,10 @@ export const AnalyticsCharts = ({ days = 7 }) => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* 1. Activity Score Timeline */}
+      {/* 1. People detected over time */}
       <Panel
         wide
-        title={`Activity Index Timeline — ${rangeLabel} (0 – 100 Score)`}
+        title={`People Detected — ${rangeLabel}`}
         icon={TrendingUp}
         iconColor="text-accent"
       >
@@ -295,11 +295,11 @@ export const AnalyticsCharts = ({ days = 7 }) => {
               <LineChart data={timeline}>
                 <CartesianGrid strokeDasharray="3 3" stroke={grid} />
                 <XAxis dataKey="time" stroke={axis} />
-                <YAxis domain={[0, 100]} stroke={axis} />
+                <YAxis allowDecimals={false} stroke={axis} />
                 <Tooltip
                   contentStyle={tooltipStyle}
                   itemStyle={{ color: series }}
-                  formatter={(value) => [value, 'Activity index']}
+                  formatter={(value) => [value, 'People detected']}
                 />
                 <Line
                   type="monotone"
@@ -317,7 +317,7 @@ export const AnalyticsCharts = ({ days = 7 }) => {
       </Panel>
 
       {/* 2. Posture Distribution Pie */}
-      <Panel title="Posture Balance Ratio" icon={PieIcon} iconColor="text-accent">
+      <Panel title="Posture Mix" icon={PieIcon} iconColor="text-accent">
         {postureState ? (
           <ChartState kind={postureState.kind} height="h-56" message={postureState.message} />
         ) : (
@@ -358,8 +358,8 @@ export const AnalyticsCharts = ({ days = 7 }) => {
         )}
       </Panel>
 
-      {/* 3. Zone Dwell Time Bar Chart */}
-      <Panel title="Workstation Dwell Time (Minutes)" icon={BarChart3} iconColor="text-accent">
+      {/* 3. Time spent in each zone */}
+      <Panel title="Time in Zone (Minutes)" icon={BarChart3} iconColor="text-accent">
         {zonesState ? (
           <ChartState kind={zonesState.kind} height="h-56" message={zonesState.message} />
         ) : (
@@ -373,7 +373,7 @@ export const AnalyticsCharts = ({ days = 7 }) => {
                   contentStyle={tooltipStyle}
                   formatter={(value, _name, entry) => [
                     `${value} min · ${entry?.payload?.visitors ?? 0} tracked`,
-                    'Dwell',
+                    'Time in zone',
                   ]}
                 />
                 <Bar dataKey="minutes" fill={series} radius={[6, 6, 0, 0]} isAnimationActive={false} />

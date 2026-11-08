@@ -117,7 +117,7 @@ export default function InvitationsPanel() {
             {invites.length === 1 ? 'You have an invitation' : `You have ${invites.length} invitations`}
           </h2>
           <p className="text-[13px] text-ink-muted font-medium">
-            Join an existing workspace — no plan needed.
+            Join an existing organisation — no plan needed.
           </p>
         </div>
       </div>

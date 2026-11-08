@@ -16,7 +16,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.db.database import engine, Base, apply_lightweight_migrations
-from app.api.routers import cameras, zones, analytics, websocket, video_upload, enrolment, pairing
+from app.api.routers import cameras, zones, analytics, websocket, video_upload, pairing
 
 # Create database tables automatically on startup, then add any columns that
 # were introduced after an existing database was created (create_all does not
@@ -82,17 +82,11 @@ async def lifespan(app: FastAPI):
     up, each aggregating the same window.
     """
     from app.db.minute_aggregator import ensure_bucket_table, run_aggregator_loop
-    from app.db.identity_writer import ensure_identity_table
 
     # Needs the running loop, so it belongs here rather than at import time.
     _silence_proactor_disconnects()
 
     ensure_bucket_table()
-    # The per-person mirror of migration 020. Created here rather than by
-    # Base.metadata.create_all() because it carries CHECK constraints that
-    # SQLAlchemy's declarative models do not express — including the one that
-    # keeps UNKNOWN honest in both employee_id and method.
-    ensure_identity_table()
     task = asyncio.create_task(run_aggregator_loop())
     try:
         yield
@@ -128,10 +122,6 @@ app.include_router(zones.router, prefix="/api/v1/zones", tags=["Zones"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(websocket.router, prefix="/api/v1/ws", tags=["WebSockets"])
 app.include_router(video_upload.router, prefix="/api/v1/video", tags=["Video Upload"])
-# Face enrolment (Step 9). Separate from /video because it is roster
-# configuration, not analysis: it is gated on employees.edit and it writes to
-# Postgres rather than to the local telemetry tables.
-app.include_router(enrolment.router, prefix="/api/v1/employees", tags=["Face Enrolment"])
 # Phone-as-camera pairing. Carries its own /api/v1/pair prefix because the
 # WebSocket path is part of the QR code a phone scans, and a prefix declared
 # in two places is a prefix that eventually disagrees with itself.
@@ -141,7 +131,7 @@ app.include_router(pairing.router, tags=["Pairing"])
 def read_root():
     return {
         "status": "ONLINE",
-        "system": "Vision-Based Workplace Activity Analytics Engine",
+        "system": "VisionWorks — Workplace Safety Compliance Engine",
         "version": "1.0.0"
     }
 

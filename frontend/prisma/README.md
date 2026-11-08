@@ -11,7 +11,7 @@ project yet.
 
 | File | What it is |
 |---|---|
-| `schema.prisma` | 13 tables, 15 enums, 52 indexes. The single source of truth. |
+| `schema.prisma` | 15 tables, 15 enums. The single source of truth (after 024 retired the eight productivity tables). |
 | `../prisma.config.ts` | Prisma 7 config — connection strings live here now, not in the schema. |
 | `sql/001_constraints.sql` | 30 CHECK constraints + the last-admin trigger. Guards the invariants Prisma can't express. |
 | `sql/002_auth_triggers.sql` | Bridges Supabase `auth.users` → `profiles`. Auto-accepts invites. `create_organisation()`. Role helper functions. |
@@ -22,10 +22,12 @@ project yet.
 | `sql/007_operator_revoke.sql` | `revoke_operator()` with the last-operator lockout guard. |
 | `sql/008_uuid_defaults.sql` | **`DEFAULT gen_random_uuid()` on every generated `id`.** Prisma's `@default(uuid())` is client-side only, so PostgREST inserts (every Supabase Server Action) failed with a NOT NULL violation on `id`. |
 | `sql/009_dashboard_analytics.sql` | Dashboard aggregation in SQL. PostgREST caps responses at 1000 rows, so folding buckets in JS silently produced wrong numbers. |
-| `sql/010_alert_update_role.sql` | Restricts alert acknowledgement to ADMIN + MANAGER (`alert_update` had allowed VIEWER). |
+| `sql/010_alert_update_role.sql` | *(historical: the `alerts` table it protected was dropped by 024.)* |
 | `sql/011_retention_schedule.sql` | pg_cron jobs: day rollup 02:45, retention purge 03:15, report expiry 03:30 UTC. |
 | `sql/012_dashboard_covering_index.sql` | INCLUDE index so wide-window aggregations run index-only; fixes a cold-cache timeout on first load. |
-| `sql/020_identity.sql` | **Per-employee identity.** Five tables, RLS mirroring 003, and the biometric column revoked from `authenticated` the way 004 protects `rtspUrl`. The anonymous path is untouched. |
+| `sql/020_identity.sql` | *(historical: the per-employee identity tables it created were dropped by 024.)* |
+| `sql/021_camera_role.sql`, `022_employee_hours_and_visibility.sql`, `023_zone_slug.sql` | Camera role, a (since dropped) employee rollup, and the zone slug used to match zones by name. |
+| `sql/024_retire_productivity_tables.sql` | **Retires the workplace-productivity tables** (`employees`, `face_templates`, `identity_events`, `employee_day_stats`, `employee_hour_stats`, `camera_links`, `alerts`, `alert_rules`) and their functions and enums. Refuses to run if any holds a row. Dropped without CASCADE so an unexpected dependency fails loudly. |
 | `seed.ts` | Generates ~826,000 minute buckets of realistic shaped data. |
 
 **Order matters.** 001 → 002 → … → 010 → 011 → 012. Later files

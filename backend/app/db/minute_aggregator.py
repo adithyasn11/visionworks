@@ -808,17 +808,10 @@ async def run_aggregator_loop(stop_event: asyncio.Event | None = None) -> None:
                         f"draw the zone again, or delete the rows if the camera is gone."
                     )
 
-            # Rules are evaluated on every tick, not only when buckets were
-            # written. CAMERA_OFFLINE fires precisely BECAUSE nothing arrived,
-            # so gating this on new data would make that rule unable to fire.
-            if service_role_configured():
-                from app.db.alerts_engine import evaluate_rules
-                verdict = await evaluate_rules()
-                if verdict.get("fired"):
-                    logger.info(
-                        f"Alerts: {verdict['fired']} fired, "
-                        f"{verdict.get('suppressed', 0)} suppressed by cooldown"
-                    )
+            # (The occupancy alert rules that used to be evaluated here are gone
+            # with the `alert_rules` / `alerts` tables, migration 024. Safety
+            # alerts are decisions written by the safety engine, not rules polled
+            # from measurement buckets.)
         except asyncio.CancelledError:
             logger.info("Minute aggregator stopped")
             raise

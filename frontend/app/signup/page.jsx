@@ -11,13 +11,13 @@ import AuthAside from '../components/AuthAside';
 import { GoogleButton, Divider, Field, PasswordField, Banner, SubmitButton } from '../components/AuthFormBits';
 
 const ASIDE = {
-  eyebrow: 'setup // ~5 min',
+  eyebrow: 'setup // minutes',
   headline: 'Point it at a camera you already own.',
-  sub: 'Draw two zones on the feed and the occupancy, dwell time and posture data starts the same afternoon.',
+  sub: 'Draw a checkpoint and a restricted zone on the feed, and the first verdicts appear the same afternoon.',
   facts: [
     { term: 'input',     detail: 'RTSP stream, uploaded file, or a plain webcam' },
     { term: 'hardware',  detail: 'CUDA GPU for real time; CPU fallback works too' },
-    { term: 'retention', detail: 'No footage written to disk, ever' },
+    { term: 'retention', detail: 'No continuous video written to disk' },
   ],
 };
 
@@ -212,7 +212,7 @@ function SignupForm() {
                       Create your account
                     </h1>
                     <p className="text-[14px] text-ink-muted font-medium leading-relaxed">
-                      Connect a camera and see how your space is used — usually within the hour.
+                      Connect a camera and start checking safety compliance — usually within the hour.
                     </p>
                   </header>
 

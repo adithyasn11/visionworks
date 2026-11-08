@@ -14,7 +14,7 @@ model's measured behaviour on its own test split (conf 0.35) is:
 
 A single frame therefore cannot accuse anyone: 12% of real vests are simply
 not detected in any one frame. Two defences are built in, mirroring the
-identity code's "abstain rather than guess" rule:
+design's "abstain rather than guess" rule:
 
   1. A frame only counts as evidence when the person is CLEAR — big enough,
      not cut off at the top of the frame, not tangled with another person.
@@ -162,9 +162,10 @@ class PpeEvidenceTracker:
     """
     Rolling PPE evidence per track.
 
-    Keyed by whatever id the caller passes — a local ByteTrack id, or an
-    identity_id once the identity tracker has stitched fragments. Use the
-    identity_id when you have it: evidence then survives an occlusion.
+    Keyed by the ByteTrack id the caller passes (the worker's anonymous id
+    within one camera view). If a worker is lost and picked up again under a
+    new id, their evidence starts over, and until enough clear frames have
+    accumulated the verdict is UNVERIFIABLE rather than a guess.
     """
 
     def __init__(self, required=(HELMET, VEST), window=WINDOW_FRAMES,

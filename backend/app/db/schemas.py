@@ -15,32 +15,26 @@ class CameraCreate(CameraBase):
 
 class CameraUpdate(BaseModel):
     """
-    What may be changed on an existing camera.
-
-    `role` is the whole reason this exists. A camera defaults to AREA, and
-    AREA cameras never run face matching — so without a way to mark one DOOR,
-    an enrolled face could never be recognised anywhere and the enrolment
-    screen led nowhere. Only these two fields: name and rtsp_url identify the
-    camera, and letting them drift would orphan the telemetry keyed to them.
+    What may be changed on an existing camera: the frame width the pose model
+    sees. Name and rtsp_url identify the camera, and letting them drift would
+    orphan the telemetry keyed to them.
     """
-    role: Optional[str] = Field(default=None, example="DOOR")
     inference_width: Optional[int] = Field(default=None, example=1280)
 
 
 class CameraResponse(CameraBase):
     status: str
     created_at: datetime
-    role: Optional[str] = None
     inference_width: Optional[int] = None
 
     class Config:
         from_attributes = True
 
 class ZoneBase(BaseModel):
-    zone_id: str = Field(..., example="desk_01")
+    zone_id: str = Field(..., example="restricted_01")
     camera_id: str = Field(..., example="cam_01")
-    zone_name: str = Field(..., example="Workstation 1")
-    zone_type: Optional[str] = "WORKSTATION"
+    zone_name: str = Field(..., example="Press line")
+    zone_type: Optional[str] = "GENERAL"
     polygon_coordinates: List[List[float]] # Array of [x, y]
     homography_matrix: Optional[List[List[float]]] = None
 
