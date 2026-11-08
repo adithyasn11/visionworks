@@ -23,28 +23,36 @@ major project/
 ├── backend/                  # FastAPI Python backend
 │   ├── app/
 │   │   ├── api/routers/      # REST & WebSocket endpoints
-│   │   ├── cv/               # YOLOv8 inference, SORT tracker, spatial engine
-│   │   ├── db/               # Supabase client, models, schemas
-│   │   ├── services/         # Business logic layer
+│   │   ├── cv/               # Detection, tracking, identity, handoff, PPE evidence
+│   │   ├── db/               # Local telemetry DB, models, writers, aggregators
 │   │   ├── utils/            # Report generator, helpers
 │   │   └── main.py           # FastAPI app entry point
+│   ├── eval/                 # Synthetic evaluation harness (identity tracking)
+│   ├── models/               # Re-ID model download script
+│   ├── tests/                # Test suite (run each file with the venv's python)
 │   ├── requirements.txt
-│   └── .env.example          # ← Copy to .env and fill in credentials
+│   └── .env.example          # Copy to .env and fill in credentials
 │
 ├── frontend/                 # Next.js 14 (App Router) frontend
-│   ├── app/
-│   │   ├── components/       # Shared UI (LandingNavbar, LandingFooter, etc.)
-│   │   ├── dashboard/        # Main authenticated dashboard
-│   │   ├── features/         # Public features page
-│   │   ├── security/         # Public security page
-│   │   ├── lib/              # Supabase client config
-│   │   └── page.jsx          # Landing page
+│   ├── app/                  # Pages, components, server actions, lib
+│   ├── prisma/               # Postgres schema, migrations, SQL (RLS, triggers)
 │   ├── package.json
-│   └── .env.local.example    # ← Copy to .env.local and fill in credentials
+│   └── .env.local.example    # Copy to .env.local and fill in credentials
 │
-├── sample_videos/            # Drop test .mp4 files here (git-ignored)
-├── setup.py                  # ← Run this first to bootstrap everything
-├── run_system.py             # ← Run this to start the full system
+├── ppe_training/             # PPE (helmet / vest) detector: training + evaluation
+│   ├── datasets/             # Training datasets (git-ignored; see below)
+│   ├── runs/                 # Training runs and weights (git-ignored)
+│   ├── reports/              # Model evaluation results
+│   └── *.py, *.bat           # Train / test / evaluate scripts
+│
+├── docs/                     # Design docs, plans, failure analysis, project brief
+│   ├── safety-pivot/         # The safety-compliance direction and gap analysis
+│   └── archive/              # Superseded early specifications
+│
+├── scripts/                  # Dev HTTPS certificate + HTTPS backend launcher
+├── sample_videos/            # Drop test videos here (git-ignored)
+├── setup.py                  # Run this first to bootstrap everything
+├── run_system.py             # Run this to start the full system
 └── README.md
 ```
 

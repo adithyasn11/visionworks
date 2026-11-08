@@ -1,0 +1,299 @@
+{
+  "split": "valid",
+  "images": 425,
+  "gt_instances": {
+    "person": 311,
+    "safety_vest": 278,
+    "boots": 386,
+    "helmet": 218,
+    "mask": 225,
+    "gloves": 376
+  },
+  "thresholds": {
+    "0.25": {
+      "boots": {
+        "tp": 319,
+        "fp": 70,
+        "fn": 67,
+        "precision": 0.82,
+        "recall": 0.826,
+        "f1": 0.823,
+        "missed_as": {
+          "nothing": 67
+        }
+      },
+      "gloves": {
+        "tp": 312,
+        "fp": 92,
+        "fn": 64,
+        "precision": 0.772,
+        "recall": 0.83,
+        "f1": 0.8,
+        "missed_as": {
+          "nothing": 62,
+          "helmet": 1,
+          "boots": 1
+        }
+      },
+      "helmet": {
+        "tp": 205,
+        "fp": 21,
+        "fn": 13,
+        "precision": 0.907,
+        "recall": 0.94,
+        "f1": 0.923,
+        "missed_as": {
+          "nothing": 13
+        }
+      },
+      "mask": {
+        "tp": 191,
+        "fp": 67,
+        "fn": 34,
+        "precision": 0.74,
+        "recall": 0.849,
+        "f1": 0.791,
+        "missed_as": {
+          "nothing": 34
+        }
+      },
+      "person": {
+        "tp": 291,
+        "fp": 48,
+        "fn": 20,
+        "precision": 0.858,
+        "recall": 0.936,
+        "f1": 0.895,
+        "missed_as": {
+          "nothing": 19,
+          "boots": 1
+        }
+      },
+      "safety_vest": {
+        "tp": 263,
+        "fp": 38,
+        "fn": 15,
+        "precision": 0.874,
+        "recall": 0.946,
+        "f1": 0.908,
+        "missed_as": {
+          "nothing": 14,
+          "helmet": 1
+        }
+      }
+    },
+    "0.35": {
+      "boots": {
+        "tp": 314,
+        "fp": 59,
+        "fn": 72,
+        "precision": 0.842,
+        "recall": 0.813,
+        "f1": 0.827,
+        "missed_as": {
+          "nothing": 72
+        }
+      },
+      "gloves": {
+        "tp": 298,
+        "fp": 74,
+        "fn": 78,
+        "precision": 0.801,
+        "recall": 0.793,
+        "f1": 0.797,
+        "missed_as": {
+          "nothing": 75,
+          "helmet": 2,
+          "boots": 1
+        }
+      },
+      "helmet": {
+        "tp": 205,
+        "fp": 18,
+        "fn": 13,
+        "precision": 0.919,
+        "recall": 0.94,
+        "f1": 0.93,
+        "missed_as": {
+          "nothing": 13
+        }
+      },
+      "mask": {
+        "tp": 186,
+        "fp": 61,
+        "fn": 39,
+        "precision": 0.753,
+        "recall": 0.827,
+        "f1": 0.788,
+        "missed_as": {
+          "nothing": 39
+        }
+      },
+      "person": {
+        "tp": 289,
+        "fp": 42,
+        "fn": 22,
+        "precision": 0.873,
+        "recall": 0.929,
+        "f1": 0.9,
+        "missed_as": {
+          "nothing": 21,
+          "boots": 1
+        }
+      },
+      "safety_vest": {
+        "tp": 259,
+        "fp": 30,
+        "fn": 19,
+        "precision": 0.896,
+        "recall": 0.932,
+        "f1": 0.914,
+        "missed_as": {
+          "nothing": 19
+        }
+      }
+    },
+    "0.5": {
+      "boots": {
+        "tp": 309,
+        "fp": 51,
+        "fn": 77,
+        "precision": 0.858,
+        "recall": 0.801,
+        "f1": 0.828,
+        "missed_as": {
+          "nothing": 77
+        }
+      },
+      "gloves": {
+        "tp": 291,
+        "fp": 55,
+        "fn": 85,
+        "precision": 0.841,
+        "recall": 0.774,
+        "f1": 0.806,
+        "missed_as": {
+          "nothing": 83,
+          "helmet": 1,
+          "boots": 1
+        }
+      },
+      "helmet": {
+        "tp": 202,
+        "fp": 13,
+        "fn": 16,
+        "precision": 0.94,
+        "recall": 0.927,
+        "f1": 0.933,
+        "missed_as": {
+          "nothing": 16
+        }
+      },
+      "mask": {
+        "tp": 168,
+        "fp": 47,
+        "fn": 57,
+        "precision": 0.781,
+        "recall": 0.747,
+        "f1": 0.764,
+        "missed_as": {
+          "nothing": 57
+        }
+      },
+      "person": {
+        "tp": 284,
+        "fp": 33,
+        "fn": 27,
+        "precision": 0.896,
+        "recall": 0.913,
+        "f1": 0.904,
+        "missed_as": {
+          "nothing": 26,
+          "boots": 1
+        }
+      },
+      "safety_vest": {
+        "tp": 254,
+        "fp": 23,
+        "fn": 24,
+        "precision": 0.917,
+        "recall": 0.914,
+        "f1": 0.915,
+        "missed_as": {
+          "nothing": 24
+        }
+      }
+    },
+    "0.65": {
+      "boots": {
+        "tp": 292,
+        "fp": 39,
+        "fn": 94,
+        "precision": 0.882,
+        "recall": 0.756,
+        "f1": 0.815,
+        "missed_as": {
+          "nothing": 94
+        }
+      },
+      "gloves": {
+        "tp": 277,
+        "fp": 34,
+        "fn": 99,
+        "precision": 0.891,
+        "recall": 0.737,
+        "f1": 0.806,
+        "missed_as": {
+          "nothing": 98,
+          "boots": 1
+        }
+      },
+      "helmet": {
+        "tp": 195,
+        "fp": 9,
+        "fn": 23,
+        "precision": 0.956,
+        "recall": 0.894,
+        "f1": 0.924,
+        "missed_as": {
+          "nothing": 23
+        }
+      },
+      "mask": {
+        "tp": 153,
+        "fp": 36,
+        "fn": 72,
+        "precision": 0.81,
+        "recall": 0.68,
+        "f1": 0.739,
+        "missed_as": {
+          "nothing": 72
+        }
+      },
+      "person": {
+        "tp": 271,
+        "fp": 19,
+        "fn": 40,
+        "precision": 0.934,
+        "recall": 0.871,
+        "f1": 0.902,
+        "missed_as": {
+          "nothing": 38,
+          "safety_vest": 1,
+          "boots": 1
+        }
+      },
+      "safety_vest": {
+        "tp": 245,
+        "fp": 15,
+        "fn": 33,
+        "precision": 0.942,
+        "recall": 0.881,
+        "f1": 0.911,
+        "missed_as": {
+          "nothing": 33
+        }
+      }
+    }
+  }
+}

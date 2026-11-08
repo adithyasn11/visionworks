@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="VisionWorks — AI-based workplace activity analytics using computer vision. Team AD16 project brief.">
+<meta name="description" content="VisionWorks — AI-based workplace and workforce analytics using computer vision, consented per-employee identity tracking, and an agentic reasoning layer. Team AD16 project brief.">
 <title>VisionWorks Project Brief</title>
 <style>
   :root {
@@ -386,36 +386,42 @@
 
   <header class="hero">
     <p class="kicker">Team Brief · AD16</p>
-    <h1>Turning office CCTV into a space-planning tool</h1>
+    <h1>Turning office CCTV into a consented workforce analytics tool</h1>
     <p class="standfirst">
-      VisionWorks reads an ordinary camera feed and answers a question facilities managers
-      currently guess at: <strong>which parts of this office are actually being used?</strong>
-      It does this without ever saving footage or identifying a single person.
+      VisionWorks reads an ordinary camera feed and answers questions facilities and people
+      managers currently guess at: <strong>which parts of this office are actually being used,
+      and how is a specific employee's day actually spending itself?</strong> It does this without
+      ever saving footage, and it identifies a person only when that person has consented —
+      everyone else is counted, never named.
     </p>
     <dl class="meta-row">
-      <div class="meta-item"><dt>Project</dt><dd>AI Workplace Activity Analytics</dd></div>
+      <div class="meta-item"><dt>Project</dt><dd>AI Workplace &amp; Workforce Analytics</dd></div>
       <div class="meta-item"><dt>Team</dt><dd>AD16 · 4 members</dd></div>
       <div class="meta-item"><dt>Guide</dt><dd>Dr. Mahendra Naik</dd></div>
-      <div class="meta-item"><dt>Stack</dt><dd>Next.js · FastAPI · YOLOv8 · Postgres</dd></div>
+      <div class="meta-item"><dt>Stack</dt><dd>Next.js · FastAPI · YOLOv8 · Re-ID · Postgres</dd></div>
     </dl>
   </header>
 
   <!-- ══════════ 1. THE PROBLEM ══════════ -->
   <section id="problem">
     <span class="sec-num">01 — The problem</span>
-    <h2>Cameras that only look backwards</h2>
+    <h2>Cameras that only look backwards, and monitoring that only works blunt</h2>
 
     <p class="lead">
       Almost every office already has CCTV. But that footage is only ever watched
       <em>after</em> something goes wrong — a theft, an accident, a dispute. It is a
-      recording device, not an information source.
+      recording device, not an information source. And the tools that do try to measure
+      the workday — badge swipes, keystroke loggers, hours logged — measure presence or
+      activity, not whether anyone actually got anything done.
     </p>
 
     <p>
-      Meanwhile the facilities team is making expensive decisions with no data at all.
-      How many desks do we actually need? Is that meeting room worth the lease? Should
-      we take another floor next year? These get answered by gut feeling, or by someone
-      physically walking the building with a clipboard once a quarter.
+      Managers are making two different kinds of decisions blind. Facilities decisions:
+      how many desks do we need, is that meeting room worth the lease. And people
+      decisions: is this employee's time at their desk real focus or just stillness, is
+      that unusual alert a genuine problem or a camera glitch. Today both get answered by
+      gut feeling, a clipboard walkthrough once a quarter, or invasive tools that measure
+      the wrong thing and damage trust the moment employees notice them.
     </p>
 
     <div class="problem-grid">
@@ -437,13 +443,15 @@
     <ul>
       <li><strong>Dedicated occupancy sensors</strong> — desk sensors, door counters, badge readers. They cost money per unit, need installation and maintenance, and only tell you <em>someone is present</em>, never what they are doing.</li>
       <li><strong>Manual surveys and walkthroughs</strong> — accurate for one afternoon, then instantly stale. Doesn't scale past a single floor, and consumes staff time every time you want fresh numbers.</li>
-      <li><strong>Existing CCTV analytics products</strong> — most work by storing footage or building facial identity profiles. That is exactly what gets a project rejected by HR and legal.</li>
+      <li><strong>Keystroke and screen monitoring</strong> — invasive, provokes pushback the moment employees find out, and still misses real work done away from a keyboard: meetings, whiteboarding, reading.</li>
+      <li><strong>Existing CCTV analytics products</strong> — most work by storing footage or running facial recognition on every frame. That is exactly what gets a project rejected by HR and legal, whether the goal is space planning or people analytics.</li>
     </ul>
 
     <div class="note">
       <strong>The gap we're filling:</strong> the hardware is already on the wall. What's missing
-      is software that turns it into occupancy data — and does so in a way a company's legal team
-      will actually sign off on.
+      is software that turns it into both occupancy data <em>and</em>, where an employee has
+      explicitly agreed to it, individual desk-time data — in a way a company's legal team will
+      actually sign off on.
     </div>
   </section>
 
@@ -452,19 +460,31 @@
   <!-- ══════════ 2. WHAT IT DOES ══════════ -->
   <section id="what">
     <span class="sec-num">02 — What we built</span>
-    <h2>From pixels to decisions</h2>
+    <h2>From pixels to two kinds of decisions</h2>
 
     <p class="lead">
-      The system watches a video feed and produces four things: how many people are present,
-      what they're doing (sitting, standing, walking), which area of the floor they're in,
-      and how long they stay there.
+      The system watches a video feed and produces the same four base numbers for everyone:
+      how many people are present, what they're doing (sitting, standing, walking), which
+      area of the floor they're in, and how long they stay there. That alone drives the
+      anonymous, zone-level analytics.
+    </p>
+
+    <p>
+      For an employee who has explicitly consented, a second layer runs in parallel:
+      appearance re-identification stitches that person's fragmented tracker IDs into one
+      stable identity for the session, binds it to their name via the desk zone they're
+      assigned to, and rolls the result into <strong>per-employee</strong> desk time, breaks,
+      and away-from-desk counts. An employee who has not consented is never touched by this
+      path — they flow through the anonymous pipeline exactly as before, and no row anywhere
+      can name them.
     </p>
 
     <p>
       Everything else in the product — the dashboards, the charts, the exported reports,
-      the alerts — is built on those four numbers. The critical design decision is what
+      the alerts — is built on those numbers. The critical design decision is what
       happens to the video itself: <strong>it is analysed frame by frame and then thrown away.</strong>
-      Nothing is written to disk. What gets saved is a row of counts.
+      Nothing is written to disk. What gets saved is a row of counts, and only a consenting
+      employee's rows are ever attributable to them by name.
     </p>
 
     <figure>
@@ -530,8 +550,10 @@
       <figcaption>
         Each frame is analysed in memory and immediately dropped (red path). Only aggregated
         counts — how many people, in which zone, in which posture, for which minute — reach the
-        database. Once a minute closes, individual movement is mathematically unrecoverable:
-        there is no column anywhere that refers to a person.
+        anonymous database. For a consenting employee only, a parallel path stitches their
+        appearance across frames and rolls up a per-person daily row instead; every other
+        employee's data stays on the anonymous path shown here, with no column anywhere that
+        refers to them.
       </figcaption>
     </figure>
   </section>
@@ -556,11 +578,19 @@
       </div>
       <div class="stack-item">
         <div class="stack-head"><span class="stack-name">ByteTrack</span><span class="stack-role">Following the same person across frames</span></div>
-        <p class="stack-why">Detection alone is amnesiac — each frame it finds "a person", with no idea it's the same person as last frame. ByteTrack assigns a <strong>persistent ID</strong> so we can measure how long someone stayed. It's also robust when a person is briefly hidden behind a monitor or colleague, which naive trackers handle badly by assigning a brand-new ID.</p>
+        <p class="stack-why">Detection alone is amnesiac — each frame it finds "a person", with no idea it's the same person as last frame. ByteTrack assigns an ID so we can measure how long someone stayed within one unbroken stretch. It has <strong>no appearance memory</strong> though: occlusion behind a monitor or colleague for ~30 frames resets the ID, which is exactly the gap the Re-ID layer below closes.</p>
+      </div>
+      <div class="stack-item">
+        <div class="stack-head"><span class="stack-name">OSNet (torchreid)</span><span class="stack-role">Recognising the same person after a lost track</span></div>
+        <p class="stack-why">A 512-dimensional appearance embedding, purpose-built for exactly the crop size (128×64) this pipeline already produces — smaller than what face recognition needs to work at all. When a track is lost and a new one appears, we compare embeddings; measured on real footage, a cosine similarity above <strong>0.65</strong> accepts 97.9% of true same-person matches while wrongly accepting only 5.7% of different people. Fused with a colour histogram and homography-based height, this <strong>stitches fragments back into one stable identity</strong> — without ever running face recognition on most cameras.</p>
+      </div>
+      <div class="stack-item">
+        <div class="stack-head"><span class="stack-name">InsightFace (ArcFace + SCRFD)</span><span class="stack-role">One-time, opt-in enrolment</span></div>
+        <p class="stack-why">Runs only on a camera explicitly marked as a <strong>door</strong> camera, and only to bind an identity to a named employee at enrolment — never continuously, and never on an ordinary area camera. An employee can withdraw consent at any time, which deletes their stored face embeddings outright.</p>
       </div>
       <div class="stack-item">
         <div class="stack-head"><span class="stack-name">Shapely</span><span class="stack-role">Deciding which zone a person is in</span></div>
-        <p class="stack-why">Once you've drawn a zone as a polygon, you need to ask "is this person's position inside that shape?" thousands of times a second. Shapely is a computational geometry library that answers that fast and correctly, including for irregular non-rectangular shapes.</p>
+        <p class="stack-why">Once you've drawn a zone as a polygon, you need to ask "is this person's position inside that shape?" thousands of times a second. Shapely is a computational geometry library that answers that fast and correctly, including for irregular non-rectangular shapes — and it's also the strongest signal for binding an identity to the employee assigned to that desk.</p>
       </div>
       <div class="stack-item">
         <div class="stack-head"><span class="stack-name">OpenCV</span><span class="stack-role">Video handling + the privacy blur</span></div>
@@ -584,7 +614,7 @@
       </div>
       <div class="stack-item">
         <div class="stack-head"><span class="stack-name">SQLAlchemy + SQLite</span><span class="stack-role">Local buffer for raw telemetry</span></div>
-        <p class="stack-why">The pipeline produces a result for every person on every frame — far too much to write straight to a cloud database. Raw readings land in a local file-based database first, get <strong>sampled</strong> (once every 5 seconds per person, plus immediately on any posture change), then rolled into per-minute summaries before being pushed to the cloud.</p>
+        <p class="stack-why">The pipeline produces a result for every person on every frame — far too much to write straight to a cloud database. Raw readings land in a local file-based database first, get <strong>sampled</strong> (once every 5 seconds per person, plus immediately on any posture change), then rolled up two ways: anonymously by zone for everyone, and by named identity for consenting employees only — before either is pushed to the cloud.</p>
       </div>
       <div class="stack-item">
         <div class="stack-head"><span class="stack-name">reportlab + pandas</span><span class="stack-role">Generating exports</span></div>
@@ -624,15 +654,25 @@
       </div>
       <div class="stack-item">
         <div class="stack-head"><span class="stack-name">Prisma</span><span class="stack-role">Database schema management</span></div>
-        <p class="stack-why">Defines all <strong>16 data models</strong> (organisations, cameras, zones, alerts, reports, audit logs…) in one file, and tracks the <strong>19 migrations</strong> that got the database to its current shape — so the schema is version-controlled alongside the code.</p>
+        <p class="stack-why">Defines all <strong>22 data models</strong> (organisations, cameras, zones, alerts, reports, audit logs, employees, consent records, identity events, per-employee day stats…) in one file, and tracks the <strong>24 migrations</strong> that got the database to its current shape — so the schema is version-controlled alongside the code.</p>
       </div>
     </div>
 
     <div class="note neutral">
       <strong>Why two databases?</strong> The local SQLite file absorbs the firehose of raw
       per-frame readings, which would overwhelm a cloud database and cost a fortune. Only the
-      cleaned, summarised, anonymous per-minute rows travel up to Postgres. It's the difference
-      between shipping every frame and shipping a receipt.
+      cleaned, summarised rows travel up to Postgres — anonymous per-minute zone rows for
+      everyone, and per-employee day rows only where consent exists. It's the difference between
+      shipping every frame and shipping a receipt.
+    </div>
+
+    <div class="note">
+      <strong>The consent boundary, structurally:</strong> <code>zone_minute_stats</code> has no
+      column that can hold a person, and it is never touched by identity code. Per-employee data
+      lives in separate tables (<code>employees</code>, <code>identity_events</code>,
+      <code>employee_day_stats</code>), gated on a consent record, with the strongest signal for
+      naming someone — desk-zone assignment — reused from the zones a manager already draws.
+      Revoking consent is a row delete, not a pipeline change.
     </div>
   </section>
 
@@ -677,6 +717,53 @@
 
   <hr class="rule">
 
+  <!-- ══════════ 4b. IDENTITY ══════════ -->
+  <section id="identity">
+    <span class="sec-num">04b — A closer look</span>
+    <h2>How the system knows <em>who</em> someone is — without face recognition</h2>
+
+    <p class="lead">
+      ByteTrack alone cannot answer "who is this" across a session, only "is this the same
+      blob as last frame". Getting from a tracker fragment to a named, consenting employee
+      takes three stages.
+    </p>
+
+    <p>
+      <strong>Stage one, re-identification.</strong> Every detection gets an appearance
+      signature — an OSNet embedding, an HSV colour histogram split at the hips using the
+      pose keypoints we already compute, and a height estimate from the homography. When a
+      tracker ID is lost, typically from occlusion, and a new one appears, we compare its
+      signature against a short-lived gallery of recently-lost identities. A cosine similarity
+      above <strong>0.65</strong> — a threshold measured on our own footage, not assumed —
+      reattaches it as the same person instead of minting a new identity.
+    </p>
+
+    <p>
+      <strong>Stage two, binding.</strong> An identity is bound to a named employee purely
+      through the desk zone they're assigned to: whichever identity spends the majority of its
+      time in that zone gets bound, with a confidence score equal to the fraction of time spent
+      there. No biometrics are involved in this step at all.
+    </p>
+
+    <p>
+      <strong>Stage three, consent.</strong> None of the above writes a named row anywhere
+      unless a consent record exists for that employee. Withdrawing consent deletes their
+      enrolled face data outright, and their day forward flows through the anonymous pipeline
+      exactly like everyone else's.
+    </p>
+
+    <div class="note">
+      <strong>Worth being honest about:</strong> binding accuracy depends on the office having
+      mostly fixed seating — it degrades in a hot-desking environment, and we say so rather than
+      hide it. The stitch-threshold numbers above (97.9% correct accept, 5.7% false accept at
+      0.65 cosine) are measured on our own test footage in <code>test_appearance.py</code>, not
+      a published benchmark, and are the clearest thing left to validate against a larger,
+      hand-labelled dataset.
+    </div>
+  </section>
+
+  <hr class="rule">
+
   <!-- ══════════ 5. THE PAGES ══════════ -->
   <section id="pages">
     <span class="sec-num">05 — The product</span>
@@ -708,15 +795,27 @@
     </div>
     <div class="page-row">
       <div><div class="page-name">Live feed</div><div class="page-who">manager +</div></div>
-      <p class="page-desc">Upload a recording or switch on a camera and watch the analysis happen in real time — boxes, IDs, posture labels, live zone counts, and a blurred head region on every person. Full playback controls for uploaded video.</p>
+      <p class="page-desc">Upload a recording or switch on a camera and watch the analysis happen in real time — boxes, IDs, posture labels, live zone counts, and a blurred head region on every person by default. Full playback controls for uploaded video.</p>
     </div>
     <div class="page-row">
       <div><div class="page-name">Zones</div><div class="page-who">manager +</div></div>
-      <p class="page-desc">Draw the areas you want measured directly onto a camera frame — click points to outline a desk, a meeting room, a corridor, then name it. These shapes are what occupancy and dwell time get attributed to.</p>
+      <p class="page-desc">Draw the areas you want measured directly onto a camera frame — click points to outline a desk, a meeting room, a corridor, then name it. These shapes are what occupancy, dwell time, and desk-based identity binding all get attributed to.</p>
+    </div>
+    <div class="page-row">
+      <div><div class="page-name">Employees</div><div class="page-who">manager +</div></div>
+      <p class="page-desc">Add employees, assign each a desk zone, and manage consent and face enrolment. Nothing about a specific employee is ever tracked until a consent record exists for them here.</p>
+    </div>
+    <div class="page-row">
+      <div><div class="page-name">Team</div><div class="page-who">manager +</div></div>
+      <p class="page-desc">Per-employee daily view for consenting employees only — desk time, breaks, away-from-desk counts — each figure shown alongside the confidence behind it, never presented as unqualified fact.</p>
+    </div>
+    <div class="page-row">
+      <div><div class="page-name">Camera topology</div><div class="page-who">manager +</div></div>
+      <p class="page-desc">Declare which camera's exit plausibly leads to which camera's entry, and how long that walk should take. Used to sanity-check identity handoffs between cameras rather than trust appearance matching alone.</p>
     </div>
     <div class="page-row">
       <div><div class="page-name">Reports</div><div class="page-who">everyone</div></div>
-      <p class="page-desc">Export the selected date range as a CSV of raw numbers or a formatted PDF summary. The page states plainly what an export contains — counts and postures, never a person.</p>
+      <p class="page-desc">Export the selected date range as a CSV of raw numbers or a formatted PDF summary. Zone-level exports contain counts and postures, never a person; per-employee exports are only available to whoever's role permits individual data, and only for consenting employees.</p>
     </div>
     <div class="page-row">
       <div><div class="page-name">Plan</div><div class="page-who">admin only</div></div>
@@ -757,10 +856,12 @@
           <tr><th>Can they…</th><th>Viewer</th><th>Manager</th><th>Admin</th></tr>
         </thead>
         <tbody>
-          <tr><td><strong>See dashboards, zones, reports</strong></td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><td><strong>See dashboards, zones, zone-level reports</strong></td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
           <tr><td><strong>Run analysis</strong> — upload video, start camera</td><td class="no">—</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
           <tr><td><strong>Draw and edit zones</strong></td><td class="no">—</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
           <tr><td><strong>Acknowledge alerts</strong></td><td class="no">—</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><td><strong>See per-employee data</strong> — consenting employees only</td><td class="no">—</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
+          <tr><td><strong>Enrol employees / manage consent</strong></td><td class="no">—</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
           <tr><td><strong>Invite and manage members</strong></td><td class="no">—</td><td class="no">—</td><td class="yes">Yes</td></tr>
           <tr><td><strong>Change plan and org settings</strong></td><td class="no">—</td><td class="no">—</td><td class="yes">Yes</td></tr>
         </tbody>
@@ -800,29 +901,39 @@
       currently set by assumption.
     </p>
 
-    <h3>Wellbeing, measured without surveillance</h3>
+    <h3>Wellbeing, measured at the zone level by default</h3>
     <p>
-      The system flags <em>zones</em> with unusually long unbroken sitting time, never individuals.
-      That supports an argument for standing desks or layout changes in a specific area,
-      without a single employee being singled out — because the data physically cannot single
-      anyone out.
+      By default the system flags <em>zones</em> with unusually long unbroken sitting time,
+      never individuals — supporting an argument for standing desks or layout changes without
+      singling anyone out, because the anonymous data physically cannot.
+    </p>
+
+    <h3>Per-employee visibility, only where it's been agreed to</h3>
+    <p>
+      For an employee who has consented, the same pipeline answers a different question:
+      how much of their day was actually spent at their desk, how many times did they step
+      away, and for how long. That is the number a manager currently has no honest way to get
+      without a keystroke logger — and this gets it without one, attaching a confidence to
+      every figure rather than presenting it as unqualified fact.
     </p>
 
     <h3>Why the privacy design is the commercial argument</h3>
     <p>
-      Workplace monitoring products usually die in a legal review. Ours is built so that the
-      honest answer to "what do you store about our employees?" is <strong>nothing that refers
-      to a person</strong>. No footage on disk. No face recognition. No identity. Once a minute
-      of data closes, the rows are counts and nothing else. That isn't a policy promise we're
-      asking anyone to trust — it's a property of the database schema, which has no column
-      capable of holding a person's identity.
+      Workplace monitoring products usually die in a legal review. Ours is built so the honest
+      answer to "what do you store about our employees?" is: <strong>nothing that refers to a
+      specific person, unless that person explicitly consented — and even then, nothing beyond
+      what they consented to, for longer than the retention window allows.</strong> No footage
+      on disk. No face recognition running continuously. That isn't a policy promise we're
+      asking anyone to trust — the anonymous path and the consented path are structurally
+      separate tables, and consent withdrawal is a row delete, not a request someone has to
+      action.
     </p>
 
     <div class="note">
-      <strong>The one-line pitch:</strong> companies already own the cameras. This turns them into
-      a space-planning tool that shows which areas are wasted and which are overcrowded —
-      without storing footage or identifying anyone, so it clears the privacy review that
-      normally kills products in this category.
+      <strong>The one-line pitch:</strong> companies already own the cameras. This turns them
+      into a tool that shows which areas are wasted or overcrowded for everyone, and — only
+      where an employee has agreed — how their own day actually breaks down, without ever
+      running continuous face recognition or storing footage.
     </div>
   </section>
 
@@ -836,26 +947,32 @@
     <h3>Working end to end</h3>
     <ul>
       <li>Full CV pipeline — detection, tracking, posture classification, zone attribution, dwell and activity scoring</li>
+      <li>Appearance re-identification stitching ByteTrack fragments into stable identities, with the 0.65 cosine threshold measured on real footage (97.9% correct accept, 5.7% false accept)</li>
+      <li>Seat-based identity-to-employee binding and a per-employee daily aggregator (desk time, chair exits, breaks, focus blocks)</li>
+      <li>Consent-gated face enrolment at door cameras, with consent withdrawal deleting stored embeddings</li>
       <li>Live processing over WebSocket for uploaded video, browser webcam and server-attached camera</li>
       <li>Head-region blurring applied by default before any frame reaches a browser</li>
-      <li>Zone drawing wired to real occupancy attribution</li>
-      <li>Dashboard, trend charts, alerts, and CSV/PDF export reading real recorded data</li>
+      <li>Zone drawing wired to real occupancy attribution, on both the anonymous and per-employee paths</li>
+      <li>Dashboard, trend charts, alerts, and CSV/PDF export reading real recorded data, including per-employee and team views</li>
       <li>Accounts, Google sign-in, invitations, three-tier roles, multi-company data isolation</li>
       <li>Platform operator console with audit logging</li>
+      <li>Camera-topology editor for declaring plausible walk times between cameras</li>
     </ul>
 
     <h3>Known gaps we're being upfront about</h3>
     <ul>
-      <li><strong>Accuracy is unmeasured.</strong> The pipeline behaves sensibly on real footage, but we have not benchmarked posture classification against hand-labelled ground truth. This is the top priority.</li>
+      <li><strong>Accuracy is only partly measured.</strong> The re-identification threshold is benchmarked; posture classification and end-to-end identity-binding accuracy against a hand-labelled dataset are not. This is the top priority.</li>
+      <li><strong>The agentic reasoning layer is not built yet.</strong> The plan calls for four agents — a Behaviour Interpreter that judges a day's pattern with a stated confidence, an Anomaly Investigator that distinguishes a real event from a sensor artefact before alerting, a Privacy Guardian that gates every individual-level query, and an Insights Narrator for weekly briefings. None of this exists in code today; the current per-employee numbers are aggregator output, not agent-reasoned output.</li>
+      <li><strong>Cross-camera handoff is unvalidated.</strong> The topology editor exists, but matching an identity across two cameras and tuning the fusion weights on real handoff data has not been done.</li>
       <li><strong>Camera identity bridging.</strong> Linking a registered camera to a processing session currently relies on names matching exactly; this needs a proper picker in the interface so it can't be got wrong.</li>
-      <li><strong>Session tracking.</strong> The operator console's "running sessions" panel reads a table the pipeline doesn't yet write to.</li>
     </ul>
 
     <div class="note neutral">
       <strong>For anyone presenting this:</strong> the strongest thing about the project isn't any
-      single model — it's that a complete path exists from a camera frame all the way to an
-      exportable business report, with a privacy boundary enforced structurally rather than
-      promised. Lead with that.
+      single model — it's that a complete path exists from a camera frame to a consented,
+      confidence-scored per-employee figure, with the anonymous path staying anonymous by
+      construction rather than by promise. Lead with that, and be upfront that the agentic
+      reasoning layer is the next thing being built on top of it, not something already running.
     </div>
   </section>
 

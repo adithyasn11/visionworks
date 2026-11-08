@@ -45,7 +45,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(_HERE, "..", "..")))
 
 RESULTS = os.path.join(_HERE, "results")
 DOC = os.path.join(os.path.abspath(os.path.join(_HERE, "..", "..")),
-                   "FAILURE_CASES.md")
+                   "docs", "FAILURE_CASES.md")
 
 
 # How each failure kind should be read. The severity ordering is the argument

@@ -93,3 +93,7 @@ backend/eval/results/tracks_*.json
 # Local HTTPS development certificate. Machine-specific and regenerable
 # (scripts/make_dev_cert.py); the private key must never be committed.
 certs/
+
+# PPE detector training assets (large, regenerable; weights are already ignored via *.pt)
+ppe_training/datasets/
+ppe_training/runs/
