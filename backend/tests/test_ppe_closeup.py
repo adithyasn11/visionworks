@@ -342,7 +342,7 @@ def painted(bgr, box=PB):
     return f
 
 
-ORANGE_BGR, YELLOW_BGR, SKIN_BGR, KHAKI_BGR = (0, 128, 255), (0, 255, 200), (120, 160, 205), (110, 140, 160)
+ORANGE_BGR, YELLOW_BGR, SKIN_BGR, KHAKI_BGR = (0, 100, 255), (0, 255, 200), (120, 160, 205), (110, 140, 160)     # ORANGE: safety orange, RGB (255,100,0)
 check("an orange torso is mostly hi-vis", hivis_fraction(painted(ORANGE_BGR), PB) > 0.9)
 check("a fluorescent yellow-green torso is mostly hi-vis", hivis_fraction(painted(YELLOW_BGR), PB) > 0.9)
 check("a grey torso, skin tone and khaki are not", all(hivis_fraction(painted(c), PB) < 0.05 for c in ((90, 90, 90), SKIN_BGR, KHAKI_BGR)),
@@ -368,6 +368,14 @@ def verdict_after(frame, detections, cfg=cfg, n=30, person=PERSON_PB):
 check("olive, tan, brown and khaki work clothes are not mistaken for hi-vis",
       all(hivis_fraction(painted(c), PB) < 0.05 for c in ((90, 130, 130), (50, 110, 160), (30, 70, 110), (110, 140, 160), (40, 95, 75))),
       str([round(hivis_fraction(painted(c), PB), 2) for c in ((90, 130, 130), (50, 110, 160), (30, 70, 110), (110, 140, 160), (40, 95, 75))]))
+import cv2 as _cv2                                                   # noqa: E402
+_FACTORY_CLIP = os.path.join(ROOT, "sample_videos", "Example of Hi-Definition Video Surveillance of a Factory Floor - by CCTVDOC.COM.mp4")
+if os.path.exists(_FACTORY_CLIP):
+    _cap = _cv2.VideoCapture(_FACTORY_CLIP)
+    _cap.set(_cv2.CAP_PROP_POS_FRAMES, 40)
+    _ok, _frame40 = _cap.read()
+    check("the real orange-vest worker in the factory clip scores well above the 0.10 floor", _ok and hivis_fraction(_frame40, [520, 358, 576, 524]) >= 0.15,
+          str(hivis_fraction(_frame40, [520, 358, 576, 524]) if _ok else None))
 check("(known limit) a bright yellow shirt DOES pass: it makes the vest reading 'cannot tell', never 'no vest'", hivis_fraction(painted((0, 230, 255)), PB) > 0.9)
 
 HELMET_ON = {"cls": "helmet", "conf": 0.9, "bbox": [430.0, 95.0, 490.0, 150.0]}
@@ -416,6 +424,8 @@ else:
     app.dependency_overrides[video_upload.require_analysis_run] = lambda: PROBE
     client = TestClient(app)
 
+    FACTORY_WORKER = {}
+
     def people_frames(path, safety):
         if safety:
             os.environ["SAFETY_ENABLED"] = "true"
@@ -430,6 +440,8 @@ else:
                     n += len(m["tracked_entities"])
                     for e in m["tracked_entities"]:
                         b = e["bbox"]
+                        if safety and path == FACTORY and 250 <= (b[0] + b[2]) / 2 <= 300 and 240 <= b[3] <= 280 and "ppe" in e:
+                            FACTORY_WORKER.setdefault("states", []).append((m["frame_index"], e["ppe"]["vest_state"]))
                         zone_ok += 0 <= b[0] < b[2] <= 645 and 0 <= b[1] < b[3] <= 365      # still in the 640x360 working frame
                 elif m.get("type") in ("COMPLETE", "ERROR") or "error" in m:
                     break
@@ -443,6 +455,10 @@ else:
             name = os.path.basename(path)[:24]
             check(f"{name}: the safety path finds far more people than the legacy one ({old} -> {new} person-frames)", new >= max(old * 2, old + 20), f"{old} -> {new}")
             check(f"{name}: boxes are still in the 640-wide working frame's pixels", in_frame == new, f"{in_frame}/{new}")
+        if FACTORY in clips and FACTORY_WORKER.get("states"):
+            later = [v for i, v in FACTORY_WORKER["states"] if i >= 30]
+            check("factory clip: the worker in the orange vest at the table is never called 'no vest' once judged (regression: a stricter colour mask lost this exact worker)",
+                  later and all(v != "ABSENT" for v in later), str(sorted(set(later))))
     finally:
         os.environ.pop("SAFETY_ENABLED", None)
 

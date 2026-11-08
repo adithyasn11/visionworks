@@ -15,11 +15,13 @@ module measures that. It can only ever lower a verdict from "absent" to "cannot
 tell"; it never says a vest is present.
 
 Measured on the Construction-PPE labels (images shrunk to 1280 wide, people at least
-90 px tall, labelled person boxes): a torso fraction >= 0.10 holds for about 79 % of
-the 1,433 people labelled as wearing a vest (66 % of the 409 under 200 px tall)
-and about 0.5 % of the 400 labelled as missing one. That dataset's "no vest" people
-are mostly plainly dressed, so it says little about bystanders in bright orange or
-yellow, who WILL trigger this: the cost is an abstention, not an accusation.
+90 px tall, labelled person boxes): a torso fraction >= 0.10 holds for about 83 % of
+the 1,433 people labelled as wearing a vest (72 % of the 409 under 200 px tall)
+and about 1.2 % of the 400 labelled as missing one. On the factory CCTV clip in
+sample_videos the orange-vest worker at the table scores 0.27. That dataset's "no
+vest" people are mostly plainly dressed, so it says little about bystanders in
+bright orange or yellow, who WILL trigger this: the cost is an abstention, never an
+accusation. Olive, tan, brown, khaki and skin tones score 0.
 
 Pure numpy/OpenCV, no model.
 """
@@ -42,7 +44,12 @@ TORSO_Y = (0.15, 0.60)
 # lime polo shirt still pass: for those the verdict becomes "cannot tell", never "no
 # vest", which is the safe direction.
 YELLOW_GREEN = dict(h=(22, 45), s_min=110, v_min=150)
-ORANGE = dict(h=(4, 21), s_min=190, v_min=160)
+# Safety orange is red-orange (OpenCV hue about 5-12; a real vest filmed from above on a
+# factory floor measured 4-9). Brown, tan and skin sit at hue 14-17, so the hue band
+# stops at 13, which is what keeps them out WITHOUT demanding the near-white brightness
+# that compressed, shaded CCTV footage never has (a first attempt that did so lost
+# exactly that vest: its torso scored 0.03 against the 0.10 floor).
+ORANGE = dict(h=(3, 13), s_min=150, v_min=120)
 
 
 def hivis_fraction(frame, bbox: Sequence[float]) -> Optional[float]:

@@ -17,13 +17,13 @@
     "vest": {
       "labelled_present": 563,
       "labelled_absent": 152,
-      "wrongly_read_absent_of_present": 220,
-      "absent_caught": 144,
+      "wrongly_read_absent_of_present": 215,
+      "absent_caught": 142,
       "absent_missed_as_present": 6,
       "clear_present": 307,
-      "clear_wrongly_read_absent": 31,
+      "clear_wrongly_read_absent": 26,
       "clear_absent": 42,
-      "clear_absent_caught": 36
+      "clear_absent_caught": 34
     }
   }
 }

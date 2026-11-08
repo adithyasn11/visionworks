@@ -30,17 +30,17 @@ Reading: PRESENT = best matching detection >= 0.45; ABSENT = nothing >= 0.20 mat
 
 | condition | people | ground truth | read PRESENT | AMBIGUOUS | read ABSENT |
 |---|---:|---|---:|---:|---:|
-| all people | 563 | PRESENT | 297 (52.8%) | 46 (8.2%) | 220 (39.1%) |
-| all people | 152 | ABSENT | 6 (3.9%) | 2 (1.3%) | 144 (94.7%) |
-| clear frames only | 307 | PRESENT | 253 (82.4%) | 23 (7.5%) | 31 (10.1%) |
-| clear frames only | 42 | ABSENT | 6 (14.3%) | 0 (0.0%) | 36 (85.7%) |
-| height 90-200 px | 268 | PRESENT | 220 (82.1%) | 19 (7.1%) | 29 (10.8%) |
+| all people | 563 | PRESENT | 297 (52.8%) | 51 (9.1%) | 215 (38.2%) |
+| all people | 152 | ABSENT | 6 (3.9%) | 4 (2.6%) | 142 (93.4%) |
+| clear frames only | 307 | PRESENT | 253 (82.4%) | 28 (9.1%) | 26 (8.5%) |
+| clear frames only | 42 | ABSENT | 6 (14.3%) | 2 (4.8%) | 34 (81.0%) |
+| height 90-200 px | 268 | PRESENT | 220 (82.1%) | 24 (9.0%) | 24 (9.0%) |
 | height 90-200 px | 37 | ABSENT | 4 (10.8%) | 0 (0.0%) | 33 (89.2%) |
 | height <90 px | 249 | PRESENT | 39 (15.7%) | 23 (9.2%) | 187 (75.1%) |
 | height <90 px | 108 | ABSENT | 0 (0.0%) | 2 (1.9%) | 106 (98.1%) |
 | height >=200 px | 46 | PRESENT | 38 (82.6%) | 4 (8.7%) | 4 (8.7%) |
-| height >=200 px | 7 | ABSENT | 2 (28.6%) | 0 (0.0%) | 5 (71.4%) |
+| height >=200 px | 7 | ABSENT | 2 (28.6%) | 2 (28.6%) | 3 (42.9%) |
 
-- **False accusation, one frame** (labelled worn but read ABSENT): all 39.1%, clear frames only 10.1%.
-- **Violation caught, one frame** (labelled missing and read ABSENT): all 94.7%, clear frames only 85.7%.
+- **False accusation, one frame** (labelled worn but read ABSENT): all 38.2%, clear frames only 8.5%.
+- **Violation caught, one frame** (labelled missing and read ABSENT): all 93.4%, clear frames only 81.0%.
 - **Violation missed as present:** all 3.9%.
