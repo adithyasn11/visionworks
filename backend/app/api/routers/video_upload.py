@@ -1,14 +1,14 @@
 # backend/app/api/routers/video_upload.py
 """
 Video Upload, Playback & Ultra-Fast Live Webcam AI Processing Router.
-Optimized for 60+ FPS Real-Time CUDA GPU Performance on NVIDIA RTX 4060.
+Runs the detection pipeline on the GPU when one is available, otherwise the CPU.
 Handles:
   - POST /upload  -> Save video file & trigger AI processing over WebSocket
   - GET  /samples -> List saved sample videos
   - GET  /status  -> Current processing status
   - WS   /process/{session_id} -> Single-Pass Real-Time AI video stream with playback controls
-  - WS   /live_webcam -> Real-time live webcam capture processed through RTX 4060 GPU
-  - WS   /process_webcam_frame -> Real-time browser camera stream processed through RTX 4060 GPU
+  - WS   /live_webcam -> Real-time live webcam capture
+  - WS   /process_webcam_frame -> Real-time browser camera stream
 """
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect, Depends, Header
@@ -30,6 +30,8 @@ from app.cv.anonymizer import privacy_blur_default
 from app.cv.frame_pipeline import process_detections
 from app.db.activity_writer import ActivityLogWriter, persist_frame
 from app.db.minute_aggregator import aggregate_after_session
+from app.safety.clock import parse_recorded_at
+from app.safety.engine import engine_for_session
 from app.api.deps import extract_token, resolve_org_role
 from app.api.permissions import can, denial_message
 
@@ -166,9 +168,9 @@ def resolve_initial_blur(websocket) -> bool:
 
     Precedence: an explicit `?blur=` query param, else `PRIVACY_BLUR_DEFAULT`
     from the environment. The query param is what lets one camera differ from
-    the deployment default without a restart — a door camera opens its socket
-    with `?blur=false` and keeps a usable face signal while every other camera
-    still honours the deployment setting.
+    the deployment default without a restart — one camera can open its socket
+    with `?blur=false` while every other camera still honours the deployment
+    setting.
 
     An unparseable value is ignored rather than guessed at, so a typo falls
     back to the configured default instead of silently choosing a privacy
@@ -415,6 +417,7 @@ def get_processing_status(org_id: str = Depends(require_analysis_run)):
 async def upload_video_file(
     file: UploadFile = File(...),
     camera_id: Optional[str] = Form(default=None),
+    recorded_at: Optional[str] = Form(default=None),
     org_id: str = Depends(require_analysis_run),
 ):
     """
@@ -425,7 +428,20 @@ async def upload_video_file(
     registered in the caller's own organisation — see
     resolve_registered_camera(). Omitting it keeps the previous behaviour of an
     ad-hoc per-session camera, whose telemetry will not sync to the dashboard.
+
+    `recorded_at` is optional: when the footage was recorded, as an ISO-8601
+    date and time ("2026-11-08T09:30:00+05:30"; a value with no timezone is
+    read as UTC). The safety layer stamps its events with it, so processing
+    yesterday's recording today still reports yesterday. Omitted, events are
+    stamped from the moment of upload, with every offset inside the clip intact.
     """
+    # Validated BEFORE anything is written to disk, so a bad value costs the
+    # caller a 422, not a stored file nobody will process.
+    try:
+        recorded_at_utc = parse_recorded_at(recorded_at)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
     allowed_exts = ('.mp4', '.avi', '.webm', '.mov', '.mkv')
     if not file.filename or not file.filename.lower().endswith(allowed_exts):
         raise HTTPException(status_code=400, detail=f"Invalid format. Supported: {allowed_exts}")
@@ -465,7 +481,10 @@ async def upload_video_file(
         "path": save_path,
         "status": "READY",
         "cancel": False,
-        "created_at": time.time()
+        "created_at": time.time(),
+        # ISO string (UTC) or None; the process socket builds the safety clock
+        # from it.
+        "recorded_at": recorded_at_utc.isoformat() if recorded_at_utc else None,
     }
 
     # Reclaim uploads that were never processed (client never opened the
@@ -484,7 +503,7 @@ async def upload_video_file(
 @router.websocket("/process/{session_id}")
 async def process_video_websocket(websocket: WebSocket, session_id: str):
     """
-    WebSocket endpoint using Single-Pass YOLOv8 Pose AI Engine on NVIDIA RTX 4060 GPU.
+    WebSocket endpoint using the single-pass YOLOv8 pose engine.
     Runs at 60+ FPS real-time speed with Play, Pause, Seek playback controls.
     """
     await websocket.accept()
@@ -583,13 +602,29 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         session["status"] = "ERROR"
         return
 
-    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if not fps or fps != fps or fps <= 0:      # 0, NaN or negative: container did not say
+        fps = 25.0
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration_sec = total_frames / max(fps, 1.0)
 
+    # The safety layer's clock for this video: time is where a frame sits in the
+    # file, so results do not depend on how fast this machine processes it. None
+    # when SAFETY_ENABLED is off, which leaves the pipeline and the payload
+    # exactly as they were.
+    try:
+        safety_engine = engine_for_session(
+            fps=fps, recorded_at=session.get("recorded_at"), live=False)
+    except Exception as e:
+        logger.error(f"Safety clock init error: {e}")
+        await websocket.send_json({"error": f"Failed to start the safety clock: {e}"})
+        await websocket.close()
+        session["status"] = "ERROR"
+        return
+
     await websocket.send_json({
         "type": "INIT",
-        "message": f"Single-pass AI engine active on RTX 4060 GPU ({device.upper()}). 60 FPS mode.",
+        "message": f"Detection engine active on {device.upper()}.",
         "total_frames": total_frames,
         "source_fps": fps,
         "duration_seconds": duration_sec,
@@ -636,6 +671,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
 
     frame_idx = 0
     processed_count = 0
+    just_sought = False
 
     try:
         while True:
@@ -647,6 +683,14 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                 control_state["seek_frame"] = None
                 cap.set(cv2.CAP_PROP_POS_FRAMES, target_f)
                 frame_idx = target_f
+                # The timeline just jumped, forwards or backwards. Anything the
+                # safety layer is holding open (a zone visit, an evidence
+                # window) spans footage that no longer connects, so close it
+                # and start clean; rewound frames are flagged as replays so
+                # nothing is raised twice.
+                if safety_engine is not None:
+                    safety_engine.reset("SEEK", frame_index=target_f)
+                just_sought = True
 
             if control_state["paused"]:
                 await asyncio.sleep(0.1)
@@ -658,11 +702,29 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
 
             frame_idx += 1
 
-            # Scale to 640px width for 60 FPS real-time throughput
-            # Per-camera width (Step 10). 640 everywhere for throughput, but a
-            # DOOR camera keeps 1280: downscaling is precisely what destroys
-            # the face signal that camera exists to capture, so the one camera
-            # that could recognise somebody would be the one least able to.
+            # Some containers (mp4, webm, mkv) seek to the nearest keyframe, not
+            # the exact frame asked for, and the clock would then be wrong by up
+            # to a GOP. Check once after each seek, and trust the decoder's own
+            # position over our arithmetic if they disagree. (AVI is exact.)
+            if just_sought:
+                just_sought = False
+                decoder_next = int(cap.get(cv2.CAP_PROP_POS_FRAMES) or 0)
+                if decoder_next > 0 and abs((decoder_next - 1) - (frame_idx - 1)) > 1:
+                    logger.warning(
+                        f"Session {session_id}: seek landed on frame {decoder_next - 1}, "
+                        f"not {frame_idx - 1}; using the decoder's position.")
+                    frame_idx = decoder_next
+
+            # `frame_idx` counts frames read, so the frame just decoded is
+            # number frame_idx - 1 (0-based). After a seek that is exactly
+            # target_f, the frame the seek asked for. (The payload's
+            # `frame_index` stays 1-based, as it always was; the safety clock's
+            # `video_time_s` is the 0-based position, so the first frame is t=0.)
+            frame_time = (safety_engine.begin_frame(frame_idx - 1)
+                          if safety_engine is not None else None)
+
+            # Resized to the camera's inference width (640 unless registered
+            # otherwise) before the pose model sees it.
             h, w = frame.shape[:2]
             if w > inference_width:
                 scale = inference_width / float(w)
@@ -709,6 +771,11 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                 "is_paused": control_state["paused"],
                 "privacy_blur": privacy_state["blur"]
             }
+
+            # Steps 4+ read this; the dashboard may show it. Absent when safety
+            # is off, so the payload is unchanged.
+            if frame_time is not None:
+                payload["safety"] = frame_time.as_payload()
 
             await websocket.send_json(payload)
             await asyncio.sleep(0.001)
@@ -760,7 +827,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
 @router.websocket("/live_webcam")
 async def live_webcam_websocket(websocket: WebSocket):
     """
-    Ultra-Fast Real-Time Live Webcam AI Endpoint on NVIDIA RTX 4060 GPU.
+    Real-time live webcam endpoint.
     Runs single-pass detection, tracking, and pose keypoint estimation at 60 FPS.
     """
     await websocket.accept()
@@ -825,7 +892,7 @@ async def live_webcam_websocket(websocket: WebSocket):
 
     await websocket.send_json({
         "type": "INIT",
-        "message": f"Single-pass 60 FPS Live Webcam active on RTX 4060 GPU ({device.upper()}).",
+        "message": f"Live webcam detection active on {device.upper()}.",
         "device": device,
         "is_live_cam": True
     })
@@ -850,6 +917,8 @@ async def live_webcam_websocket(websocket: WebSocket):
     listen_task = asyncio.create_task(listen_control())
     start_time = time.time()
     frame_idx = 0
+    # Live source: the safety clock is seconds since now, monotonic.
+    safety_engine = engine_for_session(live=True)
 
     try:
         while not control_state["stop"]:
@@ -859,11 +928,10 @@ async def live_webcam_websocket(websocket: WebSocket):
                 continue
 
             frame_idx += 1
+            frame_time = safety_engine.begin_frame() if safety_engine is not None else None
 
-            # Per-camera width (Step 10). 640 everywhere for throughput, but a
-            # DOOR camera keeps 1280: downscaling is precisely what destroys
-            # the face signal that camera exists to capture, so the one camera
-            # that could recognise somebody would be the one least able to.
+            # Resized to the camera's inference width (640 unless registered
+            # otherwise) before the pose model sees it.
             h, w = frame.shape[:2]
             if w > inference_width:
                 scale = inference_width / float(w)
@@ -903,6 +971,11 @@ async def live_webcam_websocket(websocket: WebSocket):
                 "privacy_blur": privacy_state["blur"]
             }
 
+            # Steps 4+ read this; the dashboard may show it. Absent when safety
+            # is off, so the payload is unchanged.
+            if frame_time is not None:
+                payload["safety"] = frame_time.as_payload()
+
             await websocket.send_json(payload)
             await asyncio.sleep(0.001)
 
@@ -919,7 +992,7 @@ async def live_webcam_websocket(websocket: WebSocket):
 async def process_webcam_frame_websocket(websocket: WebSocket):
     """
     Single-Pass Real-Time Browser Camera Stream Endpoint.
-    Runs on NVIDIA RTX 4060 CUDA GPU at 60 FPS.
+    Same pipeline as /live_webcam, fed by frames from the browser.
     """
     await websocket.accept()
     org_id, role = await _resolve_session_org(websocket)
@@ -972,7 +1045,7 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
 
     await websocket.send_json({
         "type": "INIT",
-        "message": f"Single-pass 60 FPS Browser Stream active on RTX 4060 GPU ({device.upper()}).",
+        "message": f"Browser camera detection active on {device.upper()}.",
         "device": device,
         "is_live_cam": True
     })
@@ -980,6 +1053,8 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
     frame_idx = 0
     start_time = time.time()
     privacy_state = {"blur": resolve_initial_blur(websocket)}
+    # Live source: the safety clock is seconds since now, monotonic.
+    safety_engine = engine_for_session(live=True)
 
     try:
         while True:
@@ -1007,11 +1082,10 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
                 continue
 
             frame_idx += 1
+            frame_time = safety_engine.begin_frame() if safety_engine is not None else None
 
-            # Per-camera width (Step 10). 640 everywhere for throughput, but a
-            # DOOR camera keeps 1280: downscaling is precisely what destroys
-            # the face signal that camera exists to capture, so the one camera
-            # that could recognise somebody would be the one least able to.
+            # Resized to the camera's inference width (640 unless registered
+            # otherwise) before the pose model sees it.
             h, w = frame.shape[:2]
             if w > inference_width:
                 scale = inference_width / float(w)
@@ -1050,6 +1124,11 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
                 "is_live_cam": True,
                 "privacy_blur": privacy_state["blur"]
             }
+
+            # Steps 4+ read this; the dashboard may show it. Absent when safety
+            # is off, so the payload is unchanged.
+            if frame_time is not None:
+                payload["safety"] = frame_time.as_payload()
 
             await websocket.send_json(payload)
 

@@ -34,6 +34,13 @@ function formatTime(seconds) {
    as the STANDING segment of the posture bar. These are the DARK-mode steps:
    the overlay is always drawn on video, never on the page ground. */
 
+/** "Now" as a datetime-local value in the viewer's own zone: the picker's upper bound. */
+function localNowValue() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
 /**
  * `readOnly` hides the controls that START an analysis — upload and camera.
  * Running the pipeline WRITES telemetry, so it is a configuration act
@@ -64,6 +71,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
 
   const [phase, setPhase] = useState('idle'); // idle | uploading | processing | webcam | done | error
   const [fileName, setFileName] = useState('');
+  // When the footage was recorded, as the browser's datetime-local value
+  // ("2026-11-08T09:30"). Optional: sent with the upload so safety events are
+  // stamped on the timeline where they really happened. Empty means "now".
+  const [recordedAt, setRecordedAt] = useState('');
   const [sessionId, setSessionId] = useState('');
   const [progress, setProgress] = useState(0);
   const [currentTimeSec, setCurrentTimeSec] = useState(0);
@@ -153,7 +164,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     if (connectionEpochRef.current !== epoch) { ws.close(); return; }
     wsRef.current = ws;
 
-    ws.onopen  = () => setStatusMsg('Connected — AI pipeline running on RTX 4060 GPU...');
+    ws.onopen  = () => setStatusMsg('Connected — detection running...');
     ws.onclose = () => { setPhase(p => p === 'processing' ? 'done' : p); };
     ws.onerror = () => { setPhase('error'); setStatusMsg('WebSocket error — is the backend running?'); };
 
@@ -253,6 +264,12 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       const formData = new FormData();
       formData.append('file', file);
       formData.append('camera_id', cameraId);
+      if (recordedAt) {
+        // The picker gives LOCAL time with no zone. Converting here pins it to
+        // the viewer's own zone and sends an unambiguous UTC instant.
+        const when = new Date(recordedAt);
+        if (!Number.isNaN(when.getTime())) formData.append('recorded_at', when.toISOString());
+      }
 
       const res = await backendFetch('/api/v1/video/upload', {
         method: 'POST',
@@ -267,8 +284,11 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       const data = await res.json();
       const sid = data.session_id;
       setSessionId(sid);
+      // One recording time belongs to one file. Clearing it means the next
+      // upload cannot silently inherit this one's.
+      setRecordedAt('');
       setPhase('processing');
-      setStatusMsg('Upload complete — initialising YOLOv8m (Medium) AI model on RTX 4060 GPU...');
+      setStatusMsg('Upload complete — starting the detection model...');
 
       connectProcessingWS(sid);
 
@@ -276,7 +296,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       setPhase('error');
       setStatusMsg(`Upload error: ${err.message}`);
     }
-  }, [connectProcessingWS, cameraId]);
+  }, [connectProcessingWS, cameraId, recordedAt]);
 
   // Start Live Webcam Stream
   const startLiveWebcam = useCallback(async () => {
@@ -288,7 +308,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     const epoch = connectionEpochRef.current;
     setPhase('webcam');
     setIsWebcamActive(true);
-    setStatusMsg('Requesting camera permission & initializing RTX 4060 GPU...');
+    setStatusMsg('Requesting camera permission...');
 
     try {
       // 1. First try browser camera capture via getUserMedia
@@ -339,7 +359,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       };
 
       ws.onopen = () => {
-        setStatusMsg('Live Camera Active — Real-Time RTX 4060 GPU AI Stream (0ms Lag)');
+        setStatusMsg('Live camera active — detection running');
         isAwaitingResponse = false;
         sendNextFrame();
       };
@@ -409,7 +429,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     wsRef.current = ws;
 
     ws.onopen = () => {
-      setStatusMsg('Live Backend Camera Active — RTX 4060 GPU AI Stream');
+      setStatusMsg('Server camera active — detection running');
     };
 
     ws.onmessage = (evt) => {
@@ -554,7 +574,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           <span>Live Camera Feed — Detection View</span>
           <span className="ml-2 px-2 py-0.5 rounded bg-accent/10 border border-line text-[10px] text-accent font-mono font-bold flex items-center gap-1">
             <Cpu className="w-3 h-3" />
-            <span>NVIDIA RTX 4060 (CUDA) • YOLOv8m Medium</span>
+            <span>YOLOv8m pose</span>
           </span>
         </div>
 
@@ -598,6 +618,22 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           >
             <RefreshCw className="w-4 h-4" />
           </button>
+          {!readOnly && (
+          <label
+            className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint"
+            title="When this footage was recorded. Safety events are stamped with it. Leave empty to use the upload time."
+          >
+            <span>Recorded</span>
+            <input
+              type="datetime-local"
+              value={recordedAt}
+              max={localNowValue()}
+              onChange={(e) => setRecordedAt(e.target.value)}
+              disabled={phase === 'uploading' || isWebcamActive}
+              className="rounded-lg bg-ground border border-field hover:border-field-hover px-2 py-1 text-[11px] normal-case tracking-normal font-sans text-ink [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-[color:var(--accent)] disabled:opacity-40 transition-colors"
+            />
+          </label>
+          )}
           {!readOnly && (
           <button
             onClick={() => fileInputRef.current?.click()}
