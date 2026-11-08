@@ -2,7 +2,7 @@
 
 // frontend/app/components/ReportExport.jsx
 //
-// Download the recorded telemetry as a CSV extract or an executive PDF.
+// Download the recorded telemetry as a CSV extract or a PDF summary.
 //
 // Both files are generated server-side from `activity_logs` (see
 // backend/app/utils/report_generator.py) and streamed back as attachments, so
@@ -71,7 +71,7 @@ export const ReportExport = ({ hours = DEFAULT_WINDOW_HOURS, rangeLabel }) => {
     //        API would reject 720 with a validation error the user cannot act
     //        on.
     //   PDF  takes NO window parameter at all. It calls get_analytics_summary()
-    //        over the whole history, deliberately, so the executive summary
+    //        over the whole history, deliberately, so the summary
     //        cannot drift from the dashboard's own totals.
     //
     // The UI states both of these plainly. Sending `hours` to the PDF endpoint
@@ -138,7 +138,7 @@ export const ReportExport = ({ hours = DEFAULT_WINDOW_HOURS, rangeLabel }) => {
           </dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
-          <dt className="text-[11.5px] font-bold text-ink">Executive PDF</dt>
+          <dt className="text-[11.5px] font-bold text-ink">PDF summary</dt>
           <dd className="text-[11px] text-ink-muted font-mono text-right">
             all recorded history
           </dd>
@@ -176,7 +176,7 @@ export const ReportExport = ({ hours = DEFAULT_WINDOW_HOURS, rangeLabel }) => {
           {busy === 'pdf'
             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
             : <FileText className="w-3.5 h-3.5" />}
-          Executive PDF
+          PDF summary
         </button>
       </div>
 

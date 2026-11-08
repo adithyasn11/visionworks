@@ -97,7 +97,7 @@ function ChartState({ kind, height, message }) {
 }
 
 const EMPTY_HINT =
-  'No detections yet. Upload a video or start the live camera above — people and the zones they are in appear here as they are detected.';
+  'No detections yet. Open Live feed and process a video or start the camera — people and the zones they are in appear here as they are detected.';
 
 /* ── data hook ────────────────────────────────────────────────────────────── */
 
