@@ -74,3 +74,15 @@ export function zoneTypeMeta(value) {
 }
 
 export const zoneTypeColor = (value) => zoneTypeMeta(value).color;
+
+/**
+ * The text drawn on a zone's polygon: its short type badge, then its name, e.g.
+ * "RESTR · Press line". Shared by the editor canvas and the live overlay so the
+ * two can never label the same zone differently. A legacy or missing type reads
+ * as GEN, and a zone with no name falls back to its id, then to `fallback`.
+ */
+export function zoneCanvasLabel(zone, fallback = '') {
+  const name = (zone && (zone.zone_name || zone.zone_id)) || fallback;
+  const badge = zoneTypeMeta(zone && zone.zone_type).badge;
+  return name ? `${badge} · ${name}` : badge;
+}

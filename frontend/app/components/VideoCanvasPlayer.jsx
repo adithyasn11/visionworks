@@ -615,9 +615,8 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           
           A laptop webcam points at your face from 40cm; a CCTV camera looks
           down at a room from a corner. A phone propped on a shelf is the only
-          way to produce the second view without buying hardware, and the seat
-          binding, the chair-exit debounce and the handoff logic were all
-          designed for that geometry. */}
+          way to produce the second view without buying hardware, and a worker
+          seen from a corner is exactly what the zone rules are written for. */}
       {!readOnly && (
         <PhoneCameraPanel
           cameraId={cameraId}

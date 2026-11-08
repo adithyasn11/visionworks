@@ -49,6 +49,7 @@ def raises_422(fn):
 
 # The router mirrors zones to Postgres on every write. That is a network call
 # and has nothing to do with what is tested here.
+ORIGINAL_MIRROR = zones_router._mirror_zone_to_postgres
 zones_router._mirror_zone_to_postgres = lambda *a, **k: None
 
 # ── 1. The type lists ────────────────────────────────────────────────────────
@@ -162,6 +163,119 @@ finally:
     db.execute(text("DELETE FROM zones WHERE camera_id = :c"), {"c": CAM})
     db.commit()
     db.close()
+
+# ── 6. The pipeline loads the type, in all three sockets ─────────────────────
+print("6. Type reaches the SpatialEngine in every socket")
+import re                                                    # noqa: E402
+from app.api.routers import video_upload                     # noqa: E402
+from app.api.routers.video_upload import load_zones_for_camera  # noqa: E402
+
+source = open(video_upload.__file__, encoding="utf-8").read()
+loads = re.findall(r"load_zones_for_camera\(effective_camera_id, org_id=org_id\)\n"
+                   r"\s*spatial_engine = SpatialEngine\(zones_config=zones_config\)", source)
+check("all three sockets (upload, live webcam, phone) load zones and build the engine the same way",
+      len(loads) == 3, f"{len(loads)} of 3")
+check("...and nothing else builds a SpatialEngine in the router",
+      source.count("SpatialEngine(") == 3, str(source.count("SpatialEngine(")))
+
+CAM2, OTHER_ORG = "probe_zone_types_load_cam", "00000000-0000-0000-0000-00000000aaab"
+db = SessionLocal()
+try:
+    db.execute(text("DELETE FROM zones WHERE camera_id = :c"), {"c": CAM2})
+    for zid, kind, org in [("zl_r", "RESTRICTED", ORG), ("zl_p", "PPE_CHECKPOINT", ORG),
+                           ("zl_e", "EXIT", ORG), ("zl_a", "APPROACH", ORG),
+                           ("zl_g", "GENERAL", ORG), ("zl_w", "WORKSTATION", ORG),
+                           ("zl_n", None, ORG), ("zl_other", "RESTRICTED", OTHER_ORG)]:
+        db.add(ZoneModel(zone_id=zid, camera_id=CAM2, org_id=org, zone_name=zid,
+                         zone_type=kind, polygon_coordinates=SQUARE))
+    db.commit()
+
+    loaded = load_zones_for_camera(CAM2, org_id=ORG)
+    engine = SpatialEngine(zones_config=loaded)
+    for zid, expected in [("zl_r", "RESTRICTED"), ("zl_p", "PPE_CHECKPOINT"), ("zl_e", "EXIT"),
+                          ("zl_a", "APPROACH"), ("zl_g", "GENERAL"),
+                          ("zl_w", "WORKSTATION"), ("zl_n", "GENERAL")]:
+        check(f"{zid}: engine.zone_type_of = {expected}", engine.zone_type_of(zid) == expected,
+              str(engine.zone_type_of(zid)))
+    check("another organisation's zone is not loaded", engine.zone_type_of("zl_other") is None)
+
+    fallback = SpatialEngine(zones_config=load_zones_for_camera("probe_no_such_camera", org_id=ORG))
+    check("no zones drawn -> DEFAULT_ZONES, typed GENERAL in the engine",
+          [fallback.zone_type_of(z["zone_id"]) for z in DEFAULT_ZONES] == ["GENERAL", "GENERAL"])
+finally:
+    db.execute(text("DELETE FROM zones WHERE camera_id = :c"), {"c": CAM2})
+    db.commit()
+    db.close()
+
+# ── 7. The Postgres mirror never sends a type (Step 7 adds it) ───────────────
+print("7. Postgres mirror")
+import json                                                  # noqa: E402
+import urllib.request                                        # noqa: E402
+
+
+class _Resp:
+    def __init__(self, payload):
+        self._p, self.status = payload, 200
+
+    def read(self):
+        return json.dumps(self._p).encode()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def run_mirror(zones_rows, zone_name):
+    """Call the REAL mirror with a fake PostgREST; return the write requests."""
+    writes = []
+
+    def fake_urlopen(request, timeout=0):
+        url = request.full_url
+        if request.get_method() in ("POST", "PATCH"):
+            writes.append((request.get_method(), json.loads(request.data.decode())))
+            return _Resp([])
+        if "/cameras?" in url:
+            return _Resp([{"id": "cam-uuid"}])
+        return _Resp(zones_rows)
+
+    saved = (urllib.request.urlopen, os.environ.get("SUPABASE_SERVICE_ROLE_KEY"),
+             os.environ.get("SUPABASE_URL"))
+    urllib.request.urlopen = fake_urlopen
+    os.environ["SUPABASE_SERVICE_ROLE_KEY"] = "test-key"
+    os.environ["SUPABASE_URL"] = "http://postgrest.invalid"
+    try:
+        ORIGINAL_MIRROR(ORG, "cam", "zone_x", SQUARE, zone_name)
+    finally:
+        urllib.request.urlopen = saved[0]
+        for key, val in (("SUPABASE_SERVICE_ROLE_KEY", saved[1]), ("SUPABASE_URL", saved[2])):
+            if val is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = val
+    return writes
+
+
+def keys_of(writes):
+    out = set()
+    for _method, payload in writes:
+        for row in (payload if isinstance(payload, list) else [payload]):
+            out |= set(row)
+    return out
+
+
+created = run_mirror([], "Press line")
+check("a new zone is mirrored with a POST", [m for m, _ in created] == ["POST"], str(created)[:80])
+check("...and the payload carries no type field",
+      not ({"zone_type", "zoneType", "safetyType", "type"} & keys_of(created)), str(sorted(keys_of(created))))
+renamed = run_mirror([{"id": "z1", "name": "old name"}], "Press line")
+check("a renamed zone is mirrored with a PATCH", [m for m, _ in renamed] == ["PATCH"], str(renamed)[:80])
+check("...with no type field either",
+      not ({"zone_type", "zoneType", "safetyType", "type"} & keys_of(renamed)), str(sorted(keys_of(renamed))))
+same_name = run_mirror([{"id": "z1", "name": "Press line"}], "Press line")
+check("a type-only change (same name) sends nothing to Postgres today (Step 7 gap, known)",
+      same_name == [], str(same_name))
 
 print()
 if FAILS:

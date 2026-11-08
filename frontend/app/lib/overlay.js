@@ -19,7 +19,7 @@ const POSTURE_COLORS = {
   UNKNOWN:  '#8B8792',
 };
 
-import { zoneTypeColor } from './zoneTypes';
+import { zoneTypeColor, zoneCanvasLabel } from './zoneTypes';
 
 /* A zone's colour comes from its type, from the same module the ZoneEditor
    uses: a zone must be the same colour where it is drawn and where it is
@@ -34,7 +34,7 @@ const ZONE_FRAME_W = 640;
  * `zones` was accepted by drawHUD and never used: the overlay drew people and
  * nothing else, so a zone you had just spent time drawing was invisible
  * exactly where it mattered — over the footage it applies to. Without it there
- * is no way to see that a desk polygon is in the wrong place until the desk
+ * is no way to see that a restricted-area polygon is in the wrong place until the
  * time comes out wrong days later.
  *
  * SCALED, NOT DRAWN RAW
@@ -67,17 +67,22 @@ function drawZones(ctx, canvas, zones) {
 
     ctx.fillStyle = `${color}1A`;
     ctx.fill();
+    // Dark under-stroke first (solid), then the coloured dashes on top, so the
+    // pale types stay visible over bright footage.
+    ctx.strokeStyle = 'rgba(11,10,12,0.55)';
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([6, 4]);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // The name, at the polygon's centroid rather than its first point: a
-    // label pinned to a corner drifts off the shape on an L-shaped zone.
+    // The type badge and name, at the polygon's centroid rather than its first
+    // point: a label pinned to a corner drifts off the shape on an L-shaped zone.
     const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length * scale;
     const cy = pts.reduce((a, p) => a + p[1], 0) / pts.length * scale;
-    const label = zone.zone_name || zone.zone_id || `Zone ${index + 1}`;
+    const label = zoneCanvasLabel(zone, `Zone ${index + 1}`);
 
     ctx.font = '600 11px Inter, sans-serif';
     const tw = ctx.measureText(label).width;

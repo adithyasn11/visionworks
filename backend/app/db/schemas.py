@@ -1,5 +1,5 @@
 # backend/app/db/schemas.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 from datetime import datetime
 
@@ -42,6 +42,15 @@ class ZoneCreate(ZoneBase):
     pass
 
 class ZoneResponse(ZoneBase):
+    # A row with no stored type (older data) is a General zone, and is reported
+    # as one, so no client ever has to handle a null type.
+    @field_validator("zone_type", mode="before")
+    @classmethod
+    def _missing_type_is_general(cls, value):
+        if value is None or not str(value).strip():
+            return "GENERAL"
+        return value
+
     class Config:
         from_attributes = True
 

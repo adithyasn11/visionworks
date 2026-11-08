@@ -22,7 +22,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { backendFetch } from '../lib/backend';
 import { subscribeToFrames, getLatestFrame } from '../lib/liveFrame';
-import { ZONE_TYPES, zoneTypeMeta, zoneTypeColor } from '../lib/zoneTypes';
+import { ZONE_TYPES, zoneTypeMeta, zoneTypeColor, zoneCanvasLabel } from '../lib/zoneTypes';
 import {
   Shapes, Plus, Trash2, Check, X, Undo2, Loader2, AlertCircle, MousePointerClick, Eye,
   RefreshCw, Pencil,
@@ -55,15 +55,20 @@ function paint(canvas, zones, draft, hoverPoint) {
 
     ctx.fillStyle = `${color}22`;
     ctx.fill();
+    // A dark under-stroke first, so the pale types (white, pink) still read
+    // over a bright wall and the red ones over a dark corner.
+    ctx.strokeStyle = 'rgba(11,10,12,0.55)';
+    ctx.lineWidth = 4;
+    ctx.stroke();
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
     ctx.stroke();
 
     // Label at the polygon's centroid, on a plate so it stays readable over
-    // whatever the frame happens to show.
+    // whatever the frame happens to show. Type badge first, then the name.
     const cx = pts.reduce((sum, p) => sum + p[0], 0) / pts.length;
     const cy = pts.reduce((sum, p) => sum + p[1], 0) / pts.length;
-    const label = zone.zone_name || zone.zone_id;
+    const label = zoneCanvasLabel(zone, `Zone ${index + 1}`);
     ctx.font = '600 12px Inter, sans-serif';
     const width = ctx.measureText(label).width;
     ctx.fillStyle = 'rgba(11,10,12,0.82)';
@@ -584,8 +589,8 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
               <MousePointerClick className="w-6 h-6 text-accent mx-auto mb-1.5" strokeWidth={1.8} />
               <p className="text-[12px] text-ink-muted leading-relaxed">
                 <span className="text-ink font-bold">Click “Draw zone”</span>, then
-                click each corner of the area. Click the first point again, or press
-                Finish, to close the shape.
+                click each corner of the area, then press Save to close the
+                shape.
               </p>
             </div>
           </div>
@@ -609,7 +614,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
               className="flex items-center gap-2.5 rounded-lg bg-surface-alt border border-line px-3 py-2"
             >
               <span
-                className="w-2.5 h-2.5 rounded-full shrink-0"
+                className="w-2.5 h-2.5 rounded-full shrink-0 border border-[color:var(--field)]"
                 style={{ backgroundColor: zoneTypeColor(zone.zone_type) }}
               />
 
@@ -631,6 +636,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
                   <select
                     value={editType}
                     onChange={(e) => setEditType(e.target.value)}
+                    title={zoneTypeMeta(editType).hint}
                     className="rounded bg-ground border border-field px-1.5 py-1 text-[11px] text-ink focus:outline-none focus:border-[color:var(--accent)]"
                   >
                     {ZONE_TYPES.map((t) => (

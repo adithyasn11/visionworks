@@ -302,6 +302,14 @@ def update_zone(
         zone.zone_name = name
 
     if patch.zone_type is not None:
+        # A blank type on a PATCH is refused rather than read as GENERAL: the
+        # create path treats "no type" as the safe default, but here it would
+        # silently downgrade a restricted area that already has rules.
+        if not patch.zone_type.strip():
+            raise HTTPException(
+                status_code=422,
+                detail=f"Zone type must be one of: {', '.join(sorted(SAFETY_ZONE_TYPES))}.",
+            )
         zone.zone_type = normalise_zone_type(patch.zone_type)
 
     db.commit()
@@ -382,8 +390,11 @@ def create_or_update_zone(
         existing.homography_matrix = zone.homography_matrix
         # Only when the caller actually sent one: re-saving a shape from a
         # client that does not know about types must not reset a restricted
-        # area to the default.
-        if "zone_type" in zone.model_fields_set:
+        # area to the default. The schema fills in GENERAL when the field is
+        # absent, so "was it sent" is read from model_fields_set; an explicit
+        # null or blank counts as not sent, not as a request to become GENERAL.
+        if ("zone_type" in zone.model_fields_set
+                and zone.zone_type is not None and zone.zone_type.strip()):
             existing.zone_type = zone_type
         db.commit()
         db.refresh(existing)
