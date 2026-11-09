@@ -65,7 +65,7 @@ export const PLANS = [
       { text: 'Live detection and tracking', included: true },
       { text: 'Safety zone editor', included: true },
       { text: 'Scheduled PDF reports', included: false },
-      { text: 'Safety rules and alerts', included: false },
+      { text: 'Safety rules and alerts', included: true },
     ],
     limits: { cameras: 1, sites: 1, seats: 3, retentionDays: 7 },
     cta: 'Start free',
