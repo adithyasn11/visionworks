@@ -118,6 +118,8 @@ enum ReportKind {
   ZONE_COMPARISON
   POSTURE_BREAKDOWN
   RAW_BUCKETS
+  /// Safety compliance summary (added by 025_safety.sql).
+  SAFETY_SUMMARY
 }
 
 enum ReportFormat {
@@ -205,31 +207,31 @@ model Organisation {
   /// Entitlement tier for this organisation. Copied from the creator's
   /// profiles."selectedPlan" by create_organisation(), inside the same
   /// transaction that creates the org, so an org can never exist without one.
-  plan           PlanTier  @default(FREE)
+  plan           PlanTier      @default(FREE)
   /// When the current tier was chosen. Null on the free tier.
-  planSelectedAt DateTime? @db.Timestamptz(6)
+  planSelectedAt DateTime?     @db.Timestamptz(6)
   /// Length of the current term.
   billingPeriod  BillingPeriod @default(MONTHLY)
   /// When the current term began. Reset by change_plan() on every switch, so
   /// upgrading mid-term never buys a shorter term than the one before.
-  planStartedAt  DateTime? @db.Timestamptz(6)
+  planStartedAt  DateTime?     @db.Timestamptz(6)
   /// End of the current term. NULL on the free tier, which does not expire.
   /// Computed in Postgres by plan_term_end(), never in the browser — two
   /// places computing a renewal date is how they come to disagree.
-  planRenewsAt   DateTime? @db.Timestamptz(6)
+  planRenewsAt   DateTime?     @db.Timestamptz(6)
 
   // ── Privacy & retention controls, surfaced on /settings/organisation ──
   /// ZoneMinuteStat rows older than this are deleted by the retention job.
-  dataRetentionDays Int @default(90)
+  dataRetentionDays         Int     @default(90)
   /// Delete the uploaded video file as soon as processing finishes. Default
   /// on: the frames are the sensitive artefact, the buckets are not.
   purgeVideoAfterProcessing Boolean @default(true)
 
   // ── Defaults inherited by new zones, so a manager sets policy once ──
   /// Minutes of sustained seated occupancy before a SEDENTARY alert.
-  defaultSedentaryThresholdMinutes Int @default(60)
+  defaultSedentaryThresholdMinutes Int   @default(60)
   /// A zone below this utilisation across the window is flagged underused.
-  defaultUtilisationFloorPct Float @default(30)
+  defaultUtilisationFloorPct       Float @default(30)
 
   createdAt DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @db.Timestamptz(6)
@@ -237,15 +239,23 @@ model Organisation {
   /// period and so audit history is never orphaned.
   deletedAt DateTime? @db.Timestamptz(6)
 
-  memberships Membership[]
-  sites       Site[]
-  cameras     Camera[]
-  zones       Zone[]
-  minuteStats ZoneMinuteStat[]
-  sessions    AnalysisSession[]
-  reports     Report[]
-  auditLogs   AuditLog[]
-  profiles    Profile[]
+  /// Whether the pipeline may keep an evidence snapshot with a potential
+  /// violation. Off means decisions are stored without a picture (025_safety.sql).
+  safetyEvidenceEnabled Boolean @default(true)
+
+  memberships       Membership[]
+  sites             Site[]
+  cameras           Camera[]
+  zones             Zone[]
+  minuteStats       ZoneMinuteStat[]
+  sessions          AnalysisSession[]
+  reports           Report[]
+  auditLogs         AuditLog[]
+  profiles          Profile[]
+  safetyRules       SafetyRule[]
+  safetyEvents      SafetyEvent[]
+  safetyDecisions   SafetyDecision[]
+  correctiveActions CorrectiveAction[]
 
   @@index([deletedAt])
   @@map("organisations")
@@ -267,10 +277,10 @@ model Profile {
 
   /// Denormalised from auth.users for display and invite matching. Not the
   /// source of truth for login — Supabase owns that.
-  email       String  @unique @db.VarChar(320)
-  fullName    String? @db.VarChar(160)
-  avatarUrl   String? @db.VarChar(1024)
-  jobTitle    String? @db.VarChar(120)
+  email     String  @unique @db.VarChar(320)
+  fullName  String? @db.VarChar(160)
+  avatarUrl String? @db.VarChar(1024)
+  jobTitle  String? @db.VarChar(120)
 
   themePreference ThemePreference @default(SYSTEM)
   /// Overrides the org timezone for this user's own rendering, if set.
@@ -286,12 +296,12 @@ model Profile {
   /// which is why it lives here and not on Organisation. Consumed and cleared
   /// by create_organisation(), so it is a pending choice, never an entitlement:
   /// `profile_update_self` lets a user write this column themselves.
-  selectedPlan   PlanTier?
+  selectedPlan          PlanTier?
   /// The TERM chosen alongside the tier. Consumed and cleared by
   /// create_organisation() together with selectedPlan — it used to be missing,
   /// so a yearly customer's organisation was created MONTHLY (018).
   selectedBillingPeriod BillingPeriod?
-  selectedPlanAt DateTime? @db.Timestamptz(6)
+  selectedPlanAt        DateTime?      @db.Timestamptz(6)
 
   /// Null until the user finishes /onboarding. Distinct from createdAt so you
   /// can measure signup-to-activated drop-off.
@@ -301,14 +311,19 @@ model Profile {
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
-  memberships       Membership[]
-  invitesSent       Membership[]      @relation("MembershipInviter")
-  sessionsStarted   AnalysisSession[]
-  reportsRequested  Report[]
-  auditLogs         AuditLog[]
-  zonesCreated      Zone[]
-  platformAdmin     PlatformAdmin?
-  platformGrants    PlatformAdmin[]   @relation("PlatformAdminGrantedBy")
+  memberships        Membership[]
+  invitesSent        Membership[]       @relation("MembershipInviter")
+  sessionsStarted    AnalysisSession[]
+  reportsRequested   Report[]
+  auditLogs          AuditLog[]
+  zonesCreated       Zone[]
+  safetyRulesCreated SafetyRule[]
+  safetyReviews      SafetyDecision[]   @relation("SafetyDecisionReviewer")
+  actionsAssigned    CorrectiveAction[] @relation("ActionAssignee")
+  actionsCreated     CorrectiveAction[] @relation("ActionCreator")
+  actionsClosed      CorrectiveAction[] @relation("ActionCloser")
+  platformAdmin      PlatformAdmin?
+  platformGrants     PlatformAdmin[]    @relation("PlatformAdminGrantedBy")
 
   @@index([currentOrgId])
   @@map("profiles")
@@ -351,7 +366,7 @@ model PlatformAdmin {
 
   /// Who granted it. Null for the first operator, who is bootstrapped by hand
   /// through the SQL in 005 (there is nobody to grant it).
-  grantedById String? @db.Uuid
+  grantedById String?  @db.Uuid
   grantedAt   DateTime @default(now()) @db.Timestamptz(6)
 
   /// Soft revoke. Kept rather than deleted so audit entries attributed to this
@@ -386,10 +401,10 @@ model Membership {
 
   /// Lower-cased at write time so invite matching is case-insensitive
   /// without needing a functional index.
-  invitedEmail String  @db.VarChar(320)
+  invitedEmail    String    @db.VarChar(320)
   /// Single-use, cryptographically random. Hashed, never stored raw — the
   /// token is a bearer credential and a leaked table must not grant access.
-  inviteTokenHash String? @unique @db.VarChar(64)
+  inviteTokenHash String?   @unique @db.VarChar(64)
   inviteExpiresAt DateTime? @db.Timestamptz(6)
   invitedById     String?   @db.Uuid
 
@@ -435,8 +450,8 @@ model Site {
   /// Local time-of-day defining "working hours", as minutes from midnight.
   /// Analytics excludes out-of-hours buckets by default — a cleaner walking
   /// through at 03:00 should not depress the utilisation figure.
-  workdayStartMinute Int @default(540) /// 09:00
-  workdayEndMinute   Int @default(1080) /// 18:00
+  workdayStartMinute Int   @default(540) /// 09:00
+  workdayEndMinute   Int   @default(1080) /// 18:00
   /// ISO-8601 weekdays counted as working days (1 = Monday … 7 = Sunday).
   workdays           Int[] @default([1, 2, 3, 4, 5])
 
@@ -465,13 +480,13 @@ model Camera {
   name        String  @db.VarChar(160)
   description String? @db.VarChar(500)
 
-  sourceType SourceType
+  sourceType  SourceType
   /// Connection string for RTSP sources. Contains credentials, so it is
   /// column-encrypted in Postgres and never returned to the browser — the API
   /// sends a redacted form. See prisma/sql/003_encryption.sql.
-  rtspUrl    String?    @db.VarChar(1024)
+  rtspUrl     String?    @db.VarChar(1024)
   /// Device index for WEBCAM sources.
-  deviceIndex Int?      @db.SmallInt
+  deviceIndex Int?       @db.SmallInt
 
   /// Inference target. 8 is enough for occupancy analytics and leaves GPU
   /// headroom; the live HUD renders faster than this.
@@ -490,7 +505,7 @@ model Camera {
   /// calibration can be reopened and adjusted rather than redone.
   homographyPoints Json?
 
-  status           CameraStatus @default(INACTIVE)
+  status CameraStatus @default(INACTIVE)
 
   /// DOOR or AREA (021). Only a DOOR camera runs face matching.
   role CameraRole @default(AREA)
@@ -499,19 +514,22 @@ model Camera {
   /// throughput; a DOOR camera keeps 1280, because downscaling is exactly what
   /// destroys the face signal it exists to capture. NULL means "the default for
   /// this role".
-  inferenceWidth Int?
-  lastSeenAt       DateTime?    @db.Timestamptz(6)
-  lastErrorMessage String?      @db.VarChar(500)
+  inferenceWidth   Int?
+  lastSeenAt       DateTime? @db.Timestamptz(6)
+  lastErrorMessage String?   @db.VarChar(500)
 
   createdAt DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @db.Timestamptz(6)
   deletedAt DateTime? @db.Timestamptz(6)
 
-  org         Organisation      @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  site        Site?             @relation(fields: [siteId], references: [id], onDelete: SetNull)
-  zones       Zone[]
-  sessions    AnalysisSession[]
-  minuteStats ZoneMinuteStat[]
+  org             Organisation      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  site            Site?             @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  zones           Zone[]
+  sessions        AnalysisSession[]
+  minuteStats     ZoneMinuteStat[]
+  safetyRules     SafetyRule[]
+  safetyEvents    SafetyEvent[]
+  safetyDecisions SafetyDecision[]
 
   @@unique([orgId, name])
   @@index([orgId, status])
@@ -522,14 +540,21 @@ model Camera {
 /// A named polygon on a camera's view — the object that turns a generic
 /// person-detector into a workspace analytics tool.
 model Zone {
-  id       String @id @default(uuid()) @db.Uuid
-  orgId    String @db.Uuid
-  cameraId String @db.Uuid
+  id       String  @id @default(uuid()) @db.Uuid
+  orgId    String  @db.Uuid
+  cameraId String  @db.Uuid
   /// Denormalised from the camera so site-level analytics need no join.
   siteId   String? @db.Uuid
 
-  name     String   @db.VarChar(160)
-  zoneType ZoneType @default(WORKSTATION)
+  name       String   @db.VarChar(160)
+  /// The CV pipeline's stable zone identifier (local zones.zone_id); never
+  /// displayed. Unique per camera where set (023_zone_slug.sql).
+  slug       String?  @db.VarChar(64)
+  zoneType   ZoneType @default(WORKSTATION)
+  /// What the safety rules treat this zone as:
+  /// PPE_CHECKPOINT | APPROACH | RESTRICTED | EXIT | GENERAL (025_safety.sql).
+  /// Separate from zoneType, which the site overview uses.
+  safetyType String?  @db.VarChar(20)
 
   /// Ordered vertices in camera pixel space: `[[x,y], [x,y], ...]`.
   /// Minimum three points; validated in the API, and by a CHECK constraint
@@ -561,11 +586,14 @@ model Zone {
   updatedAt DateTime  @updatedAt @db.Timestamptz(6)
   deletedAt DateTime? @db.Timestamptz(6)
 
-  org         Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  camera      Camera           @relation(fields: [cameraId], references: [id], onDelete: Cascade)
-  site        Site?            @relation(fields: [siteId], references: [id], onDelete: SetNull)
-  createdBy   Profile?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  minuteStats ZoneMinuteStat[]
+  org             Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  camera          Camera           @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  site            Site?            @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  createdBy       Profile?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  minuteStats     ZoneMinuteStat[]
+  safetyRules     SafetyRule[]
+  safetyEvents    SafetyEvent[]
+  safetyDecisions SafetyDecision[]
 
   @@unique([cameraId, name])
   @@index([orgId, deletedAt])
@@ -626,15 +654,15 @@ model ZoneMinuteStat {
 
   // ── Derived measures ──
   /// Mean activity index across the minute (0–100).
-  avgActivityScore Float @default(0)
+  avgActivityScore  Float @default(0)
   /// Summed presence across all tracks. 2 people for the full minute = 120.
   /// Divided by 60 this gives average concurrent occupancy; it is the
   /// quantity that makes "person-hours" reportable without identity.
-  totalDwellSeconds Int @default(0)
+  totalDwellSeconds Int   @default(0)
   /// Distinct tracks seen. A *count only* — the ids themselves are never
   /// persisted. Distinguishes "one person for an hour" from "sixty people
   /// for a minute each", which occupancyAvg alone cannot.
-  uniqueTrackCount Int @default(0) @db.SmallInt
+  uniqueTrackCount  Int   @default(0) @db.SmallInt
 
   /// Which run produced this bucket. Null for buckets from a live stream
   /// that outlived its session record.
@@ -687,19 +715,19 @@ model ZoneDayStat {
   /// "Tuesday" means the customer's Tuesday.
   statDate DateTime @db.Date
 
-  peakOccupancy    Int   @db.SmallInt
-  avgOccupancy     Float
+  peakOccupancy     Int   @db.SmallInt
+  avgOccupancy      Float
   /// Local hour (0–23) at which peakOccupancy occurred.
-  peakHour         Int?  @db.SmallInt
+  peakHour          Int?  @db.SmallInt
   /// Minutes with occupancy >= 1, within working hours.
-  occupiedMinutes  Int
+  occupiedMinutes   Int
   /// occupiedMinutes / available working minutes, as a percentage.
-  utilisationPct   Float
-  sittingRatio     Float @default(0)
-  standingRatio    Float @default(0)
-  walkingRatio     Float @default(0)
-  totalDwellSeconds Int  @default(0)
-  avgActivityScore Float @default(0)
+  utilisationPct    Float
+  sittingRatio      Float @default(0)
+  standingRatio     Float @default(0)
+  walkingRatio      Float @default(0)
+  totalDwellSeconds Int   @default(0)
+  avgActivityScore  Float @default(0)
 
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
@@ -723,14 +751,14 @@ model AnalysisSession {
 
   /// Original upload name, sanitised. Display only — never used to build a
   /// filesystem path, which is how the path-traversal hole was closed.
-  sourceFilename String? @db.VarChar(255)
+  sourceFilename  String? @db.VarChar(255)
   sourceSizeBytes BigInt?
   /// Server-side path while processing. Nulled once the file is purged, so a
   /// non-null value on a DONE session means the file is still on disk.
-  storagePath    String? @db.VarChar(1024)
+  storagePath     String? @db.VarChar(1024)
 
   totalFrames     Int?
-  processedFrames Int   @default(0)
+  processedFrames Int    @default(0)
   fpsAchieved     Float?
   durationSeconds Int?
 
@@ -786,17 +814,17 @@ model Report {
   zoneIds String[] @db.Uuid
   siteIds String[] @db.Uuid
 
-  filePath  String? @db.VarChar(1024)
-  fileSizeBytes BigInt?
+  filePath          String?   @db.VarChar(1024)
+  fileSizeBytes     BigInt?
   /// Unguessable download token, hashed.
-  downloadTokenHash String? @unique @db.VarChar(64)
+  downloadTokenHash String?   @unique @db.VarChar(64)
   /// After this, the file is deleted and status becomes EXPIRED.
-  expiresAt DateTime? @db.Timestamptz(6)
+  expiresAt         DateTime? @db.Timestamptz(6)
 
   errorMessage String? @db.VarChar(1000)
 
-  requestedById String?  @db.Uuid
-  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  requestedById String?   @db.Uuid
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
   completedAt   DateTime? @db.Timestamptz(6)
 
   org         Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -899,3 +927,146 @@ model PlatformAuditLog {
 // constraints, the partial unique indexes, and the `updatedAt` triggers. Prisma
 // describes the shape; the SQL file is what makes it true.
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  SAFETY COMPLIANCE  —  rules, measured events, decisions, actions
+//  (025_safety.sql holds the CHECK constraints, triggers, RLS and functions.)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// What to check. Writable by ADMIN/MANAGER; soft-deleted through soft_delete_safety_rule().
+model SafetyRule {
+  id                    String    @id @default(uuid()) @db.Uuid
+  orgId                 String    @db.Uuid
+  cameraId              String?   @db.Uuid
+  zoneId                String?   @db.Uuid
+  name                  String    @db.VarChar(160)
+  /// PPE_ENTRY | PPE_CONTINUOUS | MAX_DWELL | REQUIRED_EXIT | OCCUPANCY | MAN_DOWN | WALK_ONLY
+  type                  String    @db.VarChar(24)
+  params                Json      @default("{}")
+  /// INFO | WARNING | CRITICAL
+  severity              String    @default("WARNING") @db.VarChar(10)
+  isEnabled             Boolean   @default(true)
+  minEvidenceConfidence Float     @default(0.6)
+  createdById           String?   @db.Uuid
+  createdAt             DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt             DateTime? @db.Timestamptz(6)
+
+  org       Organisation     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  camera    Camera?          @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  zone      Zone?            @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  createdBy Profile?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  decisions SafetyDecision[]
+
+  @@index([orgId, isEnabled])
+  @@index([zoneId])
+  @@index([cameraId])
+  @@index([createdById])
+  @@map("safety_rules")
+}
+
+/// Raw zone transitions seen by the pipeline. Measured data: read-only to browsers.
+model SafetyEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  eventUid   String   @unique @db.VarChar(36)
+  orgId      String   @db.Uuid
+  cameraId   String   @db.Uuid
+  zoneId     String?  @db.Uuid
+  workerKey  String   @db.VarChar(80)
+  sessionKey String?  @db.VarChar(40)
+  eventType  String   @db.VarChar(24)
+  videoTimeS Float
+  observedAt DateTime @db.Timestamptz(6)
+  details    Json?
+
+  org    Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  camera Camera       @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  zone   Zone?        @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, observedAt(sort: Desc)])
+  @@index([zoneId, observedAt])
+  @@index([cameraId])
+  @@index([workerKey, observedAt])
+  @@map("safety_events")
+}
+
+/// One verdict per rule evaluation. Immutable except through review_safety_decision().
+model SafetyDecision {
+  id          String   @id @db.Uuid
+  orgId       String   @db.Uuid
+  cameraId    String   @db.Uuid
+  zoneId      String?  @db.Uuid
+  ruleId      String?  @db.Uuid
+  ruleType    String   @db.VarChar(24)
+  severity    String   @db.VarChar(10)
+  workerKey   String   @db.VarChar(80)
+  sessionKey  String?  @db.VarChar(40)
+  /// COMPLIANT | POTENTIAL_VIOLATION | UNVERIFIABLE
+  status      String   @db.VarChar(20)
+  reason      String   @db.VarChar(500)
+  confidence  Float
+  evidence    Json
+  thresholds  Json?
+  snapshotRef String?  @db.VarChar(300)
+  videoTimeS  Float
+  observedAt  DateTime @db.Timestamptz(6)
+
+  /// NOT_REQUIRED | PENDING | CONFIRMED | DISMISSED
+  reviewState      String    @default("NOT_REQUIRED") @db.VarChar(14)
+  reviewedById     String?   @db.Uuid
+  reviewedAt       DateTime? @db.Timestamptz(6)
+  reviewReasonCode String?   @db.VarChar(24)
+  reviewNote       String?   @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  org      Organisation       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  camera   Camera             @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  zone     Zone?              @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  rule     SafetyRule?        @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  reviewer Profile?           @relation("SafetyDecisionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  actions  CorrectiveAction[]
+
+  @@index([orgId, observedAt(sort: Desc)])
+  @@index([orgId, status, observedAt(sort: Desc)])
+  @@index([zoneId, observedAt])
+  @@index([cameraId])
+  @@index([ruleId])
+  @@index([reviewedById])
+  @@index([orgId, sessionKey])
+  @@map("safety_decisions")
+}
+
+/// What was done about a confirmed violation. Writable by ADMIN/MANAGER; never deleted (cancel instead).
+model CorrectiveAction {
+  id           String    @id @default(uuid()) @db.Uuid
+  orgId        String    @db.Uuid
+  decisionId   String    @db.Uuid
+  title        String    @db.VarChar(200)
+  description  String?   @db.VarChar(2000)
+  /// INFO | WARNING | CRITICAL (defaults from the rule severity in the UI)
+  priority     String    @default("WARNING") @db.VarChar(10)
+  /// OPEN | IN_PROGRESS | CLOSED | CANCELLED
+  status       String    @default("OPEN") @db.VarChar(12)
+  assignedToId String?   @db.Uuid
+  dueDate      DateTime? @db.Date
+  createdById  String?   @db.Uuid
+  closedById   String?   @db.Uuid
+  closedAt     DateTime? @db.Timestamptz(6)
+  closingNote  String?   @db.VarChar(1000)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(6)
+
+  org        Organisation   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  decision   SafetyDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  assignedTo Profile?       @relation("ActionAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy  Profile?       @relation("ActionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  closedBy   Profile?       @relation("ActionCloser", fields: [closedById], references: [id], onDelete: SetNull)
+
+  @@index([orgId, status, dueDate])
+  @@index([decisionId])
+  @@index([assignedToId])
+  @@index([createdById])
+  @@index([closedById])
+  @@map("corrective_actions")
+}

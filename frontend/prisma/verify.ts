@@ -49,8 +49,8 @@ async function main() {
       WHERE table_schema='public' AND table_type='BASE TABLE'
         AND table_name <> '_prisma_migrations'`),
   );
-  // 13 tenant tables + platform_admins + platform_audit_logs from 005.
-  check('15 tables created', tables === 15, `${tables} found`);
+  // 14 tenant tables (after 024) + 4 safety tables (025).
+  check('18 tables created', tables === 18, `${tables} found`);
 
   const enums = Number(
     await one<bigint>(`SELECT count(*)::bigint FROM pg_type t
@@ -161,6 +161,55 @@ async function main() {
         AND privilege_type IN ('UPDATE','DELETE')`),
   );
   check('audit_logs append-only', auditMut === 0, `${auditMut} mutate grants`);
+
+  // ── 025: safety tables ──
+  console.log('\nSafety (025)');
+  for (const t of ['safety_events', 'safety_decisions']) {
+    const w = Number(
+      await one<bigint>(`SELECT count(*)::bigint FROM information_schema.role_table_grants
+        WHERE table_schema='public' AND table_name='${t}' AND grantee='authenticated'
+          AND privilege_type IN ('INSERT','UPDATE','DELETE')`),
+    );
+    check(`${t} read-only to clients`, w === 0, `${w} write grants`);
+  }
+  for (const t of ['safety_rules', 'corrective_actions']) {
+    const d = Number(
+      await one<bigint>(`SELECT count(*)::bigint FROM information_schema.role_table_grants
+        WHERE table_schema='public' AND table_name='${t}' AND grantee='authenticated'
+          AND privilege_type NOT IN ('SELECT','INSERT','UPDATE')`),
+    );
+    check(`${t}: clients cannot delete or truncate`, d === 0, `${d} extra grants`);
+  }
+  const deletedAtUpdate = Number(
+    await one<bigint>(`SELECT count(*)::bigint FROM information_schema.column_privileges
+      WHERE table_schema='public' AND table_name='safety_rules' AND column_name='deletedAt'
+        AND grantee='authenticated' AND privilege_type='UPDATE'`),
+  );
+  check('safety_rules.deletedAt not updatable by clients (soft delete is audited)', deletedAtUpdate === 0, `${deletedAtUpdate} grants`);
+  const safetyWritePolicies = Number(
+    await one<bigint>(`SELECT count(*)::bigint FROM pg_policies
+      WHERE schemaname='public' AND tablename IN ('safety_events','safety_decisions') AND cmd <> 'SELECT'`),
+  );
+  check('no insert/update/delete policy on measured safety data', safetyWritePolicies === 0, `${safetyWritePolicies} found`);
+  for (const f of ['review_safety_decision', 'soft_delete_safety_rule', 'purge_safety_data',
+                   'safety_rule_check_scope', 'corrective_action_check_decision']) {
+    const n = Number(
+      await one<bigint>(`SELECT count(*)::bigint FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='public' AND p.proname='${f}'`),
+    );
+    check(`function ${f}`, n === 1);
+  }
+  const anonExec = Number(
+    await one<bigint>(`SELECT count(*)::bigint FROM information_schema.routine_privileges
+      WHERE routine_schema='public' AND grantee IN ('anon','PUBLIC')
+        AND routine_name IN ('review_safety_decision','soft_delete_safety_rule','purge_safety_data')`),
+  );
+  check('safety functions not executable by anon / PUBLIC', anonExec === 0, `${anonExec} grants`);
+  const purgeExec = Number(
+    await one<bigint>(`SELECT count(*)::bigint FROM information_schema.routine_privileges
+      WHERE routine_schema='public' AND grantee='authenticated' AND routine_name='purge_safety_data'`),
+  );
+  check('purge_safety_data not executable by signed-in users', purgeExec === 0, `${purgeExec} grants`);
 
   // ── 004: credentials + jobs ──
   console.log('\nCredentials & retention (004)');

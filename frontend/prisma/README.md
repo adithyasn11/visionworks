@@ -11,7 +11,7 @@ project yet.
 
 | File | What it is |
 |---|---|
-| `schema.prisma` | 15 tables, 15 enums. The single source of truth (after 024 retired the eight productivity tables). |
+| `schema.prisma` | 18 tables, 15 enums. The single source of truth (024 retired the eight productivity tables; 025 added the four safety tables). |
 | `../prisma.config.ts` | Prisma 7 config — connection strings live here now, not in the schema. |
 | `sql/001_constraints.sql` | 30 CHECK constraints + the last-admin trigger. Guards the invariants Prisma can't express. |
 | `sql/002_auth_triggers.sql` | Bridges Supabase `auth.users` → `profiles`. Auto-accepts invites. `create_organisation()`. Role helper functions. |
@@ -28,9 +28,10 @@ project yet.
 | `sql/020_identity.sql` | *(historical: the per-employee identity tables it created were dropped by 024.)* |
 | `sql/021_camera_role.sql`, `022_employee_hours_and_visibility.sql`, `023_zone_slug.sql` | Camera role, a (since dropped) employee rollup, and the zone slug used to match zones by name. |
 | `sql/024_retire_productivity_tables.sql` | **Retires the workplace-productivity tables** (`employees`, `face_templates`, `identity_events`, `employee_day_stats`, `employee_hour_stats`, `camera_links`, `alerts`, `alert_rules`) and their functions and enums. Refuses to run if any holds a row. Dropped without CASCADE so an unexpected dependency fails loudly. |
+| `sql/025_safety.sql` | **Safety compliance.** Tables `safety_rules`, `safety_events`, `safety_decisions`, `corrective_actions`; `zones.safetyType`; `organisations.safetyEvidenceEnabled`; the `SAFETY_SUMMARY` report kind; CHECK constraints, tenancy triggers, indexes, RLS, grants; `review_safety_decision()`, `soft_delete_safety_rule()`, `purge_safety_data()` (cron 03:45 UTC). Idempotent. Matrix below. |
 | `seed.ts` | Generates ~826,000 minute buckets of realistic shaped data. |
 
-**Order matters.** 001 → 002 → … → 010 → 011 → 012. Later files
+**Order matters.** 001 → 002 → … → 025. Later files
 depend on earlier ones — 004's column grants must run after 003's table grants,
 or the RTSP credential becomes readable again.
 
@@ -96,6 +97,36 @@ Four real problems were caught and fixed:
    `ON DELETE CASCADE` was scanning whole tables while holding a lock —
    including `ZoneMinuteStat.cameraId` on 824k rows, which would turn "delete a
    camera" into a multi-second stall. Index count went 39 → 52.
+
+---
+
+## Safety tables: who may do what (025)
+
+Measured with real VIEWER / MANAGER / ADMIN sessions by
+`backend/tests/test_safety_rls.py` (101 checks, run against the live project;
+it creates and removes its own organisations and users). Each "refused" fails
+with a permission or RLS error or changes nothing; each "allowed" succeeds.
+
+| Actor | `safety_rules` | `safety_events` | `safety_decisions` | `review_safety_decision()` | `corrective_actions` |
+|---|---|---|---|---|---|
+| VIEWER (same org) | select ✔ · insert ✘ · update ✘ | select ✔ · write ✘ | select ✔ · write ✘ | ✘ not permitted | select ✔ · write ✘ |
+| MANAGER / ADMIN | select ✔ · insert ✔ · update ✔ · soft delete only via `soft_delete_safety_rule()` (no column privilege on `deletedAt`, so a direct update fails with or without RETURNING) · hard delete ✘; creator and attribution columns are stamped by the database | select ✔ · write ✘ | select ✔ · direct update, insert, delete ✘ | ✔ (not on `COMPLIANT`; no CONFIRMED → DISMISSED while an action is open) | select ✔ · insert ✔ (CONFIRMED decision of their own org only; assignee must be a member) · update ✔ · delete ✘ |
+| Other organisation | nothing | nothing | nothing | ✘ (same answer as "no such id") | nothing; cannot attach to another org's decision |
+| Anonymous | no privileges | no privileges | no privileges | ✘ | no privileges |
+| Service role (pipeline) | all | insert ✔ (a repeated `eventUid` is refused) | insert ✔ (still bound by the CHECKs) | n/a | all |
+
+Beyond the matrix the database also refuses: a rule whose camera or zone belongs
+to another organisation (or a zone that is not on the rule's camera); a
+confidence on an `UNVERIFIABLE` decision; a `COMPLIANT` decision in the review
+queue; a reviewed decision without a review time; an action closed without a
+finish time; an unknown rule type, severity, status or zone safety type.
+
+Read paths on 100,000 decisions and 100,000 events (EXPLAIN ANALYZE, then rolled
+back): the review queue (2.4 ms) and latest-decisions list (3.6 ms) use the
+partial and the `(orgId, observedAt)` indexes; latest events 0.1 ms; one worker's
+day 0.1 ms. A 30-day count by status over 43,200 rows took 437 ms on uncommitted
+rows (no visibility map yet); add an `INCLUDE (status)` index only if it is slow
+on real, vacuumed data.
 
 ---
 
