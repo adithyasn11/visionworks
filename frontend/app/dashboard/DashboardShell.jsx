@@ -10,7 +10,7 @@
 // one polling data source and a live video session; making them separate routes
 // would tear down the WebSocket on every tab change and re-fetch everything.
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -20,6 +20,7 @@ import {
 import ThemeToggle from '../components/ThemeToggle';
 import { supabase } from '../lib/supabase/browser';
 import { can } from '../lib/permissions';
+import { getOpenAlerts } from '../lib/safety/queries';
 
 // `plan` sits with the other views rather than down with the settings links,
 // because it is view state on this page like the rest of them — no navigation,
@@ -128,9 +129,21 @@ function NavItem({ view, active, onSelect, asLink = false, badge = 0 }) {
  * nothing is marked active. Passing it -> the dashboard itself, where the nav
  * switches view state in place.
  */
-export default function DashboardShell({ view, onViewChange, user, role, alertCount = 0, children }) {
+export default function DashboardShell({ view, onViewChange, user, role, alertCount, children }) {
   const [open, setOpen] = useState(false);
   const routed = typeof onViewChange !== 'function';
+  // The dashboard page passes the count it already polls. A routed page (settings) does not, so the
+  // shell asks for it itself and the badge is the same on every screen.
+  const [ownCount, setOwnCount] = useState(0);
+  useEffect(() => {
+    if (typeof alertCount === 'number') return undefined;
+    let live = true;
+    const load = () => getOpenAlerts().then((r) => { if (live && r && !r.error) setOwnCount(r.count || 0); }).catch(() => {});
+    load();
+    const timer = setInterval(() => { if (!document.hidden) load(); }, 30000);
+    return () => { live = false; clearInterval(timer); };
+  }, [alertCount]);
+  const shownAlerts = typeof alertCount === 'number' ? alertCount : ownCount;
   // Highlights whichever settings page is open, so the sidebar always shows
   // where you are — the same job the view marker does on the dashboard.
   const pathname = usePathname();
@@ -190,7 +203,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
             view={v}
             asLink={routed}
             active={!routed && view === v.id}
-            badge={v.id === 'overview' ? alertCount : 0}
+            badge={v.id === 'overview' ? shownAlerts : 0}
             onSelect={routed ? () => setOpen(false) : (id) => { onViewChange(id); setOpen(false); }}
           />
         ))}
@@ -303,6 +316,13 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
 
   return (
     <div className="min-h-screen bg-ground text-ink themed">
+      {/* First thing a keyboard user reaches: jump past the navigation to the page. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-accent focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+      >
+        Skip to the page content
+      </a>
       <aside className="hidden lg:block fixed inset-y-0 left-0 w-[248px] z-30">
         {sidebar}
       </aside>
@@ -352,7 +372,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
 
         {/* mx-auto is load-bearing: `max-w` alone pins the column to the left
             edge and leaves a growing band of dead space on a wide monitor. */}
-        <main className="px-5 sm:px-7 lg:px-9 py-6 lg:py-8 max-w-[1400px] mx-auto">
+        <main id="main-content" tabIndex={-1} className="px-5 sm:px-7 lg:px-9 py-6 lg:py-8 max-w-[1400px] mx-auto focus:outline-none">
           {children}
         </main>
       </div>

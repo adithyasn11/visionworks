@@ -28,7 +28,7 @@ export default function ZoneActivity({ events, zones = [] }) {
       <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="flex items-center gap-2 text-ink text-sm font-semibold">
           <MapPin className="w-4 h-4 text-accent" />
-          <span>Zone activity</span>
+          <h3 className="font-semibold">Zone activity</h3>
         </div>
         <span className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint">
           Times are from the video

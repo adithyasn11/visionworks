@@ -35,7 +35,7 @@ export default function DecisionFeed({ decisions, zones = [] }) {
       <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="flex items-center gap-2 text-ink text-sm font-semibold">
           <ShieldCheck className="w-4 h-4 text-accent" />
-          <span>Safety decisions</span>
+          <h3 className="font-semibold">Safety decisions</h3>
         </div>
         <span className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint">
           {counts.POTENTIAL_VIOLATION} to review · {counts.COMPLIANT} compliant · {counts.UNVERIFIABLE} cannot verify
