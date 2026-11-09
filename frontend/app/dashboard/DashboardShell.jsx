@@ -14,13 +14,14 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, Video, Shapes, FileDown,
+  LayoutDashboard, Video, Shapes, FileDown, ClipboardCheck, ListFilter, SlidersHorizontal, Wrench,
   Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard,
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import { supabase } from '../lib/supabase/browser';
 import { can } from '../lib/permissions';
 import { getOpenAlerts } from '../lib/safety/queries';
+import { countOverdueActions } from '../lib/safety/management';
 
 // `plan` sits with the other views rather than down with the settings links,
 // because it is view state on this page like the rest of them — no navigation,
@@ -35,8 +36,12 @@ import { getOpenAlerts } from '../lib/safety/queries';
 // A view with no `capability` is open to every ACTIVE member.
 export const VIEWS = [
   { id: 'overview', label: 'Overview',  icon: LayoutDashboard },
+  { id: 'review',   label: 'Review',    icon: ClipboardCheck },
   { id: 'live',     label: 'Live feed', icon: Video },
+  { id: 'events',   label: 'Events',    icon: ListFilter },
   { id: 'zones',    label: 'Zones',     icon: Shapes },
+  { id: 'rules',    label: 'Rules',     icon: SlidersHorizontal },
+  { id: 'actions',  label: 'Actions',   icon: Wrench },
   { id: 'reports',  label: 'Reports',   icon: FileDown },
   { id: 'plan',     label: 'Plan',      icon: CreditCard, capability: 'org.settings' },
 ];
@@ -78,7 +83,7 @@ function NavItem({ view, active, onSelect, asLink = false, badge = 0 }) {
   const pill = badge > 0 ? (
     <span className="ml-auto shrink-0 min-w-[20px] px-1.5 py-0.5 rounded-md bg-accent text-white text-[11px] font-bold tabular-nums text-center">
       {badge > 99 ? '99+' : badge}
-      <span className="sr-only"> open alerts</span>
+      <span className="sr-only">{view.id === 'actions' ? ' overdue actions' : ' waiting for review'}</span>
     </span>
   ) : null;
   const className = `group ${NAV_ROW} text-left ${
@@ -129,21 +134,26 @@ function NavItem({ view, active, onSelect, asLink = false, badge = 0 }) {
  * nothing is marked active. Passing it -> the dashboard itself, where the nav
  * switches view state in place.
  */
-export default function DashboardShell({ view, onViewChange, user, role, alertCount, children }) {
+export default function DashboardShell({ view, onViewChange, user, role, alertCount, overdueCount, children }) {
   const [open, setOpen] = useState(false);
   const routed = typeof onViewChange !== 'function';
   // The dashboard page passes the count it already polls. A routed page (settings) does not, so the
   // shell asks for it itself and the badge is the same on every screen.
   const [ownCount, setOwnCount] = useState(0);
+  const [ownOverdue, setOwnOverdue] = useState(0);
   useEffect(() => {
-    if (typeof alertCount === 'number') return undefined;
+    if (typeof alertCount === 'number' && typeof overdueCount === 'number') return undefined;
     let live = true;
-    const load = () => getOpenAlerts().then((r) => { if (live && r && !r.error) setOwnCount(r.count || 0); }).catch(() => {});
+    const load = () => {
+      getOpenAlerts().then((r) => { if (live && r && !r.error) setOwnCount(r.count || 0); }).catch(() => {});
+      countOverdueActions(new Date().toLocaleDateString("en-CA")).then((n) => { if (live) setOwnOverdue(n || 0); }).catch(() => {});
+    };
     load();
     const timer = setInterval(() => { if (!document.hidden) load(); }, 30000);
     return () => { live = false; clearInterval(timer); };
-  }, [alertCount]);
+  }, [alertCount, overdueCount]);
   const shownAlerts = typeof alertCount === 'number' ? alertCount : ownCount;
+  const shownOverdue = typeof overdueCount === 'number' ? overdueCount : ownOverdue;
   // Highlights whichever settings page is open, so the sidebar always shows
   // where you are — the same job the view marker does on the dashboard.
   const pathname = usePathname();
@@ -203,7 +213,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
             view={v}
             asLink={routed}
             active={!routed && view === v.id}
-            badge={v.id === 'overview' ? shownAlerts : 0}
+            badge={v.id === 'review' ? shownAlerts : v.id === 'actions' ? shownOverdue : 0}
             onSelect={routed ? () => setOpen(false) : (id) => { onViewChange(id); setOpen(false); }}
           />
         ))}

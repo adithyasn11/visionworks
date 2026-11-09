@@ -59,6 +59,7 @@ CAPABILITIES = {
     "safety.review": ("ADMIN", "MANAGER"),
     "safety.rules.edit": ("ADMIN", "MANAGER"),
     "safety.evidence.view": ("ADMIN", "MANAGER"),
+    "safety.actions.edit": ("ADMIN", "MANAGER"),            # corrective actions: create, assign, move on, close
 
     # Governing the organisation — enforced by admin_org_ids().
     "members.invite": ("ADMIN",),

@@ -185,6 +185,11 @@ for method, path, body in (("get", "/rules", None), ("get", "/events", None), ("
 print()
 print("B. Queries run as the caller")
 STUB.reset()
+STUB.reset()
+client.get(base + "/decisions?sort=oldest", headers=M)
+check("the review queue asks for the oldest first (time ascending, id as the tiebreaker)", sent()[0][2]["order"] == ["observedAt.asc,id.asc"], str(sent()[0][2]["order"]))
+check("an unknown sort is refused", client.get(base + "/decisions?sort=random", headers=M).status_code == 422)
+STUB.reset()
 r = client.get(base + "/decisions?status=POTENTIAL_VIOLATION&review_state=PENDING&org_id=" + OTHER + "&orgId=" + OTHER, headers=M)
 c = sent()[0]
 check("the caller's own token and the PUBLIC key are used, never the service key", c[4] == "Bearer manager-token" and c[3] == ANON_KEY and SERVICE_KEY not in json.dumps(STUB.calls))

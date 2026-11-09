@@ -43,7 +43,8 @@ for name in sorted(set(js_table) & set(CAPABILITIES)):
 print()
 print("THE SAFETY CAPABILITIES")
 expect = {"safety.view": {"ADMIN", "MANAGER", "VIEWER"}, "safety.review": {"ADMIN", "MANAGER"},
-          "safety.rules.edit": {"ADMIN", "MANAGER"}, "safety.evidence.view": {"ADMIN", "MANAGER"}}
+          "safety.rules.edit": {"ADMIN", "MANAGER"}, "safety.evidence.view": {"ADMIN", "MANAGER"},
+          "safety.actions.edit": {"ADMIN", "MANAGER"}}
 for cap, roles in expect.items():
     check(f"{cap}: {', '.join(sorted(roles))}", {r for r in ("ADMIN", "MANAGER", "VIEWER") if can(r, cap)} == roles)
 check("an unknown role or capability is never allowed", not can("OWNER", "safety.view") and not can("ADMIN", "safety.everything") and not can(None, "safety.view"))

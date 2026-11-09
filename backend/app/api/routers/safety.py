@@ -370,11 +370,14 @@ def list_decisions(
     since: Optional[str] = None, until: Optional[str] = None, status: Optional[str] = None, review_state: Optional[str] = None,
     rule_type: Optional[str] = None, severity: Optional[str] = None, zone_id: Optional[str] = None,
     camera_id: Optional[str] = None, worker_key: Optional[str] = None,
+    sort: str = Query("newest", pattern="^(newest|oldest)$"),
     limit: int = Query(50, ge=1, le=MAX_PAGE), offset: int = Query(0, ge=0),
     authorization: Optional[str] = Header(default=None),
 ):
     org_id, _, token = _who(authorization, "safety.view")
-    params: Dict[str, Any] = {"select": _DECISION_LIST, "orgId": f"eq.{org_id}", "order": "observedAt.desc,id.desc"}
+    # `oldest` is the review queue's order: the longest-waiting flag first
+    params: Dict[str, Any] = {"select": _DECISION_LIST, "orgId": f"eq.{org_id}",
+                              "order": "observedAt.asc,id.asc" if sort == "oldest" else "observedAt.desc,id.desc"}
     for column, value, allowed, what in (("status", status, STATUSES, "status"), ("reviewState", review_state, REVIEW_STATES, "review_state"),
                                           ("ruleType", rule_type, RULE_TYPES, "rule_type"), ("severity", severity, SEVERITIES, "severity")):
         if _one_of(value, allowed, what):

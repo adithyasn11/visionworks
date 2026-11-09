@@ -23,6 +23,11 @@ import { RefreshCw, Loader2, Eye, ShieldCheck, Check } from 'lucide-react';
 import DashboardShell, { VIEWS } from './DashboardShell';
 import OverviewSection from './OverviewSection';
 import SafetyAlertsPanel from './SafetyAlertsPanel';
+import ReviewQueue from './safety/ReviewQueue';
+import EventsScreen from './safety/EventsScreen';
+import RulesScreen from './safety/RulesScreen';
+import ActionsScreen from './safety/ActionsScreen';
+import SafetySummary from './safety/SafetySummary';
 import PlanSection from './PlanSection';
 import { VideoCanvasPlayer } from '../components/VideoCanvasPlayer';
 import { AnalyticsCharts } from '../components/AnalyticsCharts';
@@ -34,6 +39,7 @@ import { backendFetch } from '../lib/backend';
 import { getViewerRole } from '../lib/session';
 import { getOverview, getDataCoverage } from '../lib/analytics/queries';
 import { getOpenAlerts } from '../lib/safety/queries';
+import { countOverdueActions } from '../lib/safety/management';
 import RangePicker from './RangePicker';
 import { can, denialMessage } from '../lib/permissions';
 
@@ -209,6 +215,7 @@ function DashboardInner() {
   }, [rangeDays]);
 
   const alertsRequest = useRef(0);
+  const [overdue, setOverdue] = useState(0);
   const loadAlerts = useCallback(async () => {
     try {
       const mine = ++alertsRequest.current;
@@ -216,6 +223,7 @@ function DashboardInner() {
       if (mine !== alertsRequest.current) return;            // an older reply that arrived late
       if (r?.error) throw new Error(r.error);
       setAlerts({ status: 'ready', count: r.count, alerts: r.alerts, error: null });
+      countOverdueActions(new Date().toLocaleDateString("en-CA")).then((n) => { if (mine === alertsRequest.current) setOverdue(n || 0); }).catch(() => {});
     } catch (err) {
       // Keep the last good count and list: one failed poll must not blank the badge.
       setAlerts((s) => ({ ...s, status: 'error', error: String(err?.message || err) }));
@@ -346,7 +354,7 @@ function DashboardInner() {
   );
 
   return (
-    <DashboardShell view={view} onViewChange={setView} user={user} role={role} alertCount={alerts.count}>
+    <DashboardShell view={view} onViewChange={setView} user={user} role={role} alertCount={alerts.count} overdueCount={overdue}>
       {view === 'overview' && (
         <div className="space-y-6">
           <PageHeader
@@ -357,7 +365,9 @@ function DashboardInner() {
           />
 
           {/* What needs a person first; the measurements follow. */}
-          <SafetyAlertsPanel status={alerts.status} count={alerts.count} alerts={alerts.alerts} error={alerts.error} />
+          <SafetyAlertsPanel status={alerts.status} count={alerts.count} alerts={alerts.alerts} error={alerts.error} onReview={() => setView('review')} />
+
+          <SafetySummary days={rangeDays} refreshKey={alerts.count} />
 
           <OverviewSection
             data={overview.data}
@@ -411,6 +421,34 @@ function DashboardInner() {
           </div>
         </div>
       </div>
+
+      {view === 'review' && (
+        <div className="space-y-6">
+          <PageHeader eyebrow="Review" title="Flags waiting for a person" subtitle="Each flag is a prompt to look at the evidence and judge it. Confirm it if it was real, dismiss it if it was not; nothing here is a final verdict until someone decides." />
+          <ReviewQueue role={role} onCountChange={loadAlerts} />
+        </div>
+      )}
+
+      {view === 'events' && (
+        <div className="space-y-6">
+          <PageHeader eyebrow="Events" title="What the safety layer decided and saw" subtitle="Every decision with its reason, filterable by result, review state, zone and date, and the zone activity behind them." />
+          <EventsScreen role={role} />
+        </div>
+      )}
+
+      {view === 'rules' && (
+        <div className="space-y-6">
+          <PageHeader eyebrow="Rules" title="What gets checked" subtitle="The checks your site runs, where, and how serious each one is. Changes apply from the next run of a camera." />
+          <RulesScreen role={role} />
+        </div>
+      )}
+
+      {view === 'actions' && (
+        <div className="space-y-6">
+          <PageHeader eyebrow="Actions" title="What was done about confirmed violations" subtitle="Who is doing what, by when, and whether it is overdue." />
+          <ActionsScreen role={role} onCountChange={loadAlerts} />
+        </div>
+      )}
 
       {view === 'zones' && (
         <div className="space-y-6">

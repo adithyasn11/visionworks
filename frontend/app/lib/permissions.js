@@ -71,6 +71,7 @@ const CAPABILITIES = {
   'safety.review':        ['ADMIN', 'MANAGER'],
   'safety.rules.edit':    ['ADMIN', 'MANAGER'],
   'safety.evidence.view': ['ADMIN', 'MANAGER'],
+  'safety.actions.edit':  ['ADMIN', 'MANAGER'],
 
   // ── Governing the organisation. ──
   // enforcedBy: admin_org_ids() — membership_insert/update/delete, org_update.

@@ -1428,6 +1428,18 @@ Build in this order; each screen follows the existing patterns (server component
 **Tests:** role matrix by hand and by script: VIEWER sees data but no edit/review controls and direct calls fail; MANAGER can do everything; build passes (`npm run build`).
 **Done when:** the demo storyline steps 1–3 and 8 of §15 can be performed entirely from the UI.
 
+**As built (Step 12), where it refines the plan above:**
+1. **One page, view states, not routes.** The dashboard stays a single page; the sidebar views are Overview, Review, Live feed, Events, Zones, Rules, Actions, Reports, Plan. The screens live in `frontend/app/dashboard/safety/` (`ReviewQueue`, `EventsScreen`, `RulesScreen`, `ActionsScreen`, `DecisionDetail`, `SafetySummary`, `common.jsx`). Event detail is an expandable panel (in Review and Events) rather than its own route.
+2. **Reads go through the Step 11 API as the caller** (`lib/safetyApi.js`, results `{ok,data}` or `{ok:false,status,message}`); corrective actions and their assignee list use server actions under Supabase RLS (`lib/safety/management.js`, `lib/safety/actions.js`, with a capability check and sentence errors).
+3. **Review queue:** pending potential violations oldest-first (new `sort=oldest|newest` on `GET /decisions`), expand for the evidence table, the limits it was judged by, the worker's timeline and the evidence picture; Confirm / Dismiss with a reason and note through the review function; a judged flag leaves the queue and the badge follows. A viewer sees the queue without the controls.
+4. **Events:** Decisions and Zone activity tabs; filters for result, review state, zone and dates (a day is the viewer's own time-zone day); paging; audited CSV export.
+5. **Rules:** list, create, edit, turn on or off, delete (soft); the form changes per rule type and validates live through `/rules/validate`. Rules apply from the next run of a camera, and the page says so.
+6. **Corrective actions:** created from a confirmed decision; tabs Active, Overdue, Closed, All; assign, set a due date, Start, Close (a note is required), Cancel, Reopen; overdue is highlighted. New capability `safety.actions.edit` (ADMIN, MANAGER) mirrored in `permissions.py` and `permissions.js`; parity test updated.
+7. **Overview:** the Safety panel (compliant, potential violations, could not verify, waiting for review, judged and agreed share, zone with most flags, decisions per day) for the chosen range.
+8. **Navigation badges:** open alerts on Review, overdue actions on Actions.
+9. **Verified on screen** with a real run: review, evidence table, Events, action creation, overdue highlight and badge, Overview panel, rule create / validate / turn off / delete.
+10. Not in this step: safety content on the Reports page, PDF export, other rule types being evaluated (Steps 13-14).
+
 ---
 
 ### Step 13 — More rules: R2, R3, R4

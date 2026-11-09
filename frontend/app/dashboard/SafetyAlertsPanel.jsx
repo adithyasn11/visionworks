@@ -24,7 +24,7 @@ function when(iso) {
   return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function SafetyAlertsPanel({ status, count, alerts, error }) {
+export default function SafetyAlertsPanel({ status, count, alerts, error, onReview }) {
   const open = count > 0;
   return (
     <section
@@ -95,7 +95,8 @@ export default function SafetyAlertsPanel({ status, count, alerts, error }) {
       )}
       {status === 'ready' && open && (
         <p className="mt-2 text-[11px] text-ink-faint">
-          Reviewing alerts is coming in a later update; until then they stay listed here.
+          They stay listed until someone reviews them.{onReview ? ' ' : ''}
+          {onReview && <button type="button" onClick={onReview} className="underline text-ink hover:text-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)] rounded">Open the Review queue</button>}
         </p>
       )}
       {status === 'ready' && count > alerts.length && (
