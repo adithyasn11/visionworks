@@ -71,8 +71,15 @@ const NAV_ROW_IDLE = 'text-ink-muted hover:text-ink hover:bg-surface-alt';
  * Both look identical. The distinction is behavioural, not visual, so the
  * sidebar reads the same on every page.
  */
-function NavItem({ view, active, onSelect, asLink = false }) {
+function NavItem({ view, active, onSelect, asLink = false, badge = 0 }) {
   const Icon = view.icon;
+  // A count of things waiting (open alerts). Shown as a number, never as colour alone.
+  const pill = badge > 0 ? (
+    <span className="ml-auto shrink-0 min-w-[20px] px-1.5 py-0.5 rounded-md bg-accent text-white text-[11px] font-bold tabular-nums text-center">
+      {badge > 99 ? '99+' : badge}
+      <span className="sr-only"> open alerts</span>
+    </span>
+  ) : null;
   const className = `group ${NAV_ROW} text-left ${
     active ? NAV_ROW_ACTIVE : `${NAV_ROW_IDLE} hover:translate-x-0.5`
   }`;
@@ -91,6 +98,7 @@ function NavItem({ view, active, onSelect, asLink = false }) {
         {marker}
         <Icon className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
         <span className="truncate">{view.label}</span>
+        {pill}
       </Link>
     );
   }
@@ -109,6 +117,7 @@ function NavItem({ view, active, onSelect, asLink = false }) {
       {marker}
       <Icon className="w-[17px] h-[17px] shrink-0" strokeWidth={2.1} />
       <span className="truncate">{view.label}</span>
+      {pill}
     </button>
   );
 }
@@ -119,7 +128,7 @@ function NavItem({ view, active, onSelect, asLink = false }) {
  * nothing is marked active. Passing it -> the dashboard itself, where the nav
  * switches view state in place.
  */
-export default function DashboardShell({ view, onViewChange, user, role, children }) {
+export default function DashboardShell({ view, onViewChange, user, role, alertCount = 0, children }) {
   const [open, setOpen] = useState(false);
   const routed = typeof onViewChange !== 'function';
   // Highlights whichever settings page is open, so the sidebar always shows
@@ -181,6 +190,7 @@ export default function DashboardShell({ view, onViewChange, user, role, childre
             view={v}
             asLink={routed}
             active={!routed && view === v.id}
+            badge={v.id === 'overview' ? alertCount : 0}
             onSelect={routed ? () => setOpen(false) : (id) => { onViewChange(id); setOpen(false); }}
           />
         ))}

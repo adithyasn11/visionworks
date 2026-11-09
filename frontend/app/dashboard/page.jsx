@@ -16,12 +16,13 @@
 // data source and a live video WebSocket, and routing between them would tear
 // the socket down and re-fetch everything on every click.
 
-import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { RefreshCw, Loader2, Eye, ShieldCheck, Check } from 'lucide-react';
 
 import DashboardShell, { VIEWS } from './DashboardShell';
 import OverviewSection from './OverviewSection';
+import SafetyAlertsPanel from './SafetyAlertsPanel';
 import PlanSection from './PlanSection';
 import { VideoCanvasPlayer } from '../components/VideoCanvasPlayer';
 import { AnalyticsCharts } from '../components/AnalyticsCharts';
@@ -32,6 +33,7 @@ import { supabase } from '../lib/supabase/browser';
 import { backendFetch } from '../lib/backend';
 import { getViewerRole } from '../lib/session';
 import { getOverview, getDataCoverage } from '../lib/analytics/queries';
+import { getOpenAlerts } from '../lib/safety/queries';
 import RangePicker from './RangePicker';
 import { can, denialMessage } from '../lib/permissions';
 
@@ -132,6 +134,8 @@ function DashboardInner() {
 
   const [overview, setOverview] = useState({ status: 'loading', data: null, error: null });
   const [refreshing, setRefreshing] = useState(false);
+  // Open alerts: potential violations still waiting for review (Postgres, through the caller's RLS).
+  const [alerts, setAlerts] = useState({ status: 'loading', count: 0, alerts: [], error: null });
   // The historical panels read Postgres `zone_minute_stats`, which holds the
   // org's whole history — so the window is a user choice rather than a fixed
   // 24 hours. Live feed and heatmap still read the running session.
@@ -203,6 +207,29 @@ function DashboardInner() {
       setRefreshing(false);
     }
   }, [rangeDays]);
+
+  const alertsRequest = useRef(0);
+  const loadAlerts = useCallback(async () => {
+    try {
+      const mine = ++alertsRequest.current;
+      const r = await getOpenAlerts();
+      if (mine !== alertsRequest.current) return;            // an older reply that arrived late
+      if (r?.error) throw new Error(r.error);
+      setAlerts({ status: 'ready', count: r.count, alerts: r.alerts, error: null });
+    } catch (err) {
+      // Keep the last good count and list: one failed poll must not blank the badge.
+      setAlerts((s) => ({ ...s, status: 'error', error: String(err?.message || err) }));
+    }
+  }, []);
+
+  // The badge and the list follow the same slow poll as the overview: a flag is synced to
+  // Postgres within a minute of being raised (and at the end of a video).
+  useEffect(() => {
+    let cancelled = false;
+    loadAlerts();
+    const timer = setInterval(() => { if (!cancelled && !document.hidden) loadAlerts(); }, REFRESH_MS);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [loadAlerts]);
 
   // The org's real data extent, so the range picker can disable windows the
   // data cannot fill rather than rendering an empty chart.
@@ -319,7 +346,7 @@ function DashboardInner() {
   );
 
   return (
-    <DashboardShell view={view} onViewChange={setView} user={user} role={role}>
+    <DashboardShell view={view} onViewChange={setView} user={user} role={role} alertCount={alerts.count}>
       {view === 'overview' && (
         <div className="space-y-6">
           <PageHeader
@@ -328,6 +355,9 @@ function DashboardInner() {
             subtitle="People detected, how long they stay in each zone and their posture, measured from the camera feed. No video or names are stored."
             action={overviewActions}
           />
+
+          {/* What needs a person first; the measurements follow. */}
+          <SafetyAlertsPanel status={alerts.status} count={alerts.count} alerts={alerts.alerts} error={alerts.error} />
 
           <OverviewSection
             data={overview.data}

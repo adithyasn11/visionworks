@@ -103,11 +103,13 @@ export function drawHUD(ctx, canvas, entities, zones, enableBlur) {
     const [x1, y1, x2, y2] = entity.bbox;
     const w = x2 - x1;
     const h = y2 - y1;
-    const color = POSTURE_COLORS[entity.posture] || POSTURE_COLORS.UNKNOWN;
+    // A person with an open alert is outlined in the product red, thicker, and tagged in words.
+    const flagged = entity.flagged === true;
+    const color = flagged ? '#DC2626' : (POSTURE_COLORS[entity.posture] || POSTURE_COLORS.UNKNOWN);
 
     // Main box
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = flagged ? 4.5 : 2.5;
     ctx.strokeRect(x1, y1, w, h);
 
     // Corner reticles
@@ -123,7 +125,7 @@ export function drawHUD(ctx, canvas, entities, zones, enableBlur) {
     // Tag banner (top)
     // Sized to be read at the size the canvas is shown, not at its pixel size.
     ctx.font = '600 14px Inter, sans-serif';
-    const tag = `ID #${entity.track_id}  ${entity.posture}`;
+    const tag = `ID #${entity.track_id}  ${entity.posture}${flagged ? '  FLAGGED' : ''}`;
     const bannerW = Math.max(ctx.measureText(tag).width + 14, w);
     ctx.fillStyle = 'rgba(11,10,12,0.88)';
     ctx.fillRect(x1, y1 - 30, bannerW, 26);

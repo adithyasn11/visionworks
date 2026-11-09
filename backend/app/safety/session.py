@@ -78,6 +78,13 @@ class SafetySession:
         self._evidence_refresh_s = evidence_refresh_s
         self._evidence_checked_at = None
         self._held: Optional[dict] = None                  # the clean frame of the frame being processed
+        # Open alerts of THIS session: an alert is a POTENTIAL_VIOLATION decision that has not been
+        # reviewed, and nothing reviews a decision inside a live session, so each flag stays open here.
+        # (The dashboard's own count comes from Postgres, where reviews happen.)
+        self._open_flags: dict = {}                        # worker key -> number of open flags (the count; never reset)
+        # Who is OUTLINED as flagged. Cleared when the timeline jumps: a tracker may hand the same id to
+        # a different person after a seek, who must not be drawn as flagged.
+        self._flagged: set = set()
         self._evidence_check = evidence_check              # org -> bool, run in a thread
         engine.register(self.tracker)
         # The rule engine: judges entries into restricted zones from the zone events and
@@ -205,6 +212,7 @@ class SafetySession:
 
     def reset(self, reason: str, frame_index: Optional[int] = None) -> None:
         self._held = None
+        self._flagged.clear()
         self.engine.reset(reason, frame_index=frame_index)
 
     # ── per frame ────────────────────────────────────────────────────────────
@@ -232,6 +240,11 @@ class SafetySession:
             self._zone_events(frame_time, tracked_entities)
         except Exception as e:
             self._warn_once("zone", f"zone events skipped for a frame: {type(e).__name__}: {e}")
+        # Tell the picture which people have an open alert (the entities are sent after this call).
+        if self._flagged:
+            for entity in tracked_entities:
+                if entity.get("track_id") is not None and worker_key(entity["track_id"]) in self._flagged:
+                    entity["flagged"] = True
         await persist_safety(self.writer)
 
     def _zone_events(self, frame_time: FrameTime, tracked_entities) -> None:
@@ -311,6 +324,9 @@ class SafetySession:
             if ref:
                 self._discard_snapshot(ref)                  # no decision, so no picture
             return
+        if decision.status == POTENTIAL_VIOLATION:
+            self._open_flags[decision.worker_key] = self._open_flags.get(decision.worker_key, 0) + 1
+            self._flagged.add(decision.worker_key)
         if len(self._frame_decisions) < _MAX_EVENTS_IN_PAYLOAD:
             data = decision.as_payload()
             if wants:
@@ -421,6 +437,10 @@ class SafetySession:
             data["events"] = list(self._frame_events)
         if self._frame_decisions:
             data["decisions"] = list(self._frame_decisions)
+        if self.compliance is not None:
+            # How many flags this session has raised that nobody has reviewed. Always present when
+            # the rules run, so the dashboard can show "0" as well as a number.
+            data["open_count"] = sum(self._open_flags.values())
         return data
 
     # ── the end ──────────────────────────────────────────────────────────────
