@@ -110,16 +110,22 @@ async def lifespan(app: FastAPI):
         logging.getLogger(__name__).error(f"Safety tables could not be prepared: {e}")
 
     task = asyncio.create_task(run_aggregator_loop())
+    # Copies the safety events and decisions into Postgres (a no-op without a
+    # service-role key, so the local tables simply accumulate).
+    from app.db.safety_sync import run_safety_sync_loop
+    sync_task = asyncio.create_task(run_safety_sync_loop())
     try:
         yield
     finally:
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
-        except Exception as e:
-            logger.warning(f"Aggregator shutdown: {e}")
+        for running in (task, sync_task):
+            running.cancel()
+        for running in (task, sync_task):
+            try:
+                await running
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.warning(f"Background task shutdown: {e}")
 
 
 app = FastAPI(

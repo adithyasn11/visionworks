@@ -30,6 +30,7 @@ from app.cv.anonymizer import privacy_blur_default
 from app.cv.frame_pipeline import process_detections
 from app.db.activity_writer import ActivityLogWriter, persist_frame
 from app.db.minute_aggregator import aggregate_after_session
+from app.db.safety_sync import sync_safety_in_background
 from app.safety.clock import parse_recorded_at
 from app.safety.session import safety_session_for
 from app.api.deps import extract_token, resolve_org_role
@@ -564,6 +565,7 @@ async def upload_video_file(
     }
 
 
+
 @router.websocket("/process/{session_id}")
 async def process_video_websocket(websocket: WebSocket, session_id: str):
     """
@@ -919,7 +921,11 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         # attempt to store the session's events. Last, so a slow or cancelled
         # flush can never leave the upload on disk or skip the telemetry roll-up.
         if safety is not None:
-            await safety.finish()
+            try:
+                await safety.finish()
+            finally:
+                # Copy this run's rows to Postgres now rather than at the next tick.
+                sync_safety_in_background()
 
 
 @router.websocket("/live_webcam")
@@ -1097,7 +1103,11 @@ async def live_webcam_websocket(websocket: WebSocket):
         if cap:
             cap.release()
         if safety is not None:
-            await safety.finish()
+            try:
+                await safety.finish()
+            finally:
+                # Copy this run's rows to Postgres now rather than at the next tick.
+                sync_safety_in_background()
         logger.info("Live webcam released.")
 
 
@@ -1264,4 +1274,8 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
         logger.error(f"Browser webcam error: {e}")
     finally:
         if safety is not None:
-            await safety.finish()
+            try:
+                await safety.finish()
+            finally:
+                # Copy this run's rows to Postgres now rather than at the next tick.
+                sync_safety_in_background()

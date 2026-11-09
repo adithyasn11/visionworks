@@ -61,7 +61,7 @@ def normalise_zone_type(value: Optional[str]) -> str:
 
 
 def _mirror_zone_to_postgres(org_id: str, camera_name: str, zone_id: str,
-                             polygon: list, zone_name: str = None) -> None:
+                             polygon: list, zone_name: str = None, zone_type: str = None) -> None:
     """
     Ensures a Postgres `zones` row exists NAMED `zone_id`, under the Postgres
     camera of name `camera_name`, in this org.
@@ -109,6 +109,10 @@ def _mirror_zone_to_postgres(org_id: str, camera_name: str, zone_id: str,
     # Callers that predate the rename support pass no label; the slug is the
     # honest fallback, and the next edit through the editor corrects it.
     zone_name = zone_name or zone_id
+    # Postgres keeps the safety type in its own column (025_safety.sql). A legacy
+    # type (WORKSTATION, BREAK ...) has no safety meaning and is stored as NULL,
+    # which the rules treat the same as GENERAL: no rule attaches to it.
+    safety_type = zone_type if zone_type in SAFETY_ZONE_TYPES else None
 
     try:
         cameras = get("cameras", {"select": "id", "orgId": f"eq.{org_id}", "name": f"eq.{camera_name}", "limit": "1"})
@@ -121,29 +125,34 @@ def _mirror_zone_to_postgres(org_id: str, camera_name: str, zone_id: str,
 
         # Matched on the SLUG, which is the stable identifier, but the row
         # stores the human name — see below.
-        existing = get("zones", {"select": "id,name", "cameraId": f"eq.{camera_id}",
+        existing = get("zones", {"select": "id,name,safetyType,polygon", "cameraId": f"eq.{camera_id}",
                                  "slug": f"eq.{zone_id}", "limit": "1"})
         if not existing:
             # Older rows were mirrored before `slug` existed and were matched
             # by putting the slug in `name`. Find those too, so a rename
             # updates them instead of creating a duplicate.
-            existing = get("zones", {"select": "id,name", "cameraId": f"eq.{camera_id}",
+            existing = get("zones", {"select": "id,name,safetyType,polygon", "cameraId": f"eq.{camera_id}",
                                      "name": f"eq.{zone_id}", "limit": "1"})
 
         if existing:
             # Already mirrored. Update the name and polygon rather than
             # returning early: a zone that is renamed or reshaped in the
             # editor must not keep its old name in the desk dropdown.
-            if existing[0].get("name") == zone_name:
+            # A caller that does not pass a type leaves the stored one alone.
+            type_unchanged = zone_type is None or existing[0].get("safetyType") == safety_type
+            if existing[0].get("name") == zone_name and type_unchanged and existing[0].get("polygon") == polygon:
                 return
-            patch = json.dumps({
+            patch_body = {
                 "name": zone_name,
                 # Legacy rows were matched by name-as-slug; stamp the real
                 # slug so the next lookup uses the fast, correct path.
                 "slug": zone_id,
                 "polygon": polygon,
                 "updatedAt": datetime.now(timezone.utc).isoformat(),
-            }).encode("utf-8")
+            }
+            if zone_type is not None:
+                patch_body["safetyType"] = safety_type
+            patch = json.dumps(patch_body).encode("utf-8")
             request = urllib.request.Request(
                 f"{base}/rest/v1/zones?id=eq.{existing[0]['id']}",
                 data=patch,
@@ -175,6 +184,7 @@ def _mirror_zone_to_postgres(org_id: str, camera_name: str, zone_id: str,
             # so a rename updates this row instead of inserting a second one.
             "slug": zone_id,
             "polygon": polygon,
+            "safetyType": safety_type,
             "updatedAt": datetime.now(timezone.utc).isoformat(),
         }]).encode("utf-8")
         request = urllib.request.Request(
@@ -317,7 +327,7 @@ def update_zone(
 
     # Keep Postgres in step, or the dashboard keeps showing the old label.
     _mirror_zone_to_postgres(org_id, zone.camera_id, zone.zone_id,
-                             zone.polygon_coordinates, zone.zone_name)
+                             zone.polygon_coordinates, zone.zone_name, zone.zone_type)
     return zone
 
 
@@ -399,7 +409,7 @@ def create_or_update_zone(
         db.commit()
         db.refresh(existing)
         _mirror_zone_to_postgres(org_id, existing.camera_id, existing.zone_id,
-                                 existing.polygon_coordinates, existing.zone_name)
+                                 existing.polygon_coordinates, existing.zone_name, existing.zone_type)
         return existing
 
     # `zone_id` is the PRIMARY KEY of this table, so it is unique across the
@@ -429,5 +439,5 @@ def create_or_update_zone(
     db.commit()
     db.refresh(db_zone)
     _mirror_zone_to_postgres(org_id, db_zone.camera_id, db_zone.zone_id,
-                             db_zone.polygon_coordinates, db_zone.zone_name)
+                             db_zone.polygon_coordinates, db_zone.zone_name, db_zone.zone_type)
     return db_zone
