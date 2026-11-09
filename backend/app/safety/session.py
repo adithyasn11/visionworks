@@ -351,7 +351,8 @@ class SafetySession:
             # Two times, because they differ: the decision is stamped at the entry, the picture is
             # the frame it was decided on (up to the evidence wait later).
             banner = [f"{label}  |  {(zone or {}).get('zone_name') or decision.zone_id or 'camera'}  |  "
-                      f"entered {clock(decision.video_time_s)}  |  picture {clock(reference.video_time_s)}  |  {decision.worker_key}",
+                      f"entered {clock(decision.video_time_s)}  |  picture {clock(reference.video_time_s)}  |  "
+                      f"{('Worker ' + decision.worker_key[4:]) if decision.worker_key.startswith('trk-') else decision.worker_key}",
                       decision.reason]
             jpeg, obscured = snapshots.render(
                 held["frame"], held["people"], held["work_shape"], target_track=target,

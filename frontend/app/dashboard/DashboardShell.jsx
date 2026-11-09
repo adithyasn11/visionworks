@@ -269,7 +269,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-[12.5px] font-bold text-ink truncate">
-              {user?.fullName || 'Manager'}
+              {user?.fullName || (user?.email ? user.email.split('@')[0] : 'Account')}
             </div>
             <div className="text-[11px] text-ink-faint truncate">{user?.email}</div>
           </div>

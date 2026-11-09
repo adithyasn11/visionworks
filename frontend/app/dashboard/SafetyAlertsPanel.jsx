@@ -64,8 +64,8 @@ export default function SafetyAlertsPanel({ status, count, alerts, error }) {
 
       {status === 'ready' && !open && (
         <p className="text-xs text-ink-muted leading-relaxed">
-          Nothing is waiting in the database. A flag raised during a run appears here once it has synced, which can take
-          up to a minute (the live view shows it at once). A flag is a prompt to look, never a final verdict.
+          No open alerts. A flag raised during a run shows here once it has been saved, which can take up to a minute
+          (the live view shows it at once). A flag is a prompt to look, never a final verdict.
         </p>
       )}
 
@@ -95,7 +95,7 @@ export default function SafetyAlertsPanel({ status, count, alerts, error }) {
       )}
       {status === 'ready' && open && (
         <p className="mt-2 text-[11px] text-ink-faint">
-          Review is not available in this version yet: an alert stays open until it is reviewed in the database.
+          Reviewing alerts is coming in a later update; until then they stay listed here.
         </p>
       )}
       {status === 'ready' && count > alerts.length && (

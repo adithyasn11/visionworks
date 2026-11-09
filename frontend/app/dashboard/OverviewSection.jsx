@@ -131,6 +131,10 @@ function EmptyState() {
         video or start the camera. People, the zones they are in and how long they
         stay appear here as they are detected.
       </p>
+      <p className="text-[12px] text-ink-faint mt-2 max-w-md mx-auto leading-relaxed">
+        These totals are saved per registered camera. A run on a camera that is not registered
+        for your organisation still shows in the Live feed, but is not added here.
+      </p>
     </div>
   );
 }

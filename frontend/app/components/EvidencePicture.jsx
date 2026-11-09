@@ -18,6 +18,13 @@ export default function EvidencePicture({ decisionId }) {
 
   // Release the object URL when the picture is closed or replaced.
   useEffect(() => () => { if (state.url) URL.revokeObjectURL(state.url); }, [state.url]);
+  // Escape closes the picture, like any other pop-up.
+  useEffect(() => {
+    if (!state.open) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') { request.current += 1; setState({ open: false, loading: false, url: null, error: null }); } };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [state.open]);
   // Invalidate any request still in flight when the row goes away.
   useEffect(() => () => { request.current += 1; }, []);
 

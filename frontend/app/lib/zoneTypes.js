@@ -82,7 +82,9 @@ export const zoneTypeColor = (value) => zoneTypeMeta(value).color;
  * as GEN, and a zone with no name falls back to its id, then to `fallback`.
  */
 export function zoneCanvasLabel(zone, fallback = '') {
-  const name = (zone && (zone.zone_name || zone.zone_id)) || fallback;
+  const full = (zone && (zone.zone_name || zone.zone_id)) || fallback;
+  // A long name must not run across the whole picture; the full name is in the zone list.
+  const name = full.length > 26 ? `${full.slice(0, 25)}…` : full;
   const badge = zoneTypeMeta(zone && zone.zone_type).badge;
   return name ? `${badge} · ${name}` : badge;
 }

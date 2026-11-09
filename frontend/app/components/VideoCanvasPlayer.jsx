@@ -313,6 +313,16 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     if (!file) return;
     e.target.value = '';
 
+    // A new run starts clean: the previous run's decisions, zone activity, banners and PPE list
+    // belong to another video (worker numbers restart per run, so they would be mixed up).
+    setZoneEvents([]);
+    setDecisions([]);
+    setBanners([]);
+    setOpenCount(0);
+    bannerSeenRef.current = new Set();
+    setPpeEntities([]);
+    setPpeUnavailable(null);
+
     setFileName(file.name);
     setPhase('uploading');
     setStatusMsg('Uploading video to backend...');
@@ -650,7 +660,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {readOnly && (
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-line text-[10px] font-bold text-ink-faint">
               <Eye className="w-3 h-3" />
@@ -855,6 +865,8 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
               step="0.1"
               value={progress}
               onChange={handleSeek}
+              aria-label="Seek the video"
+              aria-valuetext={`${formatTime(currentTimeSec)} of ${formatTime(durationSec)}`}
               disabled={isWebcamActive || (phase !== 'processing' && phase !== 'done')}
               className="w-full h-2 bg-surface-alt rounded-lg appearance-none cursor-pointer accent-[color:var(--accent)] hover:accent-[color:var(--accent)] transition-all disabled:cursor-not-allowed disabled:opacity-30"
             />
@@ -865,7 +877,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         </div>
 
         {/* Playback Control Buttons Bar */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-y-2">
           <div className="flex items-center gap-2">
             {/* Rewind 5s */}
             <button
@@ -902,7 +914,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             {/* Privacy Anonymization Toggle.
                 `enableBlur === null` means no frame has arrived yet, so the
                 server's setting is still unknown. The control renders unchecked

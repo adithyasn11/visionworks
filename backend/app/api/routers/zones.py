@@ -60,6 +60,30 @@ def normalise_zone_type(value: Optional[str]) -> str:
     return kind
 
 
+def _check_zone_name(db, org_id: str, camera_id: str, name: str, exclude_zone_id: Optional[str] = None) -> str:
+    """
+    A zone's name as it will be stored, or a 4xx.
+
+    Control characters are refused (a NUL byte in a name ends up inside decision sentences and
+    breaks storing them), and so is a name longer than 80 characters or another zone on the
+    same camera with the same name: with two "Walkway" zones, a decision or an alert could not
+    say which one it meant.
+    """
+    import unicodedata
+    cleaned = (name or "").strip()
+    if not cleaned:
+        raise HTTPException(status_code=422, detail="A zone name is required.")
+    if len(cleaned) > 80:
+        raise HTTPException(status_code=422, detail="Zone names are limited to 80 characters.")
+    if any(unicodedata.category(ch).startswith("C") for ch in cleaned):
+        raise HTTPException(status_code=422, detail="A zone name cannot contain control characters.")
+    query = db.query(ZoneModel).filter(ZoneModel.org_id == org_id, ZoneModel.camera_id == camera_id)
+    for other in query.all():
+        if other.zone_id != exclude_zone_id and (other.zone_name or "").strip().lower() == cleaned.lower():
+            raise HTTPException(status_code=409, detail=f"A zone named \"{cleaned}\" already exists on this camera. Choose a different name.")
+    return cleaned
+
+
 def _mirror_zone_to_postgres(org_id: str, camera_name: str, zone_id: str,
                              polygon: list, zone_name: str = None, zone_type: str = None) -> None:
     """
@@ -303,13 +327,7 @@ def update_zone(
         raise HTTPException(status_code=404, detail=f"Zone '{zone_id}' not found")
 
     if patch.zone_name is not None:
-        name = patch.zone_name.strip()
-        if not name:
-            raise HTTPException(status_code=422, detail="A zone name is required.")
-        if len(name) > 80:
-            raise HTTPException(status_code=422,
-                                detail="Zone names are limited to 80 characters.")
-        zone.zone_name = name
+        zone.zone_name = _check_zone_name(db, org_id, zone.camera_id, patch.zone_name, exclude_zone_id=zone.zone_id)
 
     if patch.zone_type is not None:
         # A blank type on a PATCH is refused rather than read as GENERAL: the
@@ -394,8 +412,10 @@ def create_or_update_zone(
         .filter(ZoneModel.zone_id == zone.zone_id, ZoneModel.org_id == org_id)
         .first()
     )
+    clean_name = _check_zone_name(db, org_id, (existing.camera_id if existing else zone.camera_id),
+                                  zone.zone_name, exclude_zone_id=zone.zone_id)
     if existing:
-        existing.zone_name = zone.zone_name
+        existing.zone_name = clean_name
         existing.polygon_coordinates = zone.polygon_coordinates
         existing.homography_matrix = zone.homography_matrix
         # Only when the caller actually sent one: re-saving a shape from a
@@ -434,7 +454,7 @@ def create_or_update_zone(
         )
 
     # org_id comes from the verified token, never from the request body.
-    db_zone = ZoneModel(**{**zone.model_dump(), "zone_type": zone_type}, org_id=org_id)
+    db_zone = ZoneModel(**{**zone.model_dump(), "zone_type": zone_type, "zone_name": clean_name}, org_id=org_id)
     db.add(db_zone)
     db.commit()
     db.refresh(db_zone)

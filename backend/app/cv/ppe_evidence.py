@@ -196,7 +196,7 @@ class PpeEvidenceTracker:
                 "empty_fraction": round(nothing / n, 3) if n else 0.0,
                 "mean_conf": round(sum(confs) / len(confs), 3) if confs else 0.0}
         if n < self.min_clear:
-            return UNVERIFIABLE, f"only {n} clear frames (need {self.min_clear})", info
+            return UNVERIFIABLE, f"only {n} clear frame{'' if n == 1 else 's'} (need {self.min_clear})", info
         if seen / n >= self.presence:
             return PRESENT, "seen in enough clear frames", info
         if nothing / n >= self.absence:

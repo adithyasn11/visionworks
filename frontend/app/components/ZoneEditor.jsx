@@ -335,6 +335,11 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
     if (draft.length < MIN_POINTS) return;
 
     const name = zoneName.trim() || `Zone ${zones.length + 1}`;
+    // Two zones with one name would make decisions and alerts ambiguous ("which Walkway?").
+    if (zones.some((z) => String(z.zone_name || '').trim().toLowerCase() === name.toLowerCase())) {
+      setError(`A zone named "${name}" already exists on this camera. Give this one a different name.`);
+      return;
+    }
     // A stable, collision-resistant id: the API upserts on zone_id, so reusing
     // one would silently overwrite an existing zone.
     const zoneId = `zone_${Date.now().toString(36)}`;
@@ -376,6 +381,10 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
   const saveZoneEdit = async (zoneId) => {
     const name = editName.trim();
     if (!name) { setError('A zone name is required.'); return; }
+    if (zones.some((z) => z.zone_id !== zoneId && String(z.zone_name || '').trim().toLowerCase() === name.toLowerCase())) {
+      setError(`A zone named "${name}" already exists on this camera. Choose a different name.`);
+      return;
+    }
     try {
       const res = await backendFetch(`/api/v1/zones/${zoneId}`, {
         method: 'PATCH',
@@ -475,12 +484,15 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
             value={zoneName}
             onChange={(e) => setZoneName(e.target.value)}
             placeholder={`Zone ${zones.length + 1}`}
+            aria-label="Zone name"
+            maxLength={80}
             className="flex-1 min-w-[140px] rounded-lg bg-ground border border-line px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:outline-none focus:border-[color:var(--accent)] transition-colors"
           />
           <select
             value={newType}
             onChange={(e) => setNewType(e.target.value)}
             title={ZONE_TYPES.find((t) => t.value === newType)?.hint}
+            aria-label="Zone type"
             className="rounded-lg bg-ground border border-line px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors"
           >
             {ZONE_TYPES.map((t) => (
@@ -489,7 +501,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
           </select>
           <span className="text-[11px] text-ink-muted font-mono whitespace-nowrap">
             {draft.length} pt{draft.length === 1 ? '' : 's'}
-            {draft.length < MIN_POINTS && ` · need ${MIN_POINTS}`}
+            {draft.length < MIN_POINTS && ` · click at least ${MIN_POINTS} points to outline an area`}
           </span>
         </div>
       )}

@@ -125,7 +125,8 @@ export function drawHUD(ctx, canvas, entities, zones, enableBlur) {
     // Tag banner (top)
     // Sized to be read at the size the canvas is shown, not at its pixel size.
     ctx.font = '600 14px Inter, sans-serif';
-    const tag = `ID #${entity.track_id}  ${entity.posture}${flagged ? '  FLAGGED' : ''}`;
+    // "Worker 8", the same name the panels use (not "ID #8"): nobody is named, but one word for one person.
+    const tag = `Worker ${entity.track_id}  ${entity.posture}${flagged ? '  FLAGGED' : ''}`;
     const bannerW = Math.max(ctx.measureText(tag).width + 14, w);
     ctx.fillStyle = 'rgba(11,10,12,0.88)';
     ctx.fillRect(x1, y1 - 30, bannerW, 26);
