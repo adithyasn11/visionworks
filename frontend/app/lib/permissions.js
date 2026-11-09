@@ -65,6 +65,10 @@ const CAPABILITIES = {
   // read. A VIEWER watching a live feed would be creating data.
   'analysis.run':     ['ADMIN', 'MANAGER'],
 
+  // Evidence pictures show people at work, so they are not for every member;
+  // every view is written to the audit log (backend/app/api/routers/safety.py).
+  'safety.evidence.view': ['ADMIN', 'MANAGER'],
+
   // ── Governing the organisation. ──
   // enforcedBy: admin_org_ids() — membership_insert/update/delete, org_update.
   // Plus memberships_keep_an_admin, which stops the last admin removing

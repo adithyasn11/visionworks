@@ -22,6 +22,7 @@ the safety layer is logged (once, not per frame) and the video carries on.
 
 import asyncio
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
@@ -32,7 +33,8 @@ from app.safety.config import SafetyConfig, load_config
 from app.safety.engine import FrameTime, SafetyEngine, engine_for_session
 from app.safety.ppe_runner import PpeRunner, get_ppe_detector
 from app.safety.rules import load_rules
-from app.safety.schemas import Decision
+from app.safety import snapshots
+from app.safety.schemas import POTENTIAL_VIOLATION, UNVERIFIABLE, Decision
 from app.safety.zone_events import ZoneEvent, ZoneEventTracker, rule_zone_ids
 
 _log = logging.getLogger(__name__)
@@ -49,7 +51,8 @@ def worker_key(track_id) -> str:
 
 class SafetySession:
     def __init__(self, engine: SafetyEngine, writer: SafetyWriter, config: Optional[SafetyConfig] = None,
-                 zones_config=None, ppe_runner: Optional[PpeRunner] = None, rules=None):
+                 zones_config=None, ppe_runner: Optional[PpeRunner] = None, rules=None,
+                 evidence_enabled: bool = False, evidence_refresh_s: Optional[float] = None, evidence_check=None):
         """
         zones_config: the camera's zones. Only the ones safety rules can attach
         to (PPE_CHECKPOINT, APPROACH, RESTRICTED, EXIT) produce events; a person
@@ -65,6 +68,17 @@ class SafetySession:
         if ppe_runner is not None:
             engine.register(ppe_runner)
         self._tracked_zones = None if zones_config is None else rule_zone_ids(zones_config)
+        self._zones_config = list(zones_config or [])
+        # Evidence pictures (F11). Whether this organisation allows them is read ONCE, when the
+        # session starts, so no network call can happen in the middle of a frame.
+        self.evidence_enabled = bool(evidence_enabled)
+        # How often a long session re-reads the organisation's switch (None: never, as in tests).
+        # An organisation that turns evidence off must not keep getting pictures for the whole
+        # length of a live session.
+        self._evidence_refresh_s = evidence_refresh_s
+        self._evidence_checked_at = None
+        self._held: Optional[dict] = None                  # the clean frame of the frame being processed
+        self._evidence_check = evidence_check              # org -> bool, run in a thread
         engine.register(self.tracker)
         # The rule engine: judges entries into restricted zones from the zone events and
         # the PPE evidence. Without a PPE runner there is nothing to judge with.
@@ -160,13 +174,60 @@ class SafetySession:
             self._warn_once("ppe", f"PPE step skipped for a frame: {type(e).__name__}: {e}")
             return None
 
+    def hold_frame(self, clean, working, detections, frame_time: FrameTime) -> None:
+        """
+        Keep this frame's CLEAN pixels for an evidence picture, until the next frame.
+
+        Call after `detect_ppe` and BEFORE `process_detections`, which blurs the working frame
+        in place. `clean` is the frame as the camera sent it; when the pipeline did not shrink
+        it, `clean` IS `working` and the blur would write into it, so it is copied. Nothing is
+        kept unless this organisation allows evidence pictures.
+        """
+        if not self.evidence_enabled:
+            return
+        try:
+            if clean is working:
+                clean = clean.copy()
+            people = [{"track_id": d.get("track_id"), "bbox": list(d["bbox"]), "keypoints": d.get("keypoints")}
+                      for d in detections]
+            ppe = self.ppe
+            self._held = {
+                "frame": clean, "people": people, "work_shape": tuple(working.shape[:2]),
+                "video_time_s": frame_time.video_time_s,
+                # Boxes only when the model ran on THIS frame; an older run's boxes would be drawn
+                # on a frame they do not belong to.
+                "ppe_dets": list(ppe.last_detections) if ppe is not None and ppe.last_detections_call == ppe._calls else [],
+                "ppe_shape": ppe.last_ppe_shape if ppe is not None else None,
+            }
+        except Exception as e:
+            self._held = None
+            self._warn_once("hold", f"the frame could not be kept for evidence: {type(e).__name__}: {e}")
+
     def reset(self, reason: str, frame_index: Optional[int] = None) -> None:
+        self._held = None
         self.engine.reset(reason, frame_index=frame_index)
 
     # ── per frame ────────────────────────────────────────────────────────────
 
+    async def _refresh_evidence_switch(self) -> None:
+        """Re-read the organisation's evidence switch every `evidence_refresh_s`, off the event loop."""
+        if not self._evidence_refresh_s or self._evidence_check is None or not self.writer.org_id:
+            return
+        now = time.monotonic()
+        if self._evidence_checked_at is not None and now - self._evidence_checked_at < self._evidence_refresh_s:
+            return
+        self._evidence_checked_at = now
+        try:
+            self.evidence_enabled = bool(await asyncio.to_thread(self._evidence_check, self.writer.org_id))
+            if not self.evidence_enabled:
+                self._held = None                           # and stop holding frames
+        except Exception as e:
+            self._warn_once("evidence-switch", f"could not re-read the evidence switch: {type(e).__name__}: {e}")
+            self.evidence_enabled = False                   # fail closed, like the first read
+
     async def after_frame(self, frame_time: FrameTime, tracked_entities) -> None:
         """Turn this frame's positions into zone events and queue them for the database."""
+        await self._refresh_evidence_switch()
         try:
             self._zone_events(frame_time, tracked_entities)
         except Exception as e:
@@ -229,21 +290,70 @@ class SafetySession:
             self._warn_once("rules", f"the rule engine skipped a step: {type(e).__name__}: {e}")
             return
         for decision in decisions:
-            self._write_decision(decision, frame_time)
+            self._write_decision(decision, frame_time, picture=True)
 
-    def _write_decision(self, decision: Decision, reference: FrameTime) -> None:
+    def _write_decision(self, decision: Decision, reference: FrameTime, picture: bool = False) -> None:
+        """`picture`: this decision was made on the frame being processed, so that frame may be its evidence."""
+        ref, obscured = None, False
+        wants = decision.snapshot_requested or (decision.status == UNVERIFIABLE and self.config.snapshot_unverifiable)
+        if picture and wants:
+            ref, obscured = self._take_snapshot(decision, reference)
+        evidence = {**decision.evidence, "helmet_region_obscured": True} if obscured else decision.evidence
         try:
             self.writer.add_decision(
                 decision.rule_type, decision.severity, decision.worker_key, decision.status, decision.reason,
-                decision.confidence, decision.evidence, decision.video_time_s,
+                decision.confidence, evidence, decision.video_time_s,
                 self._observed_at(reference, decision.video_time_s),
                 zone_id=decision.zone_id, rule_id=decision.rule_id, thresholds=decision.thresholds,
-                decision_id=decision.id)
+                snapshot_ref=ref, decision_id=decision.id)
         except Exception as e:
             self._warn_once("decision", f"a decision was refused: {type(e).__name__}: {e}")
+            if ref:
+                self._discard_snapshot(ref)                  # no decision, so no picture
             return
         if len(self._frame_decisions) < _MAX_EVENTS_IN_PAYLOAD:
-            self._frame_decisions.append(decision.as_payload())
+            data = decision.as_payload()
+            if wants:
+                data["snapshot"] = ref is not None           # False: no picture was kept (off, or no frame to show)
+            self._frame_decisions.append(data)
+
+    def _take_snapshot(self, decision: Decision, reference: FrameTime):
+        """(snapshot_ref, helmet_region_obscured), or (None, False) when no picture is kept."""
+        held = self._held
+        if not self.evidence_enabled or held is None or reference.replay:
+            return None, False
+        if abs(held["video_time_s"] - reference.video_time_s) > 1e-6:
+            return None, False                               # not the frame this decision was made on
+        try:
+            match = decision.worker_key[4:] if decision.worker_key.startswith("trk-") else None
+            target = int(match) if match is not None and match.isdigit() else None
+            zone = next((z for z in self._zones_config if str(z.get("zone_id")) == str(decision.zone_id)), None)
+            def clock(t):
+                t = int(max(0, t))
+                return f"{t // 60:02d}:{t % 60:02d}"
+            label = "POTENTIAL VIOLATION (for review)" if decision.status == POTENTIAL_VIOLATION else "COULD NOT VERIFY"
+            # Two times, because they differ: the decision is stamped at the entry, the picture is
+            # the frame it was decided on (up to the evidence wait later).
+            banner = [f"{label}  |  {(zone or {}).get('zone_name') or decision.zone_id or 'camera'}  |  "
+                      f"entered {clock(decision.video_time_s)}  |  picture {clock(reference.video_time_s)}  |  {decision.worker_key}",
+                      decision.reason]
+            jpeg, obscured = snapshots.render(
+                held["frame"], held["people"], held["work_shape"], target_track=target,
+                ppe_dets=held["ppe_dets"], ppe_shape=held["ppe_shape"],
+                zone_polygon=(zone or {}).get("polygon"), banner=banner)
+            return snapshots.save_snapshot(jpeg, self.writer.org_id, decision.id), obscured
+        except Exception as e:
+            self._warn_once("snapshot", f"an evidence picture could not be saved: {type(e).__name__}: {e}")
+            return None, False
+
+    @staticmethod
+    def _discard_snapshot(ref: str) -> None:
+        try:
+            path = snapshots.path_for_ref(ref)
+            if path is not None and path.exists():
+                path.unlink()
+        except OSError:
+            pass
 
     def _write_closed(self, reference: FrameTime, extra=()) -> None:
         """
@@ -368,4 +478,8 @@ def safety_session_for(
     writer = SafetyWriter(camera_id=camera_id, org_id=org_id, session_id=session_id)
     config = load_config()
     runner = PpeRunner(get_ppe_detector(config), config) if with_ppe else None
-    return SafetySession(engine, writer, config, zones_config=zones_config, ppe_runner=runner)
+    # Read once, here (the sockets build the session off the event loop): may this
+    # organisation's flagged decisions keep a picture?
+    enabled = snapshots.evidence_enabled(org_id)
+    return SafetySession(engine, writer, config, zones_config=zones_config, ppe_runner=runner, evidence_enabled=enabled,
+                         evidence_refresh_s=300.0, evidence_check=snapshots.evidence_enabled)

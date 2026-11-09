@@ -817,6 +817,9 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             # in place (the blur covers exactly where a helmet is).
             ppe_by_track = (await safety.detect_ppe(frame_time, detections, ppe_frame, frame.shape)
                             if safety is not None else None)
+            if safety is not None:
+                # The clean pixels, for an evidence picture, before the blur below touches them.
+                safety.hold_frame(ppe_frame, frame, detections, frame_time)
 
             # One shared implementation — see cv/frame_pipeline.py — so the
             # three sockets cannot drift apart.
@@ -1052,6 +1055,9 @@ async def live_webcam_websocket(websocket: WebSocket):
             # in place (the blur covers exactly where a helmet is).
             ppe_by_track = (await safety.detect_ppe(frame_time, detections, ppe_frame, frame.shape)
                             if safety is not None else None)
+            if safety is not None:
+                # The clean pixels, for an evidence picture, before the blur below touches them.
+                safety.hold_frame(ppe_frame, frame, detections, frame_time)
 
             # One shared implementation — see cv/frame_pipeline.py — so the
             # three sockets cannot drift apart.
@@ -1225,6 +1231,9 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
             # in place (the blur covers exactly where a helmet is).
             ppe_by_track = (await safety.detect_ppe(frame_time, detections, ppe_frame, frame.shape)
                             if safety is not None else None)
+            if safety is not None:
+                # The clean pixels, for an evidence picture, before the blur below touches them.
+                safety.hold_frame(ppe_frame, frame, detections, frame_time)
 
             # One shared implementation — see cv/frame_pipeline.py — so the
             # three sockets cannot drift apart.

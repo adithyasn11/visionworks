@@ -519,6 +519,7 @@ def unsynced_counts(engine=None) -> dict:
 
 
 UNMAPPED_ALERT_THRESHOLD = 5
+EVIDENCE_PURGE_EVERY_S = 3600
 
 
 async def run_safety_sync_loop(stop_event=None) -> None:
@@ -527,12 +528,20 @@ async def run_safety_sync_loop(stop_event=None) -> None:
     logger.info("Safety sync started (%ss interval, Postgres %s)", SYNC_INTERVAL_S,
                 "on" if service_role_configured() else "off: no service-role key")
     delay = FIRST_PASS_DELAY_S
+    last_purge = None
     while True:
         try:
             if stop_event is not None and stop_event.is_set():
                 return
             await asyncio.sleep(delay)
             delay = SYNC_INTERVAL_S
+            if last_purge is None or time.monotonic() - last_purge > EVIDENCE_PURGE_EVERY_S:
+                last_purge = time.monotonic()
+                # Expired evidence pictures: deleted here, and their references cleared.
+                from app.safety.snapshots import purge_evidence
+                removed = await asyncio.to_thread(purge_evidence)
+                if removed["files"]:
+                    logger.info("Removed %d expired evidence picture(s)", removed["files"])
             if not service_role_configured():
                 continue
             pushed = await sync_safety()

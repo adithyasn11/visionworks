@@ -86,6 +86,11 @@ class PpeRunner:
         self.every_n = max(1, int(self.config.ppe_every_n_frames))
         self._tracker = self._new_tracker()
         self._last: Dict[str, dict] = {}        # worker key -> last associated detection
+        # The helmet/vest boxes of the most recent detection run, and the (height, width) of the
+        # frame they are in, so an evidence picture can draw what the model saw.
+        self.last_detections: List[dict] = []
+        self.last_ppe_shape = None
+        self.last_detections_call = -1          # the process() call that run belonged to; == _calls means "this frame's"
         self._last_seen: Dict[str, float] = {}
         self._calls = 0
         self._failures = 0
@@ -224,6 +229,9 @@ class PpeRunner:
         detections = list(detections) + self._close_ups(scaled, ppe_frame, small)
         self._failures = 0
         self.detections_run += 1
+        self.last_detections = [dict(d) for d in detections]
+        self.last_ppe_shape = small.shape[:2]
+        self.last_detections_call = self._calls
         if self._prev_detect_t is not None and t > self._prev_detect_t:
             self._detect_gaps.append(t - self._prev_detect_t)
         self._prev_detect_t = t
@@ -351,6 +359,8 @@ class PpeRunner:
         self._tracker = self._new_tracker()
         self._last.clear()
         self._last_seen.clear()
+        self.last_detections = []
+        self.last_ppe_shape = None
         self._calls = 0
         self._frame_gaps.clear()
         self._detect_gaps.clear()

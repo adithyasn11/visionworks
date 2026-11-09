@@ -51,6 +51,10 @@ CAPABILITIES = {
     # than a read. A VIEWER watching a live feed would be creating data.
     "analysis.run": ("ADMIN", "MANAGER"),
 
+    # Evidence pictures show people at work, so they are not for every member.
+    # Every view is written to the audit log.
+    "safety.evidence.view": ("ADMIN", "MANAGER"),
+
     # Governing the organisation — enforced by admin_org_ids().
     "members.invite": ("ADMIN",),
     "members.manage": ("ADMIN",),

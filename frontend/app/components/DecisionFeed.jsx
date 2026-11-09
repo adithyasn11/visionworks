@@ -12,6 +12,7 @@ import { ShieldCheck } from 'lucide-react';
 import { decisionStatus, confidenceLabel, tally } from '../lib/decisions';
 import { workerLabel } from '../lib/zoneEvents';
 import { zoneTypeMeta } from '../lib/zoneTypes';
+import EvidencePicture from './EvidencePicture';
 
 function clock(seconds) {
   const n = Number(seconds);
@@ -51,7 +52,7 @@ export default function DecisionFeed({ decisions, zones = [] }) {
           role="log"
           aria-label="Decisions, newest first"
           tabIndex={0}
-          className="flex flex-col divide-y divide-line/60 max-h-72 overflow-y-auto pr-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)] rounded"
+          className="flex flex-col divide-y divide-line/60 max-h-[34rem] overflow-y-auto pr-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)] rounded"
         >
           {decisions.map((d) => {
             const meta = decisionStatus(d.status);
@@ -73,6 +74,15 @@ export default function DecisionFeed({ decisions, zones = [] }) {
                   {sure && <span className="text-ink-faint">{sure}</span>}
                 </div>
                 <p className={`pl-14 leading-relaxed ${d.status === 'UNVERIFIABLE' ? 'text-ink-faint' : 'text-ink-muted'}`}>{d.reason}</p>
+                {/* snapshot is only present on decisions that wanted a picture: true = kept, false = not kept */}
+                {d.snapshot === true && (
+                  <div className="pl-14 flex flex-col">
+                    <EvidencePicture decisionId={d.id} />
+                  </div>
+                )}
+                {d.snapshot === false && (
+                  <p className="pl-14 text-[11px] text-ink-faint">No evidence picture was kept for this decision.</p>
+                )}
               </li>
             );
           })}

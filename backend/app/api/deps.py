@@ -292,6 +292,30 @@ def resolve_org_role(token: Optional[str]):
     return (cached[0], cached[3]) if cached else (None, None)
 
 
+def resolve_identity(token: Optional[str]):
+    """
+    (org_id, user_id, role) for this access token, or (None, None, None).
+
+    The same verified lookup as resolve_org_role(), with the user's id as well, for the
+    few endpoints that must record WHO did something (viewing evidence is audited). All
+    three come from ONE cache entry, so the user id cannot be lost between two lookups.
+    """
+    if not token or not isinstance(token, str):
+        return None, None, None
+    normalised = token.strip()
+    if normalised.lower().startswith("bearer "):
+        normalised = normalised[7:].strip()
+    if not normalised:
+        return None, None, None
+    cached = _cache_get(normalised)
+    if cached is None:
+        resolve_org(normalised)                 # populates the cache through the single verification path
+        cached = _cache_get(normalised)
+    if not cached or cached[0] is None:
+        return None, None, None
+    return cached[0], cached[1], cached[3]
+
+
 async def resolve_org_async(token: Optional[str]) -> Optional[str]:
     """
     resolve_org() off the event loop.
