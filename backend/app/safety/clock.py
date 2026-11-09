@@ -66,7 +66,11 @@ def utc_iso(moment: datetime) -> str:
     """An aware datetime as ISO-8601 UTC with millisecond precision."""
     if moment.tzinfo is None:
         raise ValueError("utc_iso needs a timezone-aware datetime")
-    return moment.astimezone(timezone.utc).isoformat(timespec="milliseconds")
+    moment = moment.astimezone(timezone.utc)
+    # Round to the nearest millisecond (isoformat would TRUNCATE, which put an event at video time
+    # 0 a millisecond BEFORE the recording started whenever float arithmetic landed just under).
+    moment = moment.replace(microsecond=0) + timedelta(milliseconds=round(moment.microsecond / 1000.0))
+    return moment.isoformat(timespec="milliseconds")
 
 
 def parse_recorded_at(

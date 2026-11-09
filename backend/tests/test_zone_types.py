@@ -171,7 +171,7 @@ from app.api.routers import video_upload                     # noqa: E402
 from app.api.routers.video_upload import load_zones_for_camera  # noqa: E402
 
 source = open(video_upload.__file__, encoding="utf-8").read()
-loads = re.findall(r"load_zones_for_camera\(effective_camera_id, org_id=org_id\)\n"
+loads = re.findall(r"load_zones_for_camera\(zones_camera_id, org_id=org_id\)\n"
                    r"\s*spatial_engine = SpatialEngine\(zones_config=zones_config\)", source)
 check("all three sockets (upload, live webcam, phone) load zones and build the engine the same way",
       len(loads) == 3, f"{len(loads)} of 3")
@@ -227,7 +227,7 @@ class _Resp:
         return False
 
 
-def run_mirror(zones_rows, zone_name):
+def run_mirror(zones_rows, zone_name, zone_type=None):
     """Call the REAL mirror with a fake PostgREST; return the write requests."""
     writes = []
 
@@ -246,7 +246,7 @@ def run_mirror(zones_rows, zone_name):
     os.environ["SUPABASE_SERVICE_ROLE_KEY"] = "test-key"
     os.environ["SUPABASE_URL"] = "http://postgrest.invalid"
     try:
-        ORIGINAL_MIRROR(ORG, "cam", "zone_x", SQUARE, zone_name)
+        ORIGINAL_MIRROR(ORG, "cam", "zone_x", SQUARE, zone_name, zone_type)
     finally:
         urllib.request.urlopen = saved[0]
         for key, val in (("SUPABASE_SERVICE_ROLE_KEY", saved[1]), ("SUPABASE_URL", saved[2])):
@@ -265,17 +265,19 @@ def keys_of(writes):
     return out
 
 
-created = run_mirror([], "Press line")
+created = run_mirror([], "Press line", "RESTRICTED")
 check("a new zone is mirrored with a POST", [m for m, _ in created] == ["POST"], str(created)[:80])
-check("...and the payload carries no type field",
-      not ({"zone_type", "zoneType", "safetyType", "type"} & keys_of(created)), str(sorted(keys_of(created))))
-renamed = run_mirror([{"id": "z1", "name": "old name"}], "Press line")
+check("...carrying its safety type (Step 7: zones.safetyType)", created and created[0][1][0].get("safetyType") == "RESTRICTED", str(created)[:120])
+legacy = run_mirror([], "Press line", "WORKSTATION")
+check("a legacy type is stored as NULL (it has no safety meaning)", legacy and legacy[0][1][0].get("safetyType") is None)
+renamed = run_mirror([{"id": "z1", "name": "old name", "safetyType": "RESTRICTED", "polygon": SQUARE}], "Press line", "RESTRICTED")
 check("a renamed zone is mirrored with a PATCH", [m for m, _ in renamed] == ["PATCH"], str(renamed)[:80])
-check("...with no type field either",
-      not ({"zone_type", "zoneType", "safetyType", "type"} & keys_of(renamed)), str(sorted(keys_of(renamed))))
-same_name = run_mirror([{"id": "z1", "name": "Press line"}], "Press line")
-check("a type-only change (same name) sends nothing to Postgres today (Step 7 gap, known)",
-      same_name == [], str(same_name))
+same_name = run_mirror([{"id": "z1", "name": "Press line", "safetyType": "RESTRICTED", "polygon": SQUARE}], "Press line", "RESTRICTED")
+check("nothing changed: nothing is sent", same_name == [], str(same_name))
+type_only = run_mirror([{"id": "z1", "name": "Press line", "safetyType": "RESTRICTED", "polygon": SQUARE}], "Press line", "EXIT")
+check("a type-only change (same name) is now mirrored (it used to be skipped)", [m for m, _ in type_only] == ["PATCH"] and type_only[0][1].get("safetyType") == "EXIT", str(type_only))
+no_type = run_mirror([{"id": "z1", "name": "Press line", "safetyType": "RESTRICTED", "polygon": SQUARE}], "Press line", None)
+check("a caller that passes no type leaves the stored type alone", no_type == [], str(no_type))
 
 print()
 if FAILS:

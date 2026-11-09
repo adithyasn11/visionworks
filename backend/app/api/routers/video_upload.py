@@ -59,7 +59,35 @@ async def _resolve_session_org(websocket):
         return None, None
     return await asyncio.to_thread(resolve_org_role, token)
 
+def _discard_session(session_id: str) -> None:
+    """
+    A session that failed before it could run: delete its uploaded file and forget it. The orphan
+    purge skips any file whose session is still registered, so a failed one used to keep its file
+    (and its entry) for ever.
+    """
+    session = _active_sessions.pop(session_id, None)
+    path = (session or {}).get("path")
+    try:
+        if path and os.path.exists(path):
+            os.remove(path)
+    except OSError as e:
+        logger.warning(f"Could not remove the upload of failed session {session_id}: {e}")
+
+
+def standalone_live_allowed() -> bool:
+    """
+    May the live camera sockets run with no verified organisation? Only when the operator turns
+    on `VISIONWORKS_STANDALONE_LIVE` (a single-machine demo with no accounts). Off by default: an
+    unauthenticated caller must not be able to watch the server's camera or use its GPU.
+    """
+    return os.getenv("VISIONWORKS_STANDALONE_LIVE", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../"))
+# Absolute, so the weights are found whatever folder the server is started from (a bare file name
+# makes ultralytics download 50 MB when the working directory is not backend/).
+_POSE_WEIGHTS = os.path.join(ROOT_DIR, "backend", "yolov8m-pose.pt")
+POSE_MODEL_PATH = _POSE_WEIGHTS if os.path.exists(_POSE_WEIGHTS) else "yolov8m-pose.pt"
 SAMPLE_VIDEOS_DIR = os.path.join(ROOT_DIR, "sample_videos")
 os.makedirs(SAMPLE_VIDEOS_DIR, exist_ok=True)
 
@@ -506,14 +534,17 @@ async def upload_video_file(
 
     allowed_exts = ('.mp4', '.avi', '.webm', '.mov', '.mkv')
     if not file.filename or not file.filename.lower().endswith(allowed_exts):
-        raise HTTPException(status_code=400, detail=f"Invalid format. Supported: {allowed_exts}")
+        raise HTTPException(status_code=400, detail="Invalid format. Supported: " + ", ".join(allowed_exts))
 
     # Strip any directory components: a filename like "../../x.mp4" must never
     # be able to escape SAMPLE_VIDEOS_DIR and write elsewhere on disk.
     safe_name = os.path.basename(file.filename.replace("\\", "/"))
     safe_name = re.sub(r'[^A-Za-z0-9._-]', '_', safe_name).lstrip('.')
     if not safe_name.lower().endswith(allowed_exts):
-        raise HTTPException(status_code=400, detail=f"Invalid format. Supported: {allowed_exts}")
+        raise HTTPException(status_code=400, detail="Invalid format. Supported: " + ", ".join(allowed_exts))
+    if len(safe_name) > 120:                    # a very long name made the file system refuse the write (a 500)
+        stem, ext = os.path.splitext(safe_name)
+        safe_name = stem[:120 - len(ext)] + ext
 
     session_id = str(uuid.uuid4())[:8]
     save_path = os.path.join(SAMPLE_VIDEOS_DIR, f"{session_id}_{safe_name}")
@@ -522,6 +553,10 @@ async def upload_video_file(
         with open(save_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
+        try:
+            os.remove(save_path)
+        except OSError:
+            pass
         raise HTTPException(status_code=500, detail=f"Failed to save video: {e}")
 
     # See resolve_registered_camera(). None (unregistered id, or none given)
@@ -643,7 +678,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         # Falls back to the ad-hoc per-session id when none was supplied.
         effective_camera_id = session.get("camera_id") or f"upload_{session_id}"
 
-        pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
+        pose_engine = PostureEstimator(pose_model_path=POSE_MODEL_PATH, conf_thresh=0.35, device=device)
         zones_camera_id = zones_camera_for(session.get("requested_camera_id"), org_id, effective_camera_id)
         zones_config = load_zones_for_camera(zones_camera_id, org_id=org_id)
         spatial_engine = SpatialEngine(zones_config=zones_config)
@@ -659,14 +694,16 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         logger.error(f"AI init error: {e}")
         await websocket.send_json({"error": f"Failed to initialize AI pipeline: {str(e)}"})
         await websocket.close()
-        session["status"] = "ERROR"
+        _discard_session(session_id)
         return
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        await websocket.send_json({"error": f"Cannot open video: {video_path}"})
+        cap.release()
+        # No server path in the message: the person only needs to know the file is not a readable video.
+        await websocket.send_json({"error": "Cannot open this video: the file could not be read as a video."})
         await websocket.close()
-        session["status"] = "ERROR"
+        _discard_session(session_id)
         return
 
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -689,9 +726,10 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             zones_config=zones_config)
     except Exception as e:
         logger.error(f"Safety clock init error: {e}")
+        cap.release()
         await websocket.send_json({"error": f"Failed to start the safety clock: {e}"})
         await websocket.close()
-        session["status"] = "ERROR"
+        _discard_session(session_id)
         return
 
     await websocket.send_json({
@@ -741,6 +779,10 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                     logger.warning(f"Control parse error: {ex}")
         except Exception:
             pass
+        finally:
+            # The client is gone (or the socket failed). Tell the main loop, which may be
+            # sitting in the paused branch with nothing else to notice it.
+            control_state["gone"] = True
 
     control_task = asyncio.create_task(receive_controls())
 
@@ -766,6 +808,9 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                 if safety is not None:
                     safety.reset("SEEK", frame_index=target_f)
                 just_sought = True
+
+            if control_state.get("gone"):
+                break                                   # the client disconnected: stop, clean up in `finally`
 
             if control_state["paused"]:
                 await asyncio.sleep(0.1)
@@ -939,14 +984,19 @@ async def live_webcam_websocket(websocket: WebSocket):
     """
     await websocket.accept()
     org_id, role = await _resolve_session_org(websocket)
-    if org_id is not None and not can(role, "analysis.run"):
+    # A live camera (the server's own, or frames sent in) is only for a verified member who may run
+    # analysis. With no verified organisation it used to run "standalone" and stream the server's
+    # physical camera to anyone who connected; that now needs an explicit opt-in.
+    unverified = org_id is None and not standalone_live_allowed()
+    if unverified or (org_id is not None and not can(role, "analysis.run")):
         # send_json() immediately followed by close() races: the frame can be
         # dropped before delivery, and the client sees only an abnormal 1006
         # with no reason. Measured — the refusal worked but was unexplained.
         # Sending, then closing with an explicit policy-violation code (1008)
         # and the reason in the handshake, means the client learns WHY even if
         # the JSON frame loses the race.
-        reason = denial_message("analysis.run")
+        reason = ("Sign in to an organisation to use the camera." if unverified
+                  else denial_message("analysis.run"))
         try:
             await websocket.send_json({"error": reason})
         except Exception:
@@ -966,7 +1016,7 @@ async def live_webcam_websocket(websocket: WebSocket):
         from app.cv.activity_aggregator import ActivityAggregator
         from app.cv.anonymizer import PrivacyAnonymizer
 
-        pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
+        pose_engine = PostureEstimator(pose_model_path=POSE_MODEL_PATH, conf_thresh=0.35, device=device)
         zones_camera_id = zones_camera_for(requested_camera_id, org_id, effective_camera_id)
         zones_config = load_zones_for_camera(zones_camera_id, org_id=org_id)
         spatial_engine = SpatialEngine(zones_config=zones_config)
@@ -1125,14 +1175,19 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
     """
     await websocket.accept()
     org_id, role = await _resolve_session_org(websocket)
-    if org_id is not None and not can(role, "analysis.run"):
+    # A live camera (the server's own, or frames sent in) is only for a verified member who may run
+    # analysis. With no verified organisation it used to run "standalone" and stream the server's
+    # physical camera to anyone who connected; that now needs an explicit opt-in.
+    unverified = org_id is None and not standalone_live_allowed()
+    if unverified or (org_id is not None and not can(role, "analysis.run")):
         # send_json() immediately followed by close() races: the frame can be
         # dropped before delivery, and the client sees only an abnormal 1006
         # with no reason. Measured — the refusal worked but was unexplained.
         # Sending, then closing with an explicit policy-violation code (1008)
         # and the reason in the handshake, means the client learns WHY even if
         # the JSON frame loses the race.
-        reason = denial_message("analysis.run")
+        reason = ("Sign in to an organisation to use the camera." if unverified
+                  else denial_message("analysis.run"))
         try:
             await websocket.send_json({"error": reason})
         except Exception:
@@ -1152,7 +1207,7 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
         from app.cv.activity_aggregator import ActivityAggregator
         from app.cv.anonymizer import PrivacyAnonymizer
 
-        pose_engine = PostureEstimator(pose_model_path="yolov8m-pose.pt", conf_thresh=0.35, device=device)
+        pose_engine = PostureEstimator(pose_model_path=POSE_MODEL_PATH, conf_thresh=0.35, device=device)
         # Falls back to the same camera id as the /live_webcam path and as
         # ZoneEditor's default `cameraId` prop (see dashboard/page.jsx
         # CAMERA_ID). The browser-camera and backend-direct-camera paths are two
