@@ -499,8 +499,12 @@ def safety_session_for(
     writer = SafetyWriter(camera_id=camera_id, org_id=org_id, session_id=session_id)
     config = load_config()
     runner = PpeRunner(get_ppe_detector(config), config) if with_ppe else None
+    rules = None
+    if runner is not None:
+        from app.safety.rules_store import rules_for_session
+        rules = rules_for_session(org_id, zones_config, camera_id)   # the organisation's own rules for THIS camera, plus the default where a zone has none
     # Read once, here (the sockets build the session off the event loop): may this
     # organisation's flagged decisions keep a picture?
     enabled = snapshots.evidence_enabled(org_id)
-    return SafetySession(engine, writer, config, zones_config=zones_config, ppe_runner=runner, evidence_enabled=enabled,
-                         evidence_refresh_s=300.0, evidence_check=snapshots.evidence_enabled)
+    return SafetySession(engine, writer, config, zones_config=zones_config, ppe_runner=runner, rules=rules,
+                         evidence_enabled=enabled, evidence_refresh_s=300.0, evidence_check=snapshots.evidence_enabled)

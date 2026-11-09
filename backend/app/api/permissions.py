@@ -51,8 +51,13 @@ CAPABILITIES = {
     # than a read. A VIEWER watching a live feed would be creating data.
     "analysis.run": ("ADMIN", "MANAGER"),
 
-    # Evidence pictures show people at work, so they are not for every member.
-    # Every view is written to the audit log.
+    # Safety compliance (Step 11). Reading decisions, events, rules and the summary is open to every
+    # active member (enforced by user_org_ids()); judging a flag and writing rules are for the people who
+    # run the site (manage_org_ids()). Evidence pictures show people at work, so they are narrower still,
+    # and every view is written to the audit log.
+    "safety.view": ("ADMIN", "MANAGER", "VIEWER"),
+    "safety.review": ("ADMIN", "MANAGER"),
+    "safety.rules.edit": ("ADMIN", "MANAGER"),
     "safety.evidence.view": ("ADMIN", "MANAGER"),
 
     # Governing the organisation — enforced by admin_org_ids().

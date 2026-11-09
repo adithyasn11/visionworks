@@ -67,6 +67,9 @@ const CAPABILITIES = {
 
   // Evidence pictures show people at work, so they are not for every member;
   // every view is written to the audit log (backend/app/api/routers/safety.py).
+  'safety.view':          ['ADMIN', 'MANAGER', 'VIEWER'],
+  'safety.review':        ['ADMIN', 'MANAGER'],
+  'safety.rules.edit':    ['ADMIN', 'MANAGER'],
   'safety.evidence.view': ['ADMIN', 'MANAGER'],
 
   // ── Governing the organisation. ──

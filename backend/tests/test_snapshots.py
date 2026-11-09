@@ -538,6 +538,13 @@ if TestClient is not None:
     _real_record_view = safety_router._record_view
     safety_router.resolve_identity = lambda token: IDENTITIES.get(token, (None, None, None))
     safety_router._default_engine = ide
+    can_see = {"yes": True, "raise": None}
+
+    def fake_can_see(token, org, decision):
+        if can_see["raise"]:
+            raise can_see["raise"]
+        return can_see["yes"]
+    safety_router._caller_can_see = fake_can_see
 
     def fake_audit(org, user, decision):
         if state["audit_fails"]:
@@ -584,6 +591,17 @@ if TestClient is not None:
     r = client.get(url(d_ok), headers=hdr("Bearer manager"))
     check("when the view cannot be audited the picture is NOT sent (503)", r.status_code == 503 and r.headers.get("content-type", "").startswith("application/json") and jpeg[:50] not in r.content)
     state["audit_fails"] = False
+    n = len(audits)
+    can_see["yes"] = False
+    r = client.get(url(d_ok), headers=hdr("Bearer manager"))
+    check("a member the database no longer lets read the decision (removed a moment ago, organisation deleted) is refused: 404, no audit row",
+          r.status_code == 404 and len(audits) == n, str(r.status_code))
+    can_see["yes"] = True
+    from fastapi import HTTPException
+    can_see["raise"] = HTTPException(status_code=401, detail="Your session has expired. Sign in again.")
+    r = client.get(url(d_ok), headers=hdr("Bearer manager"))
+    check("an expired token is 401 'sign in again', not a picture", r.status_code == 401 and len(audits) == n)
+    can_see["raise"] = None
     IDENTITIES["Bearer anonymous-user"] = (ORG, None, "MANAGER")
     safety_router._record_view = _real_record_view
     os.environ.pop("SUPABASE_SERVICE_ROLE_KEY", None)
