@@ -66,6 +66,7 @@ class Stub:
         self.fail_get = None            # status to answer GETs with
         self.reject_ids = set()         # row ids answered 400 when sent
         self.schema_missing = False     # answer every POST with PostgREST's "table not found"
+        self.reject_style = "short"     # "long": the rejection is a long body with a letter-coded SQLSTATE
         self.auth_seen = set()
 
 
@@ -119,12 +120,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._reply(code, b'{"message":"stub failure"}')
         table = u.path.rsplit("/", 1)[-1]
         if any(str(r.get("id", r.get("eventUid"))) in STUB.reject_ids for r in body):
+            if getattr(STUB, "reject_style", "short") == "long":
+                # a real Postgres body: a letter-coded SQLSTATE and a message far longer than 300 characters
+                long_msg = ("invalid byte sequence ... Failing row contains (" + "x" * 600 + ")").replace('"', "'")
+                return self._reply(400, ('{"code":"22P05","message":"' + long_msg + '","details":null}').encode())
             return self._reply(400, b'{"code":"23514","message":"violates a constraint"}')
         if STUB.schema_missing:
             return self._reply(404, b'{"code":"PGRST205","message":"Could not find the table in the schema cache"}')
         if table == "safety_events":
-            for r in body:                                       # merge-duplicates
-                STUB.events.setdefault(r["eventUid"], {}).update(r)
+            for r in body:                                       # ignore-duplicates: the stored row wins
+                STUB.events.setdefault(r["eventUid"], dict(r))
         elif table == "safety_decisions":
             for r in body:
                 if "ignore-duplicates" in prefer:                # the real behaviour: keep the stored row
@@ -229,8 +234,8 @@ check("an event arrives keyed by its eventUid with its details as JSON, not text
       and STUB.events[ev_zone]["zoneId"] == ZONE_UUID and STUB.events[ev_zone]["eventType"] == "ENTERED_ZONE")
 check("a camera-wide row (no zone) is sent with zoneId null, not dropped", STUB.events[ev_cam]["zoneId"] is None and STUB.events[ev_cam]["cameraId"] == CAM_UUID)
 posts = {p[0]: p for p in STUB.posts}
-check("events: conflict target eventUid with merge-duplicates",
-      posts["safety_events"][1] == {"on_conflict": "eventUid"} and "merge-duplicates" in posts["safety_events"][2], str(posts["safety_events"][1:3]))
+check("events: conflict target eventUid with ignore-duplicates (a re-send can never rewrite or move a stored event)",
+      posts["safety_events"][1] == {"on_conflict": "eventUid"} and "ignore-duplicates" in posts["safety_events"][2], str(posts["safety_events"][1:3]))
 check("decisions: conflict target id with IGNORE-duplicates (a re-send can never overwrite a review)",
       posts["safety_decisions"][1] == {"on_conflict": "id"} and "ignore-duplicates" in posts["safety_decisions"][2], str(posts["safety_decisions"][1:3]))
 check("the service key is sent", STUB.auth_seen == {"service-key-for-the-stub"})
@@ -467,6 +472,40 @@ wg = writer(e); add_ok(wg); wg.flush_sync()
 out = run(e)
 check("a 36-character non-hex organisation id does not pause the pass or reach Postgres; the good row still syncs",
       "error" not in out and out["invalid"] == 1 and out["synced_decisions"] == 1 and not any(g[1].get("orgId") == "eq.zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz" for g in STUB.gets), str(out))
+
+
+# a real-world rejection: a letter-coded SQLSTATE (22P05) and a body far longer than 300 characters
+e = fresh()
+w = writer(e)
+good_a, bad_long, good_b = add_flag(w), add_flag(w), add_ok(w)
+w.flush_sync()
+STUB.reject_ids = {bad_long}
+STUB.reject_style = "long"
+out = run(e)
+check("a long 22P05 rejection is still recognised as being about the row: its neighbours sync, it is set aside",
+      {good_a, good_b} <= set(STUB.decisions) and bad_long not in STUB.decisions and out["rejected"] == 1 and "error" not in out, str(out))
+
+# NaN / Infinity in stored JSON must not make a batch unsendable
+e = fresh()
+w = writer(e)
+nan_row = add_flag(w)
+fine = add_ok(w)
+w.flush_sync()
+with e.begin() as c:
+    c.execute(text("UPDATE safety_decisions SET evidence = :v, thresholds = :v WHERE id = :i"), {"v": '{"x": NaN, "y": Infinity, "z": [1, -Infinity]}', "i": nan_row})
+out = run(e)
+check("NaN / Infinity inside stored JSON becomes null and the row syncs with all its neighbours", {nan_row, fine} <= set(STUB.decisions) and "error" not in out
+      and STUB.decisions[nan_row]["evidence"] == {"x": None, "y": None, "z": [1, None]}, str(out))
+
+# an event that already exists is never rewritten, whoever sends it
+e = fresh()
+w = writer(e)
+ev_uid = add_event(w)
+w.flush_sync()
+STUB.events[ev_uid] = {"eventUid": ev_uid, "orgId": "some-other-organisation", "workerKey": "trk-original"}
+run(e)
+check("an event uid that already exists under another organisation is left exactly as stored (ignore-duplicates)",
+      STUB.events[ev_uid]["orgId"] == "some-other-organisation" and STUB.events[ev_uid]["workerKey"] == "trk-original")
 
 # names that need encoding
 cam_id = str(uuid.uuid4())

@@ -29,6 +29,7 @@ project yet.
 | `sql/021_camera_role.sql`, `022_employee_hours_and_visibility.sql`, `023_zone_slug.sql` | Camera role, a (since dropped) employee rollup, and the zone slug used to match zones by name. |
 | `sql/024_retire_productivity_tables.sql` | **Retires the workplace-productivity tables** (`employees`, `face_templates`, `identity_events`, `employee_day_stats`, `employee_hour_stats`, `camera_links`, `alerts`, `alert_rules`) and their functions and enums. Refuses to run if any holds a row. Dropped without CASCADE so an unexpected dependency fails loudly. |
 | `sql/025_safety.sql` | **Safety compliance.** Tables `safety_rules`, `safety_events`, `safety_decisions`, `corrective_actions`; `zones.safetyType`; `organisations.safetyEvidenceEnabled`; the `SAFETY_SUMMARY` report kind; CHECK constraints, tenancy triggers, indexes, RLS, grants; `review_safety_decision()`, `soft_delete_safety_rule()`, `purge_safety_data()` (cron 03:45 UTC). Idempotent. Matrix below. |
+| `sql/026_safety_hardening.sql` | **Safety hardening** from the test pass: reopening an action re-checks its decision; members cannot write `safety.*` audit rows (the functions and the service role do); the database stamps attribution and timestamps on insert (a rule is born alive, an action's closer/time are set by the transition); a soft-deleted organisation loses access to safety data; review reasons come from a list; blank names/titles and oversized params are refused. Idempotent. |
 | `seed.ts` | Generates ~826,000 minute buckets of realistic shaped data. |
 
 **Order matters.** 001 → 002 → … → 025. Later files
@@ -103,7 +104,7 @@ Four real problems were caught and fixed:
 ## Safety tables: who may do what (025)
 
 Measured with real VIEWER / MANAGER / ADMIN sessions by
-`backend/tests/test_safety_rls.py` (101 checks, run against the live project;
+`backend/tests/test_safety_rls.py` (123 checks, run against the live project;
 it creates and removes its own organisations and users). Each "refused" fails
 with a permission or RLS error or changes nothing; each "allowed" succeeds.
 

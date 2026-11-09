@@ -158,7 +158,7 @@ async function main() {
   const auditMut = Number(
     await one<bigint>(`SELECT count(*)::bigint FROM information_schema.role_table_grants
       WHERE table_schema='public' AND table_name='audit_logs' AND grantee='authenticated'
-        AND privilege_type IN ('UPDATE','DELETE')`),
+        AND privilege_type IN ('UPDATE','DELETE','TRUNCATE')`),
   );
   check('audit_logs append-only', auditMut === 0, `${auditMut} mutate grants`);
 

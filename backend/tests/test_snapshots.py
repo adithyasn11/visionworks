@@ -524,6 +524,13 @@ if TestClient is not None:
     d_foreign = wb.add_decision("PPE_ENTRY", "WARNING", "trk-1", "POTENTIAL_VIOLATION", "r", 0.9, {}, 1.0, "2026-11-08T04:00:00.000+00:00", zone_id="press",
                                 snapshot_ref=snapshots.save_snapshot(jpeg, ORG_B, str(uuid.uuid4())))
     wb.flush_sync()
+    with ide.begin() as c:
+        c.execute(text("UPDATE safety_decisions SET snapshot_ref = :r WHERE id = :i"), {"r": snapshots.save_snapshot(jpeg, ORG_B, d_foreign), "i": d_foreign})
+    # a decision of organisation A whose stored reference names ANOTHER organisation's picture (local tampering)
+    d_swap = wa.add_decision("PPE_ENTRY", "WARNING", "trk-8", "POTENTIAL_VIOLATION", "r", 0.9, {}, 8.0, "2026-11-08T04:00:08.000+00:00", zone_id="press")
+    wa.flush_sync()
+    with ide.begin() as c:
+        c.execute(text("UPDATE safety_decisions SET snapshot_ref = :r WHERE id = :i"), {"r": f"{ORG_B}/{d_foreign}.jpg", "i": d_swap})
     audits = []
     state = {"audit_fails": False}
     IDENTITIES = {"Bearer manager": (ORG, USER_M, "MANAGER"), "Bearer admin": (ORG, USER_M, "ADMIN"), "Bearer viewer": (ORG, USER_V, "VIEWER"),
@@ -569,6 +576,8 @@ if TestClient is not None:
                      ("a stored reference that escapes the folder", d_evil)):
         r = client.get(url(d), headers=hdr("Bearer manager"))
         check(f"{label}: 404 and no audit row", r.status_code == 404 and len(audits) == n, str(r.status_code))
+    r = client.get(url(d_swap), headers=hdr("Bearer manager"))
+    check("a stored reference naming another organisation's picture is never followed: 404, no audit row", r.status_code == 404 and len(audits) == n, str(r.status_code))
     r = client.get(url(d_gone), headers=hdr("Bearer manager"))
     check("a picture that has expired: 410 Gone, no audit row", r.status_code == 410 and len(audits) == n)
     state["audit_fails"] = True

@@ -76,7 +76,13 @@ def decision_snapshot(decision_id: str, authorization: Optional[str] = Header(de
         raise HTTPException(status_code=404, detail="Decision not found.")
     if not row["snapshot_ref"]:
         raise HTTPException(status_code=404, detail="No evidence picture was stored for this decision.")
-    path = snapshots.path_for_ref(row["snapshot_ref"])
+    # The reference must be exactly this organisation's and this decision's own file: a stored value
+    # pointing at anyone else's picture is never followed.
+    try:
+        expected = snapshots.ref_for(org_id, decision_id)
+    except ValueError:
+        expected = None
+    path = snapshots.path_for_ref(row["snapshot_ref"]) if row["snapshot_ref"] == expected else None
     if path is None:
         logger.error("Decision %s has an unusable snapshot reference", decision_id)
         raise HTTPException(status_code=404, detail="No evidence picture was stored for this decision.")

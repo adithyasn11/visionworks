@@ -9,10 +9,10 @@ Postgres. This module is the bridge, and it is deliberately boring:
   * One direction. SQLite -> Postgres. A human review lives only in Postgres.
   * Idempotent. Every row carries a uuid made at the source, so sending it twice
     changes nothing.
-        events     POST ...?on_conflict=eventUid   merge-duplicates
+        events     POST ...?on_conflict=eventUid   ignore-duplicates
         decisions  POST ...?on_conflict=id         ignore-duplicates
-    Decisions use IGNORE, never merge: a decision is a measurement, and a re-sent
-    copy must not be able to overwrite the review fields a person set since.
+    Both use IGNORE, never merge: each is a measurement, a re-sent copy must not be able to
+    rewrite what is stored (a review a person set since; an event moved to another organisation).
   * Nothing is invented. A row whose camera or zone has no Postgres row stays
     unsynced and is counted. It is never attached to something else.
   * Never raises into the video loop. A failure is logged and the rows are tried
@@ -101,7 +101,7 @@ _cursor: dict = {}                 # table -> (created_at, id) of the last row e
 _negative: dict = {}               # lookup key -> monotonic time until which "not found" is believed
 _background: set = set()           # keeps fire-and-forget tasks alive until they finish
 
-_PG_ROW_ERROR = re.compile(r"^(22|23)\d{3}$")     # data exception / integrity violation: about the row
+_PG_ROW_ERROR = re.compile(r"^(22|23)[0-9A-Z]{3}$")     # data exception / integrity violation (incl. 22P02, 22P05): about the row
 
 
 class _LookupFailed(Exception):
@@ -109,10 +109,11 @@ class _LookupFailed(Exception):
 
 
 class _SendRejected(Exception):
-    def __init__(self, status: int, detail: str):
-        super().__init__(f"HTTP {status}: {detail}")
+    def __init__(self, status: int, detail: str, code: str = ""):
+        super().__init__(f"HTTP {status}: {detail[:300]}")
         self.status = status
-        self.detail = detail
+        self.detail = detail[:300]
+        self.code = code                        # PostgREST's SQLSTATE, parsed from the WHOLE body (a long one is cut for logs only)
 
     @property
     def about_the_row(self) -> bool:
@@ -125,11 +126,7 @@ class _SendRejected(Exception):
         """
         if self.status not in (400, 409, 422):
             return False
-        try:
-            code = str(json.loads(self.detail).get("code", ""))
-        except Exception:
-            return False
-        return bool(_PG_ROW_ERROR.match(code))
+        return bool(_PG_ROW_ERROR.match(self.code))
 
 
 # ── configuration ────────────────────────────────────────────────────────────
@@ -169,12 +166,13 @@ def _call(method: str, path: str, params: Optional[dict] = None, body=None, pref
         with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_S) as response:
             return response.status, response.read().decode("utf-8") or ""
     except urllib.error.HTTPError as e:
-        detail = ""
+        body, code = "", ""
         try:
-            detail = e.read().decode("utf-8")[:300]
+            body = e.read().decode("utf-8")
+            code = str(json.loads(body).get("code", ""))
         except Exception:
             pass
-        raise _SendRejected(e.code, detail)
+        raise _SendRejected(e.code, body, code)
 
 
 def _lookup(table: str, params: dict, cache: dict) -> Optional[str]:
@@ -236,7 +234,9 @@ def _json_or_none(raw):
     if raw is None or raw == "":
         return None
     try:
-        return json.loads(raw)
+        # NaN and Infinity are accepted by Python's parser but are not JSON: they become null here
+        # instead of making the whole batch unsendable.
+        return json.loads(raw, parse_constant=lambda _c: None)
     except (TypeError, ValueError):
         return None
 
@@ -285,7 +285,7 @@ def decision_payload(row: dict, camera_id: str, zone_id: Optional[str], rule_id:
 
 _TABLES = {
     # table: (Postgres path, conflict target, Prefer header)
-    "safety_events": ("safety_events", "eventUid", "resolution=merge-duplicates,return=minimal"),
+    "safety_events": ("safety_events", "eventUid", "resolution=ignore-duplicates,return=minimal"),
     "safety_decisions": ("safety_decisions", "id", "resolution=ignore-duplicates,return=minimal"),
 }
 
@@ -402,6 +402,18 @@ def _sync_table(engine, table: str, limit: int, retire_days: int, summary: dict,
     summary["retired"] += _retire_ids(engine, table, invalid, retire_days)
     summary["retired"] += _retire_ids(engine, table, unmapped_in_known_org, UNMAPPED_RETIRE_DAYS)
 
+    # A row that cannot be turned into JSON (a stray NaN in a number column) is set aside on its own
+    # rather than raising for the whole batch.
+    sendable = []
+    for row_id, payload_row in built:
+        try:
+            json.dumps(payload_row, allow_nan=False)
+            sendable.append((row_id, payload_row))
+        except (TypeError, ValueError) as e:
+            _rejected[(table, row_id)] = time.monotonic() + REJECT_COOLDOWN_S
+            summary["rejected"] += 1
+            logger.error("A %s row cannot be encoded as JSON and was set aside: %s", table, e)
+    built = sendable
     if not built:
         return
     ids = [i for i, _ in built]

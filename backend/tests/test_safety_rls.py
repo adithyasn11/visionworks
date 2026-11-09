@@ -369,8 +369,19 @@ try:
     check("cannot be assigned to someone outside the organisation", ok, why)
     ok, why = refused(lambda: manager.table("corrective_actions").update({"decisionId": d_conf_a}, returning=ReturnMethod.minimal).eq("id", action).execute())
     check("cannot be re-pointed at another decision", ok and "permission denied" in why, why)
-    ok, why = refused(lambda: manager.table("corrective_actions").update({"status": "CLOSED"}).eq("id", action).execute())
-    check("cannot be closed without a finish time", ok, why)
+    # closing and reopening (026): the database stamps who and when, a client cannot choose
+    ok, data = allowed(lambda: manager.table("corrective_actions").insert(
+        {"orgId": orgA, "decisionId": d_flag, "title": "Second", "closedById": admin_id, "closedAt": "2001-01-01T00:00:00Z"}).execute())
+    action2 = data[0]["id"] if ok else None
+    check("a new action ignores a forged closedById / closedAt (it is open, so both are empty)",
+          ok and data[0]["closedById"] is None and data[0]["closedAt"] is None, str(data)[:120])
+    ok, data = allowed(lambda: manager.table("corrective_actions").update({"status": "CLOSED", "closedAt": "2001-01-01T00:00:00Z"}).eq("id", action2).execute())
+    check("closing stamps the closer and the time itself (a backdated closedAt is replaced)",
+          ok and data[0]["closedById"] == manager_id and data[0]["closedAt"] and data[0]["closedAt"][:4] != "2001", str(data)[:120])
+    ok, data = allowed(lambda: manager.table("corrective_actions").update({"status": "OPEN"}).eq("id", action2).execute())
+    check("reopening clears the old closure (closer, time)", ok and data[0]["closedById"] is None and data[0]["closedAt"] is None, str(data)[:120])
+    ok, data = allowed(lambda: manager.table("corrective_actions").update({"status": "CANCELLED"}).eq("id", action2).execute())
+    check("...and the second action ends cancelled", ok and data[0]["status"] == "CANCELLED")
     ok, data = allowed(lambda: manager.table("corrective_actions").update(
         {"status": "IN_PROGRESS", "assignedToId": admin_id}).eq("id", action).execute())
     check("can be assigned and moved on", ok and data and data[0]["status"] == "IN_PROGRESS", str(data)[:100])
@@ -384,7 +395,9 @@ try:
           ok and data and data[0]["closedById"] == manager_id, str(data)[:100])
     ok, data = allowed(lambda: manager.rpc("review_safety_decision", {"p_decision_id": d_flag, "p_state": "DISMISSED"}).execute())
     check("...then the decision can be dismissed", ok and data["reviewState"] == "DISMISSED", str(data)[:100])
-    check("a viewer sees the action", len(viewer.table("corrective_actions").select("id").execute().data) == 1)
+    ok, why = refused(lambda: manager.table("corrective_actions").update({"status": "OPEN"}, returning=ReturnMethod.minimal).eq("id", action).execute())
+    check("a cancelled action cannot be set back to OPEN once its decision is DISMISSED (the guard cannot be bypassed)", ok and "confirmed" in why, why)
+    check("a viewer sees the actions", len(viewer.table("corrective_actions").select("id").execute().data) == 2)
 
     # ── ADMIN ────────────────────────────────────────────────────────────
     print()
@@ -418,6 +431,49 @@ try:
     check("cannot review organisation A's decision", ok, why)
     check("organisation B's own decision is still unreviewed",
           svc.table("safety_decisions").select("reviewState").eq("id", d_foreign).execute().data[0]["reviewState"] == "PENDING")
+
+    # ── Hardening (026) ──────────────────────────────────────────────────
+    print()
+    print("  Hardening (026)")
+    forged = lambda c, action_name, org=orgA: c.table("audit_logs").insert(
+        {"orgId": org, "actorId": viewer_id if c is viewer else manager_id, "action": action_name, "targetType": "safety_decision",
+         "targetId": d_flag, "metadata": {}}, returning=ReturnMethod.minimal).execute()
+    for who, c in (("a VIEWER", viewer), ("a MANAGER", manager)):
+        for act in ("safety.decision_reviewed", "safety.evidence_viewed", "safety.rule_deleted"):
+            ok, why = refused(lambda c=c, act=act: forged(c, act))
+            check(f"{who} cannot write a '{act}' audit row", ok, why)
+    ok, data = allowed(lambda: forged(viewer, "zone.created"))
+    check("...while an ordinary audit row from a member still works (the policy is narrow)", ok, str(data)[:100])
+    ok, data = allowed(lambda: manager.table("safety_rules").insert(
+        {"orgId": orgA, "zoneId": zA, "name": "Born deleted?", "type": "PPE_ENTRY", "params": {}, "deletedAt": ago(1),
+         "createdAt": "2001-01-01T00:00:00Z", "createdById": admin_id}, returning=ReturnMethod.representation).execute())
+    visible = [r for r in manager.table("safety_rules").select("id,createdAt,deletedAt,createdById").eq("name", "Born deleted?").execute().data]
+    check("a rule inserted with deletedAt / createdAt / createdById is born alive, dated now, and owned by the signer",
+          visible and visible[0]["deletedAt"] is None and visible[0]["createdAt"][:4] != "2001" and visible[0]["createdById"] == manager_id, str(visible)[:140])
+    ok, why = refused(lambda: new_rule(manager, name="   "))
+    check("a blank rule name is refused", ok and "name_present" in why, why)
+    ok, why = refused(lambda: new_rule(manager, params={"x": "y" * 9000}))
+    check("an oversized params object is refused", ok and "params_small" in why, why)
+    ok, why = refused(lambda: manager.table("corrective_actions").insert({"orgId": orgA, "decisionId": d_conf_a, "title": "  "}).execute())
+    check("a blank action title is refused (before or after the decision check)", ok, why)
+    ok, why = refused(lambda: manager.rpc("review_safety_decision", {"p_decision_id": d_flag2, "p_state": "CONFIRMED", "p_reason": "because"}).execute())
+    check("a review reason outside the offered list is refused", ok and "unknown review reason" in why, why)
+    ok, data = allowed(lambda: manager.rpc("review_safety_decision", {"p_decision_id": d_flag2, "p_state": "CONFIRMED", "p_reason": "PPE_PRESENT"}).execute())
+    check("...and one from the list is accepted", ok, str(data)[:100])
+
+    # a soft-deleted organisation loses access, and gets it back when restored
+    svc.table("organisations").update({"deletedAt": ago(0)}).eq("id", orgA).execute()
+    check("in a soft-deleted organisation a manager sees no decisions, rules or events",
+          not manager.table("safety_decisions").select("id").execute().data and not manager.table("safety_rules").select("id").execute().data
+          and not manager.table("safety_events").select("id").execute().data)
+    ok, why = refused(lambda: new_rule(manager))
+    check("...cannot add a rule", ok, why)
+    ok, why = refused(lambda: manager.rpc("review_safety_decision", {"p_decision_id": d_flag2, "p_state": "DISMISSED"}).execute())
+    check("...cannot review", ok and "permitted" in why, why)
+    ok, why = refused(lambda: manager.rpc("soft_delete_safety_rule", {"p_rule_id": ruleA}).execute())
+    check("...cannot delete a rule", ok, why)
+    svc.table("organisations").update({"deletedAt": None}).eq("id", orgA).execute()
+    check("restoring the organisation restores access", len(manager.table("safety_decisions").select("id").execute().data) >= 4)
 
     # ── Anonymous ────────────────────────────────────────────────────────
     print()
