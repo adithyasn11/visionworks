@@ -14,7 +14,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { createRule, deleteRule, listRules, updateRule, validateRule } from '../../lib/safetyApi';
 import { listSafetyZones } from '../../lib/safety/management';
-import { RULE_TYPES, SEVERITIES, PPE_ITEMS, defaultParams, isEnforced, ruleBody, ruleTypeMeta } from '../../lib/safety/ruleTypes';
+import { RULE_TYPES, SEVERITIES, PPE_ITEMS, defaultParams, friendlyRuleError, isEnforced, ruleBody, ruleTypeMeta } from '../../lib/safety/ruleTypes';
 import { can } from '../../lib/permissions';
 import { BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel, SeverityChip } from './common';
 
@@ -82,6 +82,9 @@ function RuleForm({ initial, zones, onSaved, onCancel }) {
   const [form, setForm] = useState(initial);
   const [check, setCheck] = useState({ state: 'idle' });
   const [saving, setSaving] = useState(false);
+  const formRef = useRef(null);
+  // The form opens below the list: bring it into view (and focus its first field) so the click visibly did something.
+  useEffect(() => { const el = formRef.current; if (el) { el.scrollIntoView({ block: "nearest", behavior: "smooth" }); const f = el.querySelector("input, select"); if (f) f.focus({ preventScroll: true }); } }, []);
   const [error, setError] = useState(null);
   const meta = ruleTypeMeta(form.type);
   const editing = Boolean(form.id);
@@ -99,7 +102,7 @@ function RuleForm({ initial, zones, onSaved, onCancel }) {
     const timer = setTimeout(async () => {
       const r = await validateRule(body);
       if (mine !== token.current) return;
-      if (!r.ok) setCheck({ state: 'error', message: r.message });
+      if (!r.ok) setCheck({ state: 'error', message: friendlyRuleError(r.message) });
       else if (r.data.valid) setCheck({ state: 'valid', enforced: r.data.evaluated_by_engine });
       else setCheck({ state: 'invalid', errors: r.data.errors });
     }, 450);
@@ -115,12 +118,12 @@ function RuleForm({ initial, zones, onSaved, onCancel }) {
     setSaving(true); setError(null);
     const r = editing ? await updateRule(form.id, body) : await createRule(body);
     setSaving(false);
-    if (!r.ok) { setError(r.message); return; }
+    if (!r.ok) { setError(friendlyRuleError(r.message)); return; }
     onSaved(r.data);
   }
 
   return (
-    <form onSubmit={save} className="flex flex-col gap-3 rounded-lg border border-line bg-surface-alt/40 p-3 sm:p-4" aria-label={editing ? 'Edit rule' : 'New rule'}>
+    <form ref={formRef} onSubmit={save} className="flex flex-col gap-3 rounded-lg border border-line bg-surface-alt/40 p-3 sm:p-4" aria-label={editing ? 'Edit rule' : 'New rule'}>
       <div className="flex flex-wrap gap-3">
         <label className="flex flex-col gap-1 text-[11px] text-ink-faint flex-1 min-w-[200px]">Name
           <input value={form.name} maxLength={160} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="For example: Hard hat and vest at the press" className={INPUT} required />
@@ -172,7 +175,7 @@ function RuleForm({ initial, zones, onSaved, onCancel }) {
             This rule is valid. {check.enforced ? 'The safety engine acts on it from the next run of a camera.' : 'It will be saved, but the safety engine does not act on this kind of rule yet.'}
           </Notice>
         )}
-        {check.state === 'invalid' && <Notice tone="error">{check.errors.join(' ')}</Notice>}
+        {check.state === 'invalid' && <Notice tone="error">{check.errors.map(friendlyRuleError).join(' ')}</Notice>}
         {check.state === 'error' && <Notice tone="error">{check.message}</Notice>}
       </div>
       {error && <Notice tone="error">{error}</Notice>}
@@ -205,7 +208,7 @@ export default function RulesScreen({ role }) {
   async function toggle(rule) {
     setMessage(null);
     const r = await updateRule(rule.id, { is_enabled: !rule.isEnabled });
-    if (!r.ok) { setMessage({ tone: 'error', text: r.message }); return; }
+    if (!r.ok) { setMessage({ tone: 'error', text: friendlyRuleError(r.message) }); return; }
     load();
   }
 
@@ -213,7 +216,7 @@ export default function RulesScreen({ role }) {
     setMessage(null);
     const r = await deleteRule(rule.id);
     setConfirmDelete(null);
-    if (!r.ok) { setMessage({ tone: 'error', text: r.message }); return; }
+    if (!r.ok) { setMessage({ tone: 'error', text: friendlyRuleError(r.message) }); return; }
     setMessage({ tone: 'ok', text: `"${rule.name}" was deleted. Decisions it made keep their record.` });
     load();
   }

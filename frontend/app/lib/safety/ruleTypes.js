@@ -154,3 +154,25 @@ export function ruleBody(form) {
     min_evidence_confidence: Number(form.minEvidenceConfidence),
   };
 }
+
+const FRIENDLY = [
+  [/must be anchored to a RESTRICTED zone/i, 'This rule only applies to a Restricted zone. Choose a Restricted zone, or change the zone type on the Zones page.'],
+  [/must be anchored to a zone/i, 'Choose the zone this rule applies to.'],
+  [/is not one of this camera's zones/i, 'That zone is not available. Choose another one.'],
+  [/needs a real zone/i, 'A General zone has no safety meaning. Choose a zone with a safety type.'],
+  [/required_ppe must list at least one/i, 'Choose at least one item to check for.'],
+  [/checkpoint_zone_id is required/i, 'Choose the checkpoint zone workers pass first.'],
+  [/checkpoint_zone_id must be/i, 'The checkpoint must be a PPE checkpoint zone on the same camera.'],
+  [/exit_zone_id is required/i, 'Choose the exit zone.'],
+  [/exit_zone_id must be/i, 'The exit must be an Exit zone on the same camera.'],
+  [/give min_people, max_people or both/i, 'Give a smallest number of people, a largest number, or both.'],
+  [/min_people cannot be more than max_people/i, 'The smallest number cannot be larger than the largest.'],
+  [/max_seconds is required/i, 'Say how long a stay may last.'],
+];
+
+/** A server validation sentence in words a site manager would use (anything unrecognised is shown as it came). */
+export function friendlyRuleError(message) {
+  const text = String(message || '');
+  const hit = FRIENDLY.find(([re]) => re.test(text));
+  return hit ? hit[1] : text;
+}
