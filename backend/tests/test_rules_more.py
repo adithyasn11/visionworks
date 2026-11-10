@@ -71,10 +71,10 @@ def rule(rule_type, zone="press", severity="WARNING", **params):
 
 # ── A. Rules ────────────────────────────────────────────────────────────────
 print("A. The new rule types")
-check("MAX_DWELL, PPE_CONTINUOUS and REQUIRED_EXIT are evaluated; PPE_ENTRY only AT_ENTRY; the rest are not yet",
+check("MAX_DWELL, PPE_CONTINUOUS and REQUIRED_EXIT are evaluated; PPE_ENTRY only AT_ENTRY; MAN_DOWN too; the rest are not yet",
       is_evaluated("MAX_DWELL", {}) and is_evaluated("PPE_CONTINUOUS", {}) and is_evaluated("REQUIRED_EXIT", {})
       and is_evaluated("PPE_ENTRY", {}) and not is_evaluated("PPE_ENTRY", {"mode": "VIA_CHECKPOINT"})
-      and not is_evaluated("OCCUPANCY", {}) and not is_evaluated("MAN_DOWN", {}) and not is_evaluated("WALK_ONLY", {}))
+      and not is_evaluated("OCCUPANCY", {}) and is_evaluated("MAN_DOWN", {}) and not is_evaluated("WALK_ONLY", {}))
 r = rule("MAX_DWELL", max_seconds=30)
 check("a stay limit fills in its warning fraction", r.params == {"max_seconds": 30.0, "warn_fraction": 0.8}, str(r.params))
 r = rule("PPE_CONTINUOUS")

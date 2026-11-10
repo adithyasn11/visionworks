@@ -32,6 +32,7 @@ from app.safety.compliance_engine import ComplianceEngine
 from app.safety.config import SafetyConfig, load_config
 from app.safety.engine import FrameTime, SafetyEngine, engine_for_session
 from app.safety.ppe_runner import PpeRunner, get_ppe_detector
+from app.safety.man_down import ManDownMonitor
 from app.safety.rules import load_rules
 from app.safety import snapshots
 from app.safety.schemas import POTENTIAL_VIOLATION, UNVERIFIABLE, Decision
@@ -91,6 +92,7 @@ class SafetySession:
         # the PPE evidence. Without a PPE runner there is nothing to judge with.
         # `rules` are the organisation's rules (None: the built-in default).
         self.compliance: Optional[ComplianceEngine] = None
+        self.rules = list(rules) if rules is not None else None
         if ppe_runner is not None:
             self.rules = rules if rules is not None else load_rules(writer.org_id, zones_config)
             names = {str(z.get("zone_id")): str(z.get("zone_name") or z.get("zone_id")) for z in (zones_config or [])}
@@ -101,6 +103,14 @@ class SafetySession:
             # limit-reached events the rule engine turns into decisions.
             for zone, limit, warn in self.compliance.dwell_watches():
                 self.tracker.watch_dwell(zone, limit, warn)
+        # Man-down reads the pose keypoints, not the PPE evidence, so it runs whenever the session has rules.
+        self.man_down: Optional[ManDownMonitor] = None
+        if getattr(self, "rules", None):
+            names = {str(z.get("zone_id")): str(z.get("zone_name") or z.get("zone_id")) for z in (zones_config or [])}
+            monitor = ManDownMonitor(self.rules, self.config, names)
+            self.man_down = monitor if monitor else None
+            if self.man_down is not None:
+                engine.register(self.man_down)
         self._frame_decisions: List[dict] = []
         self._closed_decisions: List[Decision] = []
         self._last_frame: Optional[FrameTime] = None
@@ -218,6 +228,7 @@ class SafetySession:
 
     def reset(self, reason: str, frame_index: Optional[int] = None) -> None:
         self._held = None
+        # (the engine resets the man-down monitor itself, as a registered component)
         self._flagged.clear()
         self.engine.reset(reason, frame_index=frame_index)
 
@@ -239,13 +250,18 @@ class SafetySession:
             self._warn_once("evidence-switch", f"could not re-read the evidence switch: {type(e).__name__}: {e}")
             self.evidence_enabled = False                   # fail closed, like the first read
 
-    async def after_frame(self, frame_time: FrameTime, tracked_entities) -> None:
-        """Turn this frame's positions into zone events and queue them for the database."""
+    async def after_frame(self, frame_time: FrameTime, tracked_entities, detections=None, frame_shape=None) -> None:
+        """
+        Turn this frame's positions into zone events and queue them for the database.
+        `detections` (with the pose keypoints) and `frame_shape` feed the man-down rule.
+        """
         await self._refresh_evidence_switch()
         try:
             self._zone_events(frame_time, tracked_entities)
         except Exception as e:
             self._warn_once("zone", f"zone events skipped for a frame: {type(e).__name__}: {e}")
+        if self.man_down is not None and detections is not None and frame_shape is not None and not frame_time.replay:
+            self._judge(lambda: self._man_down_step(frame_time, tracked_entities, detections, frame_shape), frame_time)
         # Tell the picture which people have an open alert (the entities are sent after this call).
         if self._flagged:
             for entity in tracked_entities:
@@ -296,6 +312,16 @@ class SafetySession:
 
         if self.compliance is not None and not frame_time.replay:
             self._judge(lambda: self.compliance.on_tick(frame_time.video_time_s, set(worker_zone)), frame_time)
+
+    def _man_down_step(self, frame_time: FrameTime, tracked_entities, detections, frame_shape) -> List[Decision]:
+        zone_of = {}
+        for entity in tracked_entities:
+            if entity.get("track_id") is not None:
+                zone_of[worker_key(entity["track_id"])] = entity.get("zone_id")
+        people = [{"worker_key": worker_key(d["track_id"]), "keypoints": d.get("keypoints"), "bbox": d["bbox"],
+                   "posture": d.get("posture")} for d in detections if d.get("track_id") is not None]
+        height, width = frame_shape[:2]
+        return self.man_down.update(people, frame_time.video_time_s, width, height, zone_of)
 
     def _judge(self, ask, frame_time: FrameTime) -> None:
         """
@@ -358,7 +384,7 @@ class SafetySession:
             # Two times, because they differ: the decision is stamped at the moment it is about (the
             # entry, the limit being reached, the exit), the picture is the frame it was decided on.
             moment = {"PPE_ENTRY": "entered", "PPE_CONTINUOUS": "began", "MAX_DWELL": "limit reached",
-                      "REQUIRED_EXIT": "left"}.get(decision.rule_type, "at")
+                      "REQUIRED_EXIT": "left", "MAN_DOWN": "lying since"}.get(decision.rule_type, "at")
             banner = [f"{label}  |  {(zone or {}).get('zone_name') or decision.zone_id or 'camera'}  |  "
                       f"{moment} {clock(decision.video_time_s)}  |  picture {clock(reference.video_time_s)}  |  "
                       f"{('Worker ' + decision.worker_key[4:]) if decision.worker_key.startswith('trk-') else decision.worker_key}",

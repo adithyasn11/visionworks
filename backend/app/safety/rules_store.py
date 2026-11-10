@@ -94,6 +94,11 @@ def rules_for_session(org_id: Optional[str], zones_config, camera_name: Optional
     mapped = []
     for r in rows:
         zid = str(r.get("zoneId")) if r.get("zoneId") else None
+        if zid is None and r.get("type") == "MAN_DOWN":
+            # A whole-camera rule: it belongs to this camera, or (no camera named) to every camera of the organisation.
+            if r.get("cameraId") in (None, camera_id):
+                mapped.append(dict(r, zoneId=None, params=_translate_params(r.get("params"), slug_of)))
+            continue
         if zid is None or zid not in slug_of or slug_of[zid] not in local_ids:
             continue                                     # a rule for a zone of another camera (or one this session does not have)
         mapped.append(dict(r, zoneId=slug_of[zid], params=_translate_params(r.get("params"), slug_of)))

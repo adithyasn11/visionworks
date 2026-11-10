@@ -884,7 +884,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             # own failures, so it cannot stall or break the video stream.
             await persist_frame(activity_writer, tracked_entities)
             if safety is not None:
-                await safety.after_frame(frame_time, tracked_entities)
+                await safety.after_frame(frame_time, tracked_entities, detections=detections, frame_shape=frame.shape)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
@@ -1125,7 +1125,7 @@ async def live_webcam_websocket(websocket: WebSocket):
 
             await persist_frame(activity_writer, tracked_entities)
             if safety is not None:
-                await safety.after_frame(frame_time, tracked_entities)
+                await safety.after_frame(frame_time, tracked_entities, detections=detections, frame_shape=frame.shape)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')
@@ -1306,7 +1306,7 @@ async def process_webcam_frame_websocket(websocket: WebSocket):
 
             await persist_frame(activity_writer, tracked_entities)
             if safety is not None:
-                await safety.after_frame(frame_time, tracked_entities)
+                await safety.after_frame(frame_time, tracked_entities, detections=detections, frame_shape=frame.shape)
 
             _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
             frame_b64 = "data:image/jpeg;base64," + base64.b64encode(buffer).decode('utf-8')

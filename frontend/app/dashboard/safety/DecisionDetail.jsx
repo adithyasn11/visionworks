@@ -37,6 +37,8 @@ const OUTCOMES = {
   OTHER_ZONE: 'Went to another zone first',
   NOT_REACHED: 'Still in view without having reached the exit zone',
   OUT_OF_VIEW: 'Out of view before reaching the exit zone',
+  LYING_STILL: 'Lying still for longer than the rule allows',
+  UNCLEAR: 'Still, and might be lying down, but the picture is not clear enough to say',
 };
 
 /** The measurements of a decision that is not about helmets and vests: a stay, or the way out of a zone. */
@@ -60,6 +62,16 @@ function Facts({ ruleType, evidence }) {
       ['Time since leaving', sec(evidence.elapsed_seconds)],
       ['Went to instead', evidence.went_to || null],
     ];
+  } else if (ruleType === 'MAN_DOWN') {
+    const lying = evidence.frames ? `${evidence.frames_lying} of ${evidence.frames} frames` : null;
+    rows = [
+      ['What happened', OUTCOMES[evidence.outcome] || evidence.outcome],
+      ['Still for', sec(evidence.seconds_down)],
+      ['Time the rule allows', sec(evidence.min_seconds_down)],
+      ['Clearly lying in', lying],
+      ['Not clear enough to tell in', evidence.frames_unclear ? `${evidence.frames_unclear} of ${evidence.frames} frames` : null],
+      ['Torso angle from upright', evidence.torso_angle_deg != null ? `about ${Math.round(evidence.torso_angle_deg)} degrees` : null],
+    ];
   }
   rows = rows.filter(([, v]) => v !== null && v !== undefined && v !== '');
   if (rows.length === 0) return <p className="text-xs text-ink-faint">No measurements were stored for this decision.</p>;
@@ -76,7 +88,7 @@ function Facts({ ruleType, evidence }) {
 }
 
 function Evidence({ evidence, ruleType }) {
-  if (evidence && !evidence.items && (ruleType === 'MAX_DWELL' || ruleType === 'REQUIRED_EXIT')) return <Facts ruleType={ruleType} evidence={evidence} />;
+  if (evidence && !evidence.items && (ruleType === 'MAX_DWELL' || ruleType === 'REQUIRED_EXIT' || ruleType === 'MAN_DOWN')) return <Facts ruleType={ruleType} evidence={evidence} />;
   const items = evidence && evidence.items ? Object.entries(evidence.items) : [];
   if (items.length === 0) return <p className="text-xs text-ink-faint">No measurements were stored for this decision.</p>;
   return (

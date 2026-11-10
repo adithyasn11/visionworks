@@ -139,7 +139,7 @@ function RuleForm({ initial, zones, onSaved, onCancel }) {
       <div className="flex flex-wrap gap-3">
         <label className="flex flex-col gap-1 text-[11px] text-ink-faint">Where{meta.zoneOptional ? ' (optional)' : ''}
           <select value={form.zoneId} onChange={(e) => setForm({ ...form, zoneId: e.target.value, params: { ...form.params, ...(form.params.checkpoint_zone_id !== undefined ? { checkpoint_zone_id: '' } : {}), ...(form.params.exit_zone_id !== undefined ? { exit_zone_id: '' } : {}) } })} className={INPUT}>
-            <option value="">{meta.zoneOptional ? 'The whole camera' : 'Choose a zone'}</option>
+            <option value="">{meta.zoneOptional ? 'Everywhere (every camera)' : 'Choose a zone'}</option>
             {zoneChoices.map((z) => <option key={z.id} value={z.id}>{z.name}{z.camera ? ` (${z.camera})` : ''} · {ZONE_TYPE_LABELS[z.safetyType]}</option>)}
           </select>
         </label>
@@ -244,7 +244,7 @@ export default function RulesScreen({ role }) {
                   <SeverityChip severity={rule.severity} />
                   <span className={rule.isEnabled ? 'text-ink' : 'text-ink-faint'}>{rule.isEnabled ? 'On' : 'Off'}</span>
                   <span className="text-ink-muted">{meta ? meta.label : rule.type}</span>
-                  <span className="text-ink-faint">{[rule.camera && rule.camera.name, rule.zone && rule.zone.name].filter(Boolean).join(' · ') || 'Whole camera'}</span>
+                  <span className="text-ink-faint">{[rule.camera && rule.camera.name, rule.zone && rule.zone.name].filter(Boolean).join(' · ') || 'Every camera'}</span>
                 </div>
                 {rule.evaluated_by_engine && ruleSummary(rule.type, rule.params, (id) => (zones.find((z) => z.id === id) || {}).name) && (
                   <p className="text-[11px] text-ink-muted">{ruleSummary(rule.type, rule.params, (id) => (zones.find((z) => z.id === id) || {}).name)}</p>

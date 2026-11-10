@@ -6,8 +6,8 @@
 // which has the last word: the editor also asks the server to validate before saving.
 //
 // `enforced` says whether the safety engine acts on this kind of rule TODAY. Every type can be saved
-// and validated, but only helmet-and-vest at entry, helmet-and-vest while inside, the longest stay and
-// the required exit are evaluated so far; the screen says so plainly rather than letting someone
+// and validated, but only helmet-and-vest at entry, helmet-and-vest while inside, the longest stay, the
+// required exit and a person lying still are evaluated so far; the screen says so plainly rather than letting someone
 // believe a crowding limit is protecting a doorway. (The server also says, as `evaluated_by_engine`.)
 
 export const PPE_ITEMS = [
@@ -92,13 +92,13 @@ export const RULE_TYPES = [
   {
     value: 'MAN_DOWN',
     label: 'Person lying down',
-    blurb: 'Flags someone who stays down. A whole-camera rule needs no zone.',
+    blurb: 'Raises a critical flag when someone lies still for longer than the time below, so a person who may have fallen is found quickly. Sitting, crouching and bending over on their feet are not flagged, and if the picture is not clear enough it says it could not tell. Leave the place empty to watch everywhere, on every camera.',
     zoneTypes: ['PPE_CHECKPOINT', 'APPROACH', 'RESTRICTED', 'EXIT'],
     zoneOptional: true,
-    enforced: () => false,
+    enforced: () => true,
     defaults: { min_seconds_down: 5 },
     fields: [
-      { key: 'min_seconds_down', kind: 'number', label: 'Down for at least (seconds)', min: 3, max: 60, step: 1 },
+      { key: 'min_seconds_down', kind: 'number', label: 'Lying still for at least (seconds)', min: 3, max: 60, step: 1 },
     ],
   },
   {
@@ -205,6 +205,8 @@ export function ruleSummary(type, params, zoneName = () => null) {
       return (p.warn_fraction ?? 0.8) < 1
         ? `Longest stay ${durationText(p.max_seconds)}; a warning is recorded at ${Math.round((p.warn_fraction ?? 0.8) * 100)}% of it`
         : `Longest stay ${durationText(p.max_seconds)}; no earlier warning`;
+    case 'MAN_DOWN':
+      return `Critical flag when someone lies still for ${durationText(p.min_seconds_down ?? 5)}`;
     case 'REQUIRED_EXIT': {
       const name = zoneName(p.exit_zone_id);
       return `After leaving, reach ${name ? `the exit zone "${name}"` : 'the exit zone'} within ${durationText(p.max_seconds_to_exit)}`;
