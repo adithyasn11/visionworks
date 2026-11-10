@@ -521,7 +521,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
             value={snapSource}
             disabled={backdropIsLive}
             onChange={(e) => { setSnapSource(e.target.value); grabSnapshot(e.target.value); }}
-            className="rounded-lg bg-ground border border-line px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="max-w-full min-w-0 rounded-lg bg-ground border border-line px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="webcam">Live webcam</option>
             {snapVideos.map((v) => (
