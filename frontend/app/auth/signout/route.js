@@ -20,7 +20,13 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
 async function signOut(request) {
-  const { origin } = new URL(request.url);
+  // Redirect to the address the browser actually used. Behind `next dev -H 0.0.0.0`, request.url is the
+  // address the process bound (https://0.0.0.0:3000), which a browser cannot open: that was the blank
+  // screen after signing out. Same rule as /auth/callback.
+  const requestUrl = new URL(request.url);
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || requestUrl.host;
+  const proto = request.headers.get('x-forwarded-proto') || requestUrl.protocol.replace(':', '');
+  const origin = `${proto}://${host}`;
   const cookieStore = cookies();
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
