@@ -18,7 +18,7 @@ const PAGE = 25;
 const STATUS_OPTIONS = [['', 'Any result'], ['POTENTIAL_VIOLATION', 'Potential violation'], ['COMPLIANT', 'Compliant'], ['UNVERIFIABLE', 'Cannot verify']];
 const REVIEW_OPTIONS = [['', 'Any review state'], ['PENDING', 'Waiting for review'], ['CONFIRMED', 'Confirmed'], ['DISMISSED', 'Dismissed'], ['NOT_REQUIRED', 'Not reviewed']];
 
-const EVENT_TYPES = [['', 'Any activity'], ['ENTERED_ZONE', 'Entered'], ['EXITED_ZONE', 'Left or closed'], ['LOST_IN_ZONE', 'Lost from view'], ['REAPPEARED', 'Back in view']];
+const EVENT_TYPES = [['', 'Any activity'], ['ENTERED_ZONE', 'Entered'], ['EXITED_ZONE', 'Left or closed'], ['LOST_IN_ZONE', 'Lost from view'], ['REAPPEARED', 'Back in view'], ['DWELL_WARNING', 'Time warning'], ['DWELL_EXCEEDED', 'Time limit reached']];
 
 /** An <input type=date> value (a day, in the viewer's own time zone) as the start / end instant of that day. */
 const dayStart = (v) => (v ? new Date(`${v}T00:00:00`).toISOString() : undefined);

@@ -80,6 +80,7 @@ class SafetyConfig:
     continuous_ppe_grace_s: float = 3.0
     dwell_warn_fraction: float = 0.8
     realert_after_s: float = 60.0    # min gap between two episodes of one (rule, zone, worker)
+    exit_visible_slack_s: float = 1.5   # required exit: a worker counts as still in view if seen this recently when the timer runs out
 
     # ── Man-down (F17) ───────────────────────────────────────────────────────
     man_down_angle_deg: float = 60.0         # torso angle from vertical counted as "down"
@@ -140,6 +141,7 @@ _RANGES = {
     "continuous_ppe_grace_s": (0.0, 60.0),
     "dwell_warn_fraction": (0.1, 1.0),
     "realert_after_s": (0.0, 86400.0),
+    "exit_visible_slack_s": (0.0, 30.0),
     "man_down_angle_deg": (10.0, 90.0),
     "man_down_min_s": (1.0, 120.0),
     "man_down_upright_deg": (0.0, 90.0),

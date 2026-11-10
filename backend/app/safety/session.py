@@ -93,8 +93,14 @@ class SafetySession:
         self.compliance: Optional[ComplianceEngine] = None
         if ppe_runner is not None:
             self.rules = rules if rules is not None else load_rules(writer.org_id, zones_config)
-            self.compliance = ComplianceEngine(self.rules, ppe_runner, self.config)
+            names = {str(z.get("zone_id")): str(z.get("zone_name") or z.get("zone_id")) for z in (zones_config or [])}
+            types = {str(z.get("zone_id")): str(z.get("zone_type") or "GENERAL") for z in (zones_config or [])}
+            self.compliance = ComplianceEngine(self.rules, ppe_runner, self.config, zone_names=names, zone_types=types)
             engine.register(self.compliance)
+            # A time limit in a zone is counted by the zone tracker, which raises the warning and the
+            # limit-reached events the rule engine turns into decisions.
+            for zone, limit, warn in self.compliance.dwell_watches():
+                self.tracker.watch_dwell(zone, limit, warn)
         self._frame_decisions: List[dict] = []
         self._closed_decisions: List[Decision] = []
         self._last_frame: Optional[FrameTime] = None
@@ -289,7 +295,7 @@ class SafetySession:
                 self._judge(lambda ev=original: self.compliance.on_event(ev, frame_time.video_time_s), frame_time)
 
         if self.compliance is not None and not frame_time.replay:
-            self._judge(lambda: self.compliance.on_tick(frame_time.video_time_s), frame_time)
+            self._judge(lambda: self.compliance.on_tick(frame_time.video_time_s, set(worker_zone)), frame_time)
 
     def _judge(self, ask, frame_time: FrameTime) -> None:
         """
@@ -312,9 +318,10 @@ class SafetySession:
         if picture and wants:
             ref, obscured = self._take_snapshot(decision, reference)
         evidence = {**decision.evidence, "helmet_region_obscured": True} if obscured else decision.evidence
+        reason = decision.reason if len(decision.reason) <= 500 else decision.reason[:497] + "..."   # the column holds 500
         try:
             self.writer.add_decision(
-                decision.rule_type, decision.severity, decision.worker_key, decision.status, decision.reason,
+                decision.rule_type, decision.severity, decision.worker_key, decision.status, reason,
                 decision.confidence, evidence, decision.video_time_s,
                 self._observed_at(reference, decision.video_time_s),
                 zone_id=decision.zone_id, rule_id=decision.rule_id, thresholds=decision.thresholds,
@@ -348,10 +355,12 @@ class SafetySession:
                 t = int(max(0, t))
                 return f"{t // 60:02d}:{t % 60:02d}"
             label = "POTENTIAL VIOLATION (for review)" if decision.status == POTENTIAL_VIOLATION else "COULD NOT VERIFY"
-            # Two times, because they differ: the decision is stamped at the entry, the picture is
-            # the frame it was decided on (up to the evidence wait later).
+            # Two times, because they differ: the decision is stamped at the moment it is about (the
+            # entry, the limit being reached, the exit), the picture is the frame it was decided on.
+            moment = {"PPE_ENTRY": "entered", "PPE_CONTINUOUS": "began", "MAX_DWELL": "limit reached",
+                      "REQUIRED_EXIT": "left"}.get(decision.rule_type, "at")
             banner = [f"{label}  |  {(zone or {}).get('zone_name') or decision.zone_id or 'camera'}  |  "
-                      f"entered {clock(decision.video_time_s)}  |  picture {clock(reference.video_time_s)}  |  "
+                      f"{moment} {clock(decision.video_time_s)}  |  picture {clock(reference.video_time_s)}  |  "
                       f"{('Worker ' + decision.worker_key[4:]) if decision.worker_key.startswith('trk-') else decision.worker_key}",
                       decision.reason]
             jpeg, obscured = snapshots.render(

@@ -215,8 +215,9 @@ def _validated_rule(token: str, org_id: str, data: dict) -> dict:
 
 
 def _evaluated(row: dict) -> bool:
-    """Does the engine evaluate this rule today? (Only helmet-and-vest at entry; the others are stored and validated.)"""
-    return row.get("type") == "PPE_ENTRY" and (row.get("params") or {}).get("mode", "AT_ENTRY") == "AT_ENTRY"
+    """Does the engine evaluate this rule today? (The engine says; the other types are stored and validated.)"""
+    from app.safety.compliance_engine import is_evaluated
+    return is_evaluated(row.get("type"), row.get("params"))
 
 
 @router.get("/rules")
@@ -337,7 +338,7 @@ def list_events(
     authorization: Optional[str] = Header(default=None),
 ):
     org_id, _, token = _who(authorization, "safety.view")
-    params: Dict[str, Any] = {"select": "id,eventUid,cameraId,zoneId,workerKey,sessionKey,eventType,videoTimeS,observedAt,details",
+    params: Dict[str, Any] = {"select": "id,eventUid,cameraId,zoneId,workerKey,sessionKey,eventType,videoTimeS,observedAt,details,zone:zones(name)",
                               "orgId": f"eq.{org_id}", "order": "observedAt.desc,id.desc"}
     if _uuid(zone_id, "zone_id"):
         params["zoneId"] = f"eq.{_uuid(zone_id, 'zone_id')}"

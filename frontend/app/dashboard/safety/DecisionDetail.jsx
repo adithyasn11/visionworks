@@ -16,6 +16,7 @@ import { listAssignees, listCorrectiveActions } from '../../lib/safety/managemen
 import { createCorrectiveAction } from '../../lib/safety/actions';
 import { can } from '../../lib/permissions';
 import { workerLabel, describeZoneEvent } from '../../lib/zoneEvents';
+import { durationText } from '../../lib/safety/ruleTypes';
 import EvidencePicture from '../../components/EvidencePicture';
 import {
   BTN_PRIMARY, BTN_QUIET, INPUT, Notice, ReviewChip, REVIEW_REASONS, SeverityChip, StatusChip,
@@ -25,11 +26,66 @@ import {
 const ITEM_NAMES = { helmet: 'Helmet', safety_vest: 'Safety vest' };
 const ITEM_STATE = { PRESENT: 'Seen', ABSENT: 'Not seen', UNVERIFIABLE: 'Could not tell' };
 
-function Evidence({ evidence }) {
+const OUTCOMES = {
+  EXCEEDED: 'The limit was reached',
+  WITHIN_LIMIT: 'Left within the limit',
+  PARTIAL: 'Already inside when first seen, so only part of the stay was seen',
+  LOST: 'Lost from view and did not come back',
+  INCOMPLETE: 'The video ended or jumped before the stay finished',
+  REACHED_EXIT: 'Reached the exit zone in time',
+  REACHED_EXIT_LATE: 'Reached the exit zone, but late',
+  OTHER_ZONE: 'Went to another zone first',
+  NOT_REACHED: 'Still in view without having reached the exit zone',
+  OUT_OF_VIEW: 'Out of view before reaching the exit zone',
+};
+
+/** The measurements of a decision that is not about helmets and vests: a stay, or the way out of a zone. */
+function Facts({ ruleType, evidence }) {
+  const sec = (v) => (v !== null && v !== undefined && Number.isFinite(Number(v)) ? durationText(Number(v)) : null);
+  let rows = [];
+  if (ruleType === 'MAX_DWELL') {
+    rows = [
+      ['What happened', OUTCOMES[evidence.outcome] || evidence.outcome],
+      ['Time in the zone', sec(evidence.dwell_seconds)],
+      ['Longest stay allowed', sec(evidence.limit_seconds)],
+      ['Warning recorded at', evidence.warn_fraction != null && evidence.warn_fraction < 1 ? `${Math.round(evidence.warn_fraction * 100)}% of the limit` : null],
+      ['Already inside when first seen', evidence.first_sighting ? 'Yes, so the stay is counted from then' : null],
+      ['Out of view when the limit was reached', evidence.crossed_unobserved ? 'Yes, for part of the time' : null],
+    ];
+  } else if (ruleType === 'REQUIRED_EXIT') {
+    rows = [
+      ['What happened', OUTCOMES[evidence.outcome] || evidence.outcome],
+      ['Exit zone required', evidence.exit_zone],
+      ['Time allowed', sec(evidence.max_seconds_to_exit)],
+      ['Time since leaving', sec(evidence.elapsed_seconds)],
+      ['Went to instead', evidence.went_to || null],
+    ];
+  }
+  rows = rows.filter(([, v]) => v !== null && v !== undefined && v !== '');
+  if (rows.length === 0) return <p className="text-xs text-ink-faint">No measurements were stored for this decision.</p>;
+  return (
+    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs">
+      {rows.map(([k, v]) => (
+        <div key={k} className="flex justify-between gap-3 border-t border-line/60 py-1">
+          <dt className="text-ink-faint">{k}</dt>
+          <dd className="text-ink text-right">{v}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function Evidence({ evidence, ruleType }) {
+  if (evidence && !evidence.items && (ruleType === 'MAX_DWELL' || ruleType === 'REQUIRED_EXIT')) return <Facts ruleType={ruleType} evidence={evidence} />;
   const items = evidence && evidence.items ? Object.entries(evidence.items) : [];
   if (items.length === 0) return <p className="text-xs text-ink-faint">No measurements were stored for this decision.</p>;
   return (
     <div className="overflow-x-auto">
+      {ruleType === 'PPE_CONTINUOUS' && Number.isFinite(Number(evidence.run_seconds)) && (
+        <p className="mb-2 text-[11px] text-ink-muted">
+          Checked all the time the person was inside. A required item was clearly not seen without a break for {durationText(evidence.run_seconds)} (flagged after {durationText(evidence.grace_seconds)}).
+        </p>
+      )}
       <table className="w-full text-xs">
         <caption className="sr-only">What was measured for each required item</caption>
         <thead>
@@ -68,6 +124,13 @@ function Thresholds({ thresholds }) {
     ['Not seen in at least this share to count as missing', thresholds.ppe_absence_fraction != null ? `${Math.round(thresholds.ppe_absence_fraction * 100)}%` : null],
     ['Lowest confidence to make a claim', thresholds.min_evidence_confidence != null ? `${Math.round(thresholds.min_evidence_confidence * 100)}%` : null],
     ['Time allowed to gather evidence', thresholds.entry_evidence_wait_s != null ? `${thresholds.entry_evidence_wait_s} s` : null],
+    ['Not seen without a break for at least', thresholds.grace_seconds != null ? durationText(thresholds.grace_seconds) : null],
+    ['Longest stay allowed', thresholds.max_seconds != null ? durationText(thresholds.max_seconds) : null],
+    ['Warning at this share of the limit', thresholds.warn_fraction != null ? `${Math.round(thresholds.warn_fraction * 100)}%` : null],
+    ['Lost from view after', thresholds.lost_grace_s != null ? `${thresholds.lost_grace_s} s` : null],
+    ['Visit closed as lost after', thresholds.lost_ttl_s != null ? `${thresholds.lost_ttl_s} s` : null],
+    ['Time allowed to reach the exit', thresholds.max_seconds_to_exit != null ? durationText(thresholds.max_seconds_to_exit) : null],
+    ['Counts as still in view if seen within', thresholds.exit_visible_slack_s != null ? `${thresholds.exit_visible_slack_s} s` : null],
   ].filter(([, v]) => v !== null && v !== undefined);
   if (rows.length === 0) return null;
   return (
@@ -242,9 +305,12 @@ export default function DecisionDetail({ decisionId, role, onChanged }) {
     const at = new Date(decision.observedAt).getTime();
     if (!Number.isFinite(at)) return;
     let live = true;
+    // Ten minutes either side, or the whole stay when the decision is about a long one.
+    const stay = Number((decision.evidence || {}).dwell_seconds);
+    const before = Math.max(10 * 60000, Number.isFinite(stay) ? (stay + 60) * 1000 : 0);
     listEvents({
       worker_key: decision.workerKey, camera_id: decision.cameraId, limit: 30,
-      since: new Date(at - 10 * 60000).toISOString(), until: new Date(at + 10 * 60000).toISOString(),
+      since: new Date(at - before).toISOString(), until: new Date(at + 10 * 60000).toISOString(),
     }).then((r) => { if (live) setEvents(r.ok ? r.data.events.slice().reverse() : []); });
     return () => { live = false; };
   }, [decision]);
@@ -278,7 +344,7 @@ export default function DecisionDetail({ decisionId, role, onChanged }) {
       {decision.has_picture && canEvidence && <EvidencePicture decisionId={decision.id} />}
       {decision.has_picture && !canEvidence && <p className="text-[11px] text-ink-faint">A picture was kept. Only an administrator or manager can open it.</p>}
 
-      <Section title="What was measured" icon={ListChecks}><Evidence evidence={decision.evidence} /></Section>
+      <Section title="What was measured" icon={ListChecks}><Evidence evidence={decision.evidence} ruleType={decision.ruleType} /></Section>
       {decision.thresholds && <Section title="The limits it was judged by"><Thresholds thresholds={decision.thresholds} /></Section>}
 
       <Section title="This worker around that moment">
@@ -289,7 +355,7 @@ export default function DecisionDetail({ decisionId, role, onChanged }) {
               return (
                 <li key={e.id} className="flex gap-3 py-1.5">
                   <span className="w-32 shrink-0 font-mono text-ink-faint tabular-nums">{fmtTime(e.observedAt)}</span>
-                  <span className={d.tone === 'unconfirmed' ? 'text-ink-faint' : 'text-ink-muted'}>{d.text}</span>
+                  <span className={d.tone === 'unconfirmed' ? 'text-ink-faint' : 'text-ink-muted'}>{d.text}{e.zone && e.zone.name ? ` · ${e.zone.name}` : ''}</span>
                 </li>
               );
             })}

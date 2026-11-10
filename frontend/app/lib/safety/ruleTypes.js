@@ -6,8 +6,9 @@
 // which has the last word: the editor also asks the server to validate before saving.
 //
 // `enforced` says whether the safety engine acts on this kind of rule TODAY. Every type can be saved
-// and validated, but only helmet-and-vest at entry is evaluated so far; the screen says so plainly
-// rather than letting someone believe a dwell limit is protecting a doorway.
+// and validated, but only helmet-and-vest at entry, helmet-and-vest while inside, the longest stay and
+// the required exit are evaluated so far; the screen says so plainly rather than letting someone
+// believe a crowding limit is protecting a doorway. (The server also says, as `evaluated_by_engine`.)
 
 export const PPE_ITEMS = [
   { value: 'helmet', label: 'Helmet' },
@@ -42,9 +43,9 @@ export const RULE_TYPES = [
   {
     value: 'PPE_CONTINUOUS',
     label: 'Keep helmet and vest on while inside',
-    blurb: 'Checks that required items stay on for as long as someone is in the zone.',
+    blurb: 'Raises a flag for review when a required item is clearly not seen, without a break, for longer than the grace period while someone is in the zone. If the picture is unclear, nothing is flagged.',
     zoneTypes: ['RESTRICTED'],
-    enforced: () => false,
+    enforced: () => true,
     defaults: { required_ppe: ['helmet', 'safety_vest'], grace_seconds: 3 },
     fields: [
       { key: 'required_ppe', kind: 'ppe', label: 'Required items' },
@@ -54,9 +55,9 @@ export const RULE_TYPES = [
   {
     value: 'MAX_DWELL',
     label: 'Longest stay',
-    blurb: 'Flags someone who stays in the zone longer than allowed.',
+    blurb: 'Raises a flag for review when someone stays in the zone longer than allowed. A warning is recorded earlier, at the chosen share of the limit (below 100%), but nothing is flagged until the limit is reached.',
     zoneTypes: ['PPE_CHECKPOINT', 'APPROACH', 'RESTRICTED', 'EXIT'],
-    enforced: () => false,
+    enforced: () => true,
     defaults: { max_seconds: 300, warn_fraction: 0.8 },
     fields: [
       { key: 'max_seconds', kind: 'number', label: 'Longest stay (seconds)', min: 10, max: 86400, step: 10, required: true },
@@ -66,13 +67,13 @@ export const RULE_TYPES = [
   {
     value: 'REQUIRED_EXIT',
     label: 'Leave through the exit zone',
-    blurb: 'Flags someone who does not pass the exit zone after the restricted area.',
+    blurb: 'After someone leaves the restricted zone, checks that they reach the exit zone in time. Going into another restricted zone first, or still being in view without reaching the exit, is flagged; passing through an approach or checkpoint zone on the way is fine. If they are out of view, it says it could not tell.',
     zoneTypes: ['RESTRICTED'],
-    enforced: () => false,
+    enforced: () => true,
     defaults: { max_seconds_to_exit: 30 },
     fields: [
       { key: 'exit_zone_id', kind: 'zone', label: 'Exit zone', zoneTypes: ['EXIT'], required: true },
-      { key: 'max_seconds_to_exit', kind: 'number', label: 'Time allowed to reach it (seconds)', min: 5, max: 3600, step: 5 },
+      { key: 'max_seconds_to_exit', kind: 'number', label: 'Time allowed to reach it (seconds)', min: 3, max: 600, step: 1 },
     ],
   },
   {
@@ -175,4 +176,40 @@ export function friendlyRuleError(message) {
   const text = String(message || '');
   const hit = FRIENDLY.find(([re]) => re.test(text));
   return hit ? hit[1] : text;
+}
+
+/** 125 -> "2 min 5 s". Plain words for a length of time in the rule list. */
+export function durationText(seconds) {
+  const n = Number(seconds);
+  if (!Number.isFinite(n)) return '';
+  if (n < 60) return `${Math.round(n)} s`;
+  const total = Math.round(n);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  if (h) return m ? `${h} h ${m} min` : `${h} h`;
+  return sec ? `${m} min ${sec} s` : `${m} min`;
+}
+
+/** One line saying what a rule asks, from its parameters. `zoneName(id)` turns a zone id into a name. */
+export function ruleSummary(type, params, zoneName = () => null) {
+  const p = params || {};
+  const raw = (Array.isArray(p.required_ppe) ? p.required_ppe : []).map((i) => (i === 'safety_vest' ? 'vest' : i)).join(' and ');
+  const items = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : '';
+  switch (type) {
+    case 'PPE_ENTRY':
+      return (p.mode || 'AT_ENTRY') === 'AT_ENTRY' ? `${items || 'Required items'} checked when someone enters` : 'Checked at a PPE checkpoint beforehand';
+    case 'PPE_CONTINUOUS':
+      return `${items || 'Required items'} checked all the time someone is inside; flagged after ${durationText(p.grace_seconds)} without a break`;
+    case 'MAX_DWELL':
+      return (p.warn_fraction ?? 0.8) < 1
+        ? `Longest stay ${durationText(p.max_seconds)}; a warning is recorded at ${Math.round((p.warn_fraction ?? 0.8) * 100)}% of it`
+        : `Longest stay ${durationText(p.max_seconds)}; no earlier warning`;
+    case 'REQUIRED_EXIT': {
+      const name = zoneName(p.exit_zone_id);
+      return `After leaving, reach ${name ? `the exit zone "${name}"` : 'the exit zone'} within ${durationText(p.max_seconds_to_exit)}`;
+    }
+    default:
+      return '';
+  }
 }

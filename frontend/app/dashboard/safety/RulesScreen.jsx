@@ -14,7 +14,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { createRule, deleteRule, listRules, updateRule, validateRule } from '../../lib/safetyApi';
 import { listSafetyZones } from '../../lib/safety/management';
-import { RULE_TYPES, SEVERITIES, PPE_ITEMS, defaultParams, friendlyRuleError, isEnforced, ruleBody, ruleTypeMeta } from '../../lib/safety/ruleTypes';
+import { RULE_TYPES, SEVERITIES, PPE_ITEMS, defaultParams, friendlyRuleError, isEnforced, ruleBody, ruleSummary, ruleTypeMeta } from '../../lib/safety/ruleTypes';
 import { can } from '../../lib/permissions';
 import { BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel, SeverityChip } from './common';
 
@@ -246,6 +246,9 @@ export default function RulesScreen({ role }) {
                   <span className="text-ink-muted">{meta ? meta.label : rule.type}</span>
                   <span className="text-ink-faint">{[rule.camera && rule.camera.name, rule.zone && rule.zone.name].filter(Boolean).join(' · ') || 'Whole camera'}</span>
                 </div>
+                {rule.evaluated_by_engine && ruleSummary(rule.type, rule.params, (id) => (zones.find((z) => z.id === id) || {}).name) && (
+                  <p className="text-[11px] text-ink-muted">{ruleSummary(rule.type, rule.params, (id) => (zones.find((z) => z.id === id) || {}).name)}</p>
+                )}
                 {!rule.evaluated_by_engine && <p className="text-[11px] text-ink-faint">Saved, but the safety engine does not act on this kind of rule yet.</p>}
                 {canEdit && (
                   <div className="flex flex-wrap gap-2">
