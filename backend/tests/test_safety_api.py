@@ -246,6 +246,8 @@ check("a bad parameter is reported with the reason", r.json()["valid"] is False 
 r = client.post(base + "/rules/validate", headers=M, json={"name": "Lone", "type": "MAN_DOWN", "params": {}})
 check("a camera-wide MAN_DOWN needs no zone", r.json()["valid"] is True)
 r = client.post(base + "/rules/validate", headers=M, json={"name": "Crowd", "type": "OCCUPANCY", "zone_id": Z_RESTRICTED, "params": {"max_people": 4}})
+check("a head-count rule validates and the engine acts on it", r.json()["valid"] is True and r.json()["evaluated_by_engine"] is True)
+r = client.post(base + "/rules/validate", headers=M, json={"name": "Walk", "type": "WALK_ONLY", "zone_id": Z_RESTRICTED, "params": {}})
 check("a rule type the engine does not evaluate yet validates and says so", r.json()["valid"] is True and r.json()["evaluated_by_engine"] is False)
 r = client.post(base + "/rules/validate", headers=M, json={**RULE_BODY, "name": ""})
 check("a blank name is a 422 from the request model", r.status_code == 422)

@@ -73,7 +73,7 @@ export function fmtDate(value) {
 export function confidenceText(decision) {
   if (!decision || decision.status === 'UNVERIFIABLE') return '';
   // A time or a route is measured, not estimated: a percentage would claim more than the tracker can promise.
-  if (decision.ruleType === 'MAX_DWELL' || decision.ruleType === 'REQUIRED_EXIT' || decision.ruleType === 'MAN_DOWN') return '';
+  if (decision.ruleType === 'MAX_DWELL' || decision.ruleType === 'REQUIRED_EXIT' || decision.ruleType === 'MAN_DOWN' || decision.ruleType === 'OCCUPANCY') return '';
   const c = Number(decision.confidence);
   return Number.isFinite(c) && c > 0 ? `${Math.round(c * 100)}% sure` : '';
 }

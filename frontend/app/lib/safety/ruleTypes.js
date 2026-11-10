@@ -7,7 +7,7 @@
 //
 // `enforced` says whether the safety engine acts on this kind of rule TODAY. Every type can be saved
 // and validated, but only helmet-and-vest at entry, helmet-and-vest while inside, the longest stay, the
-// required exit and a person lying still are evaluated so far; the screen says so plainly rather than letting someone
+// required exit, a person lying still and the head count (lone worker, crowding) are evaluated so far; the screen says so plainly rather than letting someone
 // believe a crowding limit is protecting a doorway. (The server also says, as `evaluated_by_engine`.)
 
 export const PPE_ITEMS = [
@@ -79,14 +79,14 @@ export const RULE_TYPES = [
   {
     value: 'OCCUPANCY',
     label: 'People in the zone (lone worker, crowding)',
-    blurb: 'Flags too few or too many people in the zone for too long.',
+    blurb: 'Raises a flag for review when too few or too many people are seen in the zone for longer than the grace period. The count is smoothed, so one missed frame changes nothing. A zone nobody is in is never flagged, a second person who is just out of view counts as still there, and if the picture is too crowded to count reliably it says it could not tell.',
     zoneTypes: ['PPE_CHECKPOINT', 'APPROACH', 'RESTRICTED', 'EXIT'],
-    enforced: () => false,
+    enforced: () => true,
     defaults: { min_people: 2, grace_seconds: 10 },
     fields: [
       { key: 'min_people', kind: 'number', label: 'At least this many people (optional)', min: 2, max: 100, step: 1 },
       { key: 'max_people', kind: 'number', label: 'At most this many people (optional)', min: 1, max: 1000, step: 1 },
-      { key: 'grace_seconds', kind: 'number', label: 'Grace period (seconds)', min: 5, max: 3600, step: 5 },
+      { key: 'grace_seconds', kind: 'number', label: 'How long before it is flagged (seconds)', min: 3, max: 120, step: 1 },
     ],
   },
   {
@@ -205,6 +205,12 @@ export function ruleSummary(type, params, zoneName = () => null) {
       return (p.warn_fraction ?? 0.8) < 1
         ? `Longest stay ${durationText(p.max_seconds)}; a warning is recorded at ${Math.round((p.warn_fraction ?? 0.8) * 100)}% of it`
         : `Longest stay ${durationText(p.max_seconds)}; no earlier warning`;
+    case 'OCCUPANCY': {
+      const lo = p.min_people != null && p.min_people !== '' ? Number(p.min_people) : null;
+      const hi = p.max_people != null && p.max_people !== '' ? Number(p.max_people) : null;
+      const asks = [lo != null ? `at least ${lo}` : null, hi != null ? `at most ${hi}` : null].filter(Boolean).join(' and ');
+      return `${asks ? `${asks.charAt(0).toUpperCase()}${asks.slice(1)} people` : 'People'} in the zone; flagged after ${durationText(p.grace_seconds ?? 10)}`;
+    }
     case 'MAN_DOWN':
       return `Critical flag when someone lies still for ${durationText(p.min_seconds_down ?? 5)}`;
     case 'REQUIRED_EXIT': {

@@ -92,6 +92,9 @@ class SafetyConfig:
     occupancy_grace_s: float = 10.0
     occupancy_window_s: float = 2.0
     occupancy_min_clear_fraction: float = 0.6   # below this the count is UNVERIFIABLE
+    occupancy_min_person_conf: float = 0.4      # a person detected less confidently than this is not "clearly" counted
+    occupancy_overlap_iou: float = 0.3          # two boxes overlapping this much: neither is "clearly" counted
+    occupancy_min_height_px: float = 60.0       # a person shorter than this (in the 640-px-wide working frame) is not "clearly" counted: small, distant people are the ones the detector misses
 
     # ── Evidence snapshots (F11) ─────────────────────────────────────────────
     evidence_retention_days: int = 7
@@ -149,6 +152,9 @@ _RANGES = {
     "occupancy_grace_s": (0.0, 600.0),
     "occupancy_window_s": (0.1, 60.0),
     "occupancy_min_clear_fraction": (0.0, 1.0),
+    "occupancy_min_person_conf": (0.0, 1.0),
+    "occupancy_overlap_iou": (0.0, 1.0),
+    "occupancy_min_height_px": (0.0, 2000.0),
     "evidence_retention_days": (1, 365),
     "local_synced_retention_days": (1, 365),
     "local_standalone_retention_days": (1, 3650),

@@ -39,6 +39,9 @@ const OUTCOMES = {
   OUT_OF_VIEW: 'Out of view before reaching the exit zone',
   LYING_STILL: 'Lying still for longer than the rule allows',
   UNCLEAR: 'Still, and might be lying down, but the picture is not clear enough to say',
+  LONE_WORKER: 'Fewer people were seen than the rule asks for',
+  OVER_CAPACITY: 'More people were seen than the rule allows',
+  CROWDED: 'The head count could not be trusted (people overlapping or partly hidden)',
 };
 
 /** The measurements of a decision that is not about helmets and vests: a stay, or the way out of a zone. */
@@ -61,6 +64,17 @@ function Facts({ ruleType, evidence }) {
       ['Time allowed', sec(evidence.max_seconds_to_exit)],
       ['Time since leaving', sec(evidence.elapsed_seconds)],
       ['Went to instead', evidence.went_to || null],
+    ];
+  } else if (ruleType === 'OCCUPANCY') {
+    rows = [
+      ['What happened', OUTCOMES[evidence.outcome] || evidence.outcome],
+      ['People seen', evidence.people_seen != null ? String(evidence.people_seen) : null],
+      ['Not in view but still counted as there', evidence.hidden_people ? String(evidence.hidden_people) : null],
+      ['The rule asks for', evidence.min_people != null ? `at least ${evidence.min_people}` : null],
+      ['The rule allows', evidence.max_people != null ? `at most ${evidence.max_people}` : null],
+      ['For', sec(evidence.seconds)],
+      ['Flagged after', sec(evidence.grace_seconds)],
+      ['People clearly countable', evidence.clear_fraction != null ? `${Math.round(evidence.clear_fraction * 100)}% of those counted` : null],
     ];
   } else if (ruleType === 'MAN_DOWN') {
     const lying = evidence.frames ? `${evidence.frames_lying} of ${evidence.frames} frames` : null;
@@ -88,7 +102,7 @@ function Facts({ ruleType, evidence }) {
 }
 
 function Evidence({ evidence, ruleType }) {
-  if (evidence && !evidence.items && (ruleType === 'MAX_DWELL' || ruleType === 'REQUIRED_EXIT' || ruleType === 'MAN_DOWN')) return <Facts ruleType={ruleType} evidence={evidence} />;
+  if (evidence && !evidence.items && (ruleType === 'MAX_DWELL' || ruleType === 'REQUIRED_EXIT' || ruleType === 'MAN_DOWN' || ruleType === 'OCCUPANCY')) return <Facts ruleType={ruleType} evidence={evidence} />;
   const items = evidence && evidence.items ? Object.entries(evidence.items) : [];
   if (items.length === 0) return <p className="text-xs text-ink-faint">No measurements were stored for this decision.</p>;
   return (

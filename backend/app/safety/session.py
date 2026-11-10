@@ -33,6 +33,7 @@ from app.safety.config import SafetyConfig, load_config
 from app.safety.engine import FrameTime, SafetyEngine, engine_for_session
 from app.safety.ppe_runner import PpeRunner, get_ppe_detector
 from app.safety.man_down import ManDownMonitor
+from app.safety.occupancy import OccupancyMonitor
 from app.safety.rules import load_rules
 from app.safety import snapshots
 from app.safety.schemas import POTENTIAL_VIOLATION, UNVERIFIABLE, Decision
@@ -105,12 +106,17 @@ class SafetySession:
                 self.tracker.watch_dwell(zone, limit, warn)
         # Man-down reads the pose keypoints, not the PPE evidence, so it runs whenever the session has rules.
         self.man_down: Optional[ManDownMonitor] = None
+        self.occupancy: Optional[OccupancyMonitor] = None
         if getattr(self, "rules", None):
             names = {str(z.get("zone_id")): str(z.get("zone_name") or z.get("zone_id")) for z in (zones_config or [])}
             monitor = ManDownMonitor(self.rules, self.config, names)
             self.man_down = monitor if monitor else None
             if self.man_down is not None:
                 engine.register(self.man_down)
+            counts = OccupancyMonitor(self.rules, self.config, names)
+            self.occupancy = counts if counts else None
+            if self.occupancy is not None:
+                engine.register(self.occupancy)
         self._frame_decisions: List[dict] = []
         self._closed_decisions: List[Decision] = []
         self._last_frame: Optional[FrameTime] = None
@@ -262,6 +268,10 @@ class SafetySession:
             self._warn_once("zone", f"zone events skipped for a frame: {type(e).__name__}: {e}")
         if self.man_down is not None and detections is not None and frame_shape is not None and not frame_time.replay:
             self._judge(lambda: self._man_down_step(frame_time, tracked_entities, detections, frame_shape), frame_time)
+        if self.occupancy is not None and detections is not None and not frame_time.replay:
+            self._judge(lambda: self.occupancy.update(
+                frame_time.video_time_s, tracked_entities, detections, worker_key,
+                lambda zone: self.tracker.unseen_in(zone, frame_time.video_time_s), self.tracker.zone_of), frame_time)
         # Tell the picture which people have an open alert (the entities are sent after this call).
         if self._flagged:
             for entity in tracked_entities:
@@ -384,10 +394,10 @@ class SafetySession:
             # Two times, because they differ: the decision is stamped at the moment it is about (the
             # entry, the limit being reached, the exit), the picture is the frame it was decided on.
             moment = {"PPE_ENTRY": "entered", "PPE_CONTINUOUS": "began", "MAX_DWELL": "limit reached",
-                      "REQUIRED_EXIT": "left", "MAN_DOWN": "lying since"}.get(decision.rule_type, "at")
+                      "REQUIRED_EXIT": "left", "MAN_DOWN": "lying since", "OCCUPANCY": "since"}.get(decision.rule_type, "at")
             banner = [f"{label}  |  {(zone or {}).get('zone_name') or decision.zone_id or 'camera'}  |  "
                       f"{moment} {clock(decision.video_time_s)}  |  picture {clock(reference.video_time_s)}  |  "
-                      f"{('Worker ' + decision.worker_key[4:]) if decision.worker_key.startswith('trk-') else decision.worker_key}",
+                      f"{('Worker ' + decision.worker_key[4:]) if decision.worker_key.startswith('trk-') else ('whole zone' if decision.worker_key.startswith('zone-') else decision.worker_key)}",
                       decision.reason]
             jpeg, obscured = snapshots.render(
                 held["frame"], held["people"], held["work_shape"], target_track=target,

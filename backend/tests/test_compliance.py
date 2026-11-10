@@ -350,11 +350,11 @@ check("a rule that requires only the helmet ignores a missing vest", out[0].stat
 
 via = Rule(type="PPE_ENTRY", zone_id="press", params={"required_ppe": ["helmet", "safety_vest"], "mode": "VIA_CHECKPOINT", "checkpoint_zone_id": "gate",
                                                        "max_seconds_since_checkpoint": 60.0})
-dwell = Rule(type="OCCUPANCY", zone_id="walk", params={"min_people": 2, "max_people": None, "grace_seconds": 10.0, "window_seconds": 2.0})
+dwell = Rule(type="WALK_ONLY", zone_id="walk", params={"max_speed_heights_per_s": 1.8, "min_seconds": 2.0})
 off = Rule(type="PPE_ENTRY", zone_id="press", params={"required_ppe": ["helmet"], "mode": "AT_ENTRY"}, enabled=False)
 eng, p = engine(rules=[via, dwell, off])
 p.set("trk-1", absent(), absent())
-check("rules not evaluated yet (VIA_CHECKPOINT, OCCUPANCY) and disabled ones make no decisions, and are listed",
+check("rules not evaluated yet (VIA_CHECKPOINT, WALK_ONLY) and disabled ones make no decisions, and are listed",
       eng.on_event(enter(), 1.0) == [] and len(eng.unsupported) == 2 and eng.active == [])
 
 eng = ComplianceEngine([RULE], None, CFG)

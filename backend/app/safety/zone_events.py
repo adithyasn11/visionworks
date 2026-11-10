@@ -430,5 +430,13 @@ class ZoneEventTracker:
         w = self._workers.get(worker_key)
         return w.current if w else None
 
+    def unseen_in(self, zone_id: str, t: float) -> int:
+        """
+        How many workers are confirmed inside `zone_id` but were not seen in the frame at time `t`
+        (behind something, or dropped by the detector). A visit is closed, and the worker forgotten, after
+        `lost_ttl_s`, so this is "a moment ago they were here", never "somewhere on the site".
+        """
+        return sum(1 for w in self._workers.values() if w.current == zone_id and w.last_seen < t - 1e-6)
+
     def open_visits(self) -> Dict[str, str]:
         return {k: w.current for k, w in self._workers.items() if w.current is not None}

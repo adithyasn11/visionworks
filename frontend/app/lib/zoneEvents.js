@@ -14,6 +14,7 @@
 /** "Worker 3" from the anonymous per-camera key "trk-3". Nobody is named. */
 export function workerLabel(key) {
   const match = /^trk-(\d+)$/.exec(String(key || ''));
+  if (/^zone-/.test(String(key || ''))) return 'The whole zone';
   return match ? `Worker ${match[1]}` : 'Worker';
 }
 

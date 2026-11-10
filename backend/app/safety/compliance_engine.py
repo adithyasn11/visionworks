@@ -95,13 +95,14 @@ from app.safety.zone_events import ZoneEvent
 _log = logging.getLogger(__name__)
 
 SUPPORTED = ("PPE_ENTRY", "PPE_CONTINUOUS", "MAX_DWELL", "REQUIRED_EXIT")
+OTHER_ENGINES = ("MAN_DOWN", "OCCUPANCY")          # evaluated, but not by this engine
 
 
 def is_evaluated(rule_type: str, params: Optional[dict]) -> bool:
     """Does the engine act on a rule of this type and these parameters? (The one place that says so.)"""
     if rule_type == "PPE_ENTRY":
         return (params or {}).get("mode", "AT_ENTRY") == "AT_ENTRY"
-    return rule_type in SUPPORTED or rule_type == "MAN_DOWN"        # MAN_DOWN is judged by man_down.py, from the pose keypoints
+    return rule_type in SUPPORTED or rule_type in ("MAN_DOWN", "OCCUPANCY")   # judged by man_down.py (pose keypoints) and occupancy.py (head counts)
 
 # The PPE evidence item states (ppe_evidence.py).
 PRESENT, ABSENT = "PRESENT", "ABSENT"
@@ -193,8 +194,8 @@ class ComplianceEngine:
         self.zone_names = dict(zone_names or {})
         self.zone_types = {k: str(v).upper() for k, v in (zone_types or {}).items()}
         self.rules = [r for r in rules if r.enabled]
-        self.active = [r for r in self.rules if is_evaluated(r.type, r.params) and r.type != "MAN_DOWN"]
-        self.unsupported = [r for r in self.rules if r not in self.active and r.type != "MAN_DOWN"]
+        self.active = [r for r in self.rules if is_evaluated(r.type, r.params) and r.type not in OTHER_ENGINES]
+        self.unsupported = [r for r in self.rules if r not in self.active and r.type not in OTHER_ENGINES]
         if self.unsupported:
             _log.info("safety rules loaded but not evaluated yet: "
                       + ", ".join(sorted({f"{r.type}/{r.params.get('mode', '')}".rstrip('/') for r in self.unsupported})))
