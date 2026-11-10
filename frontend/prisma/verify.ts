@@ -124,8 +124,11 @@ async function main() {
   // The old schema's permissive policies must be gone.
   const permissive = await prisma.$queryRawUnsafe<{ tablename: string; policyname: string }[]>(
     `SELECT tablename, policyname FROM pg_policies
-     WHERE schemaname='public' AND (qual = 'true' OR with_check = 'true')`,
+     WHERE schemaname='public' AND (qual = 'true' OR with_check = 'true')
+       AND NOT (tablename = 'plan_limits' AND policyname = 'plan_limits_select')`,
   );
+  // plan_limits is the one deliberate exception: shared reference data (tier limits, no tenant rows),
+  // readable by any signed-in user and writable by nobody through the API (migration 015).
   check('no USING(true) policies remain', permissive.length === 0,
     permissive.length ? permissive.map((p) => `${p.tablename}.${p.policyname}`).join(', ') : '');
 

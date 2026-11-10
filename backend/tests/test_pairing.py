@@ -65,7 +65,7 @@ def check(name, ok, detail=""):
 
 PROBE_EMAIL = "pairing-probe@visionworks.test"
 PROBE_PASSWORD = "Pr0be-Pairing-2026-Delete-Me"
-ORG = "0fedf5a4-8994-4f37-ac21-e3b2dad32639"
+ORG = None   # looked up when the probe is made: the test needs an organisation that exists now
 _probe_id = None
 
 
@@ -97,6 +97,11 @@ def _probe_session():
     if isinstance(made, dict) and made.get("__error"):
         return None
     _probe_id = made["id"]
+    global ORG
+    orgs = _admin("organisations?select=id&deletedAt=is.null&limit=1")
+    if not isinstance(orgs, list) or not orgs:
+        return None   # no organisation to join: the authenticated half cannot run
+    ORG = orgs[0]["id"]
     _admin("profiles", "POST", [{"id": _probe_id, "email": PROBE_EMAIL,
                                  "fullName": "Pairing Probe",
                                  "updatedAt": "2026-08-30T00:00:00Z"}])
