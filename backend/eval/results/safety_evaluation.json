@@ -1,0 +1,2548 @@
+{
+ "generated": "2026-11-11 19:35:15",
+ "variants_per_scenario": 18,
+ "frame_rates": [
+  10,
+  15,
+  25
+ ],
+ "config": {
+  "ppe_conf_floor": 0.2,
+  "ppe_present_conf": 0.45,
+  "ppe_weak_conf": 0.2,
+  "ppe_window_frames": 30,
+  "ppe_min_clear_frames": 8,
+  "ppe_presence_fraction": 0.6,
+  "ppe_absence_fraction": 0.9,
+  "ppe_stale_s": 10.0,
+  "ppe_min_person_height_px": 90.0,
+  "ppe_min_person_width_px": 28.0,
+  "ppe_crowd_iou": 0.3,
+  "ppe_every_n_frames": 2,
+  "ppe_crop_below_px": 0.0,
+  "ppe_hivis_min_fraction": 0.0,
+  "ppe_max_crops": 10,
+  "pose_max_width": 1280,
+  "ppe_max_width": 1280,
+  "enter_confirm_s": 0.7,
+  "exit_confirm_s": 1.0,
+  "lost_grace_s": 5.0,
+  "lost_ttl_s": 8.0,
+  "zone_gap_tolerance_s": 0.5,
+  "entry_evidence_wait_s": 4.0,
+  "continuous_ppe_grace_s": 3.0,
+  "dwell_warn_fraction": 0.8,
+  "realert_after_s": 60.0,
+  "exit_visible_slack_s": 1.5,
+  "man_down_angle_deg": 60.0,
+  "man_down_min_s": 5.0,
+  "man_down_upright_deg": 45.0,
+  "man_down_still_speed": 0.15,
+  "occupancy_grace_s": 10.0,
+  "occupancy_window_s": 2.0,
+  "occupancy_min_clear_fraction": 0.6,
+  "occupancy_min_person_conf": 0.4,
+  "occupancy_overlap_iou": 0.3,
+  "occupancy_min_height_px": 60.0,
+  "evidence_retention_days": 7,
+  "snapshot_unverifiable": false
+ },
+ "scenarios": [
+  {
+   "id": "S1",
+   "title": "Equipped worker enters the restricted zone",
+   "expected": "COMPLIANT",
+   "rule": "PPE_ENTRY",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {
+    "entry_error_s": {
+     "n": 18,
+     "mean_abs": 0.036,
+     "max_abs": 0.076,
+     "mean": 0.036
+    },
+    "exit_error_s": {
+     "n": 18,
+     "mean_abs": 0.03,
+     "max_abs": 0.066,
+     "mean": 0.03
+    },
+    "dwell_error_s": {
+     "n": 18,
+     "mean_abs": 0.02,
+     "max_abs": 0.05,
+     "mean": -0.006
+    }
+   },
+   "results": [
+    {
+     "variant": 0,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.024,
+     "exit_error_s": 0.035,
+     "dwell_error_s": 0.011
+    },
+    {
+     "variant": 1,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.043,
+     "exit_error_s": 0.008,
+     "dwell_error_s": -0.035
+    },
+    {
+     "variant": 2,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.013,
+     "exit_error_s": 0.032,
+     "dwell_error_s": 0.019
+    },
+    {
+     "variant": 3,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.001,
+     "exit_error_s": 0.019,
+     "dwell_error_s": 0.018
+    },
+    {
+     "variant": 4,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.05,
+     "exit_error_s": 0.058,
+     "dwell_error_s": 0.008
+    },
+    {
+     "variant": 5,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.018,
+     "exit_error_s": 0.011,
+     "dwell_error_s": -0.007
+    },
+    {
+     "variant": 6,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.076,
+     "exit_error_s": 0.055,
+     "dwell_error_s": -0.021
+    },
+    {
+     "variant": 7,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.051,
+     "exit_error_s": 0.063,
+     "dwell_error_s": 0.012
+    },
+    {
+     "variant": 8,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.001,
+     "exit_error_s": 0.034,
+     "dwell_error_s": 0.033
+    },
+    {
+     "variant": 9,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.048,
+     "exit_error_s": 0.004,
+     "dwell_error_s": -0.044
+    },
+    {
+     "variant": 10,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.06,
+     "exit_error_s": 0.01,
+     "dwell_error_s": -0.05
+    },
+    {
+     "variant": 11,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.038,
+     "exit_error_s": 0.017,
+     "dwell_error_s": -0.021
+    },
+    {
+     "variant": 12,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.076,
+     "exit_error_s": 0.066,
+     "dwell_error_s": -0.01
+    },
+    {
+     "variant": 13,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.0,
+     "exit_error_s": 0.001,
+     "dwell_error_s": 0.001
+    },
+    {
+     "variant": 14,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.036,
+     "exit_error_s": 0.001,
+     "dwell_error_s": -0.034
+    },
+    {
+     "variant": 15,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.062,
+     "exit_error_s": 0.049,
+     "dwell_error_s": -0.012
+    },
+    {
+     "variant": 16,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.036,
+     "exit_error_s": 0.059,
+     "dwell_error_s": 0.023
+    },
+    {
+     "variant": 17,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.015,
+     "exit_error_s": 0.015,
+     "dwell_error_s": 0.0
+    }
+   ]
+  },
+  {
+   "id": "S2",
+   "title": "Worker without a helmet enters",
+   "expected": "POTENTIAL_VIOLATION",
+   "rule": "PPE_ENTRY",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {
+    "entry_error_s": {
+     "n": 18,
+     "mean_abs": 0.033,
+     "max_abs": 0.097,
+     "mean": 0.033
+    },
+    "exit_error_s": {
+     "n": 18,
+     "mean_abs": 0.027,
+     "max_abs": 0.095,
+     "mean": 0.027
+    },
+    "dwell_error_s": {
+     "n": 18,
+     "mean_abs": 0.026,
+     "max_abs": 0.061,
+     "mean": -0.005
+    }
+   },
+   "results": [
+    {
+     "variant": 0,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.007,
+     "exit_error_s": 0.002,
+     "dwell_error_s": -0.005
+    },
+    {
+     "variant": 1,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.057,
+     "exit_error_s": 0.001,
+     "dwell_error_s": -0.056
+    },
+    {
+     "variant": 2,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.038,
+     "exit_error_s": 0.002,
+     "dwell_error_s": -0.036
+    },
+    {
+     "variant": 3,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.033,
+     "exit_error_s": 0.011,
+     "dwell_error_s": -0.022
+    },
+    {
+     "variant": 4,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.062,
+     "exit_error_s": 0.059,
+     "dwell_error_s": -0.004
+    },
+    {
+     "variant": 5,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.031,
+     "exit_error_s": 0.005,
+     "dwell_error_s": -0.026
+    },
+    {
+     "variant": 6,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.038,
+     "exit_error_s": 0.095,
+     "dwell_error_s": 0.058
+    },
+    {
+     "variant": 7,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.026,
+     "exit_error_s": 0.024,
+     "dwell_error_s": -0.002
+    },
+    {
+     "variant": 8,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.038,
+     "exit_error_s": 0.01,
+     "dwell_error_s": -0.028
+    },
+    {
+     "variant": 9,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.021,
+     "exit_error_s": 0.056,
+     "dwell_error_s": 0.035
+    },
+    {
+     "variant": 10,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.011,
+     "exit_error_s": 0.026,
+     "dwell_error_s": 0.015
+    },
+    {
+     "variant": 11,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.009,
+     "exit_error_s": 0.012,
+     "dwell_error_s": 0.003
+    },
+    {
+     "variant": 12,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.097,
+     "exit_error_s": 0.069,
+     "dwell_error_s": -0.028
+    },
+    {
+     "variant": 13,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.014,
+     "exit_error_s": 0.065,
+     "dwell_error_s": 0.05
+    },
+    {
+     "variant": 14,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.011,
+     "exit_error_s": 0.029,
+     "dwell_error_s": 0.019
+    },
+    {
+     "variant": 15,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.067,
+     "exit_error_s": 0.005,
+     "dwell_error_s": -0.061
+    },
+    {
+     "variant": 16,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.018,
+     "exit_error_s": 0.02,
+     "dwell_error_s": 0.002
+    },
+    {
+     "variant": 17,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.011,
+     "exit_error_s": 0.001,
+     "dwell_error_s": -0.01
+    }
+   ]
+  },
+  {
+   "id": "S3",
+   "title": "Worker without a vest enters",
+   "expected": "POTENTIAL_VIOLATION",
+   "rule": "PPE_ENTRY",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {
+    "entry_error_s": {
+     "n": 18,
+     "mean_abs": 0.043,
+     "max_abs": 0.097,
+     "mean": 0.043
+    },
+    "exit_error_s": {
+     "n": 18,
+     "mean_abs": 0.037,
+     "max_abs": 0.084,
+     "mean": 0.037
+    },
+    "dwell_error_s": {
+     "n": 18,
+     "mean_abs": 0.027,
+     "max_abs": 0.073,
+     "mean": -0.005
+    }
+   },
+   "results": [
+    {
+     "variant": 0,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.026,
+     "exit_error_s": 0.079,
+     "dwell_error_s": 0.053
+    },
+    {
+     "variant": 1,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.049,
+     "exit_error_s": 0.054,
+     "dwell_error_s": 0.005
+    },
+    {
+     "variant": 2,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.011,
+     "exit_error_s": 0.02,
+     "dwell_error_s": 0.008
+    },
+    {
+     "variant": 3,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.084,
+     "exit_error_s": 0.011,
+     "dwell_error_s": -0.073
+    },
+    {
+     "variant": 4,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.04,
+     "exit_error_s": 0.007,
+     "dwell_error_s": -0.033
+    },
+    {
+     "variant": 5,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.021,
+     "exit_error_s": 0.02,
+     "dwell_error_s": -0.002
+    },
+    {
+     "variant": 6,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.097,
+     "exit_error_s": 0.08,
+     "dwell_error_s": -0.017
+    },
+    {
+     "variant": 7,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.045,
+     "exit_error_s": 0.039,
+     "dwell_error_s": -0.006
+    },
+    {
+     "variant": 8,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.026,
+     "exit_error_s": 0.033,
+     "dwell_error_s": 0.007
+    },
+    {
+     "variant": 9,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.083,
+     "exit_error_s": 0.029,
+     "dwell_error_s": -0.054
+    },
+    {
+     "variant": 10,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.03,
+     "exit_error_s": 0.049,
+     "dwell_error_s": 0.019
+    },
+    {
+     "variant": 11,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.032,
+     "exit_error_s": 0.009,
+     "dwell_error_s": -0.024
+    },
+    {
+     "variant": 12,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.031,
+     "exit_error_s": 0.081,
+     "dwell_error_s": 0.05
+    },
+    {
+     "variant": 13,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.064,
+     "exit_error_s": 0.008,
+     "dwell_error_s": -0.057
+    },
+    {
+     "variant": 14,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.023,
+     "exit_error_s": 0.025,
+     "dwell_error_s": 0.002
+    },
+    {
+     "variant": 15,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.06,
+     "exit_error_s": 0.084,
+     "dwell_error_s": 0.024
+    },
+    {
+     "variant": 16,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.021,
+     "exit_error_s": 0.045,
+     "dwell_error_s": 0.024
+    },
+    {
+     "variant": 17,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.026,
+     "exit_error_s": 0.002,
+     "dwell_error_s": -0.024
+    }
+   ]
+  },
+  {
+   "id": "S1n",
+   "title": "S1 with the model's measured per-frame errors",
+   "expected": "COMPLIANT (or UNVERIFIABLE; never the opposite claim)",
+   "rule": "PPE_ENTRY",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {
+    "entry_error_s": {
+     "n": 18,
+     "mean_abs": 0.032,
+     "max_abs": 0.07,
+     "mean": 0.032
+    },
+    "exit_error_s": {
+     "n": 18,
+     "mean_abs": 0.031,
+     "max_abs": 0.087,
+     "mean": 0.031
+    },
+    "dwell_error_s": {
+     "n": 18,
+     "mean_abs": 0.029,
+     "max_abs": 0.073,
+     "mean": -0.001
+    }
+   },
+   "results": [
+    {
+     "variant": 0,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.062,
+     "exit_error_s": 0.02,
+     "dwell_error_s": -0.042
+    },
+    {
+     "variant": 1,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.049,
+     "exit_error_s": 0.005,
+     "dwell_error_s": -0.043
+    },
+    {
+     "variant": 2,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.023,
+     "exit_error_s": 0.014,
+     "dwell_error_s": -0.009
+    },
+    {
+     "variant": 3,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.07,
+     "exit_error_s": 0.014,
+     "dwell_error_s": -0.056
+    },
+    {
+     "variant": 4,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.051,
+     "exit_error_s": 0.024,
+     "dwell_error_s": -0.027
+    },
+    {
+     "variant": 5,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.023,
+     "exit_error_s": 0.025,
+     "dwell_error_s": 0.002
+    },
+    {
+     "variant": 6,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.037,
+     "exit_error_s": 0.054,
+     "dwell_error_s": 0.018
+    },
+    {
+     "variant": 7,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.005,
+     "exit_error_s": 0.045,
+     "dwell_error_s": 0.041
+    },
+    {
+     "variant": 8,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.028,
+     "exit_error_s": 0.022,
+     "dwell_error_s": -0.006
+    },
+    {
+     "variant": 9,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.05,
+     "exit_error_s": 0.055,
+     "dwell_error_s": 0.005
+    },
+    {
+     "variant": 10,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.056,
+     "exit_error_s": 0.008,
+     "dwell_error_s": -0.048
+    },
+    {
+     "variant": 11,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.0,
+     "exit_error_s": 0.0,
+     "dwell_error_s": -0.0
+    },
+    {
+     "variant": 12,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.014,
+     "exit_error_s": 0.087,
+     "dwell_error_s": 0.073
+    },
+    {
+     "variant": 13,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.064,
+     "exit_error_s": 0.027,
+     "dwell_error_s": -0.037
+    },
+    {
+     "variant": 14,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.001,
+     "exit_error_s": 0.028,
+     "dwell_error_s": 0.027
+    },
+    {
+     "variant": 15,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.008,
+     "exit_error_s": 0.062,
+     "dwell_error_s": 0.054
+    },
+    {
+     "variant": 16,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.02,
+     "exit_error_s": 0.035,
+     "dwell_error_s": 0.015
+    },
+    {
+     "variant": 17,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.007,
+     "exit_error_s": 0.028,
+     "dwell_error_s": 0.021
+    }
+   ]
+  },
+  {
+   "id": "S2n",
+   "title": "S2 with the model's measured per-frame errors",
+   "expected": "POTENTIAL_VIOLATION (or UNVERIFIABLE; never the opposite claim)",
+   "rule": "PPE_ENTRY",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {
+    "entry_error_s": {
+     "n": 18,
+     "mean_abs": 0.035,
+     "max_abs": 0.097,
+     "mean": 0.035
+    },
+    "exit_error_s": {
+     "n": 18,
+     "mean_abs": 0.034,
+     "max_abs": 0.075,
+     "mean": 0.034
+    },
+    "dwell_error_s": {
+     "n": 18,
+     "mean_abs": 0.027,
+     "max_abs": 0.07,
+     "mean": -0.0
+    }
+   },
+   "results": [
+    {
+     "variant": 0,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.026,
+     "exit_error_s": 0.075,
+     "dwell_error_s": 0.049
+    },
+    {
+     "variant": 1,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.06,
+     "exit_error_s": 0.006,
+     "dwell_error_s": -0.054
+    },
+    {
+     "variant": 2,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.002,
+     "exit_error_s": 0.017,
+     "dwell_error_s": 0.016
+    },
+    {
+     "variant": 3,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.072,
+     "exit_error_s": 0.058,
+     "dwell_error_s": -0.014
+    },
+    {
+     "variant": 4,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.012,
+     "exit_error_s": 0.055,
+     "dwell_error_s": 0.044
+    },
+    {
+     "variant": 5,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.015,
+     "exit_error_s": 0.022,
+     "dwell_error_s": 0.007
+    },
+    {
+     "variant": 6,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.03,
+     "exit_error_s": 0.016,
+     "dwell_error_s": -0.014
+    },
+    {
+     "variant": 7,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.063,
+     "exit_error_s": 0.06,
+     "dwell_error_s": -0.003
+    },
+    {
+     "variant": 8,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.024,
+     "exit_error_s": 0.003,
+     "dwell_error_s": -0.021
+    },
+    {
+     "variant": 9,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.097,
+     "exit_error_s": 0.026,
+     "dwell_error_s": -0.07
+    },
+    {
+     "variant": 10,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.002,
+     "exit_error_s": 0.063,
+     "dwell_error_s": 0.06
+    },
+    {
+     "variant": 11,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.008,
+     "exit_error_s": 0.014,
+     "dwell_error_s": 0.006
+    },
+    {
+     "variant": 12,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.017,
+     "exit_error_s": 0.03,
+     "dwell_error_s": 0.013
+    },
+    {
+     "variant": 13,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.034,
+     "exit_error_s": 0.051,
+     "dwell_error_s": 0.017
+    },
+    {
+     "variant": 14,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.033,
+     "exit_error_s": 0.034,
+     "dwell_error_s": 0.001
+    },
+    {
+     "variant": 15,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.071,
+     "exit_error_s": 0.009,
+     "dwell_error_s": -0.062
+    },
+    {
+     "variant": 16,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.055,
+     "exit_error_s": 0.046,
+     "dwell_error_s": -0.009
+    },
+    {
+     "variant": 17,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.001,
+     "exit_error_s": 0.029,
+     "dwell_error_s": 0.028
+    }
+   ]
+  },
+  {
+   "id": "S3n",
+   "title": "S3 with the model's measured per-frame errors",
+   "expected": "POTENTIAL_VIOLATION (or UNVERIFIABLE; never the opposite claim)",
+   "rule": "PPE_ENTRY",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {
+    "entry_error_s": {
+     "n": 18,
+     "mean_abs": 0.04,
+     "max_abs": 0.099,
+     "mean": 0.04
+    },
+    "exit_error_s": {
+     "n": 18,
+     "mean_abs": 0.032,
+     "max_abs": 0.092,
+     "mean": 0.032
+    },
+    "dwell_error_s": {
+     "n": 18,
+     "mean_abs": 0.022,
+     "max_abs": 0.075,
+     "mean": -0.008
+    }
+   },
+   "results": [
+    {
+     "variant": 0,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.037,
+     "exit_error_s": 0.003,
+     "dwell_error_s": -0.034
+    },
+    {
+     "variant": 1,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.065,
+     "exit_error_s": 0.015,
+     "dwell_error_s": -0.051
+    },
+    {
+     "variant": 2,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.016,
+     "exit_error_s": 0.01,
+     "dwell_error_s": -0.005
+    },
+    {
+     "variant": 3,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.077,
+     "exit_error_s": 0.045,
+     "dwell_error_s": -0.032
+    },
+    {
+     "variant": 4,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.022,
+     "exit_error_s": 0.038,
+     "dwell_error_s": 0.016
+    },
+    {
+     "variant": 5,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.006,
+     "exit_error_s": 0.026,
+     "dwell_error_s": 0.019
+    },
+    {
+     "variant": 6,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.046,
+     "exit_error_s": 0.084,
+     "dwell_error_s": 0.039
+    },
+    {
+     "variant": 7,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.053,
+     "exit_error_s": 0.051,
+     "dwell_error_s": -0.002
+    },
+    {
+     "variant": 8,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.009,
+     "exit_error_s": 0.015,
+     "dwell_error_s": 0.006
+    },
+    {
+     "variant": 9,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.091,
+     "exit_error_s": 0.066,
+     "dwell_error_s": -0.025
+    },
+    {
+     "variant": 10,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.013,
+     "exit_error_s": 0.025,
+     "dwell_error_s": 0.012
+    },
+    {
+     "variant": 11,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.009,
+     "exit_error_s": 0.005,
+     "dwell_error_s": -0.004
+    },
+    {
+     "variant": 12,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.099,
+     "exit_error_s": 0.024,
+     "dwell_error_s": -0.075
+    },
+    {
+     "variant": 13,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.06,
+     "exit_error_s": 0.03,
+     "dwell_error_s": -0.03
+    },
+    {
+     "variant": 14,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.01,
+     "exit_error_s": 0.002,
+     "dwell_error_s": -0.008
+    },
+    {
+     "variant": 15,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.055,
+     "exit_error_s": 0.092,
+     "dwell_error_s": 0.037
+    },
+    {
+     "variant": 16,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.022,
+     "exit_error_s": 0.021,
+     "dwell_error_s": -0.002
+    },
+    {
+     "variant": 17,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "entry_error_s": 0.03,
+     "exit_error_s": 0.022,
+     "dwell_error_s": -0.008
+    }
+   ]
+  },
+  {
+   "id": "S4",
+   "title": "Worker far away or partly hidden enters (no helmet visible)",
+   "expected": "UNVERIFIABLE",
+   "rule": "PPE_ENTRY",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {},
+   "results": [
+    {
+     "variant": "far away",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "head cut off",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "head cut off",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "head cut off",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "head cut off",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "far away",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "far away",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "far away",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "far away",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "far away",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "far away",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "head cut off",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "far away",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "far away",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "far away",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "head cut off",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "far away",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "head cut off",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    }
+   ]
+  },
+  {
+   "id": "S5",
+   "title": "Two workers close together, only one equipped",
+   "expected": "each judged on their own; overlapping -> UNVERIFIABLE",
+   "rule": "PPE_ENTRY",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {},
+   "results": [
+    {
+     "variant": "side by side",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT / POTENTIAL_VIOLATION"
+    },
+    {
+     "variant": "side by side",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT / POTENTIAL_VIOLATION"
+    },
+    {
+     "variant": "overlapping",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE / UNVERIFIABLE"
+    },
+    {
+     "variant": "overlapping",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE / UNVERIFIABLE"
+    },
+    {
+     "variant": "overlapping",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE / UNVERIFIABLE"
+    },
+    {
+     "variant": "overlapping",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE / UNVERIFIABLE"
+    },
+    {
+     "variant": "overlapping",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE / UNVERIFIABLE"
+    },
+    {
+     "variant": "side by side",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT / POTENTIAL_VIOLATION"
+    },
+    {
+     "variant": "overlapping",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE / UNVERIFIABLE"
+    },
+    {
+     "variant": "side by side",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT / POTENTIAL_VIOLATION"
+    },
+    {
+     "variant": "side by side",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT / POTENTIAL_VIOLATION"
+    },
+    {
+     "variant": "overlapping",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE / UNVERIFIABLE"
+    },
+    {
+     "variant": "overlapping",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE / UNVERIFIABLE"
+    },
+    {
+     "variant": "side by side",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT / POTENTIAL_VIOLATION"
+    },
+    {
+     "variant": "overlapping",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE / UNVERIFIABLE"
+    },
+    {
+     "variant": "side by side",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT / POTENTIAL_VIOLATION"
+    },
+    {
+     "variant": "side by side",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT / POTENTIAL_VIOLATION"
+    },
+    {
+     "variant": "overlapping",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE / UNVERIFIABLE"
+    }
+   ]
+  },
+  {
+   "id": "S6",
+   "title": "Worker stands on a zone boundary (the foot point flickers across it)",
+   "expected": "one entry, not many",
+   "rule": "zone events",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {},
+   "results": [
+    {
+     "variant": 0,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 1,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 2,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 3,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 4,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 5,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 6,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 7,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 8,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 9,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 10,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 11,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 12,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 13,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 14,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 15,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 16,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    },
+    {
+     "variant": 17,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "1 entries, 0 exits"
+    }
+   ]
+  },
+  {
+   "id": "S7",
+   "title": "Worker stays beyond the time limit (and, as a control, within it)",
+   "expected": "warning, then POTENTIAL_VIOLATION; within: COMPLIANT",
+   "rule": "MAX_DWELL",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {
+    "entry_error_s": {
+     "n": 18,
+     "mean_abs": 0.032,
+     "max_abs": 0.073,
+     "mean": 0.032
+    },
+    "exit_error_s": {
+     "n": 18,
+     "mean_abs": 0.031,
+     "max_abs": 0.064,
+     "mean": 0.031
+    },
+    "dwell_error_s": {
+     "n": 18,
+     "mean_abs": 0.013,
+     "max_abs": 0.054,
+     "mean": -0.002
+    }
+   },
+   "results": [
+    {
+     "variant": "over the limit",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION after a warning",
+     "entry_error_s": 0.001,
+     "exit_error_s": 0.015,
+     "dwell_error_s": 0.014
+    },
+    {
+     "variant": "within the limit",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.034,
+     "exit_error_s": 0.029,
+     "dwell_error_s": -0.005,
+     "measured_stay_error_s": -0.005
+    },
+    {
+     "variant": "within the limit",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.036,
+     "exit_error_s": 0.032,
+     "dwell_error_s": -0.004,
+     "measured_stay_error_s": -0.004
+    },
+    {
+     "variant": "within the limit",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.051,
+     "exit_error_s": 0.031,
+     "dwell_error_s": -0.02,
+     "measured_stay_error_s": -0.02
+    },
+    {
+     "variant": "within the limit",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.018,
+     "exit_error_s": 0.016,
+     "dwell_error_s": -0.002,
+     "measured_stay_error_s": -0.002
+    },
+    {
+     "variant": "over the limit",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION after a warning",
+     "entry_error_s": 0.035,
+     "exit_error_s": 0.035,
+     "dwell_error_s": -0.0
+    },
+    {
+     "variant": "over the limit",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION after a warning",
+     "entry_error_s": 0.062,
+     "exit_error_s": 0.061,
+     "dwell_error_s": -0.001
+    },
+    {
+     "variant": "over the limit",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION after a warning",
+     "entry_error_s": 0.003,
+     "exit_error_s": 0.018,
+     "dwell_error_s": 0.015
+    },
+    {
+     "variant": "within the limit",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.038,
+     "exit_error_s": 0.01,
+     "dwell_error_s": -0.029,
+     "measured_stay_error_s": -0.029
+    },
+    {
+     "variant": "within the limit",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.035,
+     "exit_error_s": 0.006,
+     "dwell_error_s": -0.029,
+     "measured_stay_error_s": -0.029
+    },
+    {
+     "variant": "within the limit",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.047,
+     "exit_error_s": 0.047,
+     "dwell_error_s": 0.0,
+     "measured_stay_error_s": 0.0
+    },
+    {
+     "variant": "over the limit",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION after a warning",
+     "entry_error_s": 0.009,
+     "exit_error_s": 0.002,
+     "dwell_error_s": -0.007
+    },
+    {
+     "variant": "over the limit",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION after a warning",
+     "entry_error_s": 0.01,
+     "exit_error_s": 0.064,
+     "dwell_error_s": 0.054
+    },
+    {
+     "variant": "within the limit",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.018,
+     "exit_error_s": 0.025,
+     "dwell_error_s": 0.007,
+     "measured_stay_error_s": 0.007
+    },
+    {
+     "variant": "within the limit",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.028,
+     "exit_error_s": 0.009,
+     "dwell_error_s": -0.019,
+     "measured_stay_error_s": -0.019
+    },
+    {
+     "variant": "over the limit",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION after a warning",
+     "entry_error_s": 0.073,
+     "exit_error_s": 0.054,
+     "dwell_error_s": -0.019
+    },
+    {
+     "variant": "within the limit",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT",
+     "entry_error_s": 0.06,
+     "exit_error_s": 0.062,
+     "dwell_error_s": 0.003,
+     "measured_stay_error_s": 0.003
+    },
+    {
+     "variant": "over the limit",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION after a warning",
+     "entry_error_s": 0.026,
+     "exit_error_s": 0.035,
+     "dwell_error_s": 0.01
+    }
+   ]
+  },
+  {
+   "id": "S8",
+   "title": "Worker leaves by the wrong route (and, as controls, is lost from view, or uses the exit)",
+   "expected": "wrong route: POTENTIAL_VIOLATION; lost: UNVERIFIABLE; exit: COMPLIANT",
+   "rule": "REQUIRED_EXIT",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {},
+   "results": [
+    {
+     "variant": "right route",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT"
+    },
+    {
+     "variant": "wrong route",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION"
+    },
+    {
+     "variant": "right route",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT"
+    },
+    {
+     "variant": "right route",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT"
+    },
+    {
+     "variant": "right route",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT"
+    },
+    {
+     "variant": "lost",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "wrong route",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION"
+    },
+    {
+     "variant": "wrong route",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION"
+    },
+    {
+     "variant": "lost",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "right route",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT"
+    },
+    {
+     "variant": "right route",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT"
+    },
+    {
+     "variant": "lost",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "right route",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "COMPLIANT"
+    },
+    {
+     "variant": "wrong route",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION"
+    },
+    {
+     "variant": "lost",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "lost",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "UNVERIFIABLE"
+    },
+    {
+     "variant": "right route",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "COMPLIANT"
+    },
+    {
+     "variant": "right route",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "COMPLIANT"
+    }
+   ]
+  },
+  {
+   "id": "S9",
+   "title": "Worker alone in a two-person zone (and, as a control, two workers)",
+   "expected": "LONE_WORKER after the grace; two: nothing",
+   "rule": "OCCUPANCY",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {},
+   "results": [
+    {
+     "variant": "alone",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "LONE_WORKER"
+    },
+    {
+     "variant": "alone",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "LONE_WORKER"
+    },
+    {
+     "variant": "alone",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "LONE_WORKER"
+    },
+    {
+     "variant": "two people",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "alone",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "LONE_WORKER"
+    },
+    {
+     "variant": "two people",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "alone",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "LONE_WORKER"
+    },
+    {
+     "variant": "two people",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "alone",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "LONE_WORKER"
+    },
+    {
+     "variant": "alone",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "LONE_WORKER"
+    },
+    {
+     "variant": "two people",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "alone",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "LONE_WORKER"
+    },
+    {
+     "variant": "alone",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "LONE_WORKER"
+    },
+    {
+     "variant": "alone",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "LONE_WORKER"
+    },
+    {
+     "variant": "two people",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "two people",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "alone",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "LONE_WORKER"
+    },
+    {
+     "variant": "two people",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "nothing"
+    }
+   ]
+  },
+  {
+   "id": "S10",
+   "title": "Worker hidden for a few seconds inside the zone, then seen again",
+   "expected": "the same visit continues",
+   "rule": "zone events",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {
+    "entry_error_s": {
+     "n": 18,
+     "mean_abs": 0.041,
+     "max_abs": 0.085,
+     "mean": 0.041
+    },
+    "exit_error_s": {
+     "n": 18,
+     "mean_abs": 0.039,
+     "max_abs": 0.085,
+     "mean": 0.039
+    },
+    "dwell_error_s": {
+     "n": 18,
+     "mean_abs": 0.012,
+     "max_abs": 0.033,
+     "mean": -0.002
+    }
+   },
+   "results": [
+    {
+     "variant": "6 s out of view",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit, marked lost then back",
+     "entry_error_s": 0.062,
+     "exit_error_s": 0.062,
+     "dwell_error_s": 0.0
+    },
+    {
+     "variant": "2 s out of view",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.02,
+     "exit_error_s": 0.02,
+     "dwell_error_s": 0.0
+    },
+    {
+     "variant": "2 s out of view",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.021,
+     "exit_error_s": 0.021,
+     "dwell_error_s": 0.0
+    },
+    {
+     "variant": "3.5 s out of view",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.024,
+     "exit_error_s": 0.024,
+     "dwell_error_s": 0.0
+    },
+    {
+     "variant": "3.5 s out of view",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.056,
+     "exit_error_s": 0.022,
+     "dwell_error_s": -0.033
+    },
+    {
+     "variant": "3.5 s out of view",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.037,
+     "exit_error_s": 0.017,
+     "dwell_error_s": -0.02
+    },
+    {
+     "variant": "3.5 s out of view",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.085,
+     "exit_error_s": 0.085,
+     "dwell_error_s": 0.0
+    },
+    {
+     "variant": "3.5 s out of view",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.001,
+     "exit_error_s": 0.034,
+     "dwell_error_s": 0.033
+    },
+    {
+     "variant": "3.5 s out of view",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.015,
+     "exit_error_s": 0.035,
+     "dwell_error_s": 0.02
+    },
+    {
+     "variant": "2 s out of view",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.068,
+     "exit_error_s": 0.068,
+     "dwell_error_s": -0.0
+    },
+    {
+     "variant": "2 s out of view",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.035,
+     "exit_error_s": 0.035,
+     "dwell_error_s": -0.0
+    },
+    {
+     "variant": "6 s out of view",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit, marked lost then back",
+     "entry_error_s": 0.009,
+     "exit_error_s": 0.009,
+     "dwell_error_s": 0.0
+    },
+    {
+     "variant": "6 s out of view",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit, marked lost then back",
+     "entry_error_s": 0.082,
+     "exit_error_s": 0.082,
+     "dwell_error_s": 0.0
+    },
+    {
+     "variant": "3.5 s out of view",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.033,
+     "exit_error_s": 0.066,
+     "dwell_error_s": 0.033
+    },
+    {
+     "variant": "3.5 s out of view",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.031,
+     "exit_error_s": 0.011,
+     "dwell_error_s": -0.02
+    },
+    {
+     "variant": "2 s out of view",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.062,
+     "exit_error_s": 0.062,
+     "dwell_error_s": 0.0
+    },
+    {
+     "variant": "3.5 s out of view",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.056,
+     "exit_error_s": 0.023,
+     "dwell_error_s": -0.033
+    },
+    {
+     "variant": "3.5 s out of view",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "1 entry, 1 exit",
+     "entry_error_s": 0.039,
+     "exit_error_s": 0.019,
+     "dwell_error_s": -0.02
+    }
+   ]
+  },
+  {
+   "id": "M1",
+   "title": "A worker falls and lies still (classifier labels them SITTING)",
+   "expected": "POTENTIAL_VIOLATION (CRITICAL) within seconds",
+   "rule": "MAN_DOWN",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {},
+   "results": [
+    {
+     "variant": 0,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.67
+    },
+    {
+     "variant": 1,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.6
+    },
+    {
+     "variant": 2,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.58
+    },
+    {
+     "variant": 3,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.68
+    },
+    {
+     "variant": 4,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.55
+    },
+    {
+     "variant": 5,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.61
+    },
+    {
+     "variant": 6,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.66
+    },
+    {
+     "variant": 7,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.65
+    },
+    {
+     "variant": 8,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.56
+    },
+    {
+     "variant": 9,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.51
+    },
+    {
+     "variant": 10,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.57
+    },
+    {
+     "variant": 11,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.57
+    },
+    {
+     "variant": 12,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.65
+    },
+    {
+     "variant": 13,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.75
+    },
+    {
+     "variant": 14,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.59
+    },
+    {
+     "variant": 15,
+     "fps": 10,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.55
+    },
+    {
+     "variant": 16,
+     "fps": 15,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.65
+    },
+    {
+     "variant": 17,
+     "fps": 25,
+     "outcome": "correct",
+     "got": "POTENTIAL_VIOLATION",
+     "time_to_alert_s": 5.6
+    }
+   ],
+   "time_to_alert_s": {
+    "median": 5.6,
+    "max": 5.75,
+    "min": 5.51
+   }
+  },
+  {
+   "id": "M2",
+   "title": "Hard negatives: bending over, sitting upright, crawling",
+   "expected": "nothing",
+   "rule": "MAN_DOWN",
+   "runs": 18,
+   "correct": 18,
+   "abstained": 0,
+   "wrong": 0,
+   "timing": {},
+   "results": [
+    {
+     "variant": "crawling",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "bending over",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "bending over",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "sitting upright",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "crawling",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "crawling",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "bending over",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "crawling",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "crawling",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "sitting upright",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "bending over",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "crawling",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "crawling",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "bending over",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "sitting upright",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "crawling",
+     "fps": 10,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "crawling",
+     "fps": 15,
+     "outcome": "correct",
+     "got": "nothing"
+    },
+    {
+     "variant": "bending over",
+     "fps": 25,
+     "outcome": "correct",
+     "got": "nothing"
+    }
+   ]
+  }
+ ],
+ "confusion": {
+  "S1 PPE_ENTRY": {
+   "COMPLIANT -> COMPLIANT": 18
+  },
+  "S2 PPE_ENTRY": {
+   "POTENTIAL_VIOLATION -> POTENTIAL_VIOLATION": 18
+  },
+  "S3 PPE_ENTRY": {
+   "POTENTIAL_VIOLATION -> POTENTIAL_VIOLATION": 18
+  },
+  "S1n PPE_ENTRY": {
+   "COMPLIANT (or UNVERIFIABLE; never the opposite claim) -> COMPLIANT": 18
+  },
+  "S2n PPE_ENTRY": {
+   "POTENTIAL_VIOLATION (or UNVERIFIABLE; never the opposite claim) -> POTENTIAL_VIOLATION": 18
+  },
+  "S3n PPE_ENTRY": {
+   "POTENTIAL_VIOLATION (or UNVERIFIABLE; never the opposite claim) -> POTENTIAL_VIOLATION": 18
+  },
+  "S4 PPE_ENTRY": {
+   "far away -> UNVERIFIABLE": 11,
+   "head cut off -> UNVERIFIABLE": 7
+  },
+  "S5 PPE_ENTRY": {
+   "side by side -> COMPLIANT / POTENTIAL_VIOLATION": 8,
+   "overlapping -> UNVERIFIABLE / UNVERIFIABLE": 10
+  },
+  "S6 zone events": {
+   "one entry, not many -> 1 entries, 0 exits": 18
+  },
+  "S7 MAX_DWELL": {
+   "over the limit -> POTENTIAL_VIOLATION after a warning": 8,
+   "within the limit -> COMPLIANT": 10
+  },
+  "S8 REQUIRED_EXIT": {
+   "right route -> COMPLIANT": 9,
+   "wrong route -> POTENTIAL_VIOLATION": 4,
+   "lost -> UNVERIFIABLE": 5
+  },
+  "S9 OCCUPANCY": {
+   "alone -> LONE_WORKER": 11,
+   "two people -> nothing": 7
+  },
+  "S10 zone events": {
+   "6 s out of view -> 1 entry, 1 exit, marked lost then back": 3,
+   "2 s out of view -> 1 entry, 1 exit": 5,
+   "3.5 s out of view -> 1 entry, 1 exit": 10
+  },
+  "M1 MAN_DOWN": {
+   "POTENTIAL_VIOLATION (CRITICAL) within seconds -> POTENTIAL_VIOLATION": 18
+  },
+  "M2 MAN_DOWN": {
+   "crawling -> nothing": 9,
+   "bending over -> nothing": 6,
+   "sitting upright -> nothing": 3
+  }
+ },
+ "totals": {
+  "correct": 270,
+  "abstained": 0,
+  "wrong": 0,
+  "runs": 270
+ },
+ "seconds": 22.5
+}

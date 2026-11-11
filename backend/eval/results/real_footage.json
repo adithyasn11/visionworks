@@ -1,0 +1,325 @@
+{
+ "generated": "2026-11-11 19:52:03",
+ "hardware": {
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "cpu": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+  "cores": 20,
+  "python": "3.11.9",
+  "torch": "2.5.1+cu121",
+  "os": "Windows 10",
+  "ram_gb": 23.7
+ },
+ "seconds_per_clip": 120.0,
+ "config": {
+  "pose_max_width": 1280,
+  "ppe_max_width": 1280,
+  "ppe_every_n_frames": 2,
+  "ppe_crop_below_px": 360.0
+ },
+ "clips": [
+  {
+   "clip": "Example of Hi-Definition Video Surveillance of a Factory Floor - by CCTVDOC.COM.mp4",
+   "source_resolution": "1280x720",
+   "working_resolution": "640x360",
+   "video_fps": 6.0,
+   "frames": 102,
+   "video_seconds": 17.0,
+   "speed": {
+    "processed_fps": 13.7,
+    "ms_per_frame_mean": 73.0,
+    "ms_per_frame_p95": 137.8,
+    "pose_ms_mean": 33.5,
+    "ppe_ms_mean": 75.8,
+    "ppe_every_n_frames": 2,
+    "safety_layer_ms_mean": 1.0
+   },
+   "latency": {
+    "event_to_decision_ms_mean": 73.0,
+    "event_to_decision_ms_p95": 137.8
+   },
+   "man_down": {
+    "flags": 0,
+    "could_not_tell": 0,
+    "false_alarms_per_hour": 0.0,
+    "flags_detail": []
+   },
+   "head_count": {
+    "people_seen_per_second": {
+     "0": 4.5,
+     "1": 5.0,
+     "2": 5.0,
+     "3": 4.5,
+     "4": 5.0,
+     "5": 5.0,
+     "6": 5.0,
+     "7": 5.0,
+     "8": 6.0,
+     "9": 5.0,
+     "10": 5.0,
+     "11": 5.5,
+     "12": 6.0,
+     "13": 5.0,
+     "14": 5.5,
+     "15": 5.5,
+     "16": 5.0
+    },
+    "decisions": [
+     {
+      "at_s": 0.8,
+      "status": "POTENTIAL_VIOLATION",
+      "outcome": "OVER_CAPACITY",
+      "reason": "5 people were seen in Whole picture for 10 s; this rule allows at most 2."
+     }
+    ]
+   },
+   "ppe_decisions": {
+    "COMPLIANT": 1,
+    "POTENTIAL_VIOLATION": 3,
+    "UNVERIFIABLE": 5
+   }
+  },
+  {
+   "clip": "_ Hikvision ViewStar 8 Megapixel warehouse pallet company camera.mp4",
+   "source_resolution": "1280x720",
+   "working_resolution": "640x360",
+   "video_fps": 15.0,
+   "frames": 555,
+   "video_seconds": 37.0,
+   "speed": {
+    "processed_fps": 18.55,
+    "ms_per_frame_mean": 53.9,
+    "ms_per_frame_p95": 100.6,
+    "pose_ms_mean": 32.8,
+    "ppe_ms_mean": 40.1,
+    "ppe_every_n_frames": 2,
+    "safety_layer_ms_mean": 0.5
+   },
+   "latency": {
+    "event_to_decision_ms_mean": 53.9,
+    "event_to_decision_ms_p95": 100.6
+   },
+   "man_down": {
+    "flags": 0,
+    "could_not_tell": 0,
+    "false_alarms_per_hour": 0.0,
+    "flags_detail": []
+   },
+   "head_count": {
+    "people_seen_per_second": {
+     "0": 2,
+     "1": 2,
+     "2": 2,
+     "3": 2,
+     "4": 2,
+     "5": 2,
+     "6": 2,
+     "7": 2,
+     "8": 2,
+     "9": 2,
+     "10": 3,
+     "11": 1,
+     "12": 2,
+     "13": 2,
+     "14": 2,
+     "15": 2,
+     "16": 2,
+     "17": 2,
+     "18": 2,
+     "19": 2,
+     "20": 2,
+     "21": 2,
+     "22": 2,
+     "23": 1,
+     "24": 2,
+     "25": 2,
+     "26": 2,
+     "27": 1,
+     "28": 2,
+     "29": 2,
+     "30": 1,
+     "31": 1,
+     "32": 1,
+     "33": 1,
+     "34": 2,
+     "35": 2,
+     "36": 2
+    },
+    "decisions": []
+   },
+   "ppe_decisions": {
+    "POTENTIAL_VIOLATION": 2,
+    "UNVERIFIABLE": 3
+   }
+  },
+  {
+   "clip": "vtest.avi",
+   "source_resolution": "768x576",
+   "working_resolution": "640x480",
+   "video_fps": 10.0,
+   "frames": 795,
+   "video_seconds": 79.5,
+   "speed": {
+    "processed_fps": 27.19,
+    "ms_per_frame_mean": 36.8,
+    "ms_per_frame_p95": 74.3,
+    "pose_ms_mean": 17.6,
+    "ppe_ms_mean": 34.9,
+    "ppe_every_n_frames": 2,
+    "safety_layer_ms_mean": 0.8
+   },
+   "latency": {
+    "event_to_decision_ms_mean": 36.8,
+    "event_to_decision_ms_p95": 74.3
+   },
+   "man_down": {
+    "flags": 0,
+    "could_not_tell": 0,
+    "false_alarms_per_hour": 0.0,
+    "flags_detail": []
+   },
+   "head_count": {
+    "people_seen_per_second": {
+     "0": 3.0,
+     "1": 4.0,
+     "2": 3.0,
+     "3": 2.5,
+     "4": 3.0,
+     "5": 3.0,
+     "6": 3.0,
+     "7": 4.0,
+     "8": 3.0,
+     "9": 3.0,
+     "10": 1.0,
+     "11": 1.5,
+     "12": 2.0,
+     "13": 3.0,
+     "14": 3.0,
+     "15": 2.5,
+     "16": 3.0,
+     "17": 3.0,
+     "18": 3.0,
+     "19": 3.0,
+     "20": 3.0,
+     "21": 1.5,
+     "22": 3.0,
+     "23": 4.0,
+     "24": 2.5,
+     "25": 2.0,
+     "26": 2.0,
+     "27": 2.0,
+     "28": 2.0,
+     "29": 1.5,
+     "30": 2.0,
+     "31": 2.0,
+     "32": 3.0,
+     "33": 3.0,
+     "34": 4.0,
+     "35": 4.0,
+     "36": 5.0,
+     "37": 4.0,
+     "38": 3.0,
+     "39": 3.0,
+     "40": 1.0,
+     "41": 1.0,
+     "42": 2.0,
+     "43": 2.0,
+     "44": 3.0,
+     "45": 3.0,
+     "46": 4.0,
+     "47": 3.0,
+     "48": 3.0,
+     "49": 4.0,
+     "50": 4.0,
+     "51": 5.0,
+     "52": 4.0,
+     "53": 5.0,
+     "54": 4.0,
+     "55": 4.0,
+     "56": 4.5,
+     "57": 5.0,
+     "58": 4.0,
+     "59": 4.0,
+     "60": 5.0,
+     "61": 5.0,
+     "62": 3.0,
+     "63": 3.0,
+     "64": 3.0,
+     "65": 3.5,
+     "66": 4.0,
+     "67": 2.5,
+     "68": 3.0,
+     "69": 3.5,
+     "70": 3.5,
+     "71": 3.0,
+     "72": 3.0,
+     "73": 5.0,
+     "74": 4.0,
+     "75": 4.0,
+     "76": 3.0,
+     "77": 3.0,
+     "78": 3.5,
+     "79": 4
+    },
+    "decisions": [
+     {
+      "at_s": 44.2,
+      "status": "POTENTIAL_VIOLATION",
+      "outcome": "OVER_CAPACITY",
+      "reason": "4 people were seen in Whole picture for 10 s; this rule allows at most 2."
+     }
+    ]
+   },
+   "ppe_decisions": {
+    "UNVERIFIABLE": 28,
+    "POTENTIAL_VIOLATION": 10
+   }
+  },
+  {
+   "clip": "PPE-test.mp4",
+   "source_resolution": "640x360",
+   "working_resolution": "640x360",
+   "video_fps": 25.0,
+   "frames": 149,
+   "video_seconds": 6.0,
+   "speed": {
+    "processed_fps": 34.32,
+    "ms_per_frame_mean": 29.1,
+    "ms_per_frame_p95": 44.4,
+    "pose_ms_mean": 11.8,
+    "ppe_ms_mean": 32.6,
+    "ppe_every_n_frames": 2,
+    "safety_layer_ms_mean": 0.7
+   },
+   "latency": {
+    "event_to_decision_ms_mean": 29.1,
+    "event_to_decision_ms_p95": 44.4
+   },
+   "man_down": {
+    "flags": 0,
+    "could_not_tell": 0,
+    "false_alarms_per_hour": 0.0,
+    "flags_detail": []
+   },
+   "head_count": {
+    "people_seen_per_second": {
+     "0": 2,
+     "1": 2,
+     "2": 2,
+     "3": 2,
+     "4": 2,
+     "5": 2.0
+    },
+    "decisions": []
+   },
+   "ppe_decisions": {
+    "POTENTIAL_VIOLATION": 1,
+    "COMPLIANT": 1
+   }
+  }
+ ],
+ "man_down_overall": {
+  "video_minutes": 2.3,
+  "false_alarms": 0,
+  "false_alarms_per_hour": 0.0
+ }
+}

@@ -98,5 +98,7 @@ export const getReport = ({ since, until, tz }) => call('/report', { query: { si
 export const downloadReport = (format, { since, until, tz }) => saveFile('/report/export', { format, since, until, tz }, `safety-report.${format}`);
 /** The reports made before, newest first. */
 export const getReportHistory = (limit = 20) => call('/report/history', { query: { limit } });
+/** The measured evaluation results (Step 17): the PPE benchmark, the scenario suite and the real-footage run. */
+export const getEvaluation = () => call('/evaluation');
 /** Every decision and zone event of a period (a shift), oldest first, as a CSV. */
 export const downloadAuditTrail = ({ since, until }) => saveFile('/audit-trail', { since, until }, 'safety-audit-trail.csv');

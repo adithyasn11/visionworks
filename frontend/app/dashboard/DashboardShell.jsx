@@ -15,7 +15,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Video, Shapes, FileDown, ClipboardCheck, ListFilter, SlidersHorizontal, Wrench,
-  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard,
+  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard, FlaskConical,
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import { supabase } from '../lib/supabase/browser';
@@ -43,6 +43,7 @@ export const VIEWS = [
   { id: 'rules',    label: 'Rules',     icon: SlidersHorizontal },
   { id: 'actions',  label: 'Actions',   icon: Wrench },
   { id: 'reports',  label: 'Reports',   icon: FileDown },
+  { id: 'evaluation', label: 'Evaluation', icon: FlaskConical },
   { id: 'plan',     label: 'Plan',      icon: CreditCard, capability: 'org.settings' },
 ];
 

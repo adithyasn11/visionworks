@@ -28,6 +28,7 @@ import RulesScreen from './safety/RulesScreen';
 import ActionsScreen from './safety/ActionsScreen';
 import SafetySummary from './safety/SafetySummary';
 import ReportsScreen from './safety/ReportsScreen';
+import EvaluationScreen from './evaluation/EvaluationScreen';
 import PlanSection from './PlanSection';
 import { VideoCanvasPlayer } from '../components/VideoCanvasPlayer';
 import { FloorplanHeatmap } from '../components/FloorplanHeatmap';
@@ -469,6 +470,17 @@ function DashboardInner() {
             subtitle="Your current subscription, what it includes, and how the tiers compare."
           />
           <ReadOnlyNotice capability="org.settings" />
+        </div>
+      )}
+
+      {view === 'evaluation' && (
+        <div className="space-y-6">
+          <PageHeader
+            eyebrow="Evaluation"
+            title="How well the system works, measured"
+            subtitle="The measured results: how often it would wrongly flag someone, how often it says it cannot tell, the scenario suite, speed on real video, and what your reviewers have decided so far."
+          />
+          <EvaluationScreen />
         </div>
       )}
 

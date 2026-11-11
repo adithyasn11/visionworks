@@ -6,6 +6,7 @@ Safety reports (Step 16), under the same prefix as the rest of the safety API (/
     GET /report/export          the same report as a PDF or a CSV file (audited, recorded)    safety.view
     GET /report/history         the reports made before (kind SAFETY_SUMMARY)                 safety.view
     GET /audit-trail            a CSV of every decision and zone event in a period, in order  safety.view
+    GET /evaluation             the measured evaluation results (Step 17), for the Evaluation screen safety.view
 
 (The row-level decisions CSV, GET /export, is in safety.py.)
 
@@ -20,7 +21,9 @@ so the screen can list the reports made before; if that record cannot be written
 `X-Report-Recorded: false` says so.
 """
 
+import json
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -169,3 +172,46 @@ def audit_trail(since: Optional[str] = None, until: Optional[str] = None, author
     if truncated:
         headers["X-Export-Truncated"] = "true"
     return Response(content=payload, media_type="text/csv; charset=utf-8", headers=headers)
+
+
+# ── the evaluation results (Step 17) ─────────────────────────────────────────
+
+_REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+EVALUATION_FILES = {
+    "scenarios": os.path.join(_REPO, "backend", "eval", "results", "safety_evaluation.json"),
+    "real_footage": os.path.join(_REPO, "backend", "eval", "results", "real_footage.json"),
+    "segments": os.path.join(_REPO, "ppe_training", "reports", "SEGMENT_EVAL.json"),
+}
+
+
+def _read_json(path: str):
+    """A results file, or None when it has not been made yet (or cannot be read)."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        data["_file_updated"] = datetime.fromtimestamp(os.path.getmtime(path), timezone.utc).isoformat()
+        return data
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        logger.warning("An evaluation file could not be read (%s): %s", os.path.basename(path), e)
+        return None
+
+
+@router.get("/evaluation")
+def evaluation(authorization: Optional[str] = Header(default=None)):
+    """
+    The measured results the evaluation scripts wrote (backend/eval/*.py, ppe_training/eval_segments.py). They describe the
+    SYSTEM, not an organisation's data, so every signed-in member may read them; the screen adds the organisation's own
+    review figures from /report. A result that has not been produced yet is null, and the screen says so.
+    """
+    _who(authorization, "safety.view")
+    out = {key: _read_json(path) for key, path in EVALUATION_FILES.items()}
+    scen = out.get("scenarios")
+    if scen:
+        scen.pop("config", None)                          # the full threshold list is in the file, not needed on screen
+    seg = out.get("segments")
+    if seg:
+        for name in list(seg.get("sets", {})):
+            seg["sets"][name].pop("segments_detail", None)
+    return out
