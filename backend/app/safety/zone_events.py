@@ -116,6 +116,7 @@ class _Worker:
     left_at: Optional[float] = None       # when they first stopped being in `current` (a pending move, even if its target changed)
     lost_emitted: bool = False
     fired: set = field(default_factory=set)   # dwell events already raised this visit
+    visit_first_sighting: bool = False        # the current visit began before the worker was first seen (so its length is partial)
     last_event_key: Optional[tuple] = None    # duplicate suppression
 
 
@@ -301,10 +302,14 @@ class ZoneEventTracker:
             # Count dwell up to the moment they left, then close the visit.
             self._dwell_events(key, w, left_at, out)
             self._emit(out, w, ZoneEvent("EXITED_ZONE", key, w.current, left_at, {
-                "reason": "LEFT", "dwell_s": _dwell_s(w, left_at)}))
+                "reason": "LEFT", "dwell_s": _dwell_s(w, left_at),
+                # a visit that was already under way when first seen is timed from the first frame: say so,
+                # so a report does not average a part of a stay as if it were the whole of it
+                **({"first_sighting": True} if w.visit_first_sighting else {})}))
         w.fired = set()
         w.lost_emitted = False
         w.left_at = None
+        w.visit_first_sighting = bool(first and zone is not None)
         if zone is not None:
             # A worker first seen already inside a zone: we know they are there,
             # not that they walked in. Rules decide what that is worth.

@@ -16,7 +16,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.db.database import engine, Base, apply_lightweight_migrations
-from app.api.routers import cameras, zones, analytics, websocket, video_upload, pairing, safety
+from app.api.routers import cameras, zones, analytics, websocket, video_upload, pairing, safety, safety_report
 
 # Create database tables automatically on startup, then add any columns that
 # were introduced after an existing database was created (create_all does not
@@ -142,6 +142,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # A page on another port can only read these response headers when they are exposed: the file name of a download,
+    # whether an export was cut short, and whether a report made it into the history.
+    expose_headers=["Content-Disposition", "X-Export-Truncated", "X-Report-Recorded"],
 )
 
 # Register REST Routers
@@ -151,6 +154,7 @@ app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytic
 app.include_router(websocket.router, prefix="/api/v1/ws", tags=["WebSockets"])
 app.include_router(video_upload.router, prefix="/api/v1/video", tags=["Video Upload"])
 app.include_router(safety.router, prefix="/api/v1/safety", tags=["Safety"])
+app.include_router(safety_report.router, prefix="/api/v1/safety", tags=["Safety"])
 # Phone-as-camera pairing. Carries its own /api/v1/pair prefix because the
 # WebSocket path is part of the QR code a phone scans, and a prefix declared
 # in two places is a prefix that eventually disagrees with itself.

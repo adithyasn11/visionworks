@@ -10,7 +10,7 @@
 //   Overview   what was detected on site — the home screen
 //   Live feed  the camera, with detection and tracking overlays
 //   Zones      define the areas that rules and measurements attach to
-//   Reports    export what was recorded
+//   Reports    the safety report for a period, as a PDF or CSV
 //
 // Sections are view state rather than routes on purpose: they share one polling
 // data source and a live video WebSocket, and routing between them would tear
@@ -18,7 +18,7 @@
 
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { RefreshCw, Loader2, Eye, ShieldCheck, Check } from 'lucide-react';
+import { RefreshCw, Loader2, Eye } from 'lucide-react';
 
 import DashboardShell, { VIEWS } from './DashboardShell';
 import OverviewSection from './OverviewSection';
@@ -28,12 +28,12 @@ import EventsScreen from './safety/EventsScreen';
 import RulesScreen from './safety/RulesScreen';
 import ActionsScreen from './safety/ActionsScreen';
 import SafetySummary from './safety/SafetySummary';
+import ReportsScreen from './safety/ReportsScreen';
 import PlanSection from './PlanSection';
 import { VideoCanvasPlayer } from '../components/VideoCanvasPlayer';
 import { AnalyticsCharts } from '../components/AnalyticsCharts';
 import { FloorplanHeatmap } from '../components/FloorplanHeatmap';
 import { ZoneEditor } from '../components/ZoneEditor';
-import { ReportExport } from '../components/ReportExport';
 import { supabase } from '../lib/supabase/browser';
 import { backendFetch } from '../lib/backend';
 import { getViewerRole } from '../lib/session';
@@ -531,64 +531,10 @@ function DashboardInner() {
         <div className="space-y-6">
           <PageHeader
             eyebrow="Reports"
-            title="Export site data"
-            subtitle="Download recorded detections as raw data or a summary. Exports contain counts and postures only."
-            action={
-              <RangePicker
-                value={rangeDays}
-                onChange={setRangeDays}
-                coverage={coverage}
-                busy={refreshing}
-              />
-            }
+            title="Safety reports"
+            subtitle="How the site did over a period: what was flagged, what people confirmed or dismissed, and what the system could not tell. Download it as a PDF or CSV."
           />
-
-          {/* Two columns rather than a lone `max-w-xl` card stranded in a wide
-              page. The export control is the action; the panel beside it says
-              what an export actually contains — which is the question a
-              facilities manager asks before sending one to their director, and
-              it was previously answerable only by downloading one. */}
-          {/* `items-stretch`, not `items-start`. The two cards hold different
-              amounts of text, and letting each size to its own content left the
-              left one stopping well short of the right — a visibly ragged
-              bottom edge. Stretching makes them one row. */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-stretch">
-            <ReportExport hours={rangeDays * 24} rangeLabel={rangeLabel} />
-
-            <div className="glass-panel p-5 flex flex-col gap-4 h-full">
-              <div className="flex items-center gap-2 text-ink font-bold text-[13.5px] tracking-tight">
-                <ShieldCheck className="w-4 h-4 text-accent" aria-hidden="true" />
-                What an export contains
-              </div>
-
-              <dl className="flex flex-col gap-3">
-                {[
-                  ['People per zone', 'Headcount per zone per minute, across the selected window.'],
-                  ['Posture breakdown', 'Sitting, standing and walking totals — as counts, never per person.'],
-                  ['Time in zone', 'How long each zone was occupied, aggregated per minute bucket.'],
-                ].map(([term, detail]) => (
-                  <div key={term} className="flex gap-3">
-                    <Check className="w-4 h-4 text-accent shrink-0 mt-0.5" strokeWidth={3} aria-hidden="true" />
-                    <div className="min-w-0">
-                      <dt className="text-[12.5px] font-bold text-ink">{term}</dt>
-                      <dd className="text-[12px] text-ink-muted leading-relaxed mt-0.5">{detail}</dd>
-                    </div>
-                  </div>
-                ))}
-              </dl>
-
-              {/* The anonymity guarantee is structural, not a policy promise —
-                  `zone_minute_stats` holds no person reference at all, so
-                  there is nothing identifying that an export COULD leak. */}
-              <div className="rounded-lg border border-line bg-surface-alt px-3.5 py-3 mt-auto">
-                <p className="text-[11.5px] text-ink-faint leading-relaxed">
-                  <strong className="text-ink-muted font-bold">Nothing identifying is exported.</strong>{' '}
-                  The underlying table holds counts per zone per minute and carries no track id,
-                  coordinate or person reference — so an export physically cannot contain one.
-                </p>
-              </div>
-            </div>
-          </div>
+          <ReportsScreen />
         </div>
       )}
     </DashboardShell>

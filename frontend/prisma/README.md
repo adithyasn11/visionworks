@@ -31,6 +31,7 @@ project yet.
 | `sql/025_safety.sql` | **Safety compliance.** Tables `safety_rules`, `safety_events`, `safety_decisions`, `corrective_actions`; `zones.safetyType`; `organisations.safetyEvidenceEnabled`; the `SAFETY_SUMMARY` report kind; CHECK constraints, tenancy triggers, indexes, RLS, grants; `review_safety_decision()`, `soft_delete_safety_rule()`, `purge_safety_data()` (cron 03:45 UTC). Idempotent. Matrix below. |
 | `sql/026_safety_hardening.sql` | **Safety hardening** from the test pass: reopening an action re-checks its decision; members cannot write `safety.*` audit rows (the functions and the service role do); the database stamps attribution and timestamps on insert (a rule is born alive, an action's closer/time are set by the transition); a soft-deleted organisation loses access to safety data; review reasons come from a list; blank names/titles and oversized params are refused. Idempotent. |
 | `sql/027_safety_summary.sql` | `safety_summary(org, since, until)`: counts of decisions by result, review state and zone and by day, run as the caller (RLS-scoped), for the overview and reports. |
+| `sql/028_safety_report.sql` | `safety_report(org, since, until, tz)`: every figure of the safety report as one JSON document (honest categories, by rule / zone / camera / hour / day, helmet and vest, time in restricted zones, man-down and head count, corrective actions), run as the caller (RLS-scoped). |
 | `seed.ts` | Generates ~826,000 minute buckets of realistic shaped data. |
 
 **Order matters.** 001 → 002 → … → 025. Later files

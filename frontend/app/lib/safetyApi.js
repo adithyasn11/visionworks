@@ -59,21 +59,22 @@ export const createRule = (rule) => call('/rules', { method: 'POST', body: rule 
 export const updateRule = (id, patch) => call(`/rules/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch });
 export const deleteRule = (id) => call(`/rules/${encodeURIComponent(id)}`, { method: 'DELETE' });
 
-/** Download the decisions CSV. Resolves `{ ok }` after handing the file to the browser. */
-export async function downloadExport({ since, until, status } = {}) {
+/**
+ * Fetch a file from the API and hand it to the browser. Resolves `{ ok, truncated, recorded }` or `{ ok: false, message }`.
+ * (`recorded` is false when a served report could not be written to the report history; the file is still downloaded.)
+ */
+async function saveFile(path, query, fallbackName) {
   try {
     const qs = new URLSearchParams();
-    if (since) qs.set('since', since);
-    if (until) qs.set('until', until);
-    if (status) qs.set('status', status);
-    const response = await backendFetch(`/api/v1/safety/export${qs.toString() ? `?${qs}` : ''}`);
+    Object.entries(query || {}).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') qs.set(k, v); });
+    const response = await backendFetch(`/api/v1/safety${path}${qs.toString() ? `?${qs}` : ''}`);
     if (!response.ok) {
       const parsed = await response.json().catch(() => null);
       return { ok: false, message: apiMessage(parsed, response.status) };
     }
     const blob = await response.blob();
     const disposition = response.headers.get('content-disposition') || '';
-    const name = (/filename="([^"]+)"/.exec(disposition) || [])[1] || 'safety-decisions.csv';
+    const name = (/filename="([^"]+)"/.exec(disposition) || [])[1] || fallbackName;
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -82,8 +83,20 @@ export async function downloadExport({ since, until, status } = {}) {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
-    return { ok: true, truncated: response.headers.get('x-export-truncated') === 'true' };
+    return { ok: true, truncated: response.headers.get('x-export-truncated') === 'true', recorded: response.headers.get('x-report-recorded') !== 'false', name };
   } catch {
     return { ok: false, message: 'Could not reach the server. Check your connection and try again.' };
   }
 }
+
+/** Download the decisions CSV (one row per decision). */
+export const downloadExport = ({ since, until, status } = {}) => saveFile('/export', { since, until, status }, 'safety-decisions.csv');
+
+/** The figures of a period: `{ since, until, tz }` (ISO instants, an IANA time zone name). */
+export const getReport = ({ since, until, tz }) => call('/report', { query: { since, until, tz } });
+/** The report as a file: format 'pdf' or 'csv'. */
+export const downloadReport = (format, { since, until, tz }) => saveFile('/report/export', { format, since, until, tz }, `safety-report.${format}`);
+/** The reports made before, newest first. */
+export const getReportHistory = (limit = 20) => call('/report/history', { query: { limit } });
+/** Every decision and zone event of a period (a shift), oldest first, as a CSV. */
+export const downloadAuditTrail = ({ since, until }) => saveFile('/audit-trail', { since, until }, 'safety-audit-trail.csv');

@@ -1,10 +1,6 @@
 # backend/app/api/routers/analytics.py
-import io
-import os
-import tempfile
 
 from fastapi import APIRouter, Depends, Query, HTTPException, Header
-from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Dict, Any, Optional
@@ -177,117 +173,6 @@ def get_manager_overview(
         "longest_dwell_minutes": round(int(longest) / 60.0, 1),
         "last_seen": last_seen.isoformat(sep=" ", timespec="seconds") if last_seen else None,
     }
-
-
-@router.get("/report/csv")
-def export_csv_report(
-    hours: int = Query(24, ge=1, le=168),
-    db: Session = Depends(get_db),
-    org_id: Optional[str] = Depends(current_org),
-):
-    """
-    Downloads raw telemetry for the window as CSV.
-
-    Streamed from memory rather than written into the project directory: a
-    report is a point-in-time export, and leaving generated files on disk means
-    they accumulate and go stale with nothing responsible for cleaning them up.
-    """
-    if org_id is None:
-        raise HTTPException(
-            status_code=401,
-            detail="Sign in to export telemetry.",
-        )
-
-    since_time = datetime.utcnow() - timedelta(hours=hours)
-    logs = (
-        scoped(db, org_id)
-        .filter(ActivityLogModel.timestamp >= since_time)
-        .order_by(ActivityLogModel.timestamp.asc())
-        .all()
-    )
-
-    if not logs:
-        raise HTTPException(
-            status_code=404,
-            detail="No telemetry in this window yet. Process a video or run the live camera first.",
-        )
-
-    rows = [
-        {
-            "timestamp": log.timestamp.isoformat(sep=" ", timespec="seconds"),
-            "camera_id": log.camera_id,
-            "zone_id": log.zone_id,
-            "track_id": log.track_id,
-            "posture_state": log.posture_state,
-            "activity_score": log.activity_score,
-            "dwell_duration_seconds": log.dwell_duration_seconds,
-            "floor_x": log.floor_x,
-            "floor_y": log.floor_y,
-        }
-        for log in logs
-    ]
-
-    from app.utils.report_generator import AnalyticsReportGenerator
-
-    # The generator writes to a path, so use a temp file and stream its bytes
-    # back, rather than changing a working module to satisfy the transport.
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        path = os.path.join(tmp_dir, "report.csv")
-        AnalyticsReportGenerator.generate_csv_report(rows, path)
-        with open(path, "rb") as handle:
-            payload = handle.read()
-
-    stamp = datetime.utcnow().strftime("%Y%m%d_%H%M")
-    return StreamingResponse(
-        io.BytesIO(payload),
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": f'attachment; filename="activity_telemetry_{stamp}.csv"'
-        },
-    )
-
-
-@router.get("/report/pdf")
-def export_pdf_report(
-    db: Session = Depends(get_db),
-    org_id: Optional[str] = Depends(current_org),
-):
-    """
-    Downloads the executive summary as a PDF.
-
-    Reuses get_analytics_summary() rather than recomputing the same aggregates,
-    so the numbers in the PDF can never drift from the numbers on the dashboard.
-    """
-    if org_id is None:
-        raise HTTPException(
-            status_code=401,
-            detail="Sign in to export a report.",
-        )
-
-    summary = get_analytics_summary(db=db, org_id=org_id)
-
-    if not summary.get("total_logs"):
-        raise HTTPException(
-            status_code=404,
-            detail="No telemetry recorded yet. Process a video or run the live camera first.",
-        )
-
-    from app.utils.report_generator import AnalyticsReportGenerator
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        path = os.path.join(tmp_dir, "report.pdf")
-        AnalyticsReportGenerator.generate_pdf_report(summary, path)
-        with open(path, "rb") as handle:
-            payload = handle.read()
-
-    stamp = datetime.utcnow().strftime("%Y%m%d_%H%M")
-    return StreamingResponse(
-        io.BytesIO(payload),
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'attachment; filename="workplace_report_{stamp}.pdf"'
-        },
-    )
 
 
 @router.get("/sync_health")
