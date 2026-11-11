@@ -1,9 +1,17 @@
 # backend/app/api/routers/analytics.py
 
-from fastapi import APIRouter, Depends, Query, HTTPException, Header
+"""
+Where people were seen on the floor, from the pipeline's own anonymous positions (the floor-plan map on the live feed).
+
+    GET /heatmap   density of positions over the last hours, snapped to a grid
+
+The old summary / overview / zone-time / history endpoints were removed with the screens that used them. Everything
+here is scoped to the caller's organisation (see below).
+"""
+
+from fastapi import APIRouter, Depends, Query, Header
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from typing import List, Dict, Any, Optional
+from typing import Dict, Optional
 from datetime import datetime, timedelta
 from app.db.database import get_db
 from app.db.models import ActivityLogModel
@@ -40,163 +48,6 @@ def scoped(db: Session, org_id: Optional[str]):
     every tenant correctly sees none of them.
     """
     return db.query(ActivityLogModel).filter(ActivityLogModel.org_id == org_id)
-
-
-EMPTY_OVERVIEW = {
-    "has_data": False,
-    "people": 0, "zones_active": 0, "avg_activity": 0,
-    "sitting_pct": 0, "standing_pct": 0, "walking_pct": 0,
-    "peak_zone": None, "longest_dwell_minutes": 0, "last_seen": None,
-}
-
-@router.get("/summary")
-def get_analytics_summary(
-    db: Session = Depends(get_db),
-    org_id: Optional[str] = Depends(current_org),
-):
-    """Returns instantaneous summary of this organisation's occupancy and posture ratio"""
-    if org_id is None:
-        # No verified tenant: report nothing rather than everything.
-        return {
-            "total_logs": 0,
-            "average_activity_score": 0.0,
-            "posture_distribution": {
-                "sitting_percentage": 0.0,
-                "standing_percentage": 0.0,
-                "walking_percentage": 0.0,
-            },
-        }
-
-    total_logs = scoped(db, org_id).count()
-
-    # Calculate posture breakdown
-    sitting_count = scoped(db, org_id).filter(ActivityLogModel.posture_state == "SITTING").count()
-    standing_count = scoped(db, org_id).filter(ActivityLogModel.posture_state == "STANDING").count()
-    walking_count = scoped(db, org_id).filter(ActivityLogModel.posture_state == "WALKING").count()
-
-    total_observed = max(1, sitting_count + standing_count + walking_count)
-
-    # Average activity score. Defaults to 0.0, not 65.0: a placeholder number
-    # on an empty tenant would be indistinguishable from a real measurement.
-    avg_score = (
-        scoped(db, org_id)
-        .with_entities(func.avg(ActivityLogModel.activity_score))
-        .scalar()
-        or 0.0
-    )
-
-    return {
-        "total_logs": total_logs,
-        "average_activity_score": round(float(avg_score), 2),
-        "posture_distribution": {
-            "sitting_percentage": round((sitting_count / total_observed) * 100, 1),
-            "standing_percentage": round((standing_count / total_observed) * 100, 1),
-            "walking_percentage": round((walking_count / total_observed) * 100, 1)
-        }
-    }
-
-@router.get("/overview")
-def get_manager_overview(
-    hours: int = Query(24, ge=1, le=168),
-    db: Session = Depends(get_db),
-    org_id: Optional[str] = Depends(current_org),
-):
-    """
-    The headline numbers for the manager's home screen.
-
-    Deliberately a small, fixed set. A manager opening the app wants to know
-    "is it running, how busy was it, and is anyone sitting too long" — not
-    twelve tiles of everything the schema can count.
-
-    `people` counts DISTINCT tracks, not rows: activity_logs holds a sampled
-    series per person, so counting rows would report a number many times larger
-    than the number of people actually observed.
-    """
-    if org_id is None:
-        return {"hours": hours, **EMPTY_OVERVIEW}
-
-    since = datetime.utcnow() - timedelta(hours=hours)
-    window = scoped(db, org_id).filter(ActivityLogModel.timestamp >= since)
-
-    total_rows = window.count()
-
-    if total_rows == 0:
-        return {"hours": hours, **EMPTY_OVERVIEW}
-
-    people = window.with_entities(
-        func.count(func.distinct(ActivityLogModel.track_id))
-    ).scalar() or 0
-
-    zones_active = window.with_entities(
-        func.count(func.distinct(ActivityLogModel.zone_id))
-    ).scalar() or 0
-
-    avg_activity = window.with_entities(
-        func.avg(ActivityLogModel.activity_score)
-    ).scalar() or 0.0
-
-    counts = {
-        state: window.filter(ActivityLogModel.posture_state == state).count()
-        for state in ("SITTING", "STANDING", "WALKING")
-    }
-    observed = max(1, sum(counts.values()))
-
-    # Busiest zone by distinct people, excluding transit: a corridor everyone
-    # walks through is not a utilisation signal.
-    peak = (
-        window.with_entities(
-            ActivityLogModel.zone_id,
-            func.count(func.distinct(ActivityLogModel.track_id)).label("n"),
-        )
-        .filter(ActivityLogModel.zone_id != "TRANSIT_ZONE")
-        .group_by(ActivityLogModel.zone_id)
-        .order_by(func.count(func.distinct(ActivityLogModel.track_id)).desc())
-        .first()
-    )
-
-    longest = window.with_entities(
-        func.max(ActivityLogModel.dwell_duration_seconds)
-    ).scalar() or 0
-
-    last_seen = window.with_entities(func.max(ActivityLogModel.timestamp)).scalar()
-
-    return {
-        "hours": hours,
-        "has_data": True,
-        "people": int(people),
-        "zones_active": int(zones_active),
-        "avg_activity": round(float(avg_activity), 1),
-        "sitting_pct": round(counts["SITTING"] / observed * 100, 1),
-        "standing_pct": round(counts["STANDING"] / observed * 100, 1),
-        "walking_pct": round(counts["WALKING"] / observed * 100, 1),
-        "peak_zone": {"zone": peak[0], "people": int(peak[1])} if peak else None,
-        "longest_dwell_minutes": round(int(longest) / 60.0, 1),
-        "last_seen": last_seen.isoformat(sep=" ", timespec="seconds") if last_seen else None,
-    }
-
-
-@router.get("/sync_health")
-def get_sync_health(org_id: Optional[str] = Depends(current_org)):
-    """
-    How many locally-aggregated minute buckets have not reached Postgres yet.
-
-    Not org-defensive in the paranoid sense — an unsynced count leaks no
-    occupancy data, only a number of pending rows — but still returns 0 rather
-    than the whole installation's count when there is no verified caller, for
-    the same "report nothing rather than everything" reason every other
-    endpoint here follows.
-
-    A persistently nonzero count means telemetry is being produced under a
-    camera/zone name that does not match anything registered in this org (see
-    minute_aggregator._resolve_ids) — the dashboard's Overview page reads from
-    Postgres, not SQLite, so those buckets are invisible until this resolves.
-    """
-    if org_id is None:
-        return {"unsynced_buckets": 0}
-
-    from app.db.minute_aggregator import unsynced_bucket_count_sync
-
-    return {"unsynced_buckets": unsynced_bucket_count_sync(org_id)}
 
 
 @router.get("/heatmap")
@@ -262,92 +113,3 @@ def get_floorplan_heatmap(
         "grid": grid,
         "hours": hours,
     }
-
-
-@router.get("/zones")
-def get_zone_dwell(
-    hours: int = Query(24, ge=1, le=168),
-    db: Session = Depends(get_db),
-    org_id: Optional[str] = Depends(current_org),
-):
-    """
-    Total dwell time per zone, for the zone-utilisation bar chart.
-
-    Dwell is reported per (zone, track): activity_logs holds a sampled series of
-    rows for the same person, each carrying the running dwell total for that
-    track. Summing the column directly would therefore count the same seconds
-    many times over, so the MAX per track is taken and those maxima are summed.
-    """
-    if org_id is None:
-        return []
-
-    since_time = datetime.utcnow() - timedelta(hours=hours)
-
-    rows = (
-        scoped(db, org_id)
-        .with_entities(
-            ActivityLogModel.zone_id,
-            ActivityLogModel.track_id,
-            func.max(ActivityLogModel.dwell_duration_seconds).label("dwell"),
-        )
-        .filter(ActivityLogModel.timestamp >= since_time)
-        .group_by(ActivityLogModel.zone_id, ActivityLogModel.track_id)
-        .all()
-    )
-
-    totals: Dict[str, Dict[str, Any]] = {}
-    for zone_id, _track_id, dwell in rows:
-        bucket = totals.setdefault(zone_id, {"seconds": 0, "visitors": 0})
-        bucket["seconds"] += int(dwell or 0)
-        bucket["visitors"] += 1
-
-    return [
-        {
-            "zone": zone_id,
-            "minutes": round(data["seconds"] / 60.0, 1),
-            "seconds": data["seconds"],
-            "visitors": data["visitors"],
-        }
-        for zone_id, data in sorted(totals.items(), key=lambda kv: kv[1]["seconds"], reverse=True)
-    ]
-
-
-@router.get("/historical")
-def get_historical_telemetry(
-    hours: int = Query(24, ge=1, le=168),
-    db: Session = Depends(get_db),
-    org_id: Optional[str] = Depends(current_org),
-):
-    """Fetches hourly averaged activity score and posture stats for historical charts"""
-    if org_id is None:
-        return []
-
-    since_time = datetime.utcnow() - timedelta(hours=hours)
-    logs = scoped(db, org_id).filter(ActivityLogModel.timestamp >= since_time).all()
-
-    # Aggregate by hour
-    hourly_stats: Dict[str, Any] = {}
-    for log in logs:
-        hour_key = log.timestamp.strftime("%Y-%m-%d %H:00")
-        if hour_key not in hourly_stats:
-            hourly_stats[hour_key] = {"scores": [], "sitting": 0, "standing": 0, "walking": 0}
-        hourly_stats[hour_key]["scores"].append(log.activity_score)
-        if log.posture_state == "SITTING":
-            hourly_stats[hour_key]["sitting"] += 1
-        elif log.posture_state == "STANDING":
-            hourly_stats[hour_key]["standing"] += 1
-        elif log.posture_state == "WALKING":
-            hourly_stats[hour_key]["walking"] += 1
-
-    formatted_data = []
-    for hour, data in sorted(hourly_stats.items()):
-        avg_score = sum(data["scores"]) / len(data["scores"]) if data["scores"] else 0.0
-        formatted_data.append({
-            "time": hour,
-            "avg_activity_score": round(avg_score, 2),
-            "sitting_count": data["sitting"],
-            "standing_count": data["standing"],
-            "walking_count": data["walking"]
-        })
-
-    return formatted_data

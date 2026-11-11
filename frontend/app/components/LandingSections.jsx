@@ -3,7 +3,7 @@
 // frontend/app/components/LandingSections.jsx
 // Shared content blocks used by the Features and Security pages.
 // Every figure here reflects what the system actually does — YOLOv8m-pose,
-// 17 COCO keypoints, three posture states, no video retention.
+// 17 COCO keypoints (used to find people and to tell a person who is down), no video retention.
 import React, { useState } from 'react';
 import { Plus, Minus } from 'lucide-react';
 

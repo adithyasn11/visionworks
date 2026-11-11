@@ -175,7 +175,7 @@ export const FloorplanHeatmap = () => {
     : state.status === 'error' ? { kind: 'error', message: state.error }
     : !hasPoints ? {
         kind: 'empty',
-        message: 'No positions recorded yet. Process a video or start the live camera — detected people appear here as where they spend time.',
+        message: 'No positions recorded yet. Process a video or start the live camera — detected people appear here as where they were seen.',
       }
     : null;
 
@@ -186,7 +186,7 @@ export const FloorplanHeatmap = () => {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-ink font-bold text-[13.5px] tracking-tight">
           <MapPin className="w-4 h-4 text-accent" />
-          <span>Top-Down Presence Map</span>
+          <span>Where people were seen</span>
         </div>
         <span className="text-[11px] text-ink-muted font-mono whitespace-nowrap">
           {samples > 0 ? `${samples.toLocaleString()} samples · ${WINDOW_HOURS}h` : `last ${WINDOW_HOURS}h`}

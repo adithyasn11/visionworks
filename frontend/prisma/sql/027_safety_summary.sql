@@ -39,8 +39,11 @@ BEGIN
     'potential_violations', count(*) FILTER (WHERE d.status = 'POTENTIAL_VIOLATION'),
     'abstentions', count(*) FILTER (WHERE d.status = 'UNVERIFIABLE'),
     'open_alerts', count(*) FILTER (WHERE d.status = 'POTENTIAL_VIOLATION' AND d."reviewState" = 'PENDING'),
-    'confirmed', count(*) FILTER (WHERE d."reviewState" = 'CONFIRMED'),
-    'dismissed', count(*) FILTER (WHERE d."reviewState" = 'DISMISSED'),
+    -- confirmed and dismissed are of the FLAGS (potential violations) a person judged, so that confirmed + dismissed +
+    -- waiting adds up to the flags, and the share below is of the same set. (A could-not-verify decision a reviewer
+    -- also looked at is counted in the report's "insufficient evidence" lines, not here.)
+    'confirmed', count(*) FILTER (WHERE d.status = 'POTENTIAL_VIOLATION' AND d."reviewState" = 'CONFIRMED'),
+    'dismissed', count(*) FILTER (WHERE d.status = 'POTENTIAL_VIOLATION' AND d."reviewState" = 'DISMISSED'),
     -- of the flags a person has judged, how many did they agree with
     'confirmed_share_of_reviewed',
       CASE WHEN count(*) FILTER (WHERE d.status = 'POTENTIAL_VIOLATION' AND d."reviewState" IN ('CONFIRMED','DISMISSED')) = 0

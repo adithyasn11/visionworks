@@ -78,8 +78,9 @@ def seed_report(**over):
         "by_hour": [{"hour": h, "decisions": (7 if h == 10 else 0), "flagged": (3 if h == 10 else 0)} for h in range(24)],
         "by_day": [{"day": f"2026-11-{3 + i:02d}", "decisions": i, "flagged": i % 3} for i in range(8)],
         "ppe": {"flagged": 4, "missing_helmet": 3, "missing_vest": 2, "missing_both": 1, "could_not_verify": 1, "compliant": 9},
-        "zone_time": {"visits_timed": 4, "visits_not_timed": 3, "average_seconds": 75.0, "max_seconds": 125.0,
-                      "by_zone": [{"zone": "Press line", "visits": 3, "average_seconds": 70.0, "max_seconds": 125.0}]},
+        "zone_time": {"visits_timed": 4, "visits_partial": 3, "visits_not_timed": 3, "average_seconds": 75.0, "max_seconds": 125.0,
+                      "partial_max_seconds": 500.0, "longest_seen_seconds": 500.0, "longest_seen_is_complete": False,
+                      "by_zone": [{"zone": "Press line", "visits": 3, "average_seconds": 70.0, "max_seconds": 125.0, "partial_visits": 3, "longest_seen_seconds": 500.0}]},
         "man_down": {"flagged": 2, "confirmed": 1, "dismissed": 1, "pending": 0, "could_not_verify": 1},
         "occupancy": {"lone_worker": {"flagged": 1, "confirmed": 0, "dismissed": 0, "pending": 1},
                       "over_capacity": {"flagged": 1, "confirmed": 1, "dismissed": 0, "pending": 0}, "could_not_verify": 1},
@@ -118,8 +119,15 @@ check("hours with no decisions are left out of the hour table; the day table has
       tables["By hour of the day (UTC)"][2] == [["10:00", 7, 3]] and len(tables["By day (UTC)"][2]) == 8)
 check("helmet and vest figures are carried over", [r_[1] for r_ in tables["Helmet and vest"][2]] == [9, 4, 3, 2, 1, 1])
 zt = dict((row[0], row[1]) for row in tables["Time inside restricted zones"][2])
-check("time in restricted zones: 4 timed visits, average 1 min 15 s, longest 2 min 5 s, 3 not timed",
-      zt["Visits timed from start to finish"] == 4 and zt["Average time per visit"] == "1 min 15 s" and zt["Longest visit"] == "2 min 5 s" and zt["Visits not timed"] == 3, str(zt))
+check("time in restricted zones: 4 visits seen whole (average 1 min 15 s, longest 2 min 5 s); 3 seen only in part, the longest time seen 'at least 8 min 20 s'",
+      zt["Visits seen from start to finish"] == 4 and zt["Average time per visit (those)"] == "1 min 15 s" and zt["Longest of those"] == "2 min 5 s"
+      and zt["Visits seen only in part"] == 3 and zt["Longest time seen in a restricted zone"] == "at least 8 min 20 s" and "Exits with no time recorded" not in zt, str(zt))
+zbz = tables["Time inside restricted zones, by zone"]
+check("the by-zone time table says, for each zone, how many visits were whole and how many partial", zbz[1][-2:] == ["Seen only in part", "Longest time seen"] and zbz[2][0][1:] == [3, "1 min 10 s", "2 min 5 s", 3, "at least 8 min 20 s"], str(zbz[2]))
+whole = seed_report()
+whole["zone_time"] = dict(whole["zone_time"], visits_partial=0, visits_not_timed=0, partial_max_seconds=None, longest_seen_seconds=125.0, longest_seen_is_complete=True)
+zw = dict((row[0], row[1]) for row in {t[0]: t for t in rg.report_tables(whole)}["Time inside restricted zones"][2])
+check("when every visit was whole the longest time is stated without 'at least'", zw["Longest time seen in a restricted zone"] == "2 min 5 s" and zw["Visits seen only in part"] == 0, str(zw))
 md = tables["Man-down and head count"][2]
 check("man-down and head-count incidents keep the same categories", md[0][1:] == [2, 1, 1, 0] and md[1][1:] == [1, 0, 0, 1] and md[2][1:] == [1, 1, 0, 0], str(md))
 ac = dict((row[0], row[1]) for row in tables["Corrective actions"][2])
@@ -138,14 +146,54 @@ check("a zone name that starts like a formula is neutralised in the CSV and kept
       any(r_ and r_[0].startswith("'=HYPERLINK") for r_ in rows) and not any(r_ and r_[0].startswith("=") for r_ in rows))
 check("no worker key and no person's name is anywhere in the report", "trk-" not in text and "Worker" not in text)
 
-# the PDF
-pdf = rg.build_pdf(R, "Acme Works", compress=False)
-check("the PDF is a real PDF with a page count and a title", pdf.startswith(b"%PDF-") and pdf.rstrip().endswith(b"%%EOF") and len(re.findall(rb"/Type /Page\b", pdf)) >= 1)
-need = [b"66.7%", b"Acme", b"Safety", b"Flagged", b"Confirmed", b"Waiting", b"Insufficient", b"1 min 15 s", b"2 min 5 s", b"Helmet", b"2.5"]
-missing = [n.decode() for n in need if n not in pdf]
-check("the PDF shows the same figures the CSV does", not missing, str(missing))
-check("a name with markup, a formula and a non-Latin script does not break the PDF (the markup is shown as text, not run)",
-      pdf.startswith(b"%PDF-") and pdf.rstrip().endswith(b"%%EOF") and b"<b>" not in pdf)
+# the PDF (its text is read back with pypdf)
+from pypdf import PdfReader                                                       # noqa: E402
+
+
+def pdf_text(data):
+    reader = PdfReader(io.BytesIO(data))
+    return "\n".join(page.extract_text() for page in reader.pages), len(reader.pages)
+
+
+pdf = rg.build_pdf(R, "Acme Works")
+ptext, pages = pdf_text(pdf)
+check("the PDF is a real PDF with pages, a title and the author", pdf.startswith(b"%PDF-") and pdf.rstrip().endswith(b"%%EOF") and pages >= 2
+      and "Safety report" in (PdfReader(io.BytesIO(pdf)).metadata.title or ""), str(pages))
+need = ["66.7%", "Acme Works", "Safety report", "Flagged by system", "Confirmed by reviewer", "Waiting for review", "Insufficient evidence", "1 min 15 s",
+        "2 min 5 s", "at least 8 min 20 s", "Helmet and vest on entry", "2.5", "Page 1", "Page 2", "VisionWorks safety report. Counts only: no names, no video."]
+missing = [n for n in need if n not in ptext]
+check("the PDF shows the same figures the CSV does, with a footer and page numbers", not missing, str(missing))
+check("the header lines are intact (they were once drawn in the wrong font after a non-Latin line)",
+      "From 03 Nov 2026 00:00 to 10 Nov 2026 00:00 (UTC)" in ptext and "Made 10 Nov 2026 01:00" in ptext)
+check("markup in a name is shown as text, not run, and a leading '=' is not a formula in a PDF either", (lambda flat: "<b>Dock</b>" in flat and "=HYPERLINK" in flat)("".join(ptext.split())))      # (the long name wraps across lines in its column)
+
+# every script a site is likely to name a zone in
+SCRIPTS = {"Kannada": "ಪ್ರೆಸ್ ಲೈನ್ ಪ್ರದೇಶ", "Devanagari": "प्रेस लाइन क्षेत्र", "Bengali": "বাংলা এলাকা", "Gujarati": "ગુજરાતી વિસ્તાર", "Gurmukhi": "ਪ੍ਰੈਸ ਲਾਈਨ ਖੇਤਰ",
+           "Malayalam": "മലയാളം പ്രദേശം", "Odia": "ଓଡ଼ିଆ କ୍ଷେତ୍ର", "Tamil": "தமிழ் பகுதி", "Telugu": "తెలుగు ప్రాంతం", "Arabic": "منطقة خط الضغط",
+           "Hebrew": "עברית אזור קו", "Thai": "ไทยพื้นที่สายการผลิต", "Greek/Cyrillic/Vietnamese": "Ελληνικά Русский Tiếng Việt"}
+multi = seed_report(by_zone=[breakdown(1, 1, 0, 0, 0, 0, 0, zone=name) for name in SCRIPTS.values()] + [breakdown(1, 1, 0, 0, 0, 0, 0, zone="日本語 \U0001f600 Press")])
+mt, _ = pdf_text(rg.build_pdf(multi, SCRIPTS["Kannada"] + " Works"))
+lost = {k: [c for c in v if c not in mt and not c.isspace()] for k, v in SCRIPTS.items()}
+check("every supported script appears in the PDF (every character of every sample is in its text)", not any(lost.values()), str({k: v for k, v in lost.items() if v}))
+check("a character no bundled font has (Chinese, Japanese, emoji) is shown as '?', never as a wrong glyph, and the Latin around it survives",
+      not any(c in mt for c in "日本語\U0001f600") and "??? ? Press" in mt.replace("\n", " "), mt[-200:])
+wrap = seed_report(by_zone=[breakdown(1, 1, 0, 0, 0, 0, 0, zone="ಡೆಮೊ ಪ್ರೆಸ್ ಲೈನ್ (Demo press line area number two, the long one)")], time_zone="UTC")
+wrap["zone_time"] = dict(wrap["zone_time"], by_zone=[{"zone": "ಡೆಮೊ ಪ್ರೆಸ್ ಲೈನ್ (Demo press line area number two, the long one)", "visits": 3, "average_seconds": 70.0, "max_seconds": 125.0,
+                                                     "partial_visits": 2, "longest_seen_seconds": 500.0}])
+wt = "".join(pdf_text(rg.build_pdf(wrap, "ಅಕ್ಮೆ"))[0].split())
+check("a Latin continuation after a non-Latin start, on the next line of a wrapped cell, is drawn in the right font (it was once garbled)",
+      "pressline" in wt.replace("(", "").replace(")", "").lower() and "numbertwo" in wt.lower() and "thelongone" in wt.lower(), wt[-300:])
+check("zero-width joiners and non-joiners (Malayalam chillu, Persian) are kept, control characters are dropped",
+      rg._clean("ന്\u200d می\u200cخواهم\x00\x07", {}) == "ന്\u200d می\u200cخواهم")
+zj = seed_report(by_zone=[breakdown(1, 1, 0, 0, 0, 0, 0, zone="ന്\u200d ചില്ല് می\u200cخواهم")])
+check("a name with joiners builds a PDF", rg.build_pdf(zj, "ന്\u200d").startswith(b"%PDF-"))
+check("a no-break space or thin space stays a space (a pasted name must not lose its word gap), and direction overrides are dropped",
+      rg._clean("Press\u00a0line\u2009A\u3000B", {}) == "Press line A B" and rg._clean("a\u202eb\u2066c", {}) == "abc")
+nb = seed_report(by_zone=[breakdown(1, 1, 0, 0, 0, 0, 0, zone="Press\u00a0line")])
+check("... also in a built PDF", "Press line" in pdf_text(rg.build_pdf(nb))[0])
+check("all the bundled font files and the licence are present", all(os.path.isfile(f) for f in rg.pdf_font_files()) and os.path.isfile(os.path.join(rg.FONT_DIR, "OFL.txt")))
+check("an all-Latin report loads one font (the script fonts are only added when a name needs them)", rg._plan_fonts(["Press line", "Cam A", "Zone 1"]) == ([], {}))
+check("a Kannada name needs the Kannada font and nothing else; Chinese is unsupported", rg._plan_fonts(["ಪ್ರೆಸ್"])[0] == ["NotoSansKannada"] and rg._plan_fonts(["日"])[1] == {"日": "?"})
 check("a visit that began in replayed footage says so in the audit trail, as the report leaves it out of the timed visits",
       "only a part of the stay" in rg.build_audit_csv(rg.audit_rows([], [{"observedAt": "2026-11-09T10:09:00+00:00", "workerKey": "trk-1", "eventType": "EXITED_ZONE",
                                                                          "details": {"reason": "LEFT", "dwell_s": 40, "visit_started_in_replay": True}, "zone": {"name": "Z"}, "camera": {"name": "C"}}])))
@@ -155,18 +203,21 @@ empty = seed_report(decisions=0, compliant=0, flagged_by_system=0, insufficient_
                     by_rule=[], by_zone=[], by_camera=[], by_hour=[{"hour": h, "decisions": 0, "flagged": 0} for h in range(24)],
                     by_day=[{"day": "2026-11-09", "decisions": 0, "flagged": 0}],
                     ppe={"flagged": 0, "missing_helmet": 0, "missing_vest": 0, "missing_both": 0, "could_not_verify": 0, "compliant": 0},
-                    zone_time={"visits_timed": 0, "visits_not_timed": 0, "average_seconds": None, "max_seconds": None, "by_zone": []},
+                    zone_time={"visits_timed": 0, "visits_partial": 0, "visits_not_timed": 0, "average_seconds": None, "max_seconds": None, "partial_max_seconds": None,
+                               "longest_seen_seconds": None, "longest_seen_is_complete": True, "by_zone": []},
                     man_down={"flagged": 0, "confirmed": 0, "dismissed": 0, "pending": 0, "could_not_verify": 0},
                     occupancy={"lone_worker": {"flagged": 0, "confirmed": 0, "dismissed": 0, "pending": 0}, "over_capacity": {"flagged": 0, "confirmed": 0, "dismissed": 0, "pending": 0}, "could_not_verify": 0},
                     actions={"opened": 0, "closed": 0, "open_now": 0, "overdue_now": 0, "average_days_to_close": None})
 etext = rg.build_csv(empty)
-epdf = rg.build_pdf(empty, compress=False)
+epdf = rg.build_pdf(empty)
+etxt, _ = pdf_text(epdf)
 check("an empty period reads sensibly: 'n/a' for rates (nothing to divide), 'Nothing to report' for tables, and a valid PDF",
-      "n/a" in etext and epdf.startswith(b"%PDF-") and b"Nothing" in epdf and "100.0%" not in etext and "0.0%" not in etext.split("Compliance rate")[1][:60], etext[:400])
+      "n/a" in etext and "n/a" in etxt and epdf.startswith(b"%PDF-") and "Nothing to report" in etxt and "100.0%" not in etext and "0.0%" not in etext.split("Compliance rate")[1][:60], etext[:400])
 longer = seed_report(by_day=[{"day": (date(2026, 1, 1) + timedelta(days=i)).isoformat(), "decisions": i % 7, "flagged": i % 4} for i in range(200)])
 check("a long period (200 days) still builds a PDF", rg.build_pdf(longer).startswith(b"%PDF-"))
 big = seed_report(by_zone=[breakdown(1, 1, 0, 0, 0, 0, 0, zone=f"Zone {i}") for i in range(100)])
-check("a hundred zones build a multi-page PDF", len(re.findall(rb"/Type /Page\b", rg.build_pdf(big, compress=False))) >= 2)
+check("a hundred zones build a multi-page PDF, with the table header repeated and every zone present", pdf_text(rg.build_pdf(big))[1] >= 3 and "Zone 99" in pdf_text(rg.build_pdf(big))[0])
+check("an unusually long zone name wraps instead of failing", rg.build_pdf(seed_report(by_zone=[breakdown(1, 1, 0, 0, 0, 0, 0, zone="Z" * 600)])).startswith(b"%PDF-"))
 
 # the audit trail
 dec = [{"observedAt": "2026-11-09T10:00:05+00:00", "workerKey": "trk-12", "status": "POTENTIAL_VIOLATION", "severity": "WARNING", "reason": "No helmet seen in 28 of 29 clear frames.",
@@ -524,6 +575,11 @@ else:
               (f["confirmed"], f["dismissed"], f["pending"]) == (4, 2, 3), (f["confirmed"], f["dismissed"], f["pending"]))
         check("a PENDING flag is not counted as confirmed or dismissed; the share is 4 of the 6 judged = 0.667", f["confirmed_share_of_reviewed"] == 0.667)
         check("insufficient evidence: 1 a reviewer found real (7), 1 not real (13)", (f["insufficient_confirmed"], f["insufficient_dismissed"]) == (1, 1))
+        sm = client.get(f"{base}/summary?days=7&tz=UTC", headers=V2).json()
+        check("the Overview's summary and the report agree: confirmed 4, dismissed 2, waiting 3 (flags only, so they add up to the 9 flagged), the same share, "
+              "and the two could-not-verify decisions a reviewer looked at do not count as judged flags",
+              (sm["confirmed"], sm["dismissed"], sm["open_alerts"], sm["potential_violations"]) == (4, 2, 3, 9) and sm["confirmed_share_of_reviewed"] == f["confirmed_share_of_reviewed"] == 0.667
+              and sm["confirmed"] + sm["dismissed"] + sm["open_alerts"] == sm["potential_violations"], str(sm)[:300])
         check("events recorded: 10 in the period", f["events_recorded"] == 10, f["events_recorded"])
         check("the organisation's name is in the answer", f["organisation"] == f"Report A {TAG}")
         reasons = {(x["state"], x["reason"]): x["count"] for x in f["review_reasons"]}
@@ -553,10 +609,13 @@ else:
         check("helmet and vest: 4 flagged (4, 5, 6, 8), no helmet seen 3 (4, 5, 8), no vest seen 2 (5, 6), neither 1 (5), could not verify 1 (7), compliant 3",
               (p["flagged"], p["missing_helmet"], p["missing_vest"], p["missing_both"], p["could_not_verify"], p["compliant"]) == (4, 3, 2, 1, 1, 3), str(p))
         z = f["zone_time"]
-        check("time in restricted zones: 4 timed visits (60, 120, 30, 90 s), average 75 s, longest 120 s; 3 not timed (partial, lost, replay); the dock and old and foreign exits are left out",
-              (z["visits_timed"], z["visits_not_timed"], z["average_seconds"], z["max_seconds"]) == (4, 3, 75.0, 120.0), str(z))
-        zz = {x["zone"]: (x["visits"], x["average_seconds"], x["max_seconds"]) for x in z["by_zone"]}
-        check("... by zone: Press line 3 visits (average 70, longest 120), Furnace 1 (90, 90)", zz == {"Press line": (3, 70.0, 120.0), "Furnace": (1, 90.0, 90.0)}, str(zz))
+        check("time in restricted zones: 4 whole visits (60, 120, 30, 90 s), average 75 s, longest 120 s; 3 seen only in part (500 s already inside, 40 s lost, 99 s replay); the dock and old and foreign exits are left out",
+              (z["visits_timed"], z["visits_partial"], z["visits_not_timed"], z["average_seconds"], z["max_seconds"]) == (4, 3, 3, 75.0, 120.0), str(z))
+        check("... the longest time seen is 500 s and is a lower bound (not complete); the partial times are NOT in the average",
+              z["longest_seen_seconds"] == 500.0 and z["longest_seen_is_complete"] is False and z["partial_max_seconds"] == 500.0, str(z))
+        zz = {x["zone"]: (x["visits"], x["average_seconds"], x["max_seconds"], x["partial_visits"], x["longest_seen_seconds"]) for x in z["by_zone"]}
+        check("... by zone: Press line 3 whole (average 70, longest 120) + 3 partial (longest seen 500), Furnace 1 whole (90, 90) + none partial",
+              zz == {"Press line": (3, 70.0, 120.0, 3, 500.0), "Furnace": (1, 90.0, 90.0, 0, 90.0)}, str(zz))
         check("man-down: 2 flagged (1 confirmed, 1 dismissed), 1 could not verify", (f["man_down"]["flagged"], f["man_down"]["confirmed"], f["man_down"]["dismissed"], f["man_down"]["pending"], f["man_down"]["could_not_verify"]) == (2, 1, 1, 0, 1), str(f["man_down"]))
         o = f["occupancy"]
         check("head count: 1 lone-worker flag (waiting), 1 over-capacity flag (confirmed), 1 could not verify",

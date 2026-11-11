@@ -15,9 +15,9 @@
 -- and `compliance_rate` is compliant / (compliant + flagged): of the decisions where the system made a claim.
 --
 -- Corrective actions are counted by when they were opened (createdAt) and closed (closedAt); "overdue" is as of
--- now, in the site's time zone. Time in restricted zones comes from visits the tracker saw from start to finish
--- (the worker walked out of the zone): visits that began before the video, or ended by the worker being lost or
--- the video stopping, are counted separately and not timed.
+-- now, in the site's time zone. Time in restricted zones: visits the tracker saw from start to finish are TIMED
+-- (average, longest); visits that began before the video, or ended by the worker being lost or the video stopping,
+-- are PARTIAL: reported as "at least" (never averaged in as if they were whole), so no visit is simply left out.
 --
 -- Idempotent.
 
@@ -169,26 +169,43 @@ BEGIN
      WHERE d."orgId" = p_org AND d."observedAt" >= p_since AND d."observedAt" < p_until
        AND d."ruleType" IN ('PPE_ENTRY', 'PPE_CONTINUOUS')));
 
-  -- ── time inside restricted zones: visits seen from start to finish ────────
+  -- ── time inside restricted zones ──────────────────────────────────────────
+  -- A visit is TIMED when the tracker saw it from start to finish (the worker walked out: reason LEFT, not already
+  -- inside when first seen, not begun in replayed footage). Every other visit that ended with a measured time (already
+  -- inside at the start, lost from view, the video stopped or jumped) is PARTIAL: it was at least that long, never
+  -- shorter, so it is reported as "at least" and kept out of the average, never averaged in as if it were whole.
   v := v || jsonb_build_object('zone_time', (
     SELECT jsonb_build_object(
              'visits_timed', count(*) FILTER (WHERE t.timed),
+             'visits_partial', count(*) FILTER (WHERE NOT t.timed AND t.sec IS NOT NULL),
              'visits_not_timed', count(*) FILTER (WHERE NOT t.timed),
              'average_seconds', round((avg(t.sec) FILTER (WHERE t.timed))::numeric, 1),
              'max_seconds', round((max(t.sec) FILTER (WHERE t.timed))::numeric, 1),
+             'partial_max_seconds', round((max(t.sec) FILTER (WHERE NOT t.timed))::numeric, 1),
+             'longest_seen_seconds', round((max(t.sec))::numeric, 1),
+             -- true when the longest time seen is a whole visit; false when it is a visit seen only in part (so at least)
+             'longest_seen_is_complete', COALESCE(max(t.sec) FILTER (WHERE t.timed), 0) >= COALESCE(max(t.sec), 0),
              'by_zone', COALESCE((
-               SELECT jsonb_agg(jsonb_build_object('zone', z.zone, 'visits', z.visits, 'average_seconds', z.avg_s, 'max_seconds', z.max_s)
-                                ORDER BY z.visits DESC, z.zone)
-                 FROM (SELECT COALESCE(zn.name, '(zone no longer available)') AS zone, count(*) AS visits,
-                              round((avg(x.sec))::numeric, 1) AS avg_s, round((max(x.sec))::numeric, 1) AS max_s
-                         FROM (SELECT e."zoneId", (e.details ->> 'dwell_s')::float AS sec
+               SELECT jsonb_agg(jsonb_build_object(
+                        'zone', z.zone, 'visits', z.visits, 'average_seconds', z.avg_s, 'max_seconds', z.max_s,
+                        'partial_visits', z.partial_visits, 'longest_seen_seconds', z.longest_s)
+                        ORDER BY z.visits + z.partial_visits DESC, z.zone)
+                 FROM (SELECT COALESCE(zn.name, '(zone no longer available)') AS zone,
+                              count(*) FILTER (WHERE x.timed) AS visits,
+                              round((avg(x.sec) FILTER (WHERE x.timed))::numeric, 1) AS avg_s,
+                              round((max(x.sec) FILTER (WHERE x.timed))::numeric, 1) AS max_s,
+                              count(*) FILTER (WHERE NOT x.timed AND x.sec IS NOT NULL) AS partial_visits,
+                              round((max(x.sec))::numeric, 1) AS longest_s
+                         FROM (SELECT e."zoneId",
+                                      COALESCE(e.details ->> 'reason' = 'LEFT'
+                                               AND jsonb_typeof(e.details -> 'dwell_s') = 'number'
+                                               AND COALESCE(e.details ->> 'first_sighting', 'false') <> 'true'
+                                               AND COALESCE(e.details ->> 'visit_started_in_replay', 'false') <> 'true', false) AS timed,
+                                      CASE WHEN jsonb_typeof(e.details -> 'dwell_s') = 'number' THEN (e.details ->> 'dwell_s')::float END AS sec
                                  FROM public.safety_events e
                                  JOIN public.zones z0 ON z0.id = e."zoneId" AND z0."safetyType" = 'RESTRICTED'
                                 WHERE e."orgId" = p_org AND e."observedAt" >= p_since AND e."observedAt" < p_until
-                                  AND e."eventType" = 'EXITED_ZONE' AND e.details ->> 'reason' = 'LEFT'
-                                  AND jsonb_typeof(e.details -> 'dwell_s') = 'number'
-                                  AND COALESCE(e.details ->> 'first_sighting', 'false') <> 'true'
-                                  AND COALESCE(e.details ->> 'visit_started_in_replay', 'false') <> 'true') x
+                                  AND e."eventType" = 'EXITED_ZONE') x
                          LEFT JOIN public.zones zn ON zn.id = x."zoneId"
                         GROUP BY x."zoneId", zn.name
                         ORDER BY count(*) DESC LIMIT 50) z), '[]'::jsonb))

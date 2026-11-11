@@ -248,23 +248,28 @@ function ReportBody({ r }) {
 
       <Panel title="Time inside restricted zones">
         <Facts rows={[
-          ['Visits timed from start to finish', num(z.visits_timed)],
-          ['Average time per visit', secs(z.average_seconds)],
-          ['Longest visit', secs(z.max_seconds)],
-          ['Visits not timed', num(z.visits_not_timed)],
+          ['Visits seen from start to finish', num(z.visits_timed)],
+          ['Average time per visit (those)', secs(z.average_seconds)],
+          ['Longest of those', secs(z.max_seconds)],
+          ['Visits seen only in part', num(z.visits_partial)],
+          ['Longest time seen in a restricted zone', z.longest_seen_seconds === null || z.longest_seen_seconds === undefined ? 'n/a' : `${z.longest_seen_is_complete ? '' : 'at least '}${secs(z.longest_seen_seconds)}`],
+          ['Exits with no time recorded', z.visits_not_timed - z.visits_partial > 0 ? num(z.visits_not_timed - z.visits_partial) : null],
         ]} />
         {z.by_zone.length > 0 && (
           <ul className="mt-3 text-xs text-ink-muted flex flex-col gap-1">
             {z.by_zone.map((x) => (
               <li key={`${x.zone}-${z.by_zone.indexOf(x)}`} className="flex justify-between gap-3 border-t border-line/60 pt-1">
                 <span className="text-ink">{x.zone}</span>
-                <span className="tabular-nums">{x.visits} visit{x.visits === 1 ? '' : 's'}, average {secs(x.average_seconds)}, longest {secs(x.max_seconds)}</span>
+                <span className="tabular-nums text-right">
+                  {x.visits} from start to finish (average {secs(x.average_seconds)}, longest {secs(x.max_seconds)})
+                  {x.partial_visits > 0 ? `; ${x.partial_visits} seen only in part, longest time seen ${(x.longest_seen_seconds || 0) > (x.max_seconds || 0) ? 'at least ' : ''}${secs(x.longest_seen_seconds)}` : ''}
+                </span>
               </li>
             ))}
           </ul>
         )}
         <p className="mt-2 text-[11px] text-ink-faint leading-relaxed">
-          Not timed: the worker was already inside when the video began, or was lost from view, or the video stopped. Their time would only be part of the stay, so it is left out.
+          Seen only in part: the worker was already inside when the video began, was lost from view, or the video stopped. They stayed at least the time seen, so those times are not averaged in as if they were whole stays; the longest time seen reads "at least" when it comes from such a visit.
         </p>
       </Panel>
 

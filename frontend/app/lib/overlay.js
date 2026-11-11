@@ -1,6 +1,6 @@
 // frontend/app/lib/overlay.js
 //
-// The detection overlay: bounding boxes, posture colours, track IDs and the
+// The detection overlay: bounding boxes (outlined in red when the person has an open flag), worker tags and the
 // zone outlines beneath them.
 //
 // WHY THIS IS NOT INSIDE VideoCanvasPlayer ANY MORE
@@ -12,12 +12,8 @@
 // easy mistake to repeat, and a second copy of this code would be an easy one
 // to let drift. One implementation, imported by both.
 
-const POSTURE_COLORS = {
-  SITTING:  '#E05A52',
-  STANDING: '#5B87D6',
-  WALKING:  '#B0821F',
-  UNKNOWN:  '#8B8792',
-};
+// A person with no open flag is outlined in a neutral light grey; a person with one in the product red (drawn thicker and tagged).
+const PERSON_COLOR = '#D9D6DD';
 
 import { zoneTypeColor, zoneCanvasLabel } from './zoneTypes';
 import { describePpe } from './ppe';
@@ -98,14 +94,14 @@ export function drawHUD(ctx, canvas, entities, zones, enableBlur) {
   // Zones first, so the person boxes sit on top of them.
   drawZones(ctx, canvas, zones);
 
-  // Then person annotations (bounding boxes, track IDs, posture).
+  // Then person annotations (bounding boxes and worker tags).
   entities.forEach((entity) => {
     const [x1, y1, x2, y2] = entity.bbox;
     const w = x2 - x1;
     const h = y2 - y1;
     // A person with an open alert is outlined in the product red, thicker, and tagged in words.
     const flagged = entity.flagged === true;
-    const color = flagged ? '#DC2626' : (POSTURE_COLORS[entity.posture] || POSTURE_COLORS.UNKNOWN);
+    const color = flagged ? '#DC2626' : PERSON_COLOR;
 
     // Main box
     ctx.strokeStyle = color;
@@ -126,7 +122,7 @@ export function drawHUD(ctx, canvas, entities, zones, enableBlur) {
     // Sized to be read at the size the canvas is shown, not at its pixel size.
     ctx.font = '600 14px Inter, sans-serif';
     // "Worker 8", the same name the panels use (not "ID #8"): nobody is named, but one word for one person.
-    const tag = `Worker ${entity.track_id}  ${entity.posture}${flagged ? '  FLAGGED' : ''}`;
+    const tag = `Worker ${entity.track_id}${flagged ? '  FLAGGED' : ''}`;
     const bannerW = Math.max(ctx.measureText(tag).width + 14, w);
     ctx.fillStyle = 'rgba(11,10,12,0.88)';
     ctx.fillRect(x1, y1 - 30, bannerW, 26);

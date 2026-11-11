@@ -14,16 +14,21 @@ out. It never invents or recomputes a number, and it keeps the honest categories
 A flag nobody has judged is never called a violation. Workers are never named (the report holds counts, zones,
 cameras, rules and times only), and a reader is told in plain words what each figure means.
 
-PDF text is Latin-1 (the standard PDF fonts); anything outside it is shown as "?" rather than a wrong glyph. The CSV is
-UTF-8 with a byte-order mark so a spreadsheet reads it, and a cell that starts like a formula is prefixed so it is
-shown, not run.
+THE PDF shows every script a site is likely to name its zones in. It is drawn with fpdf2 and uharfbuzz (text SHAPING:
+Indic conjuncts and vowel signs, Arabic joining and right-to-left order are laid out correctly, not letter by letter)
+and the Noto Sans fonts in `utils/fonts/` (SIL Open Font Licence, see OFL.txt there): Latin, Greek, Cyrillic, Vietnamese,
+Devanagari, Bengali, Gujarati, Gurmukhi, Kannada, Malayalam, Odia, Tamil, Telugu, Arabic, Hebrew and Thai. A character
+none of them has (Chinese, Japanese, Korean, emoji) is shown as "?" rather than a wrong glyph, and the CSV and the screen
+show it exactly. The CSV is UTF-8 with a byte-order mark so a spreadsheet reads it, and a cell that starts like a formula is
+prefixed so it is shown, not run.
 """
 
 import csv
 import io
+import os
+import unicodedata
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
-from xml.sax.saxutils import escape
 
 RULE_LABELS = {          # the same names the rule screens use
     "PPE_ENTRY": "Helmet and vest on entry",
@@ -166,16 +171,27 @@ def report_tables(report: dict) -> List[Table]:
     ], "'No helmet seen' means the system found none; it is a potential violation until a person confirms it."))
 
     z = r["zone_time"]
-    tables.append(("Time inside restricted zones", ["Measure", "Value"], [
-        ["Visits timed from start to finish", z["visits_timed"]],
-        ["Average time per visit", seconds_text(z["average_seconds"])],
-        ["Longest visit", seconds_text(z["max_seconds"])],
-        ["Visits not timed", z["visits_not_timed"]],
-    ], "Not timed: the worker was already inside when the video began, or was lost from view, or the video stopped. "
-       "Their time would only be a part of the stay, so it is left out."))
+    partial = z.get("visits_partial", 0)
+    unmeasured = max(0, z["visits_not_timed"] - partial)
+    longest = z.get("longest_seen_seconds")
+    rows = [
+        ["Visits seen from start to finish", z["visits_timed"]],
+        ["Average time per visit (those)", seconds_text(z["average_seconds"])],
+        ["Longest of those", seconds_text(z["max_seconds"])],
+        ["Visits seen only in part", partial],
+        ["Longest time seen in a restricted zone", ("" if z.get("longest_seen_is_complete", True) else "at least ") + seconds_text(longest)],
+    ]
+    if unmeasured:
+        rows.append(["Exits with no time recorded", unmeasured])
+    tables.append(("Time inside restricted zones", ["Measure", "Value"], rows,
+                   "Seen only in part: the worker was already inside when the video began, was lost from view, or the video stopped. "
+                   "They stayed at least the time seen, so those times are not averaged in as if they were whole stays; "
+                   "the longest time seen reads 'at least' when it comes from such a visit."))
     if z.get("by_zone"):
-        tables.append(("Time inside restricted zones, by zone", ["Zone", "Visits timed", "Average", "Longest"],
-                       [[x["zone"], x["visits"], seconds_text(x["average_seconds"]), seconds_text(x["max_seconds"])] for x in z["by_zone"]], None))
+        tables.append(("Time inside restricted zones, by zone", ["Zone", "Visits from start to finish", "Average", "Longest", "Seen only in part", "Longest time seen"],
+                       [[x["zone"], x["visits"], seconds_text(x["average_seconds"]), seconds_text(x["max_seconds"]), x.get("partial_visits", 0),
+                         ("at least " if x.get("partial_visits", 0) and (x.get("longest_seen_seconds") or 0) > (x["max_seconds"] or 0) else "") + seconds_text(x.get("longest_seen_seconds"))]
+                        for x in z["by_zone"]], None))
 
     m = r["man_down"]
     o = r["occupancy"]
@@ -230,99 +246,219 @@ def build_csv(report: dict, organisation: str = "") -> str:
 
 # ── PDF ──────────────────────────────────────────────────────────────────────
 
-def _latin(text: Any) -> str:
-    """Text the standard PDF fonts can show, escaped for reportlab's paragraph markup."""
-    s = "" if text is None else str(text)
-    return escape(s.encode("latin-1", "replace").decode("latin-1"))
+FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+# The main font, then one font per script it does not cover (tried in this order for each character).
+FONT_MAIN = "NotoSans"
+FONT_SCRIPTS = ["NotoSansDevanagari", "NotoSansBengali", "NotoSansGujarati", "NotoSansGurmukhi", "NotoSansKannada", "NotoSansMalayalam",
+                "NotoSansOriya", "NotoSansTamil", "NotoSansTelugu", "NotoSansArabic", "NotoSansHebrew", "NotoSansThai"]
+
+_COVERAGE: Dict[str, frozenset] = {}
+
+
+def _font_path(name: str, bold: bool = False) -> str:
+    return os.path.join(FONT_DIR, f"{name}-{'Bold' if bold else 'Regular'}.ttf")
+
+
+def _covers(name: str) -> frozenset:
+    """The code points a font file has a glyph for (read once per process)."""
+    if name not in _COVERAGE:
+        from fontTools.ttLib import TTFont
+        font = TTFont(_font_path(name), lazy=True)
+        _COVERAGE[name] = frozenset(font.getBestCmap().keys())
+        font.close()
+    return _COVERAGE[name]
+
+
+def _plan_fonts(texts) -> Tuple[List[str], Dict[str, str]]:
+    """
+    Which script fonts a report needs, and what to do with a character no font has. Returns (fonts to add, {character: "?"}).
+    Looks only at characters the main font lacks, so an all-Latin report loads one font.
+    """
+    chars = {c for t in texts for c in str(t) if ord(c) > 0x7E and c.isprintable() and unicodedata.category(c) != "Cf"}
+    if not chars:
+        return [], {}
+    main = _covers(FONT_MAIN)
+    need = [c for c in chars if ord(c) not in main]
+    used: List[str] = []
+    unsupported: Dict[str, str] = {}
+    for c in need:
+        for name in FONT_SCRIPTS:
+            if ord(c) in _covers(name):
+                if name not in used:
+                    used.append(name)
+                break
+        else:
+            unsupported[c] = "?"
+    return [n for n in FONT_SCRIPTS if n in used], unsupported
+
+
+def _clean(text: Any, unsupported: Dict[str, str]) -> str:
+    """Text as the PDF will show it: control characters out, characters no bundled font has as '?'."""
+    out = []
+    for c in "" if text is None else str(text):
+        if c in unsupported:
+            out.append(unsupported[c])
+        elif unicodedata.category(c) in ("Zs", "Zl", "Zp"):
+            out.append(" ")                                  # a no-break space, a thin space, an ideographic space: still a space
+        elif "\u202a" <= c <= "\u202e" or "\u2066" <= c <= "\u2069":
+            continue                                         # direction OVERRIDES and isolates: a name must not reorder the text around it
+        elif c in ("\n", "\t") or c.isprintable() or unicodedata.category(c) == "Cf":
+            # (Cf: the zero-width joiner and non-joiner and the direction marks are invisible but Malayalam, Kannada, Persian
+            # and mixed right-to-left names need them to be spelt and shaped right, so they stay)
+            out.append(" " if c == "\t" else c)
+    return "".join(out)
+
+
+def pdf_font_files() -> List[str]:
+    """Every font file the PDF can use (the tests check that they are all present)."""
+    return [_font_path(n, b) for n in [FONT_MAIN] + FONT_SCRIPTS for b in (False, True)]
 
 
 def build_pdf(report: dict, organisation: str = "", compress: bool = True) -> bytes:
-    """The report as a PDF (A4). `compress=False` keeps the page text readable in the bytes (used by the tests)."""
-    from reportlab.graphics.charts.barcharts import VerticalBarChart
-    from reportlab.graphics.shapes import Drawing
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-    from reportlab.lib.units import mm
-    from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table as PdfTable, TableStyle
+    """The report as a PDF (A4)."""
+    from fpdf import FPDF
+    from fpdf.enums import Align, XPos, YPos
+    from fpdf.fonts import FontFace
 
     tz = report.get("time_zone") or "UTC"
-    red, ink, muted, line, wash = colors.HexColor("#DC2626"), colors.HexColor("#111111"), colors.HexColor("#555555"), colors.HexColor("#DDDDDD"), colors.HexColor("#F6F6F6")
-    base = getSampleStyleSheet()
-    h1 = ParagraphStyle("h1", parent=base["Heading1"], fontSize=20, textColor=ink, spaceAfter=2, leading=24)
-    sub = ParagraphStyle("sub", parent=base["Normal"], fontSize=9.5, textColor=muted, leading=13)
-    h2 = ParagraphStyle("h2", parent=base["Heading2"], fontSize=12.5, textColor=ink, spaceBefore=12, spaceAfter=4, leading=15)
-    note_style = ParagraphStyle("note", parent=base["Normal"], fontSize=8, textColor=muted, leading=10.5, spaceBefore=2)
-    cell = ParagraphStyle("cell", parent=base["Normal"], fontSize=8.5, leading=10.5, textColor=ink)
-    cell_head = ParagraphStyle("cellh", parent=cell, textColor=colors.white, fontName="Helvetica-Bold", fontSize=7.5, leading=9)
+    tables = report_tables(report)
+    organisation = organisation or ""
+    heading = "Safety report"
+    texts = [organisation, heading, report_title(report)]
+    for title, headers, rows, note in tables:
+        texts += [title, note or ""] + list(headers) + [c for row in rows for c in row]
+    extra, unsupported = _plan_fonts(texts)
+    clean = lambda t: _clean(t, unsupported)                                          # noqa: E731
 
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm, bottomMargin=16 * mm,
-                            title=report_title(report), author="VisionWorks", pageCompression=1 if compress else 0)
-    width = A4[0] - 36 * mm
+    RED, INK, MUTED, LINE, WASH = (220, 38, 38), (17, 17, 17), (85, 85, 85), (221, 221, 221), (246, 246, 246)
 
-    def footer(canvas, document):
-        canvas.saveState()
-        canvas.setFont("Helvetica", 7.5)
-        canvas.setFillColor(muted)
-        canvas.drawString(18 * mm, 9 * mm, "VisionWorks safety report. Counts only: no names, no video.")
-        canvas.drawRightString(A4[0] - 18 * mm, 9 * mm, f"Page {document.page}")
-        canvas.restoreState()
+    class _Doc(FPDF):
+        def footer(self):
+            self.set_y(-11)
+            self.set_font(FONT_MAIN, "", 7.5)
+            self.set_text_color(*MUTED)
+            self.cell(0, 5, "VisionWorks safety report. Counts only: no names, no video.", align="L")
+            self.set_x(self.l_margin)
+            self.cell(0, 5, f"Page {self.page_no()}", align="R")
 
-    story: List[Any] = [
-        Paragraph("Safety report", h1),
-        Paragraph(f"{_latin(organisation)}" if organisation else "&nbsp;", sub),
-        Paragraph(f"From {_latin(_moment(report['since'], tz))} to {_latin(_moment(report['until'], tz))} ({_latin(tz)})", sub),
-        Paragraph(f"Made {_latin(_moment(report['generated_at'], tz))}", sub),
-        Spacer(1, 6),
-        Paragraph("<b>How to read this report.</b> 'Flagged by system' is a potential violation raised by the software, for a person to judge. "
-                  "Only 'Confirmed by reviewer' has been judged by a person. 'Insufficient evidence' is where the system could not tell and did not guess. "
-                  "The report holds counts, zones, cameras, rules and times only.", note_style),
-    ]
+    if hasattr(FPDF, "_render_styled_text_line"):
+        def _announce_font_after_each_line(self, *args, **kwargs):
+            # fpdf2 remembers the font it last announced, not the fallback font it switches to for a non-Latin run, so the NEXT
+            # line (the second line of a wrapped cell, the next paragraph) could be drawn with the wrong font: garbled letters.
+            # After every line, make it announce the font again (one small operator per line). Only where fpdf2 has this
+            # (private) method, so a different fpdf2 version loses the workaround, not the report: the generator also makes it
+            # announce the font after each paragraph and table (fresh_font below).
+            try:
+                return FPDF._render_styled_text_line(self, *args, **kwargs)
+            finally:
+                self.current_font_is_set_on_page = False
 
-    for title, headers, rows, note in report_tables(report):
-        block: List[Any] = [Paragraph(_latin(title), h2)]
+        _Doc._render_styled_text_line = _announce_font_after_each_line
+
+    pdf = _Doc(orientation="P", unit="mm", format="A4")
+    pdf.set_margins(18, 16, 18)
+    pdf.set_auto_page_break(True, margin=16)
+    pdf.set_compression(compress)
+    pdf.set_title(clean(report_title(report)))
+    pdf.set_author("VisionWorks")
+    pdf.set_creator("VisionWorks")
+    pdf.add_font(FONT_MAIN, "", _font_path(FONT_MAIN))
+    pdf.add_font(FONT_MAIN, "B", _font_path(FONT_MAIN, True))
+    for name in extra:
+        pdf.add_font(name, "", _font_path(name))
+        pdf.add_font(name, "B", _font_path(name, True))
+    if extra:
+        pdf.set_fallback_fonts(extra)
+    pdf.set_text_shaping(True)
+    pdf.add_page()
+    width = pdf.epw
+
+    def fresh_font():
+        # fpdf2 remembers the font it last announced, not the fallback font it may have switched to for a non-Latin run, so the
+        # next line of plain text could be drawn with the wrong one (garbled). Making it announce the font again is cheap.
+        pdf.current_font_is_set_on_page = False
+
+    def para(text, size=8.5, color=INK, bold=False, gap=0.0, line=4.4, align="L"):
+        pdf.set_font(FONT_MAIN, "B" if bold else "", size)
+        pdf.set_text_color(*color)
+        pdf.multi_cell(width, line, clean(text), align=align, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        fresh_font()
+        if gap:
+            pdf.ln(gap)
+
+    para(heading, size=20, bold=True, line=9)
+    if organisation:
+        para(organisation, size=9.5, color=MUTED, line=5)
+    para(f"From {_moment(report['since'], tz)} to {_moment(report['until'], tz)} ({tz})", size=9.5, color=MUTED, line=5)
+    para(f"Made {_moment(report['generated_at'], tz)}", size=9.5, color=MUTED, line=5, gap=3)
+    pdf.set_font(FONT_MAIN, "B", 8)
+    pdf.set_text_color(*INK)
+    pdf.write(4.2, "How to read this report. ")
+    pdf.set_font(FONT_MAIN, "", 8)
+    pdf.set_text_color(*MUTED)
+    pdf.multi_cell(0, 4.2, "'Flagged by system' is a potential violation raised by the software, for a person to judge. Only 'Confirmed by reviewer' has been "
+                   "judged by a person. 'Insufficient evidence' is where the system could not tell and did not guess. The report holds counts, "
+                   "zones, cameras, rules and times only.", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    fresh_font()
+
+    for title, headers, rows, note in tables:
+        if pdf.get_y() > pdf.h - pdf.b_margin - 38:                    # a title never sits alone at the foot of a page
+            pdf.add_page()
+        pdf.ln(4)
+        para(title, size=12.5, bold=True, line=7)
         if not rows:
-            block.append(Paragraph("Nothing to report for this period.", note_style))
+            para("Nothing to report for this period.", size=8, color=MUTED)
         else:
-            data = [[Paragraph(_latin(h), cell_head) for h in headers]] + [[Paragraph(_latin(c), cell) for c in row] for row in rows]
-            first = 0.22 if len(headers) > 5 else (0.42 if len(headers) > 3 else 0.62)      # a wide table gets narrow words, not broken ones
-            widths = [width * first] + [width * (1 - first) / (len(headers) - 1)] * (len(headers) - 1)
-            t = PdfTable(data, colWidths=widths, repeatRows=1)
-            t.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), red),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, wash]),
-                ("GRID", (0, 0), (-1, -1), 0.4, line),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ]))
-            block.append(t)
+            many = len(headers) > 5
+            first = (0.2 if len(headers) == 6 else 0.22) if many else (0.42 if len(headers) > 3 else 0.62)      # a wide table gets narrow words, not broken ones
+            widths = [first] + [(1 - first) / (len(headers) - 1)] * (len(headers) - 1)
+            pdf.set_font(FONT_MAIN, "", 8 if many else 8.5)
+            pdf.set_text_color(*INK)
+            pdf.set_draw_color(*LINE)
+            pdf.set_fill_color(*WASH)                                       # (the chart changes the fill colour, which the table would otherwise reuse)
+            with pdf.table(col_widths=tuple(w * width for w in widths), width=width, line_height=4.6 if not many else 4.2,
+                           headings_style=FontFace(emphasis="BOLD", color=(255, 255, 255), fill_color=RED, size_pt=7.5 if many else 8.5),
+                           cell_fill_color=WASH, cell_fill_mode="ROWS", borders_layout="HORIZONTAL_LINES",
+                           text_align=tuple(["LEFT"] * (2 if title.startswith("Why reviewers") else 1) + ["RIGHT"] * (len(headers) - (2 if title.startswith("Why reviewers") else 1)))) as table:
+                head = table.row()
+                for h in headers:
+                    head.cell(clean(h))
+                for row in rows:
+                    r = table.row()
+                    for c in row:
+                        r.cell(clean(c))
+            fresh_font()
         if note:
-            block.append(Paragraph(_latin(note), note_style))
-        story.append(KeepTogether(block[:2]))               # the title stays with the start of its table
-        story.extend(block[2:])
+            para(note, size=7.5, color=MUTED, line=3.8)
         if title.startswith("By day") and 1 < len(report["by_day"]) <= 92:
             days = report["by_day"]
-            d = Drawing(width, 120)
-            chart = VerticalBarChart()
-            chart.x, chart.y, chart.width, chart.height = 28, 22, width - 40, 86
-            chart.data = [[x["flagged"] for x in days]]
-            chart.categoryAxis.categoryNames = [x["day"][5:] for x in days]
-            chart.categoryAxis.labels.fontSize = 6
-            chart.categoryAxis.labels.angle = 90
-            chart.categoryAxis.labels.boxAnchor = "e"
-            chart.categoryAxis.labels.dy = -4
-            chart.valueAxis.valueMin = 0
-            chart.valueAxis.valueMax = max(1, max(x["flagged"] for x in days))
-            chart.valueAxis.valueStep = max(1, chart.valueAxis.valueMax // 5)
-            chart.valueAxis.labels.fontSize = 7
-            chart.bars[0].fillColor = red
-            chart.bars[0].strokeColor = None
-            d.add(chart)
-            story.append(KeepTogether([Paragraph("Flagged by system, per day", note_style), d]))      # the caption stays with its chart
+            if pdf.get_y() > pdf.h - pdf.b_margin - 52:
+                pdf.add_page()
+            pdf.ln(2)
+            para("Flagged by system, per day", size=7.5, color=MUTED, line=4)
+            x0, y0, w, h = pdf.l_margin + 8, pdf.get_y() + 2, width - 10, 34
+            peak = max(1, max(d["flagged"] for d in days))
+            pdf.set_draw_color(*MUTED)
+            pdf.line(x0, y0, x0, y0 + h)
+            pdf.line(x0, y0 + h, x0 + w, y0 + h)
+            pdf.set_font(FONT_MAIN, "", 6)
+            pdf.set_text_color(*MUTED)
+            pdf.text(x0 - 5, y0 + 2, str(peak))
+            pdf.text(x0 - 3, y0 + h, "0")
+            slot = w / len(days)
+            every = max(1, -(-len(days) // 16))
+            pdf.set_fill_color(*RED)
+            for k, d in enumerate(days):
+                bar = (d["flagged"] / peak) * (h - 2)
+                if d["flagged"]:
+                    pdf.rect(x0 + k * slot + slot * 0.15, y0 + h - bar, slot * 0.7, bar, style="F")
+                if k % every == 0:
+                    pdf.text(x0 + k * slot, y0 + h + 3.5, d["day"][5:])
+            pdf.set_y(y0 + h + 7)
+            pdf.set_fill_color(*WASH)
+            fresh_font()
 
-    doc.build(story, onFirstPage=footer, onLaterPages=footer)
-    return buffer.getvalue()
+    return bytes(pdf.output())
 
 
 # ── the audit trail (a CSV of what happened, in order) ──────────────────────

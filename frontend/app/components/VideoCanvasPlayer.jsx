@@ -32,15 +32,6 @@ function formatTime(seconds) {
 }
 
 
-/* Detection-box colours, kept inside the red/black/white palette. The three
-   postures are separated by weight along one red ramp rather than by unrelated
-   hues, so the overlay belongs to the same product as everything under it.
-   UNKNOWN stays neutral so an unclassified box never looks like a state. */
-/* Matches the posture slots in the dashboard's chart palette (--chart-1/2/3 in
-   globals.css), so a person boxed as STANDING on the video carries the same hue
-   as the STANDING segment of the posture bar. These are the DARK-mode steps:
-   the overlay is always drawn on video, never on the page ground. */
-
 /** "Now" as a datetime-local value in the viewer's own zone: the picker's upper bound. */
 function localNowValue() {
   const d = new Date();
@@ -101,7 +92,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   const pendingBlurRef = useRef(null);
   const [deviceInfo, setDeviceInfo] = useState('GPU (CUDA)');
   const [isWebcamActive, setIsWebcamActive] = useState(false);
-  const [stats, setStats] = useState({ detected: 0, sitting: 0, standing: 0, walking: 0 });
+  const [stats, setStats] = useState({ detected: 0, flagged: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
   // Zone events from the safety layer, newest first. `safetyOn` is true once a
   // frame carries a `safety` block, i.e. the backend is running the safety layer;
@@ -152,13 +143,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     }
 
     const entities = data.tracked_entities || [];
-    const newStats = { detected: entities.length, sitting: 0, standing: 0, walking: 0 };
-    entities.forEach((e) => {
-      if (e.posture === 'SITTING')  newStats.sitting++;
-      if (e.posture === 'STANDING') newStats.standing++;
-      if (e.posture === 'WALKING')  newStats.walking++;
-    });
-    setStats(newStats);
+    setStats({ detected: entities.length, flagged: entities.filter((e) => e.flagged === true).length });
 
     if (data.safety) {
       setSafetyOn(true);
@@ -284,7 +269,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     setDurationSec(0);
     setIsPaused(false);
     setStatusMsg('');
-    setStats({ detected: 0, sitting: 0, standing: 0, walking: 0 });
+    setStats({ detected: 0, flagged: 0 });
     setZoneEvents([]);
     setDecisions([]);
     setBanners([]);
@@ -977,14 +962,12 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         <PpeStatus entities={ppeEntities} unavailable={ppeUnavailable} />
       )}
 
-      {/* Real-time Detection Statistics Pills */}
+      {/* What is in view right now: how many people, and how many of them have an open flag. */}
       {(phase === 'processing' || isWebcamActive) && (
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {[
-            { label: 'Detected', value: stats.detected, color: 'text-ink' },
-            { label: 'Sitting',  value: stats.sitting,  color: 'text-accent' },
-            { label: 'Standing', value: stats.standing, color: 'text-accent' },
-            { label: 'Walking',  value: stats.walking,  color: 'text-accent' },
+            { label: 'People in view', value: stats.detected, color: 'text-ink' },
+            { label: 'With an open flag', value: stats.flagged, color: stats.flagged > 0 ? 'text-accent' : 'text-ink' },
           ].map(({ label, value, color }) => (
             <div key={label} className="glass-card p-2.5 text-center">
               <p className={`text-xl font-bold ${color}`}>{value}</p>

@@ -7,7 +7,7 @@
 // Four sections behind one sidebar, matching the founder console's shell so the
 // customer and operator halves of the product read as one application:
 //
-//   Overview   what was detected on site — the home screen
+//   Overview   what needs a person first, and how the site did — the home screen
 //   Live feed  the camera, with detection and tracking overlays
 //   Zones      define the areas that rules and measurements attach to
 //   Reports    the safety report for a period, as a PDF or CSV
@@ -21,7 +21,6 @@ import { useSearchParams } from 'next/navigation';
 import { RefreshCw, Loader2, Eye } from 'lucide-react';
 
 import DashboardShell, { VIEWS } from './DashboardShell';
-import OverviewSection from './OverviewSection';
 import SafetyAlertsPanel from './SafetyAlertsPanel';
 import ReviewQueue from './safety/ReviewQueue';
 import EventsScreen from './safety/EventsScreen';
@@ -31,13 +30,11 @@ import SafetySummary from './safety/SafetySummary';
 import ReportsScreen from './safety/ReportsScreen';
 import PlanSection from './PlanSection';
 import { VideoCanvasPlayer } from '../components/VideoCanvasPlayer';
-import { AnalyticsCharts } from '../components/AnalyticsCharts';
 import { FloorplanHeatmap } from '../components/FloorplanHeatmap';
 import { ZoneEditor } from '../components/ZoneEditor';
 import { supabase } from '../lib/supabase/browser';
 import { backendFetch } from '../lib/backend';
 import { getViewerRole } from '../lib/session';
-import { getOverview, getDataCoverage } from '../lib/analytics/queries';
 import { getOpenAlerts } from '../lib/safety/queries';
 import { countOverdueActions } from '../lib/safety/management';
 import RangePicker from './RangePicker';
@@ -48,7 +45,6 @@ import { can, denialMessage } from '../lib/permissions';
 // Postgres `cameras` (see minute_aggregator._resolve_ids), or telemetry is
 // captured but never syncs to the dashboard's data source.
 const CAMERA_ID = 'floor5';
-const WINDOW_HOURS = 24;
 const REFRESH_MS = 15000;
 
 // Reads better than "last 1 days".
@@ -138,15 +134,12 @@ function DashboardInner() {
   // role (see getViewerRole) so the two can never describe different orgs.
   const [org, setOrg] = useState({ name: null, plan: null, planSelectedAt: null });
 
-  const [overview, setOverview] = useState({ status: 'loading', data: null, error: null });
   const [refreshing, setRefreshing] = useState(false);
+  const [summaryTick, setSummaryTick] = useState(0);        // bumped to make the safety summary read again
   // Open alerts: potential violations still waiting for review (Postgres, through the caller's RLS).
   const [alerts, setAlerts] = useState({ status: 'loading', count: 0, alerts: [], error: null });
-  // The historical panels read Postgres `zone_minute_stats`, which holds the
-  // org's whole history — so the window is a user choice rather than a fixed
-  // 24 hours. Live feed and heatmap still read the running session.
+  // The window the overview summarises is the viewer's choice.
   const [rangeDays, setRangeDays] = useState(7);
-  const [coverage, setCoverage] = useState(null);
 
   // WHICH CAMERA EVERYTHING ON THIS PAGE IS ABOUT.
   //
@@ -192,28 +185,6 @@ function DashboardInner() {
     return () => { active = false; };
   }, []);
 
-  const loadOverview = useCallback(async ({ silent = false } = {}) => {
-    if (!silent) setOverview((s) => ({ ...s, status: 'loading' }));
-    else setRefreshing(true);
-
-    try {
-      // Reads Postgres `zone_minute_stats` through the caller's own session, so
-      // RLS scopes it — there is no orgId filter in the query, and none is
-      // needed. See app/lib/analytics/queries.js.
-      const data = await getOverview(rangeDays);
-      if (data?.error) throw new Error(data.error);
-      setOverview({ status: 'ready', data, error: null });
-    } catch (err) {
-      setOverview((s) => ({
-        ...s,
-        status: 'error',
-        error: String(err?.message || err),
-      }));
-    } finally {
-      setRefreshing(false);
-    }
-  }, [rangeDays]);
-
   const alertsRequest = useRef(0);
   const [overdue, setOverdue] = useState(0);
   const loadAlerts = useCallback(async () => {
@@ -238,23 +209,6 @@ function DashboardInner() {
     const timer = setInterval(() => { if (!cancelled && !document.hidden) loadAlerts(); }, REFRESH_MS);
     return () => { cancelled = true; clearInterval(timer); };
   }, [loadAlerts]);
-
-  // The org's real data extent, so the range picker can disable windows the
-  // data cannot fill rather than rendering an empty chart.
-  useEffect(() => {
-    let active = true;
-    getDataCoverage().then((c) => { if (active) setCoverage(c); }).catch(() => {});
-    return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadOverview();
-    const timer = setInterval(() => {
-      if (!cancelled) loadOverview({ silent: true });
-    }, REFRESH_MS);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [loadOverview]);
 
   // The cameras this org actually has, so the picker offers real ones rather
   // than a name compiled into the page.
@@ -323,10 +277,17 @@ function DashboardInner() {
     </div>
   ) : null;
 
+  // Refresh: read the waiting flags and the safety summary again.
+  const refreshOverview = async () => {
+    setRefreshing(true);
+    setSummaryTick((t) => t + 1);
+    try { await loadAlerts(); } finally { setRefreshing(false); }
+  };
+
   const refreshButton = (
     <button
       type="button"
-      onClick={() => loadOverview({ silent: true })}
+      onClick={refreshOverview}
       disabled={refreshing}
       className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3.5 py-2 text-[12.5px] font-bold text-ink-muted hover:text-ink hover:border-field transition-colors disabled:opacity-50"
     >
@@ -343,12 +304,7 @@ function DashboardInner() {
   // below is showing, so separating them would leave the reader hunting.
   const overviewActions = (
     <div className="flex items-center gap-2 flex-wrap">
-      <RangePicker
-        value={rangeDays}
-        onChange={setRangeDays}
-        coverage={coverage}
-        busy={refreshing}
-      />
+      <RangePicker value={rangeDays} onChange={setRangeDays} busy={refreshing} />
       {refreshButton}
     </div>
   );
@@ -359,26 +315,15 @@ function DashboardInner() {
         <div className="space-y-6">
           <PageHeader
             eyebrow="Site overview"
-            title={`Your site, ${rangeLabel}`}
-            subtitle="People detected, how long they stay in each zone and their posture, measured from the camera feed. No video or names are stored."
+            title={`Site safety, ${rangeLabel}`}
+            subtitle="What needs a person first, then how the site did. Every flag is a prompt for a person to judge, and nothing is a final verdict until someone decides. No video or names are stored."
             action={overviewActions}
           />
 
-          {/* What needs a person first; the measurements follow. */}
+          {/* What needs a person first; the numbers follow. */}
           <SafetyAlertsPanel status={alerts.status} count={alerts.count} alerts={alerts.alerts} error={alerts.error} onReview={() => setView('review')} />
 
-          <SafetySummary days={rangeDays} refreshKey={alerts.count} />
-
-          <OverviewSection
-            data={overview.data}
-            status={overview.status}
-            error={overview.error}
-            hours={rangeDays * 24}
-          />
-
-          {/* Trends sit below the headline numbers: the tiles answer "what is
-              true now", the charts answer "how did it get there". */}
-          <AnalyticsCharts days={rangeDays} />
+          <SafetySummary days={rangeDays} refreshKey={`${alerts.count}-${summaryTick}`} />
         </div>
       )}
 
