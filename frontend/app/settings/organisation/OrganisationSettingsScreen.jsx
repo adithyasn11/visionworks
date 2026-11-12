@@ -61,6 +61,12 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // The result banner sits at the top of the page and Save at the bottom: bring the banner into view, or the
+  // person who just clicked Save sees nothing happen.
+  useEffect(() => {
+    if (banner) window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [banner]);
+
   const [form, setForm] = useState(null);
   // Set when a shortened retention needs confirming; holds the counted impact.
   const [retentionWarning, setRetentionWarning] = useState(null);
@@ -371,7 +377,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
                   label={`Type “${state.org.name}” to confirm`}
                   value={deleteText}
                   onChange={(e) => setDeleteText(e.target.value)}
-                  placeholder={state.org.name}
+                  // No placeholder: showing the name here made the box look already filled in.
                   autoComplete="off"
                 />
                 <button

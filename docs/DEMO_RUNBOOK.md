@@ -36,10 +36,11 @@ venv/Scripts/python.exe scripts/demo_preflight.py
 Preflight must say READY. Then, in the dashboard:
 
 1. Sign in as a manager.
-2. Zones tab: delete any leftover zones so the drawing is part of the show.
-3. Rules tab: delete rules from earlier runs.
-4. Review tab: dismiss or leave old flags (the Overview counts them), whichever you prefer to show.
-5. Stand in the taped area for 10 seconds on the Live feed: the people boxes should be steady on each person.
+2. Cameras tab: a camera must be registered and selected (the Live feed shows a red notice if there is none). Without it the flags show on the Live feed but never reach Review, Events or Reports.
+3. Zones tab: delete any leftover zones so the drawing is part of the show.
+4. Rules tab: delete rules from earlier runs.
+5. Review tab: dismiss or leave old flags (the Overview counts them), whichever you prefer to show.
+6. Stand in the taped area for 10 seconds on the Live feed: the people boxes should be steady on each person.
 
 If the browser says the certificate is not trusted, trust it once on the laptop (the phone only needs to open the printed address and continue):
 

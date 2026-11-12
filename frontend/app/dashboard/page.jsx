@@ -30,6 +30,8 @@ import SafetySummary from './safety/SafetySummary';
 import ReportsScreen from './safety/ReportsScreen';
 import EvaluationScreen from './evaluation/EvaluationScreen';
 import PlanSection from './PlanSection';
+import CamerasScreen from './CamerasScreen';
+import { listCameras } from '../lib/platform/cameras';
 import { VideoCanvasPlayer } from '../components/VideoCanvasPlayer';
 import { FloorplanHeatmap } from '../components/FloorplanHeatmap';
 import { ZoneEditor } from '../components/ZoneEditor';
@@ -211,24 +213,29 @@ function DashboardInner() {
     return () => { cancelled = true; clearInterval(timer); };
   }, [loadAlerts]);
 
-  // The cameras this org actually has, so the picker offers real ones rather
-  // than a name compiled into the page.
-  useEffect(() => {
-    let active = true;
-    backendFetch('/api/v1/cameras/')
-      .then((r) => (r.ok ? r.json() : []))
-      .then((list) => {
-        if (!active || !Array.isArray(list)) return;
-        setCameras(list);
-        // Only switch away from the default if it is not a real camera —
-        // otherwise a reload would silently move somebody to a different
-        // camera than the one they were working on.
-        const names = list.map((c) => c.camera_id || c.id || c.name);
-        if (names.length && !names.includes(CAMERA_ID)) setCameraId(names[0]);
-      })
-      .catch(() => { /* the default still works; the picker just has one entry */ });
-    return () => { active = false; };
+  // The cameras this org has registered in Postgres. That registry is the one
+  // that matters: decisions, zone events and zones reach the dashboard only when
+  // the camera NAME a run uses matches one of these rows (safety_sync,
+  // zones._mirror_zone_to_postgres). It used to read the backend's local SQLite
+  // list, which nothing in the product ever filled, so the page always ran as
+  // the unregistered default and nothing synced.
+  const [camerasStatus, setCamerasStatus] = useState({ status: 'loading', error: null });
+  const loadCameras = useCallback(async (prefer) => {
+    try {
+      const r = await listCameras();
+      if (r?.error) throw new Error(r.error);
+      const list = Array.isArray(r?.cameras) ? r.cameras : [];
+      setCameras(list);
+      setCamerasStatus({ status: 'ready', error: null });
+      const names = list.map((c) => c.name);
+      // Keep the camera being worked on; otherwise the one just added, or the first.
+      setCameraId((current) => (prefer && names.includes(prefer) ? prefer
+        : names.includes(current) ? current : (names[0] ?? CAMERA_ID)));
+    } catch (err) {
+      setCamerasStatus({ status: 'error', error: String(err?.message || err) });
+    }
   }, []);
+  useEffect(() => { loadCameras(); }, [loadCameras]);
 
   // Zones for the selected camera. Loaded HERE, not in the editor, so the live
   // overlay has them whether or not the Zones page has been opened — and so
@@ -237,7 +244,7 @@ function DashboardInner() {
   const loadZones = useCallback(async () => {
     if (!cameraId) return;
     try {
-      const res = await backendFetch(`/api/v1/zones/${cameraId}`);
+      const res = await backendFetch(`/api/v1/zones/${encodeURIComponent(cameraId)}`);
       if (!res.ok) return;
       const data = await res.json();
       setActiveZones(Array.isArray(data) ? data : []);
@@ -256,8 +263,8 @@ function DashboardInner() {
    * appeared on only one of them would let the two drift apart without
    * anybody noticing which camera they were looking at.
    */
-  const cameraPicker = cameras.length > 1 ? (
-    <div className="flex items-center gap-2">
+  const cameraPicker = cameras.length > 0 ? (
+    <label className="flex items-center gap-2">
       <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
         camera
       </span>
@@ -266,15 +273,28 @@ function DashboardInner() {
         onChange={(e) => setCameraId(e.target.value)}
         className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12.5px] font-bold text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors"
       >
-        {cameras.map((c) => {
-          const id = c.camera_id || c.id || c.name;
-          return (
-            <option key={id} value={id}>
-              {c.name || id}
-            </option>
-          );
-        })}
+        {cameras.map((c) => (
+          <option key={c.id} value={c.name}>{c.name}</option>
+        ))}
       </select>
+    </label>
+  ) : null;
+
+  // Shown on Live feed and Zones while the organisation has no camera: runs
+  // still work, but nothing they decide can reach the dashboard.
+  const noCameraNotice = camerasStatus.status === 'ready' && cameras.length === 0 ? (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[color:var(--accent)] bg-accent-soft px-4 py-3">
+      <p className="text-[12.5px] text-ink-muted font-medium leading-relaxed max-w-2xl">
+        <strong className="text-ink">No camera is registered.</strong> Detection still runs, but its decisions stay on
+        this computer and never reach Review, Events, Reports or the Overview.
+      </p>
+      <button
+        type="button"
+        onClick={() => setView('cameras')}
+        className="rounded-lg bg-accent px-3.5 py-2 text-[12.5px] font-bold text-white hover:brightness-110 transition"
+      >
+        {can(role, 'cameras.edit') ? 'Add a camera' : 'See cameras'}
+      </button>
     </div>
   ) : null;
 
@@ -355,6 +375,7 @@ function DashboardInner() {
             action={cameraPicker}
           />
 
+          {noCameraNotice}
           {!can(role, 'analysis.run') && role && <ReadOnlyNotice capability="analysis.run" />}
 
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
@@ -396,6 +417,25 @@ function DashboardInner() {
         </div>
       )}
 
+      {view === 'cameras' && (
+        <div className="space-y-6">
+          <PageHeader
+            eyebrow="Cameras"
+            title="Your cameras"
+            subtitle="Each camera has its own zones and its own history. A run's decisions reach Review, Events and Reports only when it runs on a camera registered here."
+          />
+          <CamerasScreen
+            role={role}
+            cameras={cameras}
+            status={camerasStatus.status}
+            error={camerasStatus.error}
+            selected={cameras.length ? cameraId : null}
+            onSelect={setCameraId}
+            onChanged={loadCameras}
+          />
+        </div>
+      )}
+
       {view === 'zones' && (
         <div className="space-y-6">
           <PageHeader
@@ -409,6 +449,7 @@ function DashboardInner() {
             action={cameraPicker}
           />
 
+          {noCameraNotice}
           {!can(role, 'zones.edit') && role && <ReadOnlyNotice capability="zones.edit" />}
 
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-5 items-start">

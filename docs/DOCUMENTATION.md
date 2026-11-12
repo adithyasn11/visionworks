@@ -114,7 +114,7 @@ Postgres tables of the safety layer (migrations `frontend/prisma/sql/025`–`028
 | MANAGER | Cameras, zones, rules, review, evidence pictures, corrective actions, exports |
 | VIEWER | Read decisions, reports, evaluation |
 
-Dashboard screens: **Overview** (flags, review state, people in view), **Review** (queue, confirm / dismiss with notes, evidence), **Live feed** (camera, upload, phone pairing, live verdicts), **Events**, **Zones**, **Rules**, **Actions** (corrective actions), **Reports** (summary, PDF/CSV, audit trail, history), **Evaluation**, **Plan** (admin).
+Dashboard screens: **Overview** (flags, review state, people in view), **Review** (queue, confirm / dismiss with notes, evidence), **Live feed** (camera, upload, phone pairing, live verdicts), **Events**, **Cameras** (add / remove; a run's decisions sync only for a camera registered here, matched by name), **Zones**, **Rules**, **Actions** (corrective actions), **Reports** (summary, PDF/CSV, audit trail, history), **Evaluation**, **Plan** (admin).
 
 ## 9. API
 

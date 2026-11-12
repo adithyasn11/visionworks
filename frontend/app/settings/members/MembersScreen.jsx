@@ -385,6 +385,12 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
 
   useEffect(() => { load(); }, [load]);
 
+  // The result banner is at the top; the row menus are further down. Bring it into view so an action visibly
+  // did something (and a refusal is not missed).
+  useEffect(() => {
+    if (banner) window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [banner]);
+
   // Resolved through lib/permissions.js, not a hardcoded 'ADMIN' string, so
   // this and the server action that re-checks it read from one table. LAYER 1:
   // hiding the controls. The actions re-check (layer 2) and
@@ -573,7 +579,9 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
               <h2 className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint mb-2.5">
                 Members · {activeMembers.length}
               </h2>
-              <ul className="rounded-xl border border-line bg-surface overflow-hidden">
+              {/* No overflow-hidden: a row's action menu opens below it, and clipping the list cut off the menu of
+                  the last row (its items could not be reached). The rows have no background, so nothing spills. */}
+              <ul className="rounded-xl border border-line bg-surface">
                 {activeMembers.map((member) => (
                   <MemberRow
                     key={member.id}
@@ -592,7 +600,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
                 <h2 className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint mb-2.5">
                   Pending invitations · {pendingInvites.length}
                 </h2>
-                <ul className="rounded-xl border border-line bg-surface overflow-hidden">
+                <ul className="rounded-xl border border-line bg-surface">
                   {pendingInvites.map((member) => (
                     <MemberRow
                       key={member.id}

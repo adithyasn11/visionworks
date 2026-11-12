@@ -15,7 +15,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Video, Shapes, FileDown, ClipboardCheck, ListFilter, SlidersHorizontal, Wrench,
-  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard, FlaskConical,
+  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard, FlaskConical, Camera,
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import { supabase } from '../lib/supabase/browser';
@@ -39,6 +39,7 @@ export const VIEWS = [
   { id: 'review',   label: 'Review',    icon: ClipboardCheck },
   { id: 'live',     label: 'Live feed', icon: Video },
   { id: 'events',   label: 'Events',    icon: ListFilter },
+  { id: 'cameras',  label: 'Cameras',   icon: Camera },
   { id: 'zones',    label: 'Zones',     icon: Shapes },
   { id: 'rules',    label: 'Rules',     icon: SlidersHorizontal },
   { id: 'actions',  label: 'Actions',   icon: Wrench },

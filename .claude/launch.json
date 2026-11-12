@@ -7,6 +7,15 @@
       "runtimeArgs": ["--prefix", "frontend", "run", "dev:https"],
       "port": 3000,
       "url": "https://localhost:3000"
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--app-dir", "backend", "--host", "0.0.0.0", "--port", "8001",
+                      "--ssl-certfile", "certs/dev-cert.pem", "--ssl-keyfile", "certs/dev-key.pem"],
+      "port": 8001,
+      "autoPort": false,
+      "url": "https://localhost:8001"
     }
   ]
 }

@@ -130,11 +130,12 @@ This prints the address to open on the phone. Trust the generated certificate on
 ## Using the app
 
 1. **Sign up**, create an organisation on `/onboarding`.
-2. **Zones** — draw zones over the camera view and give each a type.
-3. **Rules** — add the rules that apply, with severity and parameters.
-4. **Live feed** — start the camera, upload a video, or pair a phone. Flags appear as they happen.
-5. **Review** — confirm or dismiss each flag. Open one to see the reason, the numbers and the picture.
-6. **Reports** and **Evaluation** — export a shift report; read how well the system measured up and where it is wrong.
+2. **Cameras** — add a camera (or check the one from onboarding). Decisions reach Review, Events and Reports only for a run on a registered camera; the Live feed and Zones screens say so when there is none.
+3. **Zones** — draw zones over the camera view and give each a type.
+4. **Rules** — add the rules that apply, with severity and parameters.
+5. **Live feed** — start the camera, upload a video, or pair a phone. Flags appear as they happen.
+6. **Review** — confirm or dismiss each flag. Open one to see the reason, the numbers and the picture.
+7. **Reports** and **Evaluation** — export a shift report; read how well the system measured up and where it is wrong.
 
 | Role | Can | Cannot |
 |------|-----|--------|

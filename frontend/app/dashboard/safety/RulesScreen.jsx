@@ -116,7 +116,10 @@ function RuleForm({ initial, zones, onSaved, onCancel }) {
   async function save(e) {
     e.preventDefault();
     setSaving(true); setError(null);
-    const r = editing ? await updateRule(form.id, body) : await createRule(body);
+    // An update may not carry `type` (a rule's kind cannot change, and the API refuses unknown fields), so it is left
+    // out of the PATCH; validation above still sends it, because the validator needs to know the kind.
+    const { type: _kind, ...patch } = body;
+    const r = editing ? await updateRule(form.id, patch) : await createRule(body);
     setSaving(false);
     if (!r.ok) { setError(friendlyRuleError(r.message)); return; }
     onSaved(r.data);

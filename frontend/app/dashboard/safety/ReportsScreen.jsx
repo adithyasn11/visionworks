@@ -321,8 +321,11 @@ export default function ReportsScreen() {
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState({ loading: true, rows: [], error: null });
   const [shift, setShift] = useState(() => {
+    // The last eight hours up to the NEXT full hour, so what just happened is inside it (ending at the top of the
+    // current hour left the latest minutes out, and an audit trail exported right after an incident came out empty).
     const end = new Date();
     end.setMinutes(0, 0, 0);
+    end.setTime(end.getTime() + 3600000);
     return { from: localDateTime(new Date(end.getTime() - 8 * 3600000)), to: localDateTime(end) };
   });
   const request = useRef(0);

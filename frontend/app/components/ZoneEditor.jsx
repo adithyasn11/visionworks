@@ -162,7 +162,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
 
   const loadZones = useCallback(async () => {
     try {
-      const res = await backendFetch(`/api/v1/zones/${cameraId}`);
+      const res = await backendFetch(`/api/v1/zones/${encodeURIComponent(cameraId)}`);
       if (!res.ok) throw new Error(`Zones API returned ${res.status}`);
       const data = await res.json();
       setZones(Array.isArray(data) ? data : []);

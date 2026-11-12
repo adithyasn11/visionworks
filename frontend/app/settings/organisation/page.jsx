@@ -45,7 +45,7 @@ export default async function OrganisationSettingsPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('currentOrgId')
+    .select('currentOrgId, fullName, email')
     .eq('id', data.user.id)
     .maybeSingle();
 
@@ -61,8 +61,9 @@ export default async function OrganisationSettingsPage() {
       role={membership?.role ?? null}
       viewer={{
         id: data.user.id,
-        email: data.user.email ?? null,
-        fullName: null,
+        // The same name the dashboard and the Members page show in the sidebar.
+        email: profile.email ?? data.user.email ?? null,
+        fullName: profile.fullName ?? data.user.user_metadata?.full_name ?? null,
       }}
     />
   );
