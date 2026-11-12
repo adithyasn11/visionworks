@@ -201,7 +201,7 @@ export default async function PlatformAuditPage({ searchParams }) {
             )}
           </div>
         ) : (
-          <ol className="divide-y divide-[color:var(--line)]">
+          <ol className="divide-y divide-[color:var(--line-soft)]">
             {entries.map((e) => {
               const meta = ACTION_META[e.action] ?? {
                 icon: ScrollText, tone: 'muted', label: e.action,

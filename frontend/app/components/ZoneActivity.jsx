@@ -45,7 +45,7 @@ export default function ZoneActivity({ events, zones = [] }) {
           role="log"
           aria-label="Zone events, newest first"
           tabIndex={0}
-          className="flex flex-col divide-y divide-line/60 max-h-56 overflow-y-auto pr-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)] rounded"
+          className="flex flex-col divide-y divide-line-soft max-h-56 overflow-y-auto pr-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)] rounded"
         >
           {events.map((ev) => {
             const zone = byId.get(String(ev.zone_id));

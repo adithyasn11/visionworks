@@ -34,10 +34,12 @@ function Td({ children, right, strong, tone }) {
 function Table({ caption, head, children }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-xs min-w-[560px]">
+      {/* Wide enough that the first column (the row's name) is not squeezed into five lines; on a narrow
+          screen the table scrolls sideways inside its card instead. */}
+      <table className="w-full text-xs min-w-[760px] [&_td:first-child]:min-w-[11rem] [&_th:first-child]:min-w-[11rem]">
         <caption className="sr-only">{caption}</caption>
         <thead><tr className="text-left text-[10px] font-mono uppercase tracking-[0.08em] text-ink-faint">{head}</tr></thead>
-        <tbody className="[&>tr]:border-t [&>tr]:border-line/60">{children}</tbody>
+        <tbody className="[&>tr]:border-t [&>tr]:border-line-soft">{children}</tbody>
       </table>
     </div>
   );
@@ -73,7 +75,7 @@ function Sweep({ sweep, baselines }) {
         aria-label={`Error rate against coverage for ${pts.length} threshold settings. As shipped: coverage ${pc(chosen?.coverage)}, error ${pc(chosen?.error_rate)}. Per-frame: coverage 100%, error ${pc(baselines['B0 per-frame']?.error_rate)}. Majority vote: error ${pc(baselines['B1 majority vote']?.error_rate)}.`}>
         {yTicks.map((t) => (
           <g key={t}>
-            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="var(--line)" strokeWidth="0.8" />
+            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} stroke="var(--line-soft)" strokeWidth="0.8" />
             <text x={L - 6} y={y(t) + 3} textAnchor="end" fontSize="9" fill="var(--ink-faint)">{(t * 100).toFixed(t * 100 < 10 ? 1 : 0)}%</text>
           </g>
         ))}
@@ -97,7 +99,10 @@ function Sweep({ sweep, baselines }) {
         {chosen && (
           <g>
             <circle cx={x(chosen.coverage)} cy={y(chosen.error_rate)} r="6.5" fill="var(--accent)" />
-            <text x={x(chosen.coverage) - 10} y={y(chosen.error_rate) + 16} textAnchor="end" fontSize="9" fill="var(--accent)">as shipped</text>
+            {/* Above the dot, away from the cluster of sweep marks, with a halo in the card colour so it stays
+                readable where it crosses a mark or grid line. */}
+            <text x={x(chosen.coverage) + 10} y={y(chosen.error_rate) - 10} textAnchor="start" fontSize="9" fontWeight="700"
+              fill="var(--accent)" stroke="var(--surface)" strokeWidth="3" paintOrder="stroke" strokeLinejoin="round">as shipped</text>
           </g>
         )}
       </svg>

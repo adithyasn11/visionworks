@@ -70,7 +70,7 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
       )}
 
       {status === 'ready' && open && (
-        <ul className="flex flex-col divide-y divide-line/60 max-h-[30rem] overflow-y-auto pr-1" aria-label="Open alerts, newest first">
+        <ul className="flex flex-col divide-y divide-line-soft max-h-[30rem] overflow-y-auto pr-1" aria-label="Open alerts, newest first">
           {alerts.map((a) => {
             const meta = severityMeta(a.severity);
             return (

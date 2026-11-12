@@ -196,14 +196,15 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
     <DashboardShell user={viewer} role={viewerRole}>
       <div className="mx-auto max-w-3xl">
 
-        <header className="flex flex-col gap-2 mb-7">
+        {/* Same page header as the dashboard screens (eyebrow, title, line of context, rule underneath). */}
+        <header className="flex flex-col gap-2 pb-5 mb-7 border-b border-line">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">
-            {state.org.slug}
+            {state.org.name || state.org.slug}
           </p>
-          <h1 className="text-2xl sm:text-[30px] font-black tracking-tight text-ink leading-[1.15]">
+          <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight text-ink leading-[1.15]">
             Organisation
           </h1>
-          <p className="text-[14px] text-ink-muted font-medium leading-relaxed max-w-xl">
+          <p className="text-[13.5px] text-ink-muted leading-relaxed max-w-2xl">
             Identity and data retention.
           </p>
         </header>

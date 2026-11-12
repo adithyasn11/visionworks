@@ -13,11 +13,14 @@
   --ink:           #0B0A0C;
   --ink-muted:     #57545C;
   --ink-faint:     #6B6772; /* AA (5.5:1) on both ground and surface */
-  --line:          #E7E5E9;
-  /* Form borders need real presence — --line is a divider weight and reads as
-     a smudge around an input. These are the 3:1 non-text contrast minimum. */
-  --field:         #918D98; /* 3.25:1 on white — passes non-text minimum */
-  --field-hover:   #807C88; /* 4.07:1 */
+  /* Borders are BLACK in light mode: cards, panels, inputs, buttons and the
+     page chrome are outlined in near-black, which is the red / black / white
+     identity. Thin separators INSIDE a card (table rows, list rows, hairline
+     rules) use --line-soft, so a table does not turn into a heavy grid. */
+  --line:          #1A181C;
+  --line-soft:     #D6D3DA;
+  --field:         #1A181C; /* form controls share the card border */
+  --field-hover:   #0B0A0C;
   --accent:        #DC2626; /* accent text/icons on the page ground */
   --accent-fill:   #DC2626; /* solid red panels that carry white text */
   --accent-soft:   rgba(220, 38, 38, 0.10);
@@ -32,7 +35,8 @@
   --ink:           #F7F6F8;
   --ink-muted:     #A5A1AB;
   --ink-faint:     #8B8792; /* AA (5.6:1) on both ground and surface */
-  --line:          #2A272E;
+  --line:          #2E2B33;
+  --line-soft:     #242128;
   --field:         #6A6673; /* 3.54:1 on the dark ground */
   --field-hover:   #7A7684; /* 4.47:1 */
   /* Two reds, because one cannot serve both roles on a dark ground:
@@ -46,6 +50,12 @@
 }
 
 @layer base {
+  /* A `border` with no colour class follows the theme instead of Tailwind's
+     fixed light grey (which showed as bright lines in dark mode). */
+  *, ::before, ::after {
+    border-color: var(--line-soft);
+  }
+
   body {
     background-color: var(--ground);
     color: var(--ink);
@@ -216,6 +226,7 @@ html.theme-switching body {
 .bg-accent      { background-color: var(--accent-fill); }
 .bg-accent-soft { background-color: var(--accent-soft); }
 .border-line         { border-color: var(--line); }
+.border-line-soft    { border-color: var(--line-soft); }
 .border-accent       { border-color: var(--accent-fill); }
 .border-field        { border-color: var(--field); }
 .hover\:border-field-hover:hover { border-color: var(--field-hover); }
@@ -260,7 +271,7 @@ html.theme-switching body {
   background: transparent;
 }
 .nav-scroll::-webkit-scrollbar-thumb {
-  background-color: var(--line);
+  background-color: var(--line-soft);
   border-radius: 999px;
 }
 .nav-scroll::-webkit-scrollbar-thumb:hover {

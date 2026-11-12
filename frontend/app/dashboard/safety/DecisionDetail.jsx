@@ -92,7 +92,7 @@ function Facts({ ruleType, evidence }) {
   return (
     <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs">
       {rows.map(([k, v]) => (
-        <div key={k} className="flex justify-between gap-3 border-t border-line/60 py-1">
+        <div key={k} className="flex justify-between gap-3 border-t border-line-soft py-1">
           <dt className="text-ink-faint">{k}</dt>
           <dd className="text-ink text-right">{v}</dd>
         </div>
@@ -125,7 +125,7 @@ function Evidence({ evidence, ruleType }) {
         </thead>
         <tbody>
           {items.map(([name, v]) => (
-            <tr key={name} className="border-t border-line/60 align-top">
+            <tr key={name} className="border-t border-line-soft align-top">
               <th scope="row" className="py-1.5 pr-3 text-left font-semibold text-ink">{ITEM_NAMES[name] || name}</th>
               <td className="py-1.5 pr-3 text-ink-muted">{ITEM_STATE[v.state] || v.state}</td>
               <td className="py-1.5 pr-3 tabular-nums text-ink-muted">{v.clear_frames ?? ''}</td>
@@ -162,7 +162,7 @@ function Thresholds({ thresholds }) {
   return (
     <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs">
       {rows.map(([k, v]) => (
-        <div key={k} className="flex justify-between gap-3 border-t border-line/60 py-1">
+        <div key={k} className="flex justify-between gap-3 border-t border-line-soft py-1">
           <dt className="text-ink-faint">{k}</dt>
           <dd className="text-ink tabular-nums">{v}</dd>
         </div>
@@ -375,7 +375,7 @@ export default function DecisionDetail({ decisionId, role, onChanged }) {
 
       <Section title="This worker around that moment">
         {events === null ? <p className="text-xs text-ink-faint">Loading…</p> : events.length === 0 ? <p className="text-xs text-ink-faint">No zone activity was recorded for this worker nearby.</p> : (
-          <ul className="flex flex-col divide-y divide-line/60 text-xs">
+          <ul className="flex flex-col divide-y divide-line-soft text-xs">
             {events.map((e) => {
               const d = describeZoneEvent({ event_type: e.eventType, worker_key: e.workerKey, details: e.details });
               return (
@@ -399,7 +399,7 @@ export default function DecisionDetail({ decisionId, role, onChanged }) {
       {(actions.length > 0 || (decision.reviewState === 'CONFIRMED' && canActions)) && (
         <Section title="Corrective actions" icon={Wrench}>
           {actions.length > 0 && (
-            <ul className="flex flex-col divide-y divide-line/60 text-xs">
+            <ul className="flex flex-col divide-y divide-line-soft text-xs">
               {actions.map((a) => (
                 <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
                   <span className="text-ink font-medium">{a.title}</span>

@@ -37,7 +37,7 @@ export default function PpeStatus({ entities, unavailable }) {
       ) : rows.length === 0 ? (
         <p className="text-xs text-ink-muted leading-relaxed">No one in view.</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-line/60">
+        <ul className="flex flex-col divide-y divide-line-soft">
           {rows.map((e) => {
             const { label, tone, detail } = describePpe(e.ppe);
             return (

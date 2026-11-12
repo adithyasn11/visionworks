@@ -125,7 +125,7 @@ export default function LandingPageClient() {
           <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ink-faint">
             Built for safety teams
           </span>
-          <span className="hidden sm:block w-px h-4 bg-[color:var(--line)]" aria-hidden="true"></span>
+          <span className="hidden sm:block w-px h-4 bg-[color:var(--line-soft)]" aria-hidden="true"></span>
           {['Runs on your hardware', 'No continuous video stored', 'Workers stay anonymous'].map((t) => (
             <span key={t} className="flex items-center gap-2 text-[13px] font-bold">
               <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />

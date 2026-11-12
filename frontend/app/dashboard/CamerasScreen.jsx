@@ -85,7 +85,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
           </Notice>
         )}
         {status === 'ready' && cameras.length > 0 && (
-          <ul className="divide-y divide-[color:var(--line)]">
+          <ul className="divide-y divide-[color:var(--line-soft)]">
             {cameras.map((cam) => (
               <li key={cam.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div className="min-w-0">

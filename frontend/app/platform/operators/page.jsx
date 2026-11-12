@@ -172,7 +172,7 @@ export default async function PlatformOperatorsPage() {
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-[color:var(--line)]">
+          <ul className="divide-y divide-[color:var(--line-soft)]">
             {operators.map((op) => (
               <li
                 key={op.profileId}

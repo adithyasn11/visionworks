@@ -11,10 +11,12 @@ import { Plus, Minus } from 'lucide-react';
 
 export const StatsBand = ({ stats, delay = 0 }) => (
   <section
-    className="themed animate-fade-in-up border-y border-line bg-surface rounded-3xl overflow-hidden"
+    className="themed animate-fade-in-up border border-line bg-surface rounded-3xl overflow-hidden"
     style={{ animationDelay: `${delay}ms` }}
   >
-    <dl className="grid grid-cols-2 lg:grid-cols-4 divide-y divide-x divide-line [&>div]:border-line">
+    {/* Outlined all round like every other card (it was top and bottom only, so the rounded corners looked
+        cut off); the cells inside are separated by the soft divider colour. */}
+    <dl className="grid grid-cols-2 lg:grid-cols-4 divide-y divide-x divide-line-soft lg:divide-y-0">
       {stats.map(({ value, label, note }) => (
         <div key={label} className="p-6 sm:p-8 flex flex-col gap-1 text-center">
           <dd className="text-3xl sm:text-4xl font-black tracking-tight text-ink tabular-nums leading-[1.15]">

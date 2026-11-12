@@ -41,7 +41,7 @@ export default function Loading() {
 
         <div className="rounded-xl border border-line bg-surface overflow-hidden">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-3.5 border-b border-line last:border-b-0">
+            <div key={i} className="flex items-center gap-3 px-4 py-3.5 border-b border-line-soft last:border-b-0">
               <Block className="w-9 h-9 rounded-lg" />
               <div className="flex-1 space-y-2">
                 <Block className="h-3.5 w-40" />

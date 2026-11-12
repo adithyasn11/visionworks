@@ -422,7 +422,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
           <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ink-faint">
             What you get
           </span>
-          <span aria-hidden="true" className="hidden sm:block w-px h-4 bg-[color:var(--line)]" />
+          <span aria-hidden="true" className="hidden sm:block w-px h-4 bg-[color:var(--line-soft)]" />
           {['Runs on your hardware', 'No footage retained', 'Anonymous by design'].map((t) => (
             <span key={t} className="flex items-center gap-2 text-[13px] font-bold">
               <CheckCircle2 className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />

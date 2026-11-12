@@ -733,7 +733,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
 
       {/* Status Bar */}
       {(fileName || statusMsg || isWebcamActive) && (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-alt/80 border border-line/60 text-xs text-ink-muted font-mono">
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-alt/80 border border-line-soft text-xs text-ink-muted font-mono">
           {PhaseIcon}
           <span className="truncate">
             {isWebcamActive ? `🔴 LIVE WEBCAM FEED — ${statusMsg}` : (statusMsg || fileName)}

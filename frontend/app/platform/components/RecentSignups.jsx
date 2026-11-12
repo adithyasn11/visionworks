@@ -55,7 +55,7 @@ export default function RecentSignups({ orgs }) {
           </p>
         </div>
       ) : (
-        <ul className="divide-y divide-[color:var(--line)]">
+        <ul className="divide-y divide-[color:var(--line-soft)]">
           {recent.map((o) => (
             <li key={o.id}>
               <Link

@@ -127,7 +127,7 @@ export function MembersSection({ members, error }) {
               <Th align="right">Joined</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[color:var(--line)]">
+          <tbody className="divide-y divide-[color:var(--line-soft)]">
             {members.map((m) => {
               const RoleIcon = ROLE_ICON[m.role] ?? Eye;
               return (
@@ -189,7 +189,7 @@ export function SitesSection({ sites, error }) {
               <Th>Days</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[color:var(--line)]">
+          <tbody className="divide-y divide-[color:var(--line-soft)]">
             {sites.map((s) => (
               <tr key={s.id} className="hover:bg-surface-alt transition-colors duration-150">
                 <td className="px-4 py-3 min-w-0">
@@ -255,7 +255,7 @@ export function CamerasSection({ cameras, error }) {
               <Th align="right">Last seen</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[color:var(--line)]">
+          <tbody className="divide-y divide-[color:var(--line-soft)]">
             {cameras.map((c) => {
               const SrcIcon = SOURCE_ICON[c.sourceType] ?? Camera;
               return (
@@ -327,7 +327,7 @@ export function ZonesSection({ zones, error }) {
               <Th>Camera</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[color:var(--line)]">
+          <tbody className="divide-y divide-[color:var(--line-soft)]">
             {zones.map((z) => (
               <tr key={z.id} className="hover:bg-surface-alt transition-colors duration-150">
                 <td className="px-4 py-3 min-w-0">
@@ -387,7 +387,7 @@ export function SessionsSection({ sessions, error }) {
               <Th align="right">Started</Th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[color:var(--line)]">
+          <tbody className="divide-y divide-[color:var(--line-soft)]">
             {sessions.map((s) => {
               const chip = STATUS_CHIP[s.status] ?? STATUS_CHIP.QUEUED;
               const pct =

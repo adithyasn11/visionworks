@@ -132,7 +132,7 @@ function UsageTile({ label, used, max, suffix, consumable = true, dark = false }
 
       {!unlimited && used !== null && (
         <div
-          className={`mt-2.5 h-1.5 rounded-full overflow-hidden ${dark ? 'bg-white/10' : 'bg-[color:var(--line)]'}`}
+          className={`mt-2.5 h-1.5 rounded-full overflow-hidden ${dark ? 'bg-white/10' : 'bg-[color:var(--line-soft)]'}`}
           role="progressbar"
           aria-valuenow={used}
           aria-valuemin={0}

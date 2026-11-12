@@ -93,7 +93,7 @@ export function SkeletonCard({ rows = 4, headerWidth = 'w-40', tall = false }) {
           <Shimmer className="h-[180px] w-full rounded-lg" />
         </div>
       ) : (
-        <div className="divide-y divide-[color:var(--line)]">
+        <div className="divide-y divide-[color:var(--line-soft)]">
           {Array.from({ length: rows }).map((_, i) => (
             <div key={i} className="px-4 sm:px-5 py-3.5 flex items-center gap-3">
               <div className="flex-1 min-w-0">
@@ -120,7 +120,7 @@ export function SkeletonTable({ rows = 6, cols = 5 }) {
           <Shimmer key={i} className={`h-2.5 ${i === 0 ? 'flex-1' : 'w-16'}`} />
         ))}
       </div>
-      <div className="divide-y divide-[color:var(--line)]">
+      <div className="divide-y divide-[color:var(--line-soft)]">
         {Array.from({ length: rows }).map((_, r) => (
           <div key={r} className="flex items-center gap-6 px-4 py-3.5">
             <div className="flex-1 min-w-0">

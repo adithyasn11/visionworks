@@ -129,7 +129,7 @@ export function CamerasInErrorSection({ cameras, error }) {
       error={error}
       allClear="Every camera across every organisation reports as reachable."
     >
-      <ul className="divide-y divide-[color:var(--line)]">
+      <ul className="divide-y divide-[color:var(--line-soft)]">
         {cameras.map((c) => (
           <li key={c.id} className="px-4 sm:px-5 py-3.5">
             <div className="flex items-start justify-between gap-3">
@@ -173,7 +173,7 @@ export function FailedSessionsSection({ sessions, error }) {
       error={error}
       allClear="No run has failed or been cancelled."
     >
-      <ul className="divide-y divide-[color:var(--line)]">
+      <ul className="divide-y divide-[color:var(--line-soft)]">
         {sessions.map((s) => {
           const pct =
             s.totalFrames && s.totalFrames > 0
@@ -255,7 +255,7 @@ export function RunningSessionsSection({ sessions, error }) {
       error={error}
       allClear="Nothing is processing right now."
     >
-      <ul className="divide-y divide-[color:var(--line)]">
+      <ul className="divide-y divide-[color:var(--line-soft)]">
         {sessions.map((s) => {
           const pct =
             s.totalFrames && s.totalFrames > 0
@@ -323,7 +323,7 @@ export function RunningSessionsSection({ sessions, error }) {
  */
 function StalledList({ orgs, metric }) {
   return (
-    <ul className="divide-y divide-[color:var(--line)]">
+    <ul className="divide-y divide-[color:var(--line-soft)]">
       {orgs.map((o) => (
         <li key={o.id}>
           <Link

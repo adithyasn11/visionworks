@@ -119,7 +119,7 @@ export default function OrgTable({ orgs, filtered }) {
               <th scope="col" className="w-8" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-[color:var(--line)]">
+          <tbody className="divide-y divide-[color:var(--line-soft)]">
             {orgs.map((o) => (
               <tr key={o.id} className="group hover:bg-surface-alt transition-colors duration-150">
                 <th scope="row" className="px-4 py-3 text-left font-normal">
@@ -170,7 +170,7 @@ export default function OrgTable({ orgs, filtered }) {
       </div>
 
       {/* ── Mobile cards ── */}
-      <ul className="md:hidden divide-y divide-[color:var(--line)]">
+      <ul className="md:hidden divide-y divide-[color:var(--line-soft)]">
         {orgs.map((o) => (
           <li key={o.id}>
             <Link

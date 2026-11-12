@@ -78,7 +78,7 @@ function StatusPill({ member }) {
     : member.status === 'ACTIVE'
       ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
       : member.status === 'INVITED'
-        ? 'border-[color:var(--line)] bg-surface-alt text-ink-muted'
+        ? 'border-[color:var(--line-soft)] bg-surface-alt text-ink-muted'
         : 'border-[color:var(--accent)] bg-accent-soft text-accent';
 
   const label = member.expired
@@ -198,7 +198,7 @@ function MemberRow({ member, canManage, isLastActiveAdmin, busyId, onAction }) {
   const act = (fn) => { close(); onAction(member.id, fn); };
 
   return (
-    <li className="flex items-center gap-3 px-4 py-3 border-b border-line last:border-b-0">
+    <li className="flex items-center gap-3 px-4 py-3 border-b border-line-soft last:border-b-0">
       <div className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center font-bold text-[12px] shrink-0">
         {initialsOf(member)}
       </div>
@@ -288,7 +288,7 @@ function MemberRow({ member, canManage, isLastActiveAdmin, busyId, onAction }) {
                       </MenuItem>
                     ))}
 
-                    <div className="h-px bg-[color:var(--line)] my-1.5" />
+                    <div className="h-px bg-[color:var(--line-soft)] my-1.5" />
 
                     {member.status === 'ACTIVE' ? (
                       <MenuItem
@@ -456,14 +456,15 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
     <DashboardShell user={viewer} role={state.viewerRole ?? initialRole}>
       <div className="mx-auto max-w-3xl">
 
-        <header className="flex flex-col gap-2 mb-7">
+        {/* Same page header as the dashboard screens (eyebrow, title, line of context, rule underneath). */}
+        <header className="flex flex-col gap-2 pb-5 mb-7 border-b border-line">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">
             {orgName}
           </p>
-          <h1 className="text-2xl sm:text-[30px] font-black tracking-tight text-ink leading-[1.15]">
+          <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight text-ink leading-[1.15]">
             Members
           </h1>
-          <p className="text-[14px] text-ink-muted font-medium leading-relaxed max-w-xl">
+          <p className="text-[13.5px] text-ink-muted leading-relaxed max-w-2xl">
             Everyone who can reach this organisation’s data. Roles decide what they can
             change — safety data is visible to every member, and to nobody outside.
           </p>
@@ -562,7 +563,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
         )}
 
         {state.status === 'loading' ? (
-          <div className="rounded-xl border border-line bg-surface divide-y divide-[color:var(--line)]">
+          <div className="rounded-xl border border-line bg-surface divide-y divide-[color:var(--line-soft)]">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-3.5">
                 <div className="w-9 h-9 rounded-lg bg-surface-alt animate-pulse" />

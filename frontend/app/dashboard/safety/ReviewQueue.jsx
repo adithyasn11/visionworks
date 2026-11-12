@@ -56,7 +56,7 @@ export default function ReviewQueue({ role, onCountChange }) {
       {!state.loading && !state.error && state.items.length === 0 && (
         <p className="text-xs text-ink-muted leading-relaxed">Nothing is waiting for review. When a rule flags something that may be a violation, it appears here until someone judges it.</p>
       )}
-      <ul className="flex flex-col divide-y divide-line/60" aria-label="Flags waiting for review, oldest first">
+      <ul className="flex flex-col divide-y divide-line-soft" aria-label="Flags waiting for review, oldest first">
         {state.items.map((d) => {
           const isOpen = open === d.id;
           return (

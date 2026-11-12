@@ -211,7 +211,7 @@ export default function CheckoutScreen({
                 </div>
               )}
 
-              <div aria-hidden="true" className="h-px bg-[color:var(--line)]" />
+              <div aria-hidden="true" className="h-px bg-[color:var(--line-soft)]" />
 
               <div className="flex flex-col gap-4">
                 <span className="text-[13px] font-black text-ink">What’s included</span>
@@ -225,7 +225,7 @@ export default function CheckoutScreen({
                 </ul>
               </div>
 
-              <div aria-hidden="true" className="h-px bg-[color:var(--line)]" />
+              <div aria-hidden="true" className="h-px bg-[color:var(--line-soft)]" />
 
               {/* The total. Zero for every tier, because that is the truth —
                   the price above is illustrative and this is what would

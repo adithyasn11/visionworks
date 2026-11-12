@@ -76,7 +76,7 @@ export default function OrgActions({ org }) {
         </p>
       </div>
 
-      <div className="divide-y divide-[color:var(--line)]">
+      <div className="divide-y divide-[color:var(--line-soft)]">
         {/* ── Retention ── */}
         <form onSubmit={runRetention} className="px-4 sm:px-5 py-4 space-y-2.5">
           <div className="flex items-start gap-2">

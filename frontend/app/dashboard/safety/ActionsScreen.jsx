@@ -150,7 +150,7 @@ export default function ActionsScreen({ role, onCountChange }) {
         <p className="text-xs text-ink-muted leading-relaxed">{tab === 'OVERDUE' ? 'Nothing is overdue.' : tab === 'ACTIVE' ? 'No actions are waiting to be done.' : 'No actions here.'}</p>
       )}
       {tab === 'ACTIVE' && overdueCount > 0 && <p className="mb-2 text-xs text-accent font-semibold">{overdueCount} overdue</p>}
-      <ul className="flex flex-col divide-y divide-line/60" aria-label="Corrective actions">
+      <ul className="flex flex-col divide-y divide-line-soft" aria-label="Corrective actions">
         {state.actions.map((a) => <ActionCard key={a.id} action={a} people={people} canEdit={canEdit} onChanged={changed} />)}
       </ul>
     </Panel>

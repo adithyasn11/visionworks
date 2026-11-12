@@ -52,7 +52,7 @@ export default function DecisionFeed({ decisions, zones = [] }) {
           role="log"
           aria-label="Decisions, newest first"
           tabIndex={0}
-          className="flex flex-col divide-y divide-line/60 max-h-[34rem] overflow-y-auto pr-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)] rounded"
+          className="flex flex-col divide-y divide-line-soft max-h-[34rem] overflow-y-auto pr-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)] rounded"
         >
           {decisions.map((d) => {
             const meta = decisionStatus(d.status);

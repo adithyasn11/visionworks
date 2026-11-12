@@ -52,7 +52,7 @@ export default function AttentionList({ items }) {
           </p>
         </div>
       ) : (
-        <ul className="divide-y divide-[color:var(--line)]">
+        <ul className="divide-y divide-[color:var(--line-soft)]">
           {items.map(({ org, reasons, severity }) => {
             const sev = SEVERITY[severity] ?? SEVERITY[1];
             return (

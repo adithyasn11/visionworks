@@ -124,7 +124,7 @@ function StepRail({ current, orgCreated }) {
               <span className="sr-only sm:hidden">{step.label}</span>
             </span>
             {i < STEPS.length - 1 && (
-              <span aria-hidden="true" className="w-4 h-px bg-[color:var(--line)]" />
+              <span aria-hidden="true" className="w-4 h-px bg-[color:var(--line-soft)]" />
             )}
           </li>
         );

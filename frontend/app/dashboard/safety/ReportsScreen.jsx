@@ -15,7 +15,7 @@
 // Anyone in the organisation can read and export; every export is audited on the server.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarRange, ClipboardList, FileDown, FileSpreadsheet, FileText, History, Loader2, RefreshCw, ShieldCheck } from 'lucide-react';
+import { CalendarRange, Camera, ClipboardList, Clock, FileDown, FileSpreadsheet, FileText, HardHat, History, Loader2, PersonStanding, RefreshCw, Shapes, ShieldCheck, SlidersHorizontal, Timer, Wrench } from 'lucide-react';
 import { downloadAuditTrail, downloadExport, downloadReport, getReport, getReportHistory } from '../../lib/safetyApi';
 import { durationText, ruleTypeMeta } from '../../lib/safety/ruleTypes';
 import { reasonLabel, BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel } from './common';
@@ -62,7 +62,7 @@ function Facts({ rows }) {
   return (
     <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs">
       {shown.map(([k, v]) => (
-        <div key={k} className="flex justify-between gap-3 border-t border-line/60 py-1">
+        <div key={k} className="flex justify-between gap-3 border-t border-line-soft py-1">
           <dt className="text-ink-faint">{k}</dt>
           <dd className="text-ink text-right tabular-nums">{v}</dd>
         </div>
@@ -90,7 +90,7 @@ function Breakdown({ title, first, rows, label, empty }) {
         </thead>
         <tbody>
           {shown.map((r, i) => (
-            <tr key={`${label(r)}-${i}`} className="border-t border-line/60">
+            <tr key={`${label(r)}-${i}`} className="border-t border-line-soft">
               <th scope="row" className="py-1.5 pr-3 font-medium text-ink text-left">{label(r)}</th>
               {[r.decisions, r.compliant, r.flagged, r.confirmed, r.dismissed, r.pending, r.insufficient_evidence].map((v, j) => (
                 <td key={j} className={`py-1.5 px-2 text-right tabular-nums ${j === 2 && v > 0 ? 'text-accent font-semibold' : 'text-ink-muted'}`}>{v}</td>
@@ -135,7 +135,7 @@ function FlagSplit({ r }) {
   const judged = r.confirmed + r.dismissed;
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-line/60" role="img"
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-line-soft" role="img"
         aria-label={`${total} flagged: ${r.confirmed} confirmed, ${r.dismissed} dismissed, ${r.pending} waiting for review`}>
         <div style={{ width: `${part(r.confirmed)}%`, background: 'var(--accent)' }} title={`${r.confirmed} confirmed`} />
         <div style={{ width: `${part(r.dismissed)}%`, background: 'var(--field)' }} title={`${r.dismissed} dismissed`} />
@@ -207,17 +207,17 @@ function ReportBody({ r }) {
         <>
           <Panel title="What happened to the flags" icon={ClipboardList}><FlagSplit r={r} /></Panel>
 
-          <Panel title="By rule">
+          <Panel title="By rule" icon={SlidersHorizontal}>
             <Breakdown title="Decisions by rule" first="Rule" rows={r.by_rule} label={(x) => ruleName(x.rule_type)} empty="No decisions." />
           </Panel>
-          <Panel title="By zone">
+          <Panel title="By zone" icon={Shapes}>
             <Breakdown title="Decisions by zone" first="Zone" rows={r.by_zone} label={(x) => x.zone} empty="No decisions." />
           </Panel>
-          <Panel title="By camera">
+          <Panel title="By camera" icon={Camera}>
             <Breakdown title="Decisions by camera" first="Camera" rows={r.by_camera} label={(x) => x.camera} empty="No decisions." />
           </Panel>
 
-          <Panel title="When" aside={`site time, ${tz}`}>
+          <Panel title="When" icon={Clock} aside={`site time, ${tz}`}>
             <div className="flex flex-col gap-4">
               <div>
                 <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint mb-1.5">By hour of the day (grey: decisions, red: flagged by system)</div>
@@ -234,7 +234,7 @@ function ReportBody({ r }) {
         </>
       )}
 
-      <Panel title="Helmet and vest">
+      <Panel title="Helmet and vest" icon={HardHat}>
         <Facts rows={[
           ['Checks that were fine', num(r.ppe.compliant)],
           ['Flagged by system', num(r.ppe.flagged)],
@@ -246,7 +246,7 @@ function ReportBody({ r }) {
         <p className="mt-2 text-[11px] text-ink-faint leading-relaxed">"Not seen" means the system found none. It is a potential violation until a person confirms it.</p>
       </Panel>
 
-      <Panel title="Time inside restricted zones">
+      <Panel title="Time inside restricted zones" icon={Timer}>
         <Facts rows={[
           ['Visits seen from start to finish', num(z.visits_timed)],
           ['Average time per visit (those)', secs(z.average_seconds)],
@@ -258,7 +258,7 @@ function ReportBody({ r }) {
         {z.by_zone.length > 0 && (
           <ul className="mt-3 text-xs text-ink-muted flex flex-col gap-1">
             {z.by_zone.map((x) => (
-              <li key={`${x.zone}-${z.by_zone.indexOf(x)}`} className="flex justify-between gap-3 border-t border-line/60 pt-1">
+              <li key={`${x.zone}-${z.by_zone.indexOf(x)}`} className="flex justify-between gap-3 border-t border-line-soft pt-1">
                 <span className="text-ink">{x.zone}</span>
                 <span className="tabular-nums text-right">
                   {x.visits} from start to finish (average {secs(x.average_seconds)}, longest {secs(x.max_seconds)})
@@ -273,7 +273,7 @@ function ReportBody({ r }) {
         </p>
       </Panel>
 
-      <Panel title="Man-down and head count">
+      <Panel title="Man-down and head count" icon={PersonStanding}>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <caption className="sr-only">Man-down and head-count incidents</caption>
@@ -285,7 +285,7 @@ function ReportBody({ r }) {
             </thead>
             <tbody>
               {[['Person lying still', m], ['Lone worker (fewer people than required)', lone], ['Over capacity (more people than allowed)', over]].map(([name, x]) => (
-                <tr key={name} className="border-t border-line/60">
+                <tr key={name} className="border-t border-line-soft">
                   <th scope="row" className="py-1.5 pr-3 font-medium text-ink text-left">{name}</th>
                   {[x.flagged, x.confirmed, x.dismissed, x.pending].map((v, i) => <td key={i} className="py-1.5 px-2 text-right tabular-nums text-ink-muted">{v}</td>)}
                 </tr>
@@ -296,7 +296,7 @@ function ReportBody({ r }) {
         <p className="mt-2 text-[11px] text-ink-faint">Could not verify: man-down {m.could_not_verify}, head count {r.occupancy.could_not_verify}.</p>
       </Panel>
 
-      <Panel title="Corrective actions">
+      <Panel title="Corrective actions" icon={Wrench}>
         <Facts rows={[
           ['Opened in this period', num(r.actions.opened)],
           ['Closed in this period', num(r.actions.closed)],
@@ -440,7 +440,7 @@ export default function ReportsScreen() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 border-t border-line/60 pt-3">
+          <div className="flex flex-col gap-2 border-t border-line-soft pt-3">
             <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint">Audit trail for a shift</div>
             <p className="text-xs text-ink-muted leading-relaxed">Every decision and zone event between two moments, in the order they happened. A shift is whichever period you choose here.</p>
             <div className="flex flex-wrap items-end gap-2">
@@ -471,7 +471,7 @@ export default function ReportsScreen() {
         {history.error && <Notice tone="error">{history.error}</Notice>}
         {!history.loading && !history.error && history.rows.length === 0 && <p className="text-xs text-ink-muted">No report has been made yet. The PDF and figures reports you download above are listed here.</p>}
         {history.rows.length > 0 && (
-          <ul className="flex flex-col divide-y divide-line/60 text-xs">
+          <ul className="flex flex-col divide-y divide-line-soft text-xs">
             {history.rows.map((h) => (
               <li key={h.id} className="py-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
                 <span className="font-mono text-ink-faint w-14">{h.format}</span>

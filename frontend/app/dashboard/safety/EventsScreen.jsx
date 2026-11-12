@@ -76,29 +76,29 @@ export default function EventsScreen({ role }) {
         ))}
       </div>
 
-      <div className="flex flex-wrap items-end gap-2 mb-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 items-end gap-2 mb-3">
         {tab === 'decisions' ? (
           <>
-            <label className="flex flex-col gap-1 text-[11px] text-ink-faint">Result
-              <select value={filters.status} onChange={(e) => set({ status: e.target.value })} className={INPUT}>{STATUS_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-            <label className="flex flex-col gap-1 text-[11px] text-ink-faint">Review
-              <select value={filters.reviewState} onChange={(e) => set({ reviewState: e.target.value })} className={INPUT}>{REVIEW_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+            <label className="flex flex-col gap-1 min-w-0 text-[11px] text-ink-faint">Result
+              <select value={filters.status} onChange={(e) => set({ status: e.target.value })} className={`${INPUT} w-full`}>{STATUS_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+            <label className="flex flex-col gap-1 min-w-0 text-[11px] text-ink-faint">Review
+              <select value={filters.reviewState} onChange={(e) => set({ reviewState: e.target.value })} className={`${INPUT} w-full`}>{REVIEW_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
           </>
         ) : (
-          <label className="flex flex-col gap-1 text-[11px] text-ink-faint">Activity
-            <select value={filters.eventType} onChange={(e) => set({ eventType: e.target.value })} className={INPUT}>{EVENT_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+          <label className="flex flex-col gap-1 min-w-0 text-[11px] text-ink-faint">Activity
+            <select value={filters.eventType} onChange={(e) => set({ eventType: e.target.value })} className={`${INPUT} w-full`}>{EVENT_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
         )}
-        <label className="flex flex-col gap-1 text-[11px] text-ink-faint">Zone
-          <select value={filters.zoneId} onChange={(e) => set({ zoneId: e.target.value })} className={INPUT}>
+        <label className="flex flex-col gap-1 min-w-0 text-[11px] text-ink-faint">Zone
+          <select value={filters.zoneId} onChange={(e) => set({ zoneId: e.target.value })} className={`${INPUT} w-full`}>
             <option value="">Any zone</option>
             {zones.map((z) => <option key={z.id} value={z.id}>{z.name}{z.camera ? ` (${z.camera})` : ''}</option>)}
           </select></label>
-        <label className="flex flex-col gap-1 text-[11px] text-ink-faint">From
-          <input type="date" value={filters.from} max={filters.to || undefined} onChange={(e) => set({ from: e.target.value })} className={INPUT} /></label>
-        <label className="flex flex-col gap-1 text-[11px] text-ink-faint">To
-          <input type="date" value={filters.to} min={filters.from || undefined} onChange={(e) => set({ to: e.target.value })} className={INPUT} /></label>
+        <label className="flex flex-col gap-1 min-w-0 text-[11px] text-ink-faint">From
+          <input type="date" value={filters.from} max={filters.to || undefined} onChange={(e) => set({ from: e.target.value })} className={`${INPUT} w-full`} /></label>
+        <label className="flex flex-col gap-1 min-w-0 text-[11px] text-ink-faint">To
+          <input type="date" value={filters.to} min={filters.from || undefined} onChange={(e) => set({ to: e.target.value })} className={`${INPUT} w-full`} /></label>
         {tab === 'decisions' && (
-          <button type="button" onClick={exportCsv} disabled={exporting && exporting.busy} className={`${BTN_QUIET} ml-auto`}>
+          <button type="button" onClick={exportCsv} disabled={exporting && exporting.busy} className={`${BTN_QUIET} col-span-2 md:col-span-1 xl:col-start-6 xl:justify-self-end`}>
             {exporting && exporting.busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Download className="w-3.5 h-3.5" aria-hidden="true" />} Export CSV
           </button>
         )}
@@ -115,7 +115,7 @@ export default function EventsScreen({ role }) {
       {!data.loading && !data.error && data.rows.length === 0 && <p className="text-xs text-ink-muted leading-relaxed">Nothing matches these filters.</p>}
 
       {tab === 'decisions' ? (
-        <ul className="flex flex-col divide-y divide-line/60" aria-label="Decisions, newest first">
+        <ul className="flex flex-col divide-y divide-line-soft" aria-label="Decisions, newest first">
           {data.rows.map((d) => {
             const isOpen = open === d.id;
             return (
@@ -138,7 +138,7 @@ export default function EventsScreen({ role }) {
           })}
         </ul>
       ) : (
-        <ul className="flex flex-col divide-y divide-line/60 text-xs" aria-label="Zone activity, newest first">
+        <ul className="flex flex-col divide-y divide-line-soft text-xs" aria-label="Zone activity, newest first">
           {data.rows.map((e) => {
             const d = describeZoneEvent({ event_type: e.eventType, worker_key: e.workerKey, details: e.details });
             const zone = zones.find((z) => z.id === e.zoneId);

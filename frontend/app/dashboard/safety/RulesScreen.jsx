@@ -237,7 +237,7 @@ export default function RulesScreen({ role }) {
         {state.error && <Notice tone="error">{state.error}</Notice>}
         {!state.loading && !state.error && state.rules.length === 0 && <p className="text-xs text-ink-muted leading-relaxed">No rules of your own yet, so the built-in helmet-and-vest check applies to every Restricted zone.</p>}
 
-        <ul className="flex flex-col divide-y divide-line/60" aria-label="Rules">
+        <ul className="flex flex-col divide-y divide-line-soft" aria-label="Rules">
           {state.rules.map((rule) => {
             const meta = ruleTypeMeta(rule.type);
             return (

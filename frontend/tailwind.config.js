@@ -12,6 +12,11 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Theme tokens as Tailwind colours, so border-*, divide-* and bg-* utilities exist for them
+        // (`divide-line` and `border-line/60` used to generate nothing and fell back to Tailwind's light grey,
+        // which showed as bright lines in dark mode).
+        line: 'var(--line)',
+        'line-soft': 'var(--line-soft)',
         brand: {
           dark: "#000000",
           card: "#FFFFFF",
