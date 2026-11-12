@@ -60,6 +60,9 @@ def main() -> None:
     ap.add_argument("--weights", default=str(WEIGHTS))
     ap.add_argument("--dataset", default=str(DATASET))
     ap.add_argument("--out", default=None)
+    ap.add_argument("--only", default=None,
+                    help="text file of image file names to keep (e.g. reports/ppe6_test_deduplicated.txt "
+                         "from check_leakage.py); others are skipped")
     args = ap.parse_args()
 
     from ultralytics import YOLO
@@ -67,6 +70,9 @@ def main() -> None:
     model = YOLO(args.weights)
     ds = Path(args.dataset)
     images = sorted((ds / args.split / "images").glob("*.*"))
+    if args.only:
+        keep = {l.strip() for l in Path(args.only).read_text(encoding="utf-8").splitlines() if l.strip()}
+        images = [i for i in images if i.name in keep]
     print(f"[INFO] {len(images)} images in {args.split}")
 
     # One pass at a very low conf; thresholds are applied afterwards.

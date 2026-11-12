@@ -1,0 +1,635 @@
+{
+  "method": "64-bit DCT perceptual hash, image and mirror image, Hamming distance",
+  "near_threshold": 6,
+  "close_threshold": 10,
+  "results": [
+    {
+      "summary": {
+        "name": "valB (held-out, the main result)",
+        "images": 100,
+        "compared_against": {
+          "fine-tune train (Construction-PPE)": 800,
+          "fine-tune train (PPE-6)": 1600,
+          "base model train (PPE-6 train)": 4428
+        },
+        "identical (0)": 0,
+        "near-duplicate (<= 6)": 1,
+        "close, worth a look (<= 10)": 1,
+        "median distance to the closest training image": 16.0
+      },
+      "closest_20": [
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\source-9e10b0409f922546c35b276eb5a5756e.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\source-efc23273c04e007083114c0f217335f0.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 6,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-223.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\r119_jpg.rf.1c73e43113b772721fa7e4967681b755.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 12,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-425.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\67_png_jpg.rf.0ac4e03b9d6f8b231187c9bd5dc0376c.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 12,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-447.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\Video3_45_jpg.rf.9175e3ee266eda6863a0137c7a758996.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 12,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-573.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\Video2_48_jpg.rf.d3b051a65d56682c8ddcd4d4da4e55f5.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 12,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-697.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\r13_jpg.rf.36ead3634ed26528a349722a763ef7a3.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 12,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-699.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\325_png_jpg.rf.c7c0c8c9342cbcc042a4676bb4ad93f2.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 12,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\source-150feca69395fa769adccdc8e157e935.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\images-2022-07-04T013729_jpg.rf.ccbeebd1349069629171e5b7ed9d969d.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\source-7d7efb1f8ffa163b8633ef84992a0bb7.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\construction-work-mp4-frame-170_jpg.rf.a3565a2d1642cb1f9568e594595dc57f.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 14,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\source-884ce8ac82984a62565821b150882347.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\source-74c0b473923339bf2a5d512cfb73b63c.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\source-ca41ff5d10bb701e0976d54c8acd58d6.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\KakaoTalk_20221018_001425789_23_jpg.rf.765b64a1c29eaaa5b3093b5cc6124a18.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 14,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-071.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\ultralytics-ppe-nov2026-129.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-121.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\ultralytics-ppe-nov2026-420.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-149.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\construction-work-mp4-frame-36_jpg.rf.e1d7bac9aa9e76200d1c7208540eb938.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 14,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-249.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\Video4_41_jpg.rf.a0121b8f02648a0b13e56a8e1dd9e624.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-271.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\Video3_20_jpg.rf.d6a1df922fec6442f1aecbad2adf7c64.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-275.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\image_198_jpg.rf.c78cad211c91a66ea8d6e72474a463e6.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-397.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\414_png_jpg.rf.23714a4191fbefa52514c98bd4b23a32.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 14,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-499.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\images-2022-07-04T013055-1-_jpg.rf.01938200b49288b7c86458228b21df62.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 14,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valB\\ultralytics-ppe-nov2026-547.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\Video3_158_jpg.rf.d51517edcd9cb60101ed3e2cf245ac97.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 14,
+          "mirrored": false
+        }
+      ]
+    },
+    {
+      "summary": {
+        "name": "valA (used to choose the fine-tuned model)",
+        "images": 100,
+        "compared_against": {
+          "fine-tune train (Construction-PPE)": 800,
+          "fine-tune train (PPE-6)": 1600,
+          "base model train (PPE-6 train)": 4428
+        },
+        "identical (0)": 0,
+        "near-duplicate (<= 6)": 0,
+        "close, worth a look (<= 10)": 0,
+        "median distance to the closest training image": 16.0
+      },
+      "closest_20": [
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\source-ce9bda3a2d92dbfcd2a2256b6d8e17f4.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\Video4_60_jpg.rf.2988c67cabc6bd68e58c912346a6a6ec.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 12,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\ultralytics-ppe-nov2026-074.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\Video1_29_jpg.rf.5a7a25f02c04da8ec4b8d4e398905c79.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 12,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\source-5ddf92ab1c7359b8db38cb868a5d2961.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\Video3_286_jpg.rf.5894bb99db9eb037a206d953fc8375b3.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 14,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\source-d3bebfae725c4105a5c7233da9440b24.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\Video3_271_jpg.rf.17a9090e299615c41652a1968a61d051.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\ultralytics-ppe-nov2026-096.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\source-a50e703435d59ea2b4c4177dfda28ae4.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\ultralytics-ppe-nov2026-146.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\ultralytics-ppe-nov2026-378.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\ultralytics-ppe-nov2026-148.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\858_png_jpg.rf.f68d5841e04faa59652da67978258cdf.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\ultralytics-ppe-nov2026-300.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\ultralytics-ppe-nov2026-655.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\ultralytics-ppe-nov2026-374.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\ultralytics-ppe-nov2026-442.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\ultralytics-ppe-nov2026-600.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\ultralytics-ppe-nov2026-159.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\ultralytics-ppe-nov2026-646.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\ultralytics-ppe-nov2026-487.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\ultralytics-ppe-nov2026-672.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\ultralytics-ppe-nov2026-160.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\source-00f1fbfd9c8193a3c5a071512cf8c0a7.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\ultralytics-ppe-nov2026-015.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 16,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\source-485eb05877af0e242d34e297d390c7cd.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\images-29-_jpg.rf.a7021a40f9d7f9f67c39f21f213cbcc7.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 16,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\source-6af78fcdef2424c52bcfefc5f4cf220d.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\Aitin0586_jpg.rf.938cbf898aea107971a61cfe36b778e3.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 16,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\source-6f3ca58e9c68013699ea32f8af0ceef9.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\ultralytics-ppe-nov2026-663.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 16,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\source-7721c50dc1f5f6aeb19990a9916e863c.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\images-2022-07-04T013653_jpg.rf.679912202da9aa4a2d416f4f6bed48b7.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 16,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\source-801ff8c7ea69847ba9cc5dcfb4df1892.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\images-2022-07-04T013641_jpg.rf.bea50b0289d3e1230ef3ad69f4667d3c.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 16,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\source-8497dd5065ce426e2d223085b4a773a0.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\image_180_jpg.rf.6247bd739036ed8055dd9b77e6aff93f.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 16,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe_finetune\\images\\valA\\source-a8c726058fc542d983d5eb9427f86f09.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\20220621_132901_jpg.rf.6893167b1c0abf968d513dae0caf77ff.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 16,
+          "mirrored": true
+        }
+      ]
+    },
+    {
+      "summary": {
+        "name": "Construction-PPE val, all 200",
+        "images": 200,
+        "compared_against": {
+          "fine-tune train (Construction-PPE)": 800,
+          "fine-tune train (PPE-6)": 1600,
+          "base model train (PPE-6 train)": 4428
+        },
+        "identical (0)": 0,
+        "near-duplicate (<= 6)": 1,
+        "close, worth a look (<= 10)": 1,
+        "median distance to the closest training image": 16.0
+      },
+      "closest_20": [
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\source-9e10b0409f922546c35b276eb5a5756e.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\source-efc23273c04e007083114c0f217335f0.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 6,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\source-ce9bda3a2d92dbfcd2a2256b6d8e17f4.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\Video4_60_jpg.rf.2988c67cabc6bd68e58c912346a6a6ec.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 12,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\ultralytics-ppe-nov2026-074.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\Video1_29_jpg.rf.5a7a25f02c04da8ec4b8d4e398905c79.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 12,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\ultralytics-ppe-nov2026-223.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\r119_jpg.rf.1c73e43113b772721fa7e4967681b755.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 12,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\ultralytics-ppe-nov2026-425.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\67_png_jpg.rf.0ac4e03b9d6f8b231187c9bd5dc0376c.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 12,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\ultralytics-ppe-nov2026-447.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\Video3_45_jpg.rf.9175e3ee266eda6863a0137c7a758996.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 12,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\ultralytics-ppe-nov2026-573.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\Video2_48_jpg.rf.d3b051a65d56682c8ddcd4d4da4e55f5.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 12,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\ultralytics-ppe-nov2026-697.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\r13_jpg.rf.36ead3634ed26528a349722a763ef7a3.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 12,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\ultralytics-ppe-nov2026-699.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\325_png_jpg.rf.c7c0c8c9342cbcc042a4676bb4ad93f2.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 12,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\source-150feca69395fa769adccdc8e157e935.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\images-2022-07-04T013729_jpg.rf.ccbeebd1349069629171e5b7ed9d969d.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\source-5ddf92ab1c7359b8db38cb868a5d2961.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\Video3_286_jpg.rf.5894bb99db9eb037a206d953fc8375b3.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 14,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\source-7d7efb1f8ffa163b8633ef84992a0bb7.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\construction-work-mp4-frame-170_jpg.rf.a3565a2d1642cb1f9568e594595dc57f.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 14,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\source-884ce8ac82984a62565821b150882347.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\source-74c0b473923339bf2a5d512cfb73b63c.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\source-ca41ff5d10bb701e0976d54c8acd58d6.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\KakaoTalk_20221018_001425789_23_jpg.rf.765b64a1c29eaaa5b3093b5cc6124a18.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 14,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\source-d3bebfae725c4105a5c7233da9440b24.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\Video3_271_jpg.rf.17a9090e299615c41652a1968a61d051.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\ultralytics-ppe-nov2026-071.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\ultralytics-ppe-nov2026-129.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\ultralytics-ppe-nov2026-096.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\source-a50e703435d59ea2b4c4177dfda28ae4.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\ultralytics-ppe-nov2026-121.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\ultralytics-ppe-nov2026-420.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\ultralytics-ppe-nov2026-146.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_construction\\ultralytics-ppe-nov2026-378.jpg",
+          "closest_set": "fine-tune train (Construction-PPE)",
+          "distance": 14,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\construction_ppe\\images\\val\\ultralytics-ppe-nov2026-148.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\858_png_jpg.rf.f68d5841e04faa59652da67978258cdf.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 14,
+          "mirrored": false
+        }
+      ]
+    },
+    {
+      "summary": {
+        "name": "PPE-6 public test split (per-class numbers, \u00a78.3)",
+        "images": 213,
+        "compared_against": {
+          "fine-tune train (Construction-PPE)": 800,
+          "fine-tune train (PPE-6)": 1600,
+          "base model train (PPE-6 train)": 4428
+        },
+        "identical (0)": 43,
+        "near-duplicate (<= 6)": 89,
+        "close, worth a look (<= 10)": 113,
+        "median distance to the closest training image": 10.0
+      },
+      "closest_20": [
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\755_png_jpg.rf.f0fa5f0b2f9960050260dd55f2a6c770.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\623_png_jpg.rf.ea5b1c624028f7c4042c6e5694ec2091.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\932_png_jpg.rf.aaf59d19a273dace6a4eb822e7b77379.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\721_png_jpg.rf.f8d2aa38d5591aff7c269bb004360d20.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\988_png_jpg.rf.46c973b43166b1226648ccf62ab129f9.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\103_png_jpg.rf.235e787eadffc6e8685dc353a29ea21a.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\AightOne0869_jpg.rf.222428c8938c42ef14bc9542b3b25f14.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\AightOne0873_jpg.rf.7d0d1f963ebe247fd7af35285a686e92.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\Aitin0586_jpg.rf.886e79ea7317e60b4e7eac6347fbfc7e.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\Aitin0586_jpg.rf.938cbf898aea107971a61cfe36b778e3.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\Aitin0907_jpg.rf.2194b3c00809395190067782e7201929.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\Aitin0908_jpg.rf.5a52839110d27ace74fa3e64616f40c8.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\TsirinOne0031_jpg.rf.b509798bf6a4e26809b32d795c3dabb3.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\TsirinOne0033_jpg.rf.eabfc0337c5536891a6ed84a7de641dd.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\TsirinTu0047_jpg.rf.566a801216151e960d3ffce017eed5d0.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\TsirinTu0048_jpg.rf.d9a24d22c46c3be2cf610257854be3fb.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\image_150_jpg.rf.0c9a90ce65b3047b85ad8c36edfabe91.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\image_150_jpg.rf.b1152c9ab28074de77aadc7a67a47578.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\image_150_jpg.rf.f711e1c14770d59f6e13718182ef41fb.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\image_150_jpg.rf.70706cf0040481dab7a7c0885b77ddcb.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 0,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\image_153-1-_jpg.rf.1702d00c7081a4bbabf771d9f73af8ec.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\image_153-1-_jpg.rf.a3863414b00284677a2059aaa23e9be1.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\image_153_jpg.rf.1dcde63ed3a5fcf2a5b51d007a42394e.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\image_153_jpg.rf.52661514702b74e7fb161050831e0d3f.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\image_154_jpg.rf.cf9580176c2be1b31bcc821fcf0a3e5a.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\image_154_jpg.rf.c5be443de89a39d5c3edab8cdea960b5.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\image_156_jpg.rf.367d5021dd76f3fbe43f9b0d4b76359a.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\image_164_jpg.rf.7853167d0be526cc73c3569555b14953.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\image_156_jpg.rf.51378900adddfc53fa69aa86851fc3c2.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\image_164_jpg.rf.7853167d0be526cc73c3569555b14953.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\image_156_jpg.rf.9452bb09db2d76aca6aa53be6f42b0ff.jpg",
+          "closest": "datasets\\ppe6_roboflow\\train\\images\\image_156_jpg.rf.0c3ffdd22f6debb71f6fe4b330ffbe31.jpg",
+          "closest_set": "base model train (PPE-6 train)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\image_158_jpg.rf.48a5b2e551806268f65c433f2aa33a9a.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\image_163_jpg.rf.eaa7fbeb2a55b412696f53bc7c6a86d4.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 0,
+          "mirrored": false
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\image_158_jpg.rf.491a79bad96475221f4dbb974bece286.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\image_164_jpg.rf.5ea50d4a6e724adb3862ee14f70c7be1.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 0,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\image_158_jpg.rf.63355136098366e23452cc126cb05704.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\image_164_jpg.rf.5ea50d4a6e724adb3862ee14f70c7be1.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 0,
+          "mirrored": true
+        },
+        {
+          "image": "datasets\\ppe6_roboflow\\test\\images\\image_158_jpg.rf.fd5de87c8c0ac9cb7d3493377aa33748.jpg",
+          "closest": "datasets\\ppe_finetune\\images\\train_ppe6\\image_163_jpg.rf.eaa7fbeb2a55b412696f53bc7c6a86d4.jpg",
+          "closest_set": "fine-tune train (PPE-6)",
+          "distance": 0,
+          "mirrored": false
+        }
+      ]
+    }
+  ]
+}

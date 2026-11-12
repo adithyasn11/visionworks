@@ -100,6 +100,23 @@ def main():
                f"{all_set['results']['both items']['ours']['false_accusation']} false accusations of {all_set['results']['both items']['ours']['worn']}, per-frame "
                f"{all_set['results']['both items']['B0 per-frame']['false_accusation']}, majority {all_set['results']['both items']['B1 majority vote']['false_accusation']}.", ""]
 
+    leak = load("ppe_training", "reports", "LEAKAGE_CHECK.json")
+    if leak:
+        by = {r["summary"]["name"].split(" (")[0]: r["summary"] for r in leak["results"]}
+        near, close = leak["near_threshold"], leak["close_threshold"]
+        vb, pub = by.get("valB"), by.get("PPE-6 public test split")
+        md += ["### Train / test overlap", ""]
+        para = []
+        if vb:
+            para += [f"Every valB image was compared with every image the model was trained on (perceptual hash, also mirrored; `ppe_training/check_leakage.py`): "
+                   f"{vb['identical (0)']} identical, {vb[f'near-duplicate (<= {near})']} near-duplicate of {vb['images']}; the one close pair is the same gate camera with a different person, "
+                   "so the result above is not inflated by copied pictures."]
+        if pub:
+            para += [f" The public PPE-6 test split behind the earlier per-class detector numbers is not clean: {pub['identical (0)']} of its {pub['images']} images are identical to a "
+                   f"training image and {pub[f'near-duplicate (<= {near})']} are near-duplicates (frames of the same videos). Measured again without them, helmet precision at confidence 0.35 "
+                   "falls from about 0.83 to about 0.68 (fewer than 35 helmets left, so a rough figure); the full table is in `ppe_training/reports/LEAKAGE_CHECK.md`."]
+        md += ["".join(para), ""]
+
     # ── B ──
     md += ["## 2. Scenarios through the real engine (§14.B)", ""]
     if not scen:

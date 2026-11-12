@@ -276,6 +276,8 @@ Each feature below lists: **purpose, how it works, inputs/outputs, depends on, e
   | Validation (425 images) | 0.92 / 0.94 | 0.90 / 0.93 | 0.87 / 0.93 |
 
   mAP50 on validation 0.894 (helmet 0.962, vest 0.967). Inference ≈ 14 ms/image on the project GPU.
+
+  **These public-split numbers are optimistic** (leakage check, `ppe_training/check_leakage.py` → `ppe_training/reports/LEAKAGE_CHECK.md`): 43 of the 213 test images are identical to a training image and 89 are near-duplicates (frames of the same videos). Without the 89, the same model at 0.35 gives helmet 0.68 / 0.88, vest 0.84 / 0.85, person 0.77 / 0.88 (124 images, 34 helmets: rough). The production model (`ppe_yolov8m_ft1`) is judged on the held-out Construction-PPE valB set instead, which has no copied pictures (§14, Step 17).
 - **Known limits:** trained on photos resized to 640×640 by stretching; not yet measured on our own cameras (see §14); roughly one in six detections is spurious.
 - **If our own footage shows weak numbers:** fine-tune with a few hundred frames labelled from our own cameras and re-measure. Not needed unless the footage test says so.
 - **Depends on:** F1.
@@ -725,7 +727,7 @@ Record one worker per ~10 s segment: fully equipped, no helmet, no vest, neither
 - **Report:** per-frame recall and false-detection rate per item; per-segment verdict vs truth (correct / abstained / **false accusation** / **false compliance**).
 - **How to state zero:** "0 false accusations in N segments" is reported with its 95% upper bound by the rule of three (≤ 3/N; e.g. N = 360 non-violation segments → ≤ 0.83%), never as a bare "0%".
 - **Targets:** false accusations and false compliance 0 in N (with the bound); abstention rate reported, not hidden.
-- **Check the public test split for leakage:** Roboflow exports can put near-duplicate frames in train and test. Compute perceptual hashes across splits and report the number of near-duplicates; if many, re-state the public numbers on the de-duplicated test set.
+- **Check the public test split for leakage:** Roboflow exports can put near-duplicate frames in train and test. Compute perceptual hashes across splits and report the number of near-duplicates; if many, re-state the public numbers on the de-duplicated test set. *(Done: 89 of 213 near-duplicates; re-stated in §8.3; `ppe_training/reports/LEAKAGE_CHECK.md`.)*
 
 **B. Zone events and rules** — scripted walks through the real zone layout:
 
@@ -2326,23 +2328,26 @@ Each ✘ is a test that must fail with a permission or RLS error, and each ✔ a
 
 ## 25. Final checklist before calling the project done
 
+*Status checked against the repository on 12 Nov 2026, after Step 18. A box is ticked only when the thing is done and recorded; partly done items stay open with what is missing.*
+
 **Build (by tier, §4)**
-- [ ] T1 complete: R1 end to end, SQLite persistence, face-only-blur snapshots, review screen
-- [ ] T2 complete: Postgres + RLS matrix passes, sync, alerts, dashboard, R3, man-down, CSV report
-- [ ] T3 items done or explicitly listed as future work
+- [x] T1 complete: R1 end to end, SQLite persistence, face-only-blur snapshots, review screen (Steps 0–6, 9, 12)
+- [x] T2 complete: Postgres + RLS matrix passes, sync, alerts, dashboard, R3, man-down, CSV report (Steps 7, 8, 10–14, 16)
+- [x] T3 items done or explicitly listed as future work (R2, R4, lone worker / occupancy, corrective actions, rule editor and PDF are built; Opt-A–C are not built and are future work)
 
 **Evidence (never cut)**
-- [ ] Own-footage PPE results with N, hard cases and rule-of-three bounds (§14.A); public-split leakage checked
-- [ ] Baseline B0 / B1 vs ours table and error-vs-coverage plot (§14.G); thresholds justified from it
-- [ ] Scenario suite S1–S10 results documented, including abstentions
-- [ ] Man-down and occupancy results recorded with the tested camera placement
-- [ ] Review loop run; human-judged precision and dismissal reasons recorded
-- [ ] Corrective-action loop shown end to end: confirm → create action → close; overdue count visible
-- [ ] FPS and alert latency recorded
-- [ ] `SAFETY_ENABLED=false` still behaves like the old product; all old tests pass
-- [ ] README and `docs/DOCUMENTATION.md` updated; `.env.example` complete
-- [ ] Demo rehearsed three times; fallback clips ready
-- [ ] Volunteer consent forms signed and stored; recordings deleted on the stated date
+- [ ] Own-footage PPE results with N, hard cases and rule-of-three bounds (§14.A). *Not recorded; the held-out Construction-PPE valB segments stand in for it and the evaluation says so.*
+- [x] Public-split leakage checked (`LEAKAGE_CHECK.md`: the PPE-6 test split has 89 of 213 near-duplicates and its numbers are re-stated in §8.3; valB has none)
+- [x] Baseline B0 / B1 vs ours table and error-vs-coverage plot (§14.G); thresholds justified from it (on valB, not own footage)
+- [x] Scenario suite S1–S10 results documented, including abstentions (270 of 270 runs)
+- [ ] Man-down and occupancy results recorded with the tested camera placement. *Occupancy: checked by eye on two clips (Step 15). Man-down: only scripted falls; no recorded falls or hard negatives (§14.C).*
+- [ ] Review loop run; human-judged precision and dismissal reasons recorded (§14.F). *Not run.*
+- [ ] Corrective-action loop shown end to end: confirm → create action → close; overdue count visible. *Built and tested; creating an action and the overdue badge were shown on screen in Step 12; show the close in the demo rehearsal.*
+- [ ] FPS and alert latency recorded. *FPS recorded (13.7–34 on the RTX 4060). Latency only to the decision (one frame); the time until the Review screen shows it was not measured.*
+- [x] `SAFETY_ENABLED=false` still behaves like the old product; all old tests pass (Step 18)
+- [x] README and `docs/DOCUMENTATION.md` updated; `.env.example` complete (Step 18)
+- [ ] Demo rehearsed three times; fallback clips ready. *Runbook and preflight exist (`docs/DEMO_RUNBOOK.md`); rehearsals and clips not done.*
+- [ ] Volunteer consent forms signed and stored; recordings deleted on the stated date. *No recordings of people made yet.*
 
 **Thesis / report**
 - [ ] Literature survey (15–25 papers: PPE detection, PPE-to-worker association, selective classification / reject option, fall detection from pose, privacy in video analytics) and a comparison table with existing work and commercial products

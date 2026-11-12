@@ -59,6 +59,10 @@ Below 90 px tall nobody can be judged reliably: the per-frame and majority syste
 
 **A larger, slightly less clean set.** On all 200 validation images (924 segments; half of them were used to pick the training epoch): ours 9 false accusations of 623, per-frame 53, majority 70.
 
+### Train / test overlap
+
+Every valB image was compared with every image the model was trained on (perceptual hash, also mirrored; `ppe_training/check_leakage.py`): 0 identical, 1 near-duplicate of 100; the one close pair is the same gate camera with a different person, so the result above is not inflated by copied pictures. The public PPE-6 test split behind the earlier per-class detector numbers is not clean: 43 of its 213 images are identical to a training image and 89 are near-duplicates (frames of the same videos). Measured again without them, helmet precision at confidence 0.35 falls from about 0.83 to about 0.68 (fewer than 35 helmets left, so a rough figure); the full table is in `ppe_training/reports/LEAKAGE_CHECK.md`.
+
 ## 2. Scenarios through the real engine (§14.B)
 
 Each scenario ran 18 times, at 10, 15 and 25 frames a second, with its timing and positions varied, through `SafetySession`: the zone tracker, the rule engine, the PPE evidence layer, man-down, the head count and the writer into a real SQLite file; every outcome is read back from that file. What the models see is scripted (boxes, zones, items, poses), so this measures the logic, not the models' eyes. S1n to S3n replace the perfect detector with the PPE model's measured per-frame error rates on clear frames (independent from frame to frame; correlated errors are what section 1 measures).
