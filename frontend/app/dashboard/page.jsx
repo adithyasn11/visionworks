@@ -31,6 +31,7 @@ import ReportsScreen from './safety/ReportsScreen';
 import EvaluationScreen from './evaluation/EvaluationScreen';
 import PlanSection from './PlanSection';
 import CamerasScreen from './CamerasScreen';
+import { Skeleton } from './safety/common';
 import { listCameras } from '../lib/platform/cameras';
 import { VideoCanvasPlayer } from '../components/VideoCanvasPlayer';
 import { FloorplanHeatmap } from '../components/FloorplanHeatmap';
@@ -335,12 +336,14 @@ function DashboardInner() {
       type="button"
       onClick={refreshOverview}
       disabled={refreshing}
+      aria-label="Refresh"
       className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3.5 py-2 text-[12.5px] font-bold text-ink-muted hover:text-ink hover:border-field transition-colors disabled:opacity-50"
     >
       {refreshing
         ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
         : <RefreshCw className="w-3.5 h-3.5" />}
-      Refresh
+      {/* Icon only on a phone, so the range picker and this fit one row without spilling past the edge. */}
+      <span className="hidden sm:inline">Refresh</span>
     </button>
   );
 
@@ -358,11 +361,11 @@ function DashboardInner() {
   return (
     <DashboardShell view={view} onViewChange={setView} user={user} role={role} alertCount={alerts.count} overdueCount={overdue}>
       {view === 'overview' && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-view-in">
           <PageHeader
             eyebrow="Site overview"
             title={`Site safety, ${rangeLabel}`}
-            subtitle="What needs a person first, then how the site did. Every flag is a prompt for a person to judge, and nothing is a final verdict until someone decides. No video or names are stored."
+            subtitle="What needs a person first, then how the site did."
             action={overviewActions}
           />
 
@@ -387,15 +390,15 @@ function DashboardInner() {
           back. The cleanup still fires when the DASHBOARD unmounts, so
           leaving for another page or signing out still releases the
           camera properly. */}
-      <div className={view === 'live' ? 'block' : 'hidden'} aria-hidden={view !== 'live'}>
+      <div className={view === 'live' ? 'block animate-view-in' : 'hidden'} aria-hidden={view !== 'live'}>
         <div className="space-y-6">
           <PageHeader
             eyebrow="Live feed"
             title="Camera & detection"
             subtitle={
               can(role, 'analysis.run')
-                ? 'Upload a recording or start the camera. People are detected and tracked on your own hardware, and the zones drawn for this camera are outlined on the frame.'
-                : 'Live detection and tracking, as recorded for your organisation. Starting an analysis writes new measurements, which your role does not permit.'
+                ? 'Upload a recording or start the camera. This camera’s zones are outlined on the frame.'
+                : 'Live detection for your organisation. Your role can watch but not start a run.'
             }
             action={cameraPicker}
           />
@@ -415,39 +418,39 @@ function DashboardInner() {
       </div>
 
       {view === 'review' && (
-        <div className="space-y-6">
-          <PageHeader eyebrow="Review" title="Flags waiting for a person" subtitle="Each flag is a prompt to look at the evidence and judge it. Confirm it if it was real, dismiss it if it was not; nothing here is a final verdict until someone decides." />
+        <div className="space-y-6 animate-view-in">
+          <PageHeader eyebrow="Review" title="Flags waiting for a person" subtitle="Look at the evidence, then confirm or dismiss each flag." />
           <ReviewQueue role={role} onCountChange={loadAlerts} />
         </div>
       )}
 
       {view === 'events' && (
-        <div className="space-y-6">
-          <PageHeader eyebrow="Events" title="What the safety layer decided and saw" subtitle="Every decision with its reason, filterable by result, review state, zone and date, and the zone activity behind them." />
+        <div className="space-y-6 animate-view-in">
+          <PageHeader eyebrow="Events" title="What the safety layer decided and saw" subtitle="Every decision and zone visit, with filters." />
           <EventsScreen role={role} />
         </div>
       )}
 
       {view === 'rules' && (
-        <div className="space-y-6">
-          <PageHeader eyebrow="Rules" title="What gets checked" subtitle="The checks your site runs, where, and how serious each one is. Changes apply from the next run of a camera." />
+        <div className="space-y-6 animate-view-in">
+          <PageHeader eyebrow="Rules" title="What gets checked" subtitle="What is checked, where, and how serious it is." />
           <RulesScreen role={role} />
         </div>
       )}
 
       {view === 'actions' && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-view-in">
           <PageHeader eyebrow="Actions" title="What was done about confirmed violations" subtitle="Who is doing what, by when, and whether it is overdue." />
           <ActionsScreen role={role} onCountChange={loadAlerts} />
         </div>
       )}
 
       {view === 'cameras' && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-view-in">
           <PageHeader
             eyebrow="Cameras"
             title="Your cameras"
-            subtitle="Each camera has its own zones and its own history. A run's decisions reach Review, Events and Reports only when it runs on a camera registered here."
+            subtitle="Each camera has its own zones and history. Only registered cameras reach the dashboard."
           />
           <CamerasScreen
             role={role}
@@ -462,14 +465,14 @@ function DashboardInner() {
       )}
 
       {view === 'zones' && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-view-in">
           <PageHeader
             eyebrow="Zones"
             title="Define your zones"
             subtitle={
               can(role, 'zones.edit')
-                ? 'Draw the areas you want monitored, on the camera they belong to. A zone is a region of ONE camera’s view — it means nothing in another’s.'
-                : 'The areas being monitored. Each person is attributed to whichever zone they are standing in.'
+                ? 'Draw the areas to monitor on this camera’s view.'
+                : 'The areas being monitored on this camera.'
             }
             action={cameraPicker}
           />
@@ -495,7 +498,7 @@ function DashboardInner() {
           `role` is null until it resolves, so this reads false during load and
           the panel never flashes in before disappearing. */}
       {view === 'plan' && can(role, 'org.settings') && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-view-in">
           <PageHeader
             eyebrow="Plan"
             title="Your subscription"
@@ -515,11 +518,8 @@ function DashboardInner() {
           ) : (
             /* `min-h` roughly matches the resolved panel, so the page does not
                collapse to a thin strip and then jump when the plan arrives. */
-            <div className="glass-panel p-6 flex items-center justify-center gap-3 min-h-[220px]">
-              <Loader2 className="w-4 h-4 animate-spin text-ink-faint" aria-hidden="true" />
-              <span className="text-[13px] font-medium text-ink-muted">
-                Loading your plan…
-              </span>
+            <div className="glass-panel p-6 min-h-[220px]">
+              <Skeleton rows={5} label="Loading your plan" />
             </div>
           )}
         </div>
@@ -529,7 +529,7 @@ function DashboardInner() {
           explanation rather than an empty column. Only rendered once `role` is
           known, so it does not flash for an admin mid-load. */}
       {view === 'plan' && role && !can(role, 'org.settings') && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-view-in">
           <PageHeader
             eyebrow="Plan"
             title="Your subscription"
@@ -540,22 +540,22 @@ function DashboardInner() {
       )}
 
       {view === 'evaluation' && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-view-in">
           <PageHeader
             eyebrow="Evaluation"
             title="How well the system works, measured"
-            subtitle="The measured results: how often it would wrongly flag someone, how often it says it cannot tell, the scenario suite, speed on real video, and what your reviewers have decided so far."
+            subtitle="The measured results: accuracy, scenarios, speed and your reviews."
           />
           <EvaluationScreen />
         </div>
       )}
 
       {view === 'reports' && (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-view-in">
           <PageHeader
             eyebrow="Reports"
             title="Safety reports"
-            subtitle="How the site did over a period: what was flagged, what people confirmed or dismissed, and what the system could not tell. Download it as a PDF or CSV."
+            subtitle="How the site did over a period, as a PDF or CSV."
           />
           <ReportsScreen />
         </div>

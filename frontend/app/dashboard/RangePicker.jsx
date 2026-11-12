@@ -40,7 +40,7 @@ export default function RangePicker({ value, onChange, coverage, busy = false })
 
   return (
     <div className="flex items-center gap-2">
-      <CalendarRange className="w-3.5 h-3.5 text-ink-faint shrink-0" aria-hidden="true" />
+      <CalendarRange className="hidden sm:block w-3.5 h-3.5 text-ink-faint shrink-0" aria-hidden="true" />
       <div
         role="group"
         aria-label="Date range"

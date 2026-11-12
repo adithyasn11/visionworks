@@ -175,7 +175,7 @@ export const FloorplanHeatmap = () => {
     : state.status === 'error' ? { kind: 'error', message: state.error }
     : !hasPoints ? {
         kind: 'empty',
-        message: 'No positions recorded yet. Process a video or start the live camera — detected people appear here as where they were seen.',
+        message: 'No positions yet. Run a video or start the camera.',
       }
     : null;
 

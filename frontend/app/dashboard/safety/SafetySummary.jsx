@@ -10,7 +10,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { getSummary } from '../../lib/safetyApi';
-import { Notice, Panel } from './common';
+import { Notice, Panel, Skeleton } from './common';
 
 function Tile({ label, value, hint, strong }) {
   return (
@@ -43,9 +43,9 @@ export default function SafetySummary({ days, refreshKey }) {
 
   return (
     <Panel title="Safety" icon={ShieldCheck} aside={label}>
-      {state.loading && !d && <p className="flex items-center gap-2 text-xs text-ink-muted"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Loading…</p>}
+      {state.loading && !d && <Skeleton rows={3} label="Loading" />}
       {state.error && <Notice tone="error">{state.error}</Notice>}
-      {d && d.total === 0 && <p className="text-xs text-ink-muted leading-relaxed">No safety decisions were saved in {label}. Decisions appear here once a run on a registered camera has been saved.</p>}
+      {d && d.total === 0 && <p className="text-xs text-ink-muted leading-relaxed">No safety decisions in {label} yet.</p>}
       {d && d.total > 0 && (
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">

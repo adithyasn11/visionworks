@@ -454,7 +454,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
        No `onViewChange` is passed, which puts the shell in routed mode: the
        section nav becomes links back to /dashboard instead of view switches. */
     <DashboardShell user={viewer} role={state.viewerRole ?? initialRole}>
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-3xl animate-view-in">
 
         {/* Same page header as the dashboard screens (eyebrow, title, line of context, rule underneath). */}
         <header className="flex flex-col gap-2 pb-5 mb-7 border-b border-line">
@@ -465,8 +465,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
             Members
           </h1>
           <p className="text-[13.5px] text-ink-muted leading-relaxed max-w-2xl">
-            Everyone who can reach this organisation’s data. Roles decide what they can
-            change — safety data is visible to every member, and to nobody outside.
+            Everyone who can see this organisation’s safety data, and what each person can change.
           </p>
         </header>
 

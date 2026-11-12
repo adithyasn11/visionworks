@@ -20,7 +20,7 @@ import { durationText } from '../../lib/safety/ruleTypes';
 import EvidencePicture from '../../components/EvidencePicture';
 import {
   BTN_PRIMARY, BTN_QUIET, INPUT, Notice, ReviewChip, REVIEW_REASONS, SeverityChip, StatusChip,
-  confidenceText, fmtDate, fmtTime, reasonLabel,
+  confidenceText, fmtDate, fmtTime, reasonLabel, Skeleton
 } from './common';
 
 const ITEM_NAMES = { helmet: 'Helmet', safety_vest: 'Safety vest' };
@@ -347,7 +347,7 @@ export default function DecisionDetail({ decisionId, role, onChanged }) {
   }, [decisionId]);
   useEffect(() => { loadActions(); }, [loadActions]);
 
-  if (state.loading) return <p className="flex items-center gap-2 py-3 text-xs text-ink-muted"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Loading the details…</p>;
+  if (state.loading) return <Skeleton rows={3} label="Loading the details" />;
   if (state.error) return <Notice tone="error">{state.error}</Notice>;
 
   const flag = decision.status !== 'COMPLIANT';

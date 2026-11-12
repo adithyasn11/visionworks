@@ -95,6 +95,49 @@ export const BTN_PRIMARY = `${BTN} bg-accent text-white border-[color:var(--acce
 export const BTN_QUIET = `${BTN} bg-surface-alt text-ink-muted border-line hover:text-ink hover:border-field`;
 export const INPUT = 'rounded-lg bg-ground border border-line px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:outline-none focus:border-[color:var(--accent)] transition-colors';
 
+/**
+ * Placeholder while a panel's data loads: grey bars in the shape of what is coming, with a soft shimmer
+ * (globals.css .skeleton), instead of a spinner and the word "Loading". `label` is read by screen readers.
+ */
+export function Skeleton({ rows = 3, label = 'Loading', className = '' }) {
+  const widths = ['w-11/12', 'w-4/5', 'w-2/3', 'w-3/4', 'w-1/2'];
+  return (
+    <div role="status" aria-live="polite" aria-busy="true" className={`flex flex-col gap-2.5 py-1 ${className}`}>
+      <span className="sr-only">{label}…</span>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className={`skeleton h-3 ${widths[i % widths.length]}`} aria-hidden="true" />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Detail that most people do not need on first read, folded away under a one-line summary
+ * ("How this was measured"), so a screen leads with its numbers instead of paragraphs.
+ */
+export function MoreInfo({ summary = 'More detail', children, className = '' }) {
+  return (
+    <details className={`group rounded-lg border border-line-soft ${className}`}>
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-semibold text-ink-muted hover:text-ink select-none [&::-webkit-details-marker]:hidden">
+        <span className="inline-block transition-transform duration-200 group-open:rotate-90" aria-hidden="true">›</span>
+        {summary}
+      </summary>
+      <div className="px-3 pb-3 pt-0.5 text-xs text-ink-muted leading-relaxed space-y-2">{children}</div>
+    </details>
+  );
+}
+
+/** One headline number: big value, short label, optional one-line note. */
+export function Stat({ value, label, note, tone }) {
+  return (
+    <div className="glass-panel px-4 py-4 flex flex-col gap-1 min-w-0">
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">{label}</span>
+      <span className={`text-[26px] font-black tracking-tight leading-none tabular-nums ${tone === 'accent' ? 'text-accent' : 'text-ink'}`}>{value}</span>
+      {note && <span className="text-[11.5px] text-ink-muted leading-snug">{note}</span>}
+    </div>
+  );
+}
+
 /** A page-section card with a heading. */
 export function Panel({ title, icon: Icon, aside, children, className = '' }) {
   return (

@@ -12,7 +12,7 @@ import { listDecisions } from '../../lib/safetyApi';
 import { can } from '../../lib/permissions';
 import { workerLabel } from '../../lib/zoneEvents';
 import DecisionDetail from './DecisionDetail';
-import { BTN_QUIET, Notice, Panel, SeverityChip, confidenceText, fmtTime } from './common';
+import { BTN_QUIET, Notice, Panel, SeverityChip, confidenceText, fmtTime, Skeleton } from './common';
 
 const PAGE = 20;
 
@@ -51,10 +51,10 @@ export default function ReviewQueue({ role, onCountChange }) {
       {!canReview && !state.loading && (
         <Notice className="mb-3">You have view-only access: you can see what is waiting, and an administrator or manager reviews it.</Notice>
       )}
-      {state.loading && <p className="flex items-center gap-2 text-xs text-ink-muted"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Loading the queue…</p>}
+      {state.loading && <Skeleton rows={3} label="Loading the queue" />}
       {state.error && <Notice tone="error" className="mb-3">{state.error}</Notice>}
       {!state.loading && !state.error && state.items.length === 0 && (
-        <p className="text-xs text-ink-muted leading-relaxed">Nothing is waiting for review. When a rule flags something that may be a violation, it appears here until someone judges it.</p>
+        <p className="text-xs text-ink-muted leading-relaxed">Nothing to review. New flags will appear here.</p>
       )}
       <ul className="flex flex-col divide-y divide-line-soft" aria-label="Flags waiting for review, oldest first">
         {state.items.map((d) => {

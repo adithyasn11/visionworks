@@ -7,6 +7,7 @@
 // leaves this list when it is reviewed. The wording stays non-accusing: "potential", "not seen".
 
 import React from 'react';
+import { Skeleton } from './safety/common';
 import { ShieldAlert, ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
 import { severityMeta } from '../lib/alerts';
 import { workerLabel } from '../lib/zoneEvents';
@@ -52,7 +53,7 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
       </header>
 
       {status === 'loading' && (
-        <p className="flex items-center gap-2 text-xs text-ink-muted"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading alerts…</p>
+        <Skeleton rows={3} label="Loading alerts" />
       )}
 
       {status === 'error' && (
@@ -64,8 +65,7 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
 
       {status === 'ready' && !open && (
         <p className="text-xs text-ink-muted leading-relaxed">
-          No open alerts. A flag raised during a run shows here once it has been saved, which can take up to a minute
-          (the live view shows it at once). A flag is a prompt to look, never a final verdict.
+          No open alerts. New flags appear here within a minute.
         </p>
       )}
 

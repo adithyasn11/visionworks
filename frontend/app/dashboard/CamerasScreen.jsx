@@ -11,7 +11,7 @@ import { Camera, Loader2, Plus, Trash2, Video, Upload } from 'lucide-react';
 
 import { addCamera, removeCamera } from '../lib/platform/cameras';
 import { can, denialMessage } from '../lib/permissions';
-import { Panel, Notice, BTN_PRIMARY, BTN_QUIET, INPUT, fmtTime } from './safety/common';
+import { Panel, Notice, Skeleton, BTN_PRIMARY, BTN_QUIET, INPUT, fmtTime } from './safety/common';
 
 const SOURCE_LABEL = { WEBCAM: 'Webcam or phone', UPLOAD: 'Recorded videos', RTSP: 'Network camera (RTSP)' };
 
@@ -72,11 +72,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
       {message && <Notice tone={message.tone}>{message.text}</Notice>}
 
       <Panel title="Cameras" icon={Camera} aside={status === 'ready' ? `${cameras.length} registered` : null}>
-        {status === 'loading' && (
-          <div className="flex items-center gap-2 text-xs text-ink-muted py-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Loading cameras…
-          </div>
-        )}
+        {status === 'loading' && <Skeleton rows={2} label="Loading cameras" />}
         {status === 'error' && <Notice tone="error">{error || 'Could not load the cameras.'}</Notice>}
         {status === 'ready' && cameras.length === 0 && (
           <Notice>
@@ -162,8 +158,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
             </button>
           </form>
           <p className="mt-3 text-[11.5px] text-ink-faint leading-relaxed">
-            The name is how the system finds this camera, so it cannot be changed later. Zones are drawn per camera,
-            and the plan sets how many cameras an organisation can have.
+            The name cannot be changed later. Your plan sets how many cameras you can add.
           </p>
         </Panel>
       ) : (

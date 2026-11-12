@@ -219,7 +219,16 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
             asLink={routed}
             active={!routed && view === v.id}
             badge={v.id === 'review' ? shownAlerts : v.id === 'actions' ? shownOverdue : 0}
-            onSelect={routed ? () => setOpen(false) : (id) => { onViewChange(id); setOpen(false); }}
+            onSelect={routed ? () => setOpen(false) : (id) => {
+              // Same screen: nothing to animate. Another one: the top bar sweeps (RouteProgress) and the new
+              // screen settles in (animate-view-in in page.jsx), and the page goes back to the top.
+              if (id !== view) {
+                window.dispatchEvent(new Event('vw-view-change'));
+                window.scrollTo(0, 0);
+              }
+              onViewChange(id);
+              setOpen(false);
+            }}
           />
         ))}
       </nav>

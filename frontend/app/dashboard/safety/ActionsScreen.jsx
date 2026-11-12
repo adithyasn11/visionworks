@@ -13,7 +13,7 @@ import { listActionsAndAssignees, listCorrectiveActions } from '../../lib/safety
 import { updateCorrectiveAction } from '../../lib/safety/actions';
 import { can } from '../../lib/permissions';
 import { workerLabel } from '../../lib/zoneEvents';
-import { BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel, SeverityChip, fmtDate, fmtTime } from './common';
+import { BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel, SeverityChip, fmtDate, fmtTime, Skeleton } from './common';
 
 const TABS = [['ACTIVE', 'Active'], ['OVERDUE', 'Overdue'], ['CLOSED', 'Closed'], ['ALL', 'All']];
 const STATUS_WORDS = { OPEN: 'Open', IN_PROGRESS: 'In progress', CLOSED: 'Closed', CANCELLED: 'Cancelled' };
@@ -136,7 +136,7 @@ export default function ActionsScreen({ role, onCountChange }) {
   return (
     <Panel title="Corrective actions" icon={Wrench} aside={state.loading ? '' : `${state.actions.length} shown`}>
       <Notice className="mb-3">
-        An action is opened from a violation a reviewer has confirmed: open it in Events (filter Review: Confirmed) and choose Create a corrective action.
+        Open an action from a confirmed flag: Events → Review: Confirmed → Create a corrective action.
       </Notice>
       <div role="tablist" aria-label="Which actions" className="flex flex-wrap gap-1 mb-3">
         {TABS.map(([id, label]) => (
@@ -144,7 +144,7 @@ export default function ActionsScreen({ role, onCountChange }) {
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${tab === id ? 'border-[color:var(--accent)] text-ink bg-surface-alt' : 'border-line text-ink-muted'}`}>{label}</button>
         ))}
       </div>
-      {state.loading && <p className="flex items-center gap-2 text-xs text-ink-muted"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Loading…</p>}
+      {state.loading && <Skeleton rows={3} label="Loading" />}
       {state.error && <Notice tone="error">{state.error}</Notice>}
       {!state.loading && !state.error && state.actions.length === 0 && (
         <p className="text-xs text-ink-muted leading-relaxed">{tab === 'OVERDUE' ? 'Nothing is overdue.' : tab === 'ACTIVE' ? 'No actions are waiting to be done.' : 'No actions here.'}</p>

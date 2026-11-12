@@ -57,38 +57,45 @@ export default function RouteProgress() {
   const prevKeyRef = useRef(key);
 
   useEffect(() => {
+    // A link click: shown until the URL changes, with a long safety net so it can never get stuck.
     const start = () => {
       window.clearTimeout(timeoutRef.current);
       setActive(true);
+      timeoutRef.current = window.setTimeout(() => setActive(false), 8000);
     };
     const onClick = (e) => {
       if (isInternalNavClick(e)) start();
     };
 
+    // The dashboard switches screens without changing the URL (view state, so the camera socket survives),
+    // so it announces the switch with this event: the same bar sweeps briefly, then clears on its own.
+    const onViewChange = () => {
+      window.clearTimeout(timeoutRef.current);
+      setActive(true);
+      timeoutRef.current = window.setTimeout(() => setActive(false), 550);
+    };
+
     document.addEventListener('click', onClick, true);
     window.addEventListener('popstate', start);
+    window.addEventListener('vw-view-change', onViewChange);
 
     return () => {
       document.removeEventListener('click', onClick, true);
       window.removeEventListener('popstate', start);
+      window.removeEventListener('vw-view-change', onViewChange);
     };
   }, []);
 
-  // The URL actually changed, or we're back to idle after a click that didn't
-  // navigate anywhere (e.g. the target route errored before committing) — a
-  // short trailing timeout clears the bar either way so it never gets stuck.
+  // The URL actually changed: the navigation is done. (Each start sets its own timer above, so the bar
+  // also clears after a click that never navigated, e.g. the target errored before committing.)
   useEffect(() => {
     if (prevKeyRef.current !== key) {
       prevKeyRef.current = key;
       setActive(false);
       window.clearTimeout(timeoutRef.current);
-      return;
     }
-    if (active) {
-      timeoutRef.current = window.setTimeout(() => setActive(false), 8000);
-      return () => window.clearTimeout(timeoutRef.current);
-    }
-  }, [key, active]);
+  }, [key]);
+  useEffect(() => () => window.clearTimeout(timeoutRef.current), []);
 
   if (!active) return null;
 

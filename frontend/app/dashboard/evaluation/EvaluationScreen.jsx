@@ -17,7 +17,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlaskConical, Gauge, ListChecks, Loader2, ScanSearch, Users } from 'lucide-react';
 import { getEvaluation, getReport } from '../../lib/safetyApi';
-import { reasonLabel, Notice, Panel } from '../safety/common';
+import { reasonLabel, MoreInfo, Notice, Panel, Skeleton, Stat } from '../safety/common';
 
 const pc = (v, digits = 1) => (v === null || v === undefined ? 'n/a' : `${(Number(v) * 100).toFixed(digits)}%`);
 const when = (iso) => { try { return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); } catch { return ''; } };
@@ -106,9 +106,8 @@ function Sweep({ sweep, baselines }) {
           </g>
         )}
       </svg>
-      <figcaption className="mt-1 text-[11px] text-ink-faint leading-relaxed">
-        Each open mark is one setting of the sweep (presence 0.4 to 0.7, absence 0.7 to 0.95; circle, square, triangle and diamond are windows of 10, 20, 30 and 45 frames).
-        Lower is better; further right is more often willing to decide. The red dot is the setting the product ships with.
+      <figcaption className="mt-1.5 text-[12px] text-ink-faint leading-relaxed">
+        Lower is better; further right decides more often. The red dot is the shipped setting; open marks are the other settings tried.
       </figcaption>
     </figure>
   );
@@ -123,10 +122,8 @@ function PpeSection({ seg }) {
   const nice = { 'B0 per-frame': 'Per-frame (one frame decides)', 'B1 majority vote': 'Majority vote over the window', ours: 'Ours (clear frames, 60 % / 90 %, may abstain)' };
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-xs text-ink-muted leading-relaxed">
-        {main.segments} person-and-item segments from {main.images} labelled images the model never saw in training or in being chosen. Each segment is up to {seg.frames_per_segment} frames
-        of the same still scene through slightly different camera moments (shift, zoom, light, blur, compression), each read by the production detector and association. People do not move or turn in these
-        segments, so this measures how the decision copes with a real detector's frame-to-frame jitter, not with motion.
+      <p className="text-[13px] text-ink-muted leading-relaxed max-w-3xl">
+        {main.segments} people from {main.images} images the model never saw, judged by three systems.
       </p>
       <Table caption="Helmet and vest: three systems compared" head={<><Th>System</Th><Th right>Segments</Th><Th right>False accusations (of those wearing it)</Th><Th right>False compliance (of those without it)</Th><Th right>Abstained</Th><Th right>Coverage</Th><Th right>Error among verdicts</Th></>}>
         {order.map((k) => {
@@ -145,9 +142,15 @@ function PpeSection({ seg }) {
         })}
       </Table>
       <Sweep sweep={main.sweep} baselines={both} />
-      <details className="text-xs">
-        <summary className="cursor-pointer text-ink-muted hover:text-ink">By how tall the person is in the picture</summary>
-        <div className="mt-2">
+      <MoreInfo summary="How this was measured">
+        <p>
+          Each person-and-item segment is up to {seg.frames_per_segment} frames of the same still scene through slightly different camera moments (shift, zoom, light, blur,
+          compression), each read by the production detector and association. People do not move or turn here, so this measures how the decision copes with a real detector's
+          frame-to-frame jitter, not with motion.
+        </p>
+      </MoreInfo>
+      <MoreInfo summary="By how tall the person is in the picture">
+        <div>
           <Table caption="False accusations by person height" head={<><Th>Person height</Th><Th right>Segments</Th><Th right>Per-frame</Th><Th right>Majority vote</Th><Th right>Ours</Th><Th right>Ours abstained</Th></>}>
             {Object.entries(main.by_size).map(([label, r]) => (
               <tr key={label}>
@@ -159,9 +162,20 @@ function PpeSection({ seg }) {
             ))}
           </Table>
         </div>
-      </details>
+      </MoreInfo>
     </div>
   );
+}
+
+/** The scenario file's outcome codes in the words the rest of the product uses. */
+function plainOutcome(text) {
+  return String(text || '')
+    .replace(/POTENTIAL_VIOLATION/g, 'flag')
+    .replace(/UNVERIFIABLE/g, 'could not verify')
+    .replace(/COMPLIANT/g, 'compliant')
+    .replace(/LONE_WORKER/g, 'lone-worker flag')
+    .replace(/CRITICAL/g, 'critical')
+    .replace(/\(classifier labels them SITTING\)/g, '');
 }
 
 function ScenarioSection({ scen }) {
@@ -177,16 +191,15 @@ function ScenarioSection({ scen }) {
   };
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-ink-muted leading-relaxed">
-        Each scenario runs {scen.variants_per_scenario} times (at 10, 15 and 25 frames a second, with the timing and positions varied) through the real engine: zone tracker, rules, evidence layer, man-down,
-        head count and the database. What the models would see is scripted; the S1n to S3n rows use the PPE model's measured per-frame error rates instead of a perfect detector.
-        In total: <strong className="text-ink">{t.correct} correct, {t.abstained} abstained, {t.wrong} wrong</strong> of {t.runs} runs.
+      <p className="text-[13px] text-ink-muted leading-relaxed max-w-3xl">
+        <strong className="text-ink">{t.correct} correct, {t.abstained} abstained, {t.wrong} wrong</strong> in {t.runs} scripted runs through the real engine.
       </p>
+      <MoreInfo summary={`See all ${scen.scenarios.length} scenarios`}>
       <Table caption="Scenario suite" head={<><Th>Scenario</Th><Th>Expected</Th><Th right>Runs</Th><Th right>Correct</Th><Th right>Abstained</Th><Th right>Wrong</Th><Th>Timing (worst run)</Th></>}>
         {scen.scenarios.map((s) => (
           <tr key={s.id}>
             <Td strong>{s.id} · {s.title}</Td>
-            <Td>{s.expected}</Td>
+            <Td>{plainOutcome(s.expected)}</Td>
             <Td right>{s.runs}</Td>
             <Td right>{s.correct}</Td>
             <Td right>{s.abstained}</Td>
@@ -195,6 +208,14 @@ function ScenarioSection({ scen }) {
           </tr>
         ))}
       </Table>
+      </MoreInfo>
+      <MoreInfo summary="How this was measured">
+        <p>
+          Each scenario runs {scen.variants_per_scenario} times (at 10, 15 and 25 frames a second, with timing and positions varied) through the zone tracker, rules, evidence layer,
+          man-down, head count and the database. What the models would see is scripted; the S1n to S3n rows use the PPE model's measured per-frame error rates instead of a
+          perfect detector.
+        </p>
+      </MoreInfo>
     </div>
   );
 }
@@ -206,10 +227,8 @@ function FootageSection({ real, scen }) {
   const md = real.man_down_overall || {};
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-ink-muted leading-relaxed">
-        The production chain (pose model on the original frame, tracker, PPE model every {real.config?.ppe_every_n_frames} frames, the safety layer and the database) on real CCTV clips, on
-        {' '}<strong className="text-ink">{hw.gpu}</strong>, {hw.cores} CPU threads{hw.ram_gb ? `, ${hw.ram_gb} GB RAM` : ''}. A decision is made inside the frame that triggers it, so the time from the event
-        to the decision is one frame's processing time; the live view shows it in the same message.
+      <p className="text-[13px] text-ink-muted leading-relaxed max-w-3xl">
+        Real CCTV clips through the full system on <strong className="text-ink">{hw.gpu}</strong>.
       </p>
       <Table caption="Speed on real video" head={<><Th>Clip</Th><Th right>Seconds</Th><Th right>Input</Th><Th right>Frames a second</Th><Th right>ms per frame (95th pct)</Th><Th right>Pose / PPE / safety ms</Th><Th right>Man-down flags</Th></>}>
         {real.clips.map((c) => (
@@ -224,30 +243,35 @@ function FootageSection({ real, scen }) {
           </tr>
         ))}
       </Table>
-      <ul className="text-xs text-ink-muted leading-relaxed list-disc pl-5 flex flex-col gap-1">
-        <li>Man-down on footage where nobody falls: <strong className="text-ink">{md.false_alarms} false alarm{md.false_alarms === 1 ? '' : 's'} in {md.video_minutes} minutes</strong> ({md.false_alarms_per_hour} an hour; target at most 1). Too little video to state an hourly rate with confidence.</li>
-        {m1?.time_to_alert_s && <li>Time from a fall to the alert (scenario M1): median {m1.time_to_alert_s.median} s, at most {m1.time_to_alert_s.max} s (target 8 s).</li>}
-        <li>Target of 10 processed frames a second with pose and PPE: {real.clips.every((c) => c.speed.processed_fps >= 10) ? 'met on every clip' : 'not met on every clip (see the red rows)'}.</li>
+      <ul className="text-[13px] text-ink-muted leading-relaxed list-disc pl-5 flex flex-col gap-1.5">
+        <li>Man-down false alarms: <strong className="text-ink">{md.false_alarms} in {md.video_minutes} minutes</strong> of normal activity (target: at most 1 an hour).</li>
+        {m1?.time_to_alert_s && <li>Fall to alert: <strong className="text-ink">{m1.time_to_alert_s.median} s</strong> median, {m1.time_to_alert_s.max} s at most (target 8 s).</li>}
+        <li>10 frames a second target: <strong className="text-ink">{real.clips.every((c) => c.speed.processed_fps >= 10) ? 'met on every clip' : 'not met on every clip'}</strong>.</li>
       </ul>
+      <MoreInfo summary="How this was measured">
+        <p>
+          The production chain (pose model on the original frame, tracker, PPE model every {real.config?.ppe_every_n_frames} frames, the safety layer and the database), on
+          {' '}{hw.gpu}, {hw.cores} CPU threads{hw.ram_gb ? `, ${hw.ram_gb} GB RAM` : ''}. A decision is made inside the frame that triggers it, so the time from the event to the
+          decision is one frame's processing time. The man-down count is from footage where nobody falls: too little video to state an hourly rate with confidence.
+        </p>
+      </MoreInfo>
     </div>
   );
 }
 
 function ReviewSection({ report, error }) {
   if (error) return <Notice tone="error">{error}</Notice>;
-  if (!report) return <p className="flex items-center gap-2 text-xs text-ink-muted"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Loading…</p>;
+  if (!report) return <Skeleton rows={3} label="Loading" />;
   const judged = report.confirmed + report.dismissed;
   if (!report.flagged_by_system) return <p className="text-xs text-ink-muted">No flag has been raised for this organisation in the last year, so there is nothing for people to have judged.</p>;
   return (
-    <div className="flex flex-col gap-2 text-xs text-ink-muted leading-relaxed">
-      <p>
-        From this organisation's own reviews over the last year: {report.flagged_by_system} flags raised, {judged} judged by a person.
-        {judged ? <> People agreed with <strong className="text-ink">{pc(report.confirmed_share_of_reviewed)}</strong> of the flags they judged ({report.confirmed} confirmed, {report.dismissed} dismissed); this is the human-judged precision of the flags.</> : ' None has been judged yet, so the human-judged precision cannot be stated.'}
-        {' '}{report.pending} still waiting.
-      </p>
-      <p>
-        Of the {report.insufficient_evidence} decisions the system could not make, a reviewer looked at {report.insufficient_confirmed + report.insufficient_dismissed}: {report.insufficient_confirmed} turned out to be real, {report.insufficient_dismissed} not.
-      </p>
+    <div className="flex flex-col gap-3 text-[13px] text-ink-muted leading-relaxed">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Stat label="Flags raised" value={report.flagged_by_system} note="last 12 months" />
+        <Stat label="Judged by a person" value={judged} note={`${report.pending} still waiting`} />
+        <Stat label="People agreed" value={judged ? pc(report.confirmed_share_of_reviewed) : '—'} note={judged ? `${report.confirmed} confirmed, ${report.dismissed} dismissed` : 'nothing judged yet'} tone="accent" />
+        <Stat label="Could not verify" value={report.insufficient_evidence} note={`${report.insufficient_confirmed} later found real`} />
+      </div>
       {report.review_reasons?.length > 0 && (
         <ul className="flex flex-wrap gap-x-4 gap-y-1">
           {report.review_reasons.map((x) => <li key={`${x.state}-${x.reason}`}><span className="text-ink">{x.state === 'CONFIRMED' ? 'Confirmed' : 'Dismissed'}</span>: {x.reason === 'NONE' ? 'no reason given' : reasonLabel(x.reason)} ({x.count})</li>)}
@@ -278,17 +302,32 @@ export default function EvaluationScreen() {
     return times.length ? `results from ${when(times[0])}${times.length > 1 ? ` to ${when(times[times.length - 1])}` : ''}` : '';
   }, [v]);
 
-  if (data.loading) return <p className="flex items-center gap-2 text-xs text-ink-muted"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Loading the results…</p>;
+  if (data.loading) return <Skeleton rows={3} label="Loading the results" />;
   if (data.error) return <Notice tone="error">{data.error}</Notice>;
+
+  // The headline numbers, read from the same files as the tables below.
+  const both = v?.segments?.sets?.valB?.results?.['both items'];
+  const ours = both?.ours, perFrame = both?.['B0 per-frame'];
+  const tot = v?.scenarios?.totals;
+  const fps = (v?.real_footage?.clips || []).map((c) => c.speed?.processed_fps).filter((x) => typeof x === 'number');
 
   return (
     <div className="flex flex-col gap-5">
+      {(ours || tot || fps.length > 0) && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {ours && <Stat label="Wrongly flagged" value={`${ours.false_accusation} / ${ours.worn}`} note={perFrame ? `${perFrame.false_accusation} with a one-frame check` : undefined} tone="accent" />}
+          {ours && <Stat label="Error in verdicts" value={pc(ours.error_rate)} note={perFrame ? `${pc(perFrame.error_rate)} with a one-frame check` : undefined} />}
+          {tot && <Stat label="Scenario runs correct" value={`${tot.correct} / ${tot.runs}`} note={`${tot.wrong} wrong`} />}
+          {fps.length > 0 && <Stat label="Frames a second" value={`${Math.round(Math.min(...fps))}–${Math.round(Math.max(...fps))}`} note="target 10" />}
+        </div>
+      )}
+
       <Panel title="How to read this page" icon={FlaskConical} aside={updated}>
-        <p className="text-xs text-ink-muted leading-relaxed">
-          A <strong className="text-ink">false accusation</strong> is flagging someone who was wearing the item: the error that matters most, because a flag can have consequences for a person.
-          <strong className="text-ink"> Abstaining</strong> (saying it could not tell) is not an error; it is the system refusing to guess. A count of zero is shown with the most it could be at 95 % confidence,
-          never as a bare 0 %. Coverage is how often the system was willing to give a verdict.
-        </p>
+        <dl className="grid gap-3 sm:grid-cols-3 text-[13px] leading-relaxed">
+          <div><dt className="font-bold text-ink">False accusation</dt><dd className="text-ink-muted">Flagging someone who was wearing the item. The error that matters most.</dd></div>
+          <div><dt className="font-bold text-ink">Abstaining</dt><dd className="text-ink-muted">Saying it could not tell. Not an error: the system refuses to guess.</dd></div>
+          <div><dt className="font-bold text-ink">Coverage</dt><dd className="text-ink-muted">How often the system gave a verdict. A zero is shown with its 95 % upper bound.</dd></div>
+        </dl>
       </Panel>
 
       <Panel title="Helmet and vest: our evidence layer against two simpler systems" icon={ScanSearch}><PpeSection seg={v?.segments} /></Panel>
@@ -297,10 +336,10 @@ export default function EvaluationScreen() {
       <Panel title="The human review loop (your organisation)" icon={Users}><ReviewSection report={review.report} error={review.error} /></Panel>
 
       <Panel title="Not measured yet">
-        <ul className="text-xs text-ink-muted leading-relaxed list-disc pl-5 flex flex-col gap-1">
-          <li>Helmet and vest on your own recorded footage (people walking, turning and being hidden, in your lighting): the benchmark above uses still, labelled images with camera jitter.</li>
-          <li>Man-down recall on staged falls (at least 30 falls in two directions to the camera): no fall footage has been recorded; the scenarios use scripted poses, and the real clips only show that it does not alarm on normal activity.</li>
-          <li>Human-judged precision on a reviewed set of clips: the review figures above grow as your team reviews flags.</li>
+        <ul className="text-[13px] text-ink-muted leading-relaxed list-disc pl-5 flex flex-col gap-1.5">
+          <li><strong className="text-ink">Your own footage.</strong> The benchmark uses still images, not people walking and turning in your lighting.</li>
+          <li><strong className="text-ink">Real falls.</strong> No staged falls recorded yet; man-down is tested on scripted poses.</li>
+          <li><strong className="text-ink">Precision on reviewed clips.</strong> The review numbers above grow as your team judges flags.</li>
         </ul>
       </Panel>
     </div>

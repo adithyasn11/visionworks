@@ -16,7 +16,7 @@ import { createRule, deleteRule, listRules, updateRule, validateRule } from '../
 import { listSafetyZones } from '../../lib/safety/management';
 import { RULE_TYPES, SEVERITIES, PPE_ITEMS, defaultParams, friendlyRuleError, isEnforced, ruleBody, ruleSummary, ruleTypeMeta } from '../../lib/safety/ruleTypes';
 import { can } from '../../lib/permissions';
-import { BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel, SeverityChip } from './common';
+import { BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel, SeverityChip, Skeleton } from './common';
 
 const BLANK = { id: null, name: '', type: 'PPE_ENTRY', zoneId: '', severity: 'WARNING', isEnabled: true, minEvidenceConfidence: 0.6, params: defaultParams('PPE_ENTRY') };
 const ZONE_TYPE_LABELS = { PPE_CHECKPOINT: 'PPE checkpoint', APPROACH: 'Approach', RESTRICTED: 'Restricted', EXIT: 'Exit', GENERAL: 'General' };
@@ -228,12 +228,11 @@ export default function RulesScreen({ role }) {
     <div className="space-y-5">
       <Panel title="Safety rules" icon={SlidersHorizontal} aside={state.loading ? '' : `${state.rules.length} rule${state.rules.length === 1 ? '' : 's'}`}>
         <Notice className="mb-3">
-          Every Restricted zone is already checked for a helmet and a vest by a built-in rule. A rule you write for a zone replaces it there.
-          To switch that check off for one zone, create a helmet-and-vest rule for the zone and turn it off. Rules apply from the next run of a camera, not to one already running.
+          Restricted zones are checked for a helmet and vest by default; a rule you add for a zone replaces that check. Rules apply from a camera's next run.
         </Notice>
         {!canEdit && !state.loading && <Notice className="mb-3">You have view-only access: you can read the rules, and an administrator or manager changes them.</Notice>}
         {message && <Notice tone={message.tone} className="mb-3">{message.text}</Notice>}
-        {state.loading && <p className="flex items-center gap-2 text-xs text-ink-muted"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Loading the rules…</p>}
+        {state.loading && <Skeleton rows={3} label="Loading the rules" />}
         {state.error && <Notice tone="error">{state.error}</Notice>}
         {!state.loading && !state.error && state.rules.length === 0 && <p className="text-xs text-ink-muted leading-relaxed">No rules of your own yet, so the built-in helmet-and-vest check applies to every Restricted zone.</p>}
 

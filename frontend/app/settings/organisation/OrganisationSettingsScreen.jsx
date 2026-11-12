@@ -28,6 +28,7 @@ import {
 import { Field, Banner } from '../../components/AuthFormBits';
 import { can } from '../../lib/permissions';
 import DashboardShell from '../../dashboard/DashboardShell';
+import { Skeleton } from '../../dashboard/safety/common';
 import {
   getOrganisationSettings, updateOrganisationSettings,
   previewRetentionImpact, deleteOrganisation,
@@ -182,8 +183,12 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
   if (state.status === 'loading' || !form) {
     return (
       <DashboardShell user={viewer} role={viewerRole}>
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="w-6 h-6 text-accent animate-spin" />
+        <div className="mx-auto max-w-3xl space-y-6">
+          <div className="pb-5 border-b border-line space-y-3" aria-hidden="true">
+            <div className="skeleton h-2.5 w-20" /><div className="skeleton h-8 w-56" /><div className="skeleton h-3 w-80 max-w-full" />
+          </div>
+          <div className="glass-panel p-6"><Skeleton rows={4} label="Loading organisation settings" /></div>
+          <div className="glass-panel p-6"><Skeleton rows={3} label="Loading" /></div>
         </div>
       </DashboardShell>
     );
@@ -194,7 +199,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
   return (
     /* Same shell as the dashboard — see MembersScreen for why. */
     <DashboardShell user={viewer} role={viewerRole}>
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-3xl animate-view-in">
 
         {/* Same page header as the dashboard screens (eyebrow, title, line of context, rule underneath). */}
         <header className="flex flex-col gap-2 pb-5 mb-7 border-b border-line">
@@ -336,8 +341,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
                     Delete uploaded video after processing
                   </span>
                   <span className="text-[12px] text-ink-faint font-medium leading-snug">
-                    Recommended. The footage is the sensitive part; the detection records are
-                    not. Turning this off keeps footage on disk.
+                    Recommended: the footage is the sensitive part. Off keeps it on disk.
                   </span>
                 </span>
               </label>
@@ -369,7 +373,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
             <Section
               icon={Trash2}
               title="Delete this organisation"
-              description="Members lose access immediately. Records and audit history are kept for a grace period, so this can be reversed by support — but nobody in your organisation will be able to reach the data."
+              description="Everyone loses access at once. Support can restore it during a short grace period."
               danger
             >
               <div className="flex flex-col gap-3">

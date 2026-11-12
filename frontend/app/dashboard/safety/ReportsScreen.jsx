@@ -18,7 +18,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarRange, Camera, ClipboardList, Clock, FileDown, FileSpreadsheet, FileText, HardHat, History, Loader2, PersonStanding, RefreshCw, Shapes, ShieldCheck, SlidersHorizontal, Timer, Wrench } from 'lucide-react';
 import { downloadAuditTrail, downloadExport, downloadReport, getReport, getReportHistory } from '../../lib/safetyApi';
 import { durationText, ruleTypeMeta } from '../../lib/safety/ruleTypes';
-import { reasonLabel, BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel } from './common';
+import { reasonLabel, BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel, Skeleton } from './common';
 
 const PRESETS = [
   { id: '24h', label: 'Last 24 hours', hours: 24 },
@@ -187,7 +187,7 @@ function ReportBody({ r }) {
     <div className="flex flex-col gap-5">
       <Panel title="At a glance" icon={ShieldCheck} aside={`${fmtWhen(r.since, tz)} to ${fmtWhen(r.until, tz)}`}>
         {r.decisions === 0 ? (
-          <p className="text-xs text-ink-muted leading-relaxed">No safety decisions were saved in this period. Decisions appear here once a run on a registered camera has been saved. {r.events_recorded ? `${r.events_recorded} zone events were recorded.` : ''}</p>
+          <p className="text-xs text-ink-muted leading-relaxed">No safety decisions in this period. {r.events_recorded ? `${r.events_recorded} zone events were recorded.` : ''}</p>
         ) : (
           <div className="flex flex-col gap-3">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -269,7 +269,7 @@ function ReportBody({ r }) {
           </ul>
         )}
         <p className="mt-2 text-[11px] text-ink-faint leading-relaxed">
-          Seen only in part: the worker was already inside when the video began, was lost from view, or the video stopped. They stayed at least the time seen, so those times are not averaged in as if they were whole stays; the longest time seen reads "at least" when it comes from such a visit.
+          "Seen only in part": already inside at the start, lost from view, or the video stopped. Those stays count as "at least" and are not averaged.
         </p>
       </Panel>
 
@@ -304,7 +304,7 @@ function ReportBody({ r }) {
           ['Open now', num(r.actions.open_now)],
           ['Overdue now', num(r.actions.overdue_now)],
         ]} />
-        <p className="mt-2 text-[11px] text-ink-faint">Opened counts every action created in the period, including any since cancelled. Open and overdue are as of now, not the end of the period.</p>
+        <p className="mt-2 text-[11px] text-ink-faint">Open and overdue are counted as of now.</p>
       </Panel>
     </div>
   );
@@ -414,12 +414,12 @@ export default function ReportsScreen() {
           )}
           {invalid && <Notice tone="error">{period.error}</Notice>}
           <p className="text-[11px] text-ink-faint leading-relaxed">
-            The report holds counts, zones, cameras, rules and times only: never video and never names. Hours and days follow this site's time zone.
+            Counts and times only, never video or names. Hours follow the site's time zone.
           </p>
         </div>
       </Panel>
 
-      {state.loading && !r && <p className="flex items-center gap-2 text-xs text-ink-muted"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Making the report…</p>}
+      {state.loading && !r && <Skeleton rows={3} label="Making the report" />}
       {state.error && <Notice tone="error">{state.error}</Notice>}
       {r && <div className={state.loading ? 'opacity-60 transition-opacity' : ''} aria-busy={state.loading}><ReportBody r={r} /></div>}
 
@@ -442,7 +442,7 @@ export default function ReportsScreen() {
 
           <div className="flex flex-col gap-2 border-t border-line-soft pt-3">
             <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint">Audit trail for a shift</div>
-            <p className="text-xs text-ink-muted leading-relaxed">Every decision and zone event between two moments, in the order they happened. A shift is whichever period you choose here.</p>
+            <p className="text-xs text-ink-muted leading-relaxed">Every decision and zone event in the period you choose, in order.</p>
             <div className="flex flex-wrap items-end gap-2">
               <label className="flex flex-col gap-1 text-[11px] text-ink-faint">Starts
                 <input type="datetime-local" value={shift.from} onChange={(e) => setShift((s) => ({ ...s, from: e.target.value }))} className={INPUT} /></label>
@@ -467,9 +467,9 @@ export default function ReportsScreen() {
       </Panel>
 
       <Panel title="Reports made before" icon={History}>
-        {history.loading && <p className="flex items-center gap-2 text-xs text-ink-muted"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Loading…</p>}
+        {history.loading && <Skeleton rows={3} label="Loading" />}
         {history.error && <Notice tone="error">{history.error}</Notice>}
-        {!history.loading && !history.error && history.rows.length === 0 && <p className="text-xs text-ink-muted">No report has been made yet. The PDF and figures reports you download above are listed here.</p>}
+        {!history.loading && !history.error && history.rows.length === 0 && <p className="text-xs text-ink-muted">No reports yet. Your PDF and CSV downloads appear here.</p>}
         {history.rows.length > 0 && (
           <ul className="flex flex-col divide-y divide-line-soft text-xs">
             {history.rows.map((h) => (
@@ -481,7 +481,7 @@ export default function ReportsScreen() {
             ))}
           </ul>
         )}
-        <p className="mt-2 text-[11px] text-ink-faint">The list keeps what was asked for, not the file: a report is made again from the data when you download it.</p>
+        <p className="mt-2 text-[11px] text-ink-faint">Each report is rebuilt from the data when you download it.</p>
       </Panel>
     </div>
   );

@@ -12,7 +12,7 @@ import { downloadExport, listDecisions, listEvents } from '../../lib/safetyApi';
 import { listSafetyZones } from '../../lib/safety/management';
 import { describeZoneEvent, workerLabel } from '../../lib/zoneEvents';
 import DecisionDetail from './DecisionDetail';
-import { BTN_QUIET, INPUT, Notice, Panel, ReviewChip, SeverityChip, StatusChip, confidenceText, fmtTime } from './common';
+import { BTN_QUIET, INPUT, Notice, Panel, ReviewChip, SeverityChip, StatusChip, confidenceText, fmtTime, Skeleton } from './common';
 
 const PAGE = 25;
 const STATUS_OPTIONS = [['', 'Any result'], ['POTENTIAL_VIOLATION', 'Potential violation'], ['COMPLIANT', 'Compliant'], ['UNVERIFIABLE', 'Cannot verify']];
@@ -111,7 +111,7 @@ export default function EventsScreen({ role }) {
       )}
 
       {data.error && <Notice tone="error" className="mb-3">{data.error}</Notice>}
-      {data.loading && data.rows.length === 0 && <p className="flex items-center gap-2 text-xs text-ink-muted"><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Loading…</p>}
+      {data.loading && data.rows.length === 0 && <Skeleton rows={3} label="Loading" />}
       {!data.loading && !data.error && data.rows.length === 0 && <p className="text-xs text-ink-muted leading-relaxed">Nothing matches these filters.</p>}
 
       {tab === 'decisions' ? (
