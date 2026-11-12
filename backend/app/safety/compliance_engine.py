@@ -590,7 +590,7 @@ class ComplianceEngine:
                 rule, UNVERIFIABLE, f"Could not state the length of the stay in {where}: the worker was lost from view after {_dur(dwell)} "
                                     f"and did not come back.", event.worker_key, visit.entered_at, {**base, "outcome": "LOST"})))
         else:
-            ended = "the video ended" if why == "SESSION_END" else "the video jumped"
+            ended = {"SESSION_END": "the video ended", "CAMERA_LOST": "the camera stopped sending pictures"}.get(why, "the video jumped")
             out.append(self._emit(self._dwell_decision(
                 rule, UNVERIFIABLE, f"Could not state the length of the stay in {where}: {ended} while the worker was still inside, "
                                     f"after {_dur(dwell)}.", event.worker_key, visit.entered_at, {**base, "outcome": "INCOMPLETE"})))
@@ -677,7 +677,7 @@ class ComplianceEngine:
     # ── jumps and the end ───────────────────────────────────────────────────
 
     def _close_all(self, phrase: str, t: float) -> List[Decision]:
-        """`phrase` is "the video jumped" or "the video ended": everything still open ends here, unjudged."""
+        """`phrase` is "the video jumped", "the video ended" or "the camera stopped sending pictures": everything still open ends here, unjudged."""
         out = []
         for key in list(self._pending):
             pending = self._pending.pop(key)
@@ -711,7 +711,7 @@ class ComplianceEngine:
 
     def reset(self, reason: str, last_seen_s: float, resume_at_s: float) -> List[Decision]:
         """Engine component contract: the timeline jumped. Whoever was still being judged cannot be."""
-        out = self._close_all("the video jumped", last_seen_s)
+        out = self._close_all("the camera stopped sending pictures" if reason == "CAMERA_LOST" else "the video jumped", last_seen_s)
         self._last_judged.clear()           # footage after a jump is a different stretch of time
         return out
 

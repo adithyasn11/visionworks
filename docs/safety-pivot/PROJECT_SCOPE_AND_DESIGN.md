@@ -1608,6 +1608,15 @@ State machine per worker: `UP → CANDIDATE_DOWN` when `is_down_pose and is_stil
 
 **Done when:** the full storyline runs end to end twice in a row, and the fallback clips work offline.
 
+**As built (Step 18).**
+
+1. **Camera disconnect (item 2):** the live loop (`video_upload.py`, `/live_webcam`) counts silence from the first empty read; after `camera_lost_s` (`SAFETY_CAMERA_LOST_S`, default 5 s, range 1-600) it calls `safety.reset("CAMERA_LOST")` once and sends the page `{"type": "CAMERA_LOST"}` (shown in the status line). Open zone visits close as `EXITED_ZONE` reason `CAMERA_LOST` (unverifiable), and the rule engine's pending PPE waits, stays and exit timers close as UNVERIFIABLE with "the camera stopped sending pictures"; a camera that comes back starts a fresh stretch. A dropped connection already ended the session through `finish()`. The wording reaches the CSV/PDF visit text and the event screens (`zoneEvents.js`).
+2. **Memory bounds:** found by the new hour-long test: the session's list of flagged people was a set that only a seek cleared, and the open-flag count was a dict per person. Now `_flagged` is an ordered dict capped at 2000 (oldest forgotten) and the count is one integer. Everything else already forgot people when they left (checked, not assumed).
+3. **Duplicate sessions, restart, retention (items 2-3):** tested (two sessions on one camera write their own rows; rows survive a restart still unsynced; local retention never deletes an unsynced row with a service key). The retention jobs themselves were built earlier and are unchanged: `purge_local` at start-up, `purge_evidence` in the sync loop, `purge_safety_data()` nightly by pg_cron (migration 025). Performance (item 1) is the Step 17 measurement: 13.7-34 processed fps on the four clips with every feature on against the target of 10, so no setting was changed.
+4. **Docs (item 4):** `README.md` and `docs/DOCUMENTATION.md` rewritten for the finished system; `.env.example` lists every safety setting (11 were missing) plus `SAFETY_EVIDENCE_DIR` and `VISIONWORKS_STANDALONE_LIVE`.
+5. **Demo (item 5):** `docs/DEMO_RUNBOOK.md` (the set, the ten-minute check before a run, the eight-step storyline with what to say and expected questions, the fallback-clip table, a symptom table, the printed results table, a rehearsal log) and `scripts/demo_preflight.py` (models, settings, GPU, both servers, the evidence folder, which fallback clips exist). **Not done, because they need people and a room:** taping the layout, the three rehearsals, and recording the six fallback clips (`sample_videos/demo_fallback/`); the preflight reports the missing clips as warnings.
+6. **Final regression (item 6):** `scripts/run_tests.py` runs every backend test file in its own process (`--live` adds the ones using Supabase); new files `test_robustness.py` (camera stop, an hour with every rule on, duplicate sessions, restart, the master switch) and `test_camera_lost_socket.py` (the real socket with a stand-in camera). `SAFETY_ENABLED=false` builds no engine and no session.
+
 ---
 
 ### Optional steps (only after Step 17)

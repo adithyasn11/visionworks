@@ -109,6 +109,11 @@ class SafetyConfig:
     # for ever. With a service key configured, unsynced rows are NEVER deleted.
     local_standalone_retention_days: int = 30
 
+    # ── Source robustness ────────────────────────────────────────────────────
+    # A live camera that delivers no picture for this long has stopped: open visits are closed as
+    # UNVERIFIABLE (nothing can be said about a stay nobody saw) instead of waiting for it to come back.
+    camera_lost_s: float = 5.0
+
     def as_dict(self) -> dict:
         """Plain dict of every threshold, stored with each decision."""
         return asdict(self)
@@ -158,6 +163,7 @@ _RANGES = {
     "evidence_retention_days": (1, 365),
     "local_synced_retention_days": (1, 365),
     "local_standalone_retention_days": (1, 3650),
+    "camera_lost_s": (1.0, 600.0),
 }
 
 # Pairs that must hold between fields: (smaller, larger, strictly_less).

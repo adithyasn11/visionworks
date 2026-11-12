@@ -1077,13 +1077,30 @@ async def live_webcam_websocket(websocket: WebSocket):
     frame_idx = 0
     # Live source: the safety clock is seconds since now, monotonic.
     safety = await _live_safety_session(zones_camera_id, org_id, zones_config)
+    no_picture_since = None
+    camera_lost = False
 
     try:
         while not control_state["stop"]:
             ret, frame = cap.read()
             if not ret:
+                # No picture. For a moment that is normal; for `camera_lost_s` it means the camera has stopped:
+                # what is open is closed as UNVERIFIABLE once, and the page is told. If pictures come back,
+                # the run simply carries on (the safety clock starts a new stretch).
+                # (Silence is counted from the first empty read, not from the last picture: a slow frame is not a stopped camera.)
+                if no_picture_since is None:
+                    no_picture_since = time.monotonic()
+                if safety is not None and not camera_lost and time.monotonic() - no_picture_since > safety.config.camera_lost_s:
+                    camera_lost = True
+                    safety.reset("CAMERA_LOST")
+                    try:
+                        await websocket.send_json({"type": "CAMERA_LOST", "message": "The camera stopped sending pictures. Open visits were closed as not verifiable."})
+                    except Exception:
+                        pass
                 await asyncio.sleep(0.005)
                 continue
+            no_picture_since = None
+            camera_lost = False
 
             frame_idx += 1
             frame_time = safety.begin_frame() if safety is not None else None

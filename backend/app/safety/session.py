@@ -43,6 +43,7 @@ _log = logging.getLogger(__name__)
 
 # Events shown to the dashboard per frame are only the ones raised on that frame;
 # this caps a pathological burst (a mass reset) so one payload stays small.
+_MAX_FLAGGED_KEYS = 2000          # who is outlined as flagged; the oldest are forgotten beyond this
 _MAX_EVENTS_IN_PAYLOAD = 50
 
 
@@ -83,10 +84,10 @@ class SafetySession:
         # Open alerts of THIS session: an alert is a POTENTIAL_VIOLATION decision that has not been
         # reviewed, and nothing reviews a decision inside a live session, so each flag stays open here.
         # (The dashboard's own count comes from Postgres, where reviews happen.)
-        self._open_flags: dict = {}                        # worker key -> number of open flags (the count; never reset)
+        self._open_count = 0                               # flags raised this session (never reset, never grows memory)
         # Who is OUTLINED as flagged. Cleared when the timeline jumps: a tracker may hand the same id to
         # a different person after a seek, who must not be drawn as flagged.
-        self._flagged: set = set()
+        self._flagged: dict = {}                           # worker keys, oldest first; capped so a day-long live run cannot grow it
         self._evidence_check = evidence_check              # org -> bool, run in a thread
         engine.register(self.tracker)
         # The rule engine: judges entries into restricted zones from the zone events and
@@ -368,8 +369,10 @@ class SafetySession:
                 self._discard_snapshot(ref)                  # no decision, so no picture
             return
         if decision.status == POTENTIAL_VIOLATION:
-            self._open_flags[decision.worker_key] = self._open_flags.get(decision.worker_key, 0) + 1
-            self._flagged.add(decision.worker_key)
+            self._open_count += 1
+            self._flagged[decision.worker_key] = True
+            while len(self._flagged) > _MAX_FLAGGED_KEYS:
+                self._flagged.pop(next(iter(self._flagged)))
         if len(self._frame_decisions) < _MAX_EVENTS_IN_PAYLOAD:
             data = decision.as_payload()
             if wants:
@@ -486,7 +489,7 @@ class SafetySession:
         if self.compliance is not None:
             # How many flags this session has raised that nobody has reviewed. Always present when
             # the rules run, so the dashboard can show "0" as well as a number.
-            data["open_count"] = sum(self._open_flags.values())
+            data["open_count"] = self._open_count
         return data
 
     # ── the end ──────────────────────────────────────────────────────────────

@@ -21,6 +21,7 @@ export function workerLabel(key) {
 const CLOSED_BY = {
   LOST: 'lost from view, visit closed',
   SEEK: 'video jumped, visit closed',
+  CAMERA_LOST: 'camera stopped sending pictures, visit closed',
   SESSION_END: 'still inside when the video ended',
   TIME_REGRESSED: 'video time went backwards, visit closed',
 };

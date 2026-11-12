@@ -482,7 +482,7 @@ def _event_detail(event: dict) -> str:
     d = event.get("details") or {}
     kind = event.get("eventType")
     if kind == "EXITED_ZONE":
-        why = {"LEFT": "left", "LOST": "lost from view, visit closed", "SEEK": "video jumped, visit closed", "SESSION_END": "still inside when the video ended"}.get(d.get("reason"), "")
+        why = {"LEFT": "left", "LOST": "lost from view, visit closed", "SEEK": "video jumped, visit closed", "SESSION_END": "still inside when the video ended", "CAMERA_LOST": "camera stopped, visit closed"}.get(d.get("reason"), "")
         dwell = d.get("dwell_s")
         parts = [why] if why else []
         if isinstance(dwell, (int, float)):

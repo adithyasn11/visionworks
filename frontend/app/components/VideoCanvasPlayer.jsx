@@ -216,6 +216,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           if (msg.device) setDeviceInfo(msg.device.toUpperCase());
         }
         if (msg.type === 'FRAME')    { handleFrame(msg); }
+        if (msg.type === 'CAMERA_LOST') { setStatusMsg(msg.message); }
         if (msg.type === 'COMPLETE') { setPhase('done'); setProgress(100); setStatusMsg(msg.message); }
         if (msg.type === 'ERROR')    { setPhase('error'); setStatusMsg(msg.error); }
         if (msg.error && !msg.type)  { setPhase('error'); setStatusMsg(msg.error); }
@@ -497,6 +498,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           if (msg.device) setDeviceInfo(msg.device.toUpperCase());
         }
         if (msg.type === 'FRAME') { handleFrame(msg); }
+        if (msg.type === 'CAMERA_LOST') { setStatusMsg(msg.message); }
         if (msg.error) {
           setPhase('error');
           setStatusMsg(msg.error);
