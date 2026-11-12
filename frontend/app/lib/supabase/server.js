@@ -49,6 +49,28 @@ export function createClient() {
 }
 
 /**
+ * The signed-in user's id, e-mail and metadata from a VERIFIED token, or null.
+ *
+ * getClaims() checks the JWT's signature and expiry locally against the
+ * project's published signing keys (ES256; the key set is fetched once and
+ * cached for the process), so a page load no longer waits for the auth server
+ * the way getUser() did (~250 ms each, several per page). A forged or expired
+ * cookie still yields null. For pages and reads; actions that change account
+ * state keep getUser().
+ */
+export async function getAuthUser(supabase) {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.auth.getClaims();
+    const c = data?.claims;
+    if (error || !c?.sub || c.role !== 'authenticated') return null;
+    return { id: c.sub, email: c.email ?? null, user_metadata: c.user_metadata ?? {} };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The signed-in user, or null.
  *
  * Uses getUser(), not getSession(). getSession() reads the cookie and trusts

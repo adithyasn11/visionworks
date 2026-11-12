@@ -10,7 +10,7 @@
 // is admin-gated, which is exactly what `org_update` enforces.
 
 import { redirect } from 'next/navigation';
-import { createClient } from '../../lib/supabase/server';
+import { createClient, getAuthUser } from '../../lib/supabase/server';
 import OrganisationSettingsScreen from './OrganisationSettingsScreen';
 
 export const dynamic = 'force-dynamic';
@@ -40,8 +40,9 @@ export default async function OrganisationSettingsPage() {
     );
   }
 
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user) redirect('/login?next=/settings/organisation');
+  const verified = await getAuthUser(supabase);          // checked locally, no auth-server round trip
+  if (!verified) redirect('/login?next=/settings/organisation');
+  const data = { user: verified };
 
   const { data: profile } = await supabase
     .from('profiles')

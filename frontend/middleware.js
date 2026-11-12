@@ -72,10 +72,15 @@ export async function middleware(request) {
     },
   });
 
-  // getUser() rather than getSession(): it validates the JWT with the auth
-  // server instead of trusting the cookie's contents. This call is also what
-  // triggers the token refresh, which is why it runs on every request.
-  const { data: { user } } = await supabase.auth.getUser();
+  // getClaims() rather than getSession(): it VERIFIES the JWT instead of
+  // trusting the cookie's contents. The project signs tokens with an asymmetric
+  // key (ES256), so the check is local, against the published key set (fetched
+  // once, cached for the process) — it used to be getUser(), a round trip to the
+  // auth server (~250 ms) on EVERY request, server actions included, which made
+  // each dashboard read cost two trips instead of one. getClaims() still
+  // refreshes an expired session first, so the cookie stays current.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const user = claimsData?.claims?.sub ? { id: claimsData.claims.sub } : null;
 
   const isProtected = PROTECTED_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),

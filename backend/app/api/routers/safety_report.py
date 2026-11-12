@@ -24,6 +24,7 @@ so the screen can list the reports made before; if that record cannot be written
 import json
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -76,8 +77,13 @@ def report(days: int = Query(7, ge=1, le=MAX_DAYS), since: Optional[str] = None,
     """The figures of a period (`since` / `until`, or the last `days`). `tz` (an IANA name) sets the hour and day buckets."""
     org_id, _, token = _who(authorization, "safety.view")
     start, end = _window(days, since, until)
-    data = _figures(token, org_id, start, end, tz)
-    return {**data, "organisation": _organisation_name(token, org_id)}
+    # The figures and the organisation's name do not depend on each other: fetched at the same time, so the
+    # screen waits for one database round trip, not two.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        f_name = pool.submit(_organisation_name, token, org_id)
+        data = _figures(token, org_id, start, end, tz)
+        name = f_name.result()
+    return {**data, "organisation": name}
 
 
 @router.get("/report/export")

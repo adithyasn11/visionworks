@@ -19,7 +19,7 @@
 // page does not exist.
 
 import { redirect } from 'next/navigation';
-import { createClient } from '../../lib/supabase/server';
+import { createClient, getAuthUser } from '../../lib/supabase/server';
 import MembersScreen from './MembersScreen';
 
 export const dynamic = 'force-dynamic';
@@ -49,8 +49,9 @@ export default async function MembersPage() {
     );
   }
 
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user) redirect('/login?next=/settings/members');
+  const verified = await getAuthUser(supabase);          // checked locally, no auth-server round trip
+  if (!verified) redirect('/login?next=/settings/members');
+  const data = { user: verified };
 
   const { data: profile } = await supabase
     .from('profiles')

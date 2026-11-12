@@ -21,7 +21,23 @@
 // own role gains nothing: every action re-checks (layer 2) and every policy
 // re-checks (layer 3).
 
-import { createClient } from './supabase/server';
+import { createClient, getAuthUser } from './supabase/server';
+import { listCameras } from './platform/cameras';
+import { getBadgeCounts } from './safety/queries';
+
+/**
+ * Everything the dashboard needs on opening, in ONE server call: the caller's role and organisation, the
+ * cameras, and the two badge counts. Next.js runs a page's server actions one at a time, so these used to
+ * be three calls queued in a row before the Overview could show anything; here the reads run together.
+ */
+export async function getDashboardStart(day) {
+  const [viewer, cameras, badges] = await Promise.all([
+    getViewerRole(),
+    listCameras(),
+    getBadgeCounts(day),
+  ]);
+  return { viewer, cameras, badges };
+}
 
 /** The shape returned when there is no usable session or membership. */
 const EMPTY = Object.freeze({
@@ -49,26 +65,25 @@ export async function getViewerRole() {
   const supabase = createClient();
   if (!supabase) return EMPTY;
 
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user) return EMPTY;
+  const user = await getAuthUser(supabase);
+  if (!user) return EMPTY;
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('currentOrgId')
-    .eq('id', data.user.id)
-    .maybeSingle();
+  // The profile pointer and the caller's ACTIVE memberships are read AT THE SAME TIME (they do not depend on
+  // each other); the membership of the current org is then picked from the list. One round trip of waiting
+  // instead of two, and the same cross-check as before.
+  const [{ data: profile }, { data: memberships }] = await Promise.all([
+    supabase.from('profiles').select('currentOrgId').eq('id', user.id).maybeSingle(),
+    supabase
+      .from('memberships')
+      .select('orgId, role, organisations:orgId (name, plan, planSelectedAt)')
+      .eq('profileId', user.id)
+      .eq('status', 'ACTIVE'),
+  ]);
 
   const orgId = profile?.currentOrgId ?? null;
   if (!orgId) return EMPTY;
 
-  const { data: membership } = await supabase
-    .from('memberships')
-    .select('role, organisations:orgId (name, plan, planSelectedAt)')
-    .eq('orgId', orgId)
-    .eq('profileId', data.user.id)
-    .eq('status', 'ACTIVE')
-    .maybeSingle();
-
+  const membership = (memberships || []).find((m) => m.orgId === orgId) ?? null;
   if (!membership) return { ...EMPTY, orgId };
 
   const org = membership.organisations ?? null;

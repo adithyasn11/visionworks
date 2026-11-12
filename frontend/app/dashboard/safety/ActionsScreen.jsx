@@ -9,7 +9,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Wrench } from 'lucide-react';
-import { listAssignees, listCorrectiveActions } from '../../lib/safety/management';
+import { listActionsAndAssignees, listCorrectiveActions } from '../../lib/safety/management';
 import { updateCorrectiveAction } from '../../lib/safety/actions';
 import { can } from '../../lib/permissions';
 import { workerLabel } from '../../lib/zoneEvents';
@@ -112,18 +112,23 @@ export default function ActionsScreen({ role, onCountChange }) {
   const [people, setPeople] = useState([]);
   const canEdit = can(role, 'safety.actions.edit');
   const request = useRef(0);
+  const havePeople = useRef(false);
 
   const load = useCallback(async () => {
     const filter = tab === 'ACTIVE' ? { status: 'ACTIVE' } : tab === 'OVERDUE' ? { overdue: true } : tab === 'CLOSED' ? { status: 'CLOSED' } : {};
     const mine = ++request.current;
-    const r = await listCorrectiveActions({ ...filter, today: localToday() });
+    // The first load also brings the assignee list, in the same server call (see listActionsAndAssignees).
+    const first = !havePeople.current;
+    const r = first
+      ? await listActionsAndAssignees({ ...filter, today: localToday() })
+      : await listCorrectiveActions({ ...filter, today: localToday() });
+    if (first && r.people) { havePeople.current = true; setPeople(r.people); }
     if (mine !== request.current) return; // a newer tab or reload has taken over
     if (r.error) { setState({ loading: false, actions: [], error: r.error }); return; }
     setState({ loading: false, actions: r.actions, error: null });
   }, [tab]);
 
   useEffect(() => { setState({ loading: true, actions: [], error: null }); load(); }, [load]);
-  useEffect(() => { listAssignees().then((r) => setPeople(r.people || [])); }, []);
 
   const changed = () => { load(); if (onCountChange) onCountChange(); };
   const overdueCount = useMemo(() => state.actions.filter((a) => isOverdue(a)).length, [state.actions]);

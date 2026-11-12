@@ -14,14 +14,31 @@ sentence a person can read, never the raw database text.
 
 import json
 import os
-import urllib.error
+import threading
 import urllib.parse
-import urllib.request
 from typing import Optional, Tuple
 
+import httpx
 from fastapi import HTTPException
 
 TIMEOUT_S = 20
+
+# ONE pooled client for the whole process. Every call used to open a new HTTPS connection (urllib), which
+# measured 264 ms per request against 200 ms on a reused one: the TLS handshake to the database was paid on
+# every read, several times per screen. httpx.Client is thread-safe and keeps connections alive.
+_client: Optional[httpx.Client] = None
+_client_lock = threading.Lock()
+
+
+def http() -> httpx.Client:
+    """The shared, pooled HTTP client for calls to Supabase (PostgREST and auth)."""
+    global _client
+    if _client is None:
+        with _client_lock:
+            if _client is None:
+                _client = httpx.Client(timeout=TIMEOUT_S,
+                                       limits=httpx.Limits(max_connections=32, max_keepalive_connections=16, keepalive_expiry=60))
+    return _client
 
 
 class PgError(Exception):
@@ -84,18 +101,17 @@ def user_request(method: str, path: str, token: str, *, params: Optional[dict] =
         headers["Content-Type"] = "application/json"
     if prefer:
         headers["Prefer"] = prefer
-    request = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
-            raw = response.read().decode("utf-8") or ""
-            return response.status, dict(response.headers), (json.loads(raw) if raw else None)
-    except urllib.error.HTTPError as e:
+        response = http().request(method, url, content=data, headers=headers)
+    except (httpx.HTTPError, TimeoutError, OSError) as e:
+        raise PgError(502, "", f"{type(e).__name__}")
+    if response.status_code >= 400:
         code, message = "", ""
         try:
-            parsed = json.loads(e.read().decode("utf-8"))
+            parsed = response.json()
             code, message = str(parsed.get("code", "")), str(parsed.get("message", ""))
         except Exception:
             pass
-        raise PgError(e.code, code, message)
-    except (urllib.error.URLError, TimeoutError, OSError) as e:
-        raise PgError(502, "", f"{type(e).__name__}")
+        raise PgError(response.status_code, code, message)
+    raw = response.text or ""
+    return response.status_code, dict(response.headers), (json.loads(raw) if raw else None)

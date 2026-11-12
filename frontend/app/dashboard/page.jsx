@@ -37,9 +37,8 @@ import { FloorplanHeatmap } from '../components/FloorplanHeatmap';
 import { ZoneEditor } from '../components/ZoneEditor';
 import { supabase } from '../lib/supabase/browser';
 import { backendFetch } from '../lib/backend';
-import { getViewerRole } from '../lib/session';
-import { getOpenAlerts } from '../lib/safety/queries';
-import { countOverdueActions } from '../lib/safety/management';
+import { getDashboardStart } from '../lib/session';
+import { getBadgeCounts } from '../lib/safety/queries';
 import RangePicker from './RangePicker';
 import { can, denialMessage } from '../lib/permissions';
 
@@ -166,49 +165,49 @@ function DashboardInner() {
   useEffect(() => {
     if (!supabase) return;
     let active = true;
-    supabase.auth.getUser().then(({ data }) => {
-      if (active && data?.user) {
+    // Only the name and e-mail for the sidebar, so the browser's own session is enough: getSession() reads it
+    // locally, where getUser() was a round trip to the auth server on every dashboard load. Nothing is decided
+    // by this value (the layout verified the session on the server; every read and action re-checks).
+    supabase.auth.getSession().then(({ data }) => {
+      const u = data?.session?.user;
+      if (active && u) {
         setUser({
-          email: data.user.email,
-          fullName: data.user.user_metadata?.full_name ?? null,
+          email: u.email,
+          fullName: u.user_metadata?.full_name ?? null,
         });
       }
-    });
-    // Resolved on the server so the role the UI draws from is the same one the
-    // Server Actions re-check against.
-    getViewerRole().then((r) => {
-      if (!active) return;
-      setRole(r?.role ?? null);
-      setOrg({
-        name: r?.orgName ?? null,
-        plan: r?.plan ?? null,
-        planSelectedAt: r?.planSelectedAt ?? null,
-      });
     });
     return () => { active = false; };
   }, []);
 
   const alertsRequest = useRef(0);
   const [overdue, setOverdue] = useState(0);
+  const applyBadges = useCallback((r) => {
+    setOverdue(r?.overdue || 0);
+    if (r?.error) {
+      // Keep the last good count and list: one failed poll must not blank the badge.
+      setAlerts((s) => ({ ...s, status: 'error', error: String(r.error) }));
+      return;
+    }
+    setAlerts({ status: 'ready', count: r?.count ?? 0, alerts: r?.alerts ?? [], error: null });
+  }, []);
   const loadAlerts = useCallback(async () => {
     try {
       const mine = ++alertsRequest.current;
-      const r = await getOpenAlerts();
+      // One server call for both badges (Next.js runs a page's server actions one at a time).
+      const r = await getBadgeCounts(new Date().toLocaleDateString("en-CA"));
       if (mine !== alertsRequest.current) return;            // an older reply that arrived late
-      if (r?.error) throw new Error(r.error);
-      setAlerts({ status: 'ready', count: r.count, alerts: r.alerts, error: null });
-      countOverdueActions(new Date().toLocaleDateString("en-CA")).then((n) => { if (mine === alertsRequest.current) setOverdue(n || 0); }).catch(() => {});
+      applyBadges(r);
     } catch (err) {
-      // Keep the last good count and list: one failed poll must not blank the badge.
       setAlerts((s) => ({ ...s, status: 'error', error: String(err?.message || err) }));
     }
-  }, []);
+  }, [applyBadges]);
 
   // The badge and the list follow the same slow poll as the overview: a flag is synced to
-  // Postgres within a minute of being raised (and at the end of a video).
+  // Postgres within a minute of being raised (and at the end of a video). The FIRST read comes
+  // with the opening call below, so the poll starts one interval later.
   useEffect(() => {
     let cancelled = false;
-    loadAlerts();
     const timer = setInterval(() => { if (!cancelled && !document.hidden) loadAlerts(); }, REFRESH_MS);
     return () => { cancelled = true; clearInterval(timer); };
   }, [loadAlerts]);
@@ -220,22 +219,48 @@ function DashboardInner() {
   // list, which nothing in the product ever filled, so the page always ran as
   // the unregistered default and nothing synced.
   const [camerasStatus, setCamerasStatus] = useState({ status: 'loading', error: null });
+  const applyCameras = useCallback((r, prefer) => {
+    if (r?.error) { setCamerasStatus({ status: 'error', error: String(r.error) }); return; }
+    const list = Array.isArray(r?.cameras) ? r.cameras : [];
+    setCameras(list);
+    setCamerasStatus({ status: 'ready', error: null });
+    const names = list.map((c) => c.name);
+    // Keep the camera being worked on; otherwise the one just added, or the first.
+    setCameraId((current) => (prefer && names.includes(prefer) ? prefer
+      : names.includes(current) ? current : (names[0] ?? CAMERA_ID)));
+  }, []);
   const loadCameras = useCallback(async (prefer) => {
     try {
-      const r = await listCameras();
-      if (r?.error) throw new Error(r.error);
-      const list = Array.isArray(r?.cameras) ? r.cameras : [];
-      setCameras(list);
-      setCamerasStatus({ status: 'ready', error: null });
-      const names = list.map((c) => c.name);
-      // Keep the camera being worked on; otherwise the one just added, or the first.
-      setCameraId((current) => (prefer && names.includes(prefer) ? prefer
-        : names.includes(current) ? current : (names[0] ?? CAMERA_ID)));
+      applyCameras(await listCameras(), prefer);
     } catch (err) {
       setCamerasStatus({ status: 'error', error: String(err?.message || err) });
     }
-  }, []);
-  useEffect(() => { loadCameras(); }, [loadCameras]);
+  }, [applyCameras]);
+
+  // OPENING: role and organisation, cameras and both badges in ONE server call (getDashboardStart). They
+  // used to be three separate server actions, which Next.js runs one after another, so the Overview waited
+  // for all three in a row.
+  useEffect(() => {
+    let active = true;
+    getDashboardStart(new Date().toLocaleDateString("en-CA")).then((r) => {
+      if (!active || !r) return;
+      // Resolved on the server so the role the UI draws from is the same one the
+      // Server Actions re-check against.
+      setRole(r.viewer?.role ?? null);
+      setOrg({
+        name: r.viewer?.orgName ?? null,
+        plan: r.viewer?.plan ?? null,
+        planSelectedAt: r.viewer?.planSelectedAt ?? null,
+      });
+      applyCameras(r.cameras);
+      applyBadges(r.badges);
+    }).catch((err) => {
+      if (!active) return;
+      setCamerasStatus({ status: 'error', error: String(err?.message || err) });
+      setAlerts((s) => ({ ...s, status: 'error', error: String(err?.message || err) }));
+    });
+    return () => { active = false; };
+  }, [applyCameras, applyBadges]);
 
   // Zones for the selected camera. Loaded HERE, not in the editor, so the live
   // overlay has them whether or not the Zones page has been opened — and so

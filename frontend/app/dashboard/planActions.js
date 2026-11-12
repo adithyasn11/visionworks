@@ -21,7 +21,7 @@
 // read their own organisation's usage. This is a display, not an enforcement
 // decision — the enforcement already happened in the trigger.
 
-import { createClient } from '../lib/supabase/server';
+import { createClient, getAuthUser } from '../lib/supabase/server';
 import { isPlanId } from '../lib/plans';
 
 /**
@@ -50,10 +50,13 @@ export async function getPlanUsage() {
   const supabase = createClient();
   if (!supabase) return { ok: false, message: 'Supabase is not configured.' };
 
-  const { data: userData, error: authError } = await supabase.auth.getUser();
-  if (authError || !userData?.user) {
+  // A display read, so a locally verified token is enough (getAuthUser); changePlan() below keeps getUser().
+  // Saves the auth-server round trip that made this panel take three trips in a row.
+  const verified = await getAuthUser(supabase);
+  if (!verified) {
     return { ok: false, message: 'Your session has expired.' };
   }
+  const userData = { user: verified };
 
   const { data: profile } = await supabase
     .from('profiles')

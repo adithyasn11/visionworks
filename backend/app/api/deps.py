@@ -150,16 +150,35 @@ def resolve_org(token: Optional[str]) -> Optional[str]:
     if cached is not None:
         return cached[0]
 
+    # SINGLE FLIGHT. A screen fires several requests at once with the same
+    # token; on a cold cache each of them used to run the whole verification
+    # (measured: two identical ~800 ms lookups side by side). Now the first one
+    # verifies and the others wait for it and read the cache.
+    with _flight_lock(token):
+        cached = _cache_get(token)
+        if cached is not None:
+            return cached[0]
+        return _verify_and_cache(token)
+
+
+def _verify_and_cache(token: str) -> Optional[str]:
     client = _supabase()
     if client is None:
         return None
 
     try:
-        # Verifies the JWT signature against the auth server. A forged or
-        # expired token raises here — measured: AuthApiError "invalid JWT".
-        response = client.auth.get_user(token)
-        user = getattr(response, "user", None)
-        user_id = getattr(user, "id", None) if user else None
+        # Verifies the JWT signature. The project signs tokens with an
+        # asymmetric key (ES256), so get_claims() checks the signature and the
+        # expiry LOCALLY against the published key set (fetched once, cached),
+        # instead of a round trip to the auth server on every cache miss
+        # (get_user, about 250 ms). An HS256 token still falls back to the auth
+        # server inside get_claims(). A forged or expired token raises here.
+        # Trade-off: a token from a session that was signed out elsewhere stays
+        # usable here until it expires (at most an hour) — the same as
+        # PostgREST, which runs every query under that token anyway.
+        response = client.auth.get_claims(jwt=token)
+        claims = (getattr(response, "claims", None) or (response.get("claims") if isinstance(response, dict) else None)) or {}
+        user_id = claims.get("sub") if claims.get("role") == "authenticated" else None
         if not user_id:
             _cache_put(token, None, None)
             return None
@@ -172,6 +191,21 @@ def resolve_org(token: Optional[str]) -> Optional[str]:
     org_id, role = resolved if resolved else (None, None)
     _cache_put(token, org_id, user_id, role)
     return org_id
+
+
+_flight_locks: dict = {}
+_flight_guard = threading.Lock()
+
+
+def _flight_lock(token: str) -> threading.Lock:
+    """One lock per token being verified, so concurrent misses verify once. Dropped when the dict grows."""
+    with _flight_guard:
+        lock = _flight_locks.get(token)
+        if lock is None:
+            if len(_flight_locks) > 256:
+                _flight_locks.clear()
+            lock = _flight_locks[token] = threading.Lock()
+        return lock
 
 
 def _lookup_org(token: str, user_id: str):
@@ -208,9 +242,8 @@ def _lookup_org(token: str, user_id: str):
     stale pointer, and honouring it would keep writing their telemetry into an
     org they were removed from.
     """
-    import json
-    import urllib.parse
-    import urllib.request
+    from concurrent.futures import ThreadPoolExecutor
+    from app.api.pg_user import http
 
     base = (os.getenv("SUPABASE_URL") or "").rstrip("/")
     anon = os.getenv("SUPABASE_KEY") or ""
@@ -218,9 +251,9 @@ def _lookup_org(token: str, user_id: str):
         return None
 
     def get(path: str, params: dict):
-        url = f"{base}/rest/v1/{path}?{urllib.parse.urlencode(params)}"
-        request = urllib.request.Request(
-            url,
+        response = http().get(
+            f"{base}/rest/v1/{path}",
+            params=params,
             headers={
                 # `apikey` identifies the project; `Authorization` identifies
                 # the USER. PostgREST reads auth.uid() from the latter, which
@@ -229,24 +262,28 @@ def _lookup_org(token: str, user_id: str):
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/json",
             },
+            timeout=10,
         )
-        with urllib.request.urlopen(request, timeout=10) as response:
-            return json.loads(response.read().decode("utf-8") or "[]")
+        response.raise_for_status()
+        return response.json() or []
 
     try:
         # The ROLE is fetched alongside the org, in the same request. It is what
         # Step 4 gates writes on: a VIEWER may read this organisation's
         # measurements but must not create zones or start an analysis, and the
         # endpoint needs to know that before it acts.
-        memberships = get(
-            "memberships",
-            {"select": "orgId,role", "profileId": f"eq.{user_id}", "status": "eq.ACTIVE"},
-        )
+        #
+        # The two reads are independent, so they run AT THE SAME TIME (pooled
+        # connections): one round trip of waiting instead of two.
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            f_members = pool.submit(get, "memberships",
+                                    {"select": "orgId,role", "profileId": f"eq.{user_id}", "status": "eq.ACTIVE"})
+            f_profile = pool.submit(get, "profiles", {"select": "currentOrgId", "id": f"eq.{user_id}"})
+            memberships, profiles = f_members.result(), f_profile.result()
         by_org = {row["orgId"]: row.get("role") for row in memberships if row.get("orgId")}
         if not by_org:
             return None
 
-        profiles = get("profiles", {"select": "currentOrgId", "id": f"eq.{user_id}"})
         current = profiles[0].get("currentOrgId") if profiles else None
 
         if current and current in by_org:

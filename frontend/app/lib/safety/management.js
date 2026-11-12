@@ -67,6 +67,15 @@ export async function listCorrectiveActions({ status, overdue, decisionId, today
   }
 }
 
+/**
+ * The actions list and the people they can be assigned to, in ONE server call (the two reads run together).
+ * Next.js queues a page's server actions, so two separate calls cost two waits in a row.
+ */
+export async function listActionsAndAssignees(options = {}) {
+  const [actions, people] = await Promise.all([listCorrectiveActions(options), listAssignees()]);
+  return { ...actions, people: people.people || [] };
+}
+
 /** How many active actions are past their due date (for the navigation badge). */
 export async function countOverdueActions(day) {
   const supabase = createClient();

@@ -20,8 +20,7 @@ import {
 import ThemeToggle from '../components/ThemeToggle';
 import { supabase } from '../lib/supabase/browser';
 import { can } from '../lib/permissions';
-import { getOpenAlerts } from '../lib/safety/queries';
-import { countOverdueActions } from '../lib/safety/management';
+import { getBadgeCounts } from '../lib/safety/queries';
 
 // `plan` sits with the other views rather than down with the settings links,
 // because it is view state on this page like the rest of them — no navigation,
@@ -147,8 +146,12 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
     if (typeof alertCount === 'number' && typeof overdueCount === 'number') return undefined;
     let live = true;
     const load = () => {
-      getOpenAlerts().then((r) => { if (live && r && !r.error) setOwnCount(r.count || 0); }).catch(() => {});
-      countOverdueActions(new Date().toLocaleDateString("en-CA")).then((n) => { if (live) setOwnOverdue(n || 0); }).catch(() => {});
+      // Both badges in one server call.
+      getBadgeCounts(new Date().toLocaleDateString("en-CA")).then((r) => {
+        if (!live || !r) return;
+        if (!r.error) setOwnCount(r.count || 0);
+        setOwnOverdue(r.overdue || 0);
+      }).catch(() => {});
     };
     load();
     const timer = setInterval(() => { if (!document.hidden) load(); }, 30000);

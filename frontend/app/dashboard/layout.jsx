@@ -23,7 +23,7 @@
 // lost is the redirect, not the isolation.
 
 import { redirect } from 'next/navigation';
-import { createClient } from '../lib/supabase/server';
+import { createClient, getAuthUser } from '../lib/supabase/server';
 
 // Never cached: the answer depends on who is asking, and a cached "you have an
 // org" would let a brand-new account straight past the guard.
@@ -44,8 +44,10 @@ export default async function DashboardLayout({ children }) {
   // between two broken pages with no explanation.
   if (!supabase) return children;
 
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user) redirect('/login?next=/dashboard');
+  // A verified token (checked locally, see getAuthUser) — not a trip to the auth server per page load.
+  const user = await getAuthUser(supabase);
+  if (!user) redirect('/login?next=/dashboard');
+  const data = { user };
 
   // `profiles` is readable by its owner (profile_select_self), so this needs no
   // elevated client. `maybeSingle()` rather than `single()`: the profile row is
