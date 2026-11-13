@@ -568,8 +568,8 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
         />
 
         {status === 'loading' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[color:var(--ground)]/80">
-            <Loader2 className="w-5 h-5 text-accent animate-spin" />
+          <div role="status" aria-busy="true" className="absolute inset-0 skeleton rounded-none">
+            <span className="sr-only">Loading the zones…</span>
           </div>
         )}
 

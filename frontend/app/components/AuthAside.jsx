@@ -72,24 +72,32 @@ function Floorplan() {
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
 
-    const css = getComputedStyle(document.documentElement);
-    const accent = css.getPropertyValue('--accent').trim() || '#F05252';
+    // Colours follow the theme, read every frame so switching light / dark repaints at once: light lines
+    // on the dark panel, dark lines on the light one.
+    let fg = '255,255,255';
+    let accent = '#F05252';
+    const readTheme = () => {
+      const root = document.documentElement;
+      fg = root.classList.contains('dark') ? '255,255,255' : '26,24,28';
+      accent = getComputedStyle(root).getPropertyValue('--accent').trim() || '#F05252';
+    };
 
     let lastCount = 0;
 
     const draw = (time) => {
+      readTheme();
       ctx.clearRect(0, 0, w, h);
 
       // Zone rectangles — hairline, no fills competing with the figures.
       ZONES.forEach((z) => {
         const x = z.x * w, y = z.y * h, zw = z.w * w, zh = z.h * h;
-        ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+        ctx.strokeStyle = `rgba(${fg},0.14)`;
         ctx.lineWidth = 1;
         ctx.setLineDash(z.id === 'exit' ? [4, 4] : []);
         ctx.strokeRect(x, y, zw, zh);
         ctx.setLineDash([]);
 
-        ctx.fillStyle = 'rgba(255,255,255,0.30)';
+        ctx.fillStyle = `rgba(${fg},0.30)`;
         ctx.font = '600 10px ui-monospace, SFMono-Regular, Menlo, monospace';
         ctx.fillText(z.label.toUpperCase(), x + 8, y + 17);
       });
@@ -144,18 +152,18 @@ function Floorplan() {
         if (moving) {
           const tx = (from.x + (to.x - from.x) * Math.max(0, e - 0.08)) * w;
           const ty = (from.y + (to.y - from.y) * Math.max(0, e - 0.08)) * h;
-          ctx.strokeStyle = hot ? 'rgba(240,82,82,0.35)' : 'rgba(255,255,255,0.18)';
+          ctx.strokeStyle = hot ? 'rgba(240,82,82,0.35)' : `rgba(${fg},0.18)`;
           ctx.lineWidth = 1.5;
           ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(px, py); ctx.stroke();
         }
 
         // Detection box + centroid dot, the way the HUD draws them.
         const box = 22;
-        ctx.strokeStyle = hot ? accent : 'rgba(255,255,255,0.55)';
+        ctx.strokeStyle = hot ? accent : `rgba(${fg},0.55)`;
         ctx.lineWidth = 1.5;
         ctx.strokeRect(px - box / 2, py - box / 2, box, box);
 
-        ctx.fillStyle = hot ? accent : 'rgba(255,255,255,0.85)';
+        ctx.fillStyle = hot ? accent : `rgba(${fg},0.85)`;
         ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
 
         // Track label — pushed down when another label already sits nearby,
@@ -168,7 +176,7 @@ function Floorplan() {
           if (Math.abs(p.x - lx) < 74 && Math.abs(p.y - ly) < 11) ly = p.y + 12;
         }
         placed.push({ x: lx, y: ly });
-        ctx.fillStyle = hot ? accent : 'rgba(255,255,255,0.55)';
+        ctx.fillStyle = hot ? accent : `rgba(${fg},0.55)`;
         ctx.fillText(label, lx, ly);
       });
 

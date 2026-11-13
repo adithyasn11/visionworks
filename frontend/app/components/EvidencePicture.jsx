@@ -73,7 +73,9 @@ export default function EvidencePicture({ decisionId }) {
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
-      {state.loading && <p className="text-xs text-ink-muted">Loading…</p>}
+      {state.loading && (
+        <div role="status" aria-busy="true" className="skeleton w-full aspect-video rounded-lg"><span className="sr-only">Loading the picture…</span></div>
+      )}
       {state.error && <p className="text-xs text-ink-muted">{state.error}</p>}
       {state.url && (
         // eslint-disable-next-line @next/next/no-img-element

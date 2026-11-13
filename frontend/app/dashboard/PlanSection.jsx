@@ -352,10 +352,11 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
           </dl>
 
           {!usage && (
-            <p className="flex items-center gap-2 text-[12px] font-medium opacity-45 mt-4">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
-              Reading your usage…
-            </p>
+            <div role="status" aria-busy="true" className="mt-4 flex flex-col gap-2">
+              <span className="sr-only">Reading your usage…</span>
+              <div className="skeleton h-2.5 w-2/3" aria-hidden="true" />
+              <div className="skeleton h-2.5 w-1/2" aria-hidden="true" />
+            </div>
           )}
         </div>
       </section>

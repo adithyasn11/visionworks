@@ -201,7 +201,11 @@ export const FloorplanHeatmap = () => {
         {/* heatmap.js appends its canvas here and positions it absolutely. */}
         <div ref={containerRef} className="absolute inset-0" />
 
-        {overlay && <Overlay kind={overlay.kind} message={overlay.message} />}
+        {overlay?.kind === 'loading' ? (
+          <div role="status" aria-busy="true" className="absolute inset-0 skeleton rounded-none">
+            <span className="sr-only">{overlay.message}</span>
+          </div>
+        ) : overlay && <Overlay kind={overlay.kind} message={overlay.message} />}
       </div>
 
       {hasPoints && (

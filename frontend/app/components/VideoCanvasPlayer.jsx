@@ -284,12 +284,8 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     // opening with ?blur=false, or a changed PRIVACY_BLUR_DEFAULT).
     setEnableBlur(null);
     pendingBlurRef.current = null;
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#090D16';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
+    // Back to the empty stage, in the theme's colours.
+    window.requestAnimationFrame(() => paintIdle());
   }, [stopWebcamStream]);
 
   // Upload Video File
@@ -592,27 +588,36 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
 
-  // Initial canvas grid render
-  useEffect(() => {
+  // The empty stage (no camera, no video yet), painted in the THEME's colours: a soft panel with a grid and
+  // a hint in light mode, the dark one in dark mode. Repainted when the theme changes while still idle, so
+  // light mode no longer shows a black block. Once frames arrive they paint over it.
+  const phaseRef = useRef(phase);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
+  const paintIdle = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#090D16';
-    ctx.fillRect(0, 0, 960, 540);
-    ctx.strokeStyle = 'rgba(51,65,85,0.3)';
+    const css = getComputedStyle(document.documentElement);
+    const v = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
+    const W = canvas.width, H = canvas.height;
+    ctx.fillStyle = v('--surface-alt', '#F6ECEA');
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = v('--line-soft', '#E8DAD7');
     ctx.lineWidth = 1;
-    for (let x = 0; x < 960; x += 80) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 540); ctx.stroke();
-    }
-    for (let y = 0; y < 540; y += 80) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(960, y); ctx.stroke();
-    }
-    ctx.fillStyle = '#334155';
+    for (let x = 0; x < W; x += 80) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = 0; y < H; y += 80) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    ctx.fillStyle = v('--ink-faint', '#6B6772');
     ctx.font = '600 16px Inter, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('Turn on Camera or Upload video to start monitoring', 480, 270);
+    ctx.fillText('Turn on the camera or upload a video to start', W / 2, H / 2);
     ctx.textAlign = 'left';
   }, []);
+  useEffect(() => {
+    paintIdle();
+    const mo = new MutationObserver(() => { if (phaseRef.current === 'idle') paintIdle(); });
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => mo.disconnect();
+  }, [paintIdle]);
 
   // Cleanup webcam stream on unmount
   useEffect(() => {

@@ -7,9 +7,12 @@
    ThemeToggle). Neutrals carry a slight warm/red bias rather than being pure
    grey, so the red accent sits naturally on both grounds.                   */
 :root {
-  --ground:        #FFFFFF;
-  --surface:       #FAFAFA;
-  --surface-alt:   #F4F4F5;
+  /* Light theme: not stark white. The page sits on a warm off-white with a faint red in it (blush), cards
+     are a touch lighter so they lift off it, and quieter fills lean rose. Flat colours, no gradients. */
+  --ground:        #FBF6F5;
+  --surface:       #FFFCFB;
+  --surface-alt:   #F6ECEA;
+  --feature:       #F7E3DF; /* the light-mode version of the feature cards that are dark in dark mode */
   --ink:           #0B0A0C;
   --ink-muted:     #57545C;
   --ink-faint:     #6B6772; /* AA (5.5:1) on both ground and surface */
@@ -18,12 +21,12 @@
      identity. Thin separators INSIDE a card (table rows, list rows, hairline
      rules) use --line-soft, so a table does not turn into a heavy grid. */
   --line:          #1A181C;
-  --line-soft:     #D6D3DA;
+  --line-soft:     #E6D7D4;
   --field:         #1A181C; /* form controls share the card border */
   --field-hover:   #0B0A0C;
   --accent:        #DC2626; /* accent text/icons on the page ground */
   --accent-fill:   #DC2626; /* solid red panels that carry white text */
-  --accent-soft:   rgba(220, 38, 38, 0.10);
+  --accent-soft:   rgba(220, 38, 38, 0.09);
   --inverse:       #0B0A0C;
   --inverse-ink:   #FFFFFF;
 }
@@ -32,6 +35,7 @@
   --ground:        #0B0A0C;
   --surface:       #141316;
   --surface-alt:   #1C1A1F;
+  --feature:       #1C1A1F;
   --ink:           #F7F6F8;
   --ink-muted:     #A5A1AB;
   --ink-faint:     #8B8792; /* AA (5.6:1) on both ground and surface */
@@ -203,15 +207,28 @@ html.theme-switching body {
 /* Permanently dark feature cards — a fixed design accent, not a theme
    inversion. In dark mode they lift slightly so they stay distinct from the
    page ground instead of disappearing into it. */
+/* Feature cards (`card-dark`): a deep panel in DARK mode, and in LIGHT mode a soft red-tinted card with
+   dark text, so light mode has no black blocks left. Their contents were written as light-on-dark
+   (text-white, white/10 fills and borders), so those are re-mapped to the theme inside the card in light
+   mode; anything white on a red accent (buttons, icon tiles) keeps its white text. */
 .card-dark {
-  background-color: #111013;
-  color: #F7F6F8;
+  background-color: var(--feature);
+  color: var(--ink);
+}
+/* Outlined like every other card; the footer keeps its own thick red top edge instead. */
+.card-dark:not(footer) {
+  border: 1px solid var(--line);
 }
 .dark .card-dark {
   background-color: #1C1A1F;
+  color: #F7F6F8;
+  border-color: var(--line);
 }
-.card-dark .text-ink        { color: #F7F6F8; }
-.card-dark .text-ink-muted  { color: #A5A1AB; }
+html:not(.dark) .card-dark .text-white:not(.bg-accent):not(.bg-accent *) { color: var(--ink); }
+html:not(.dark) .card-dark :is(.text-white\/40, .text-white\/60, .text-white\/75) { color: var(--ink-muted); }
+html:not(.dark) .card-dark :is(.bg-white\/5, .bg-white\/10, .bg-white\/\[0\.06\], .bg-white\/\[0\.07\]) { background-color: rgba(26, 24, 28, 0.05); }
+html:not(.dark) .card-dark :is(.bg-white\/20, .bg-white\/30) { background-color: rgba(26, 24, 28, 0.14); }
+html:not(.dark) .card-dark :is(.border-white\/10, .border-white\/15, .border-white\/\[0\.04\]) { border-color: rgba(26, 24, 28, 0.16); }
 
 .bg-ground      { background-color: var(--ground); }
 .bg-surface     { background-color: var(--surface); }
@@ -452,7 +469,7 @@ html.theme-switching body {
   --chart-1:    #C7362F;
   --chart-2:    #3B62B0;
   --chart-3:    #B7791F;
-  --chart-grid: #ECEAE7;
+  --chart-grid: #EADDDA;
   --chart-axis: #6B6772;
   --chart-tooltip-bg: #FFFFFF;
 }

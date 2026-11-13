@@ -565,10 +565,10 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
           <div className="rounded-xl border border-line bg-surface divide-y divide-[color:var(--line-soft)]">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-3.5">
-                <div className="w-9 h-9 rounded-lg bg-surface-alt animate-pulse" />
+                <div className="w-9 h-9 rounded-lg skeleton" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-3.5 w-40 rounded bg-surface-alt animate-pulse" />
-                  <div className="h-3 w-56 rounded bg-surface-alt animate-pulse" />
+                  <div className="h-3.5 w-40 skeleton" />
+                  <div className="h-3 w-56 skeleton" />
                 </div>
               </div>
             ))}

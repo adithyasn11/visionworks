@@ -374,7 +374,7 @@ export default function DecisionDetail({ decisionId, role, onChanged }) {
       {decision.thresholds && <Section title="The limits it was judged by"><Thresholds thresholds={decision.thresholds} /></Section>}
 
       <Section title="This worker around that moment">
-        {events === null ? <p className="text-xs text-ink-faint">Loading…</p> : events.length === 0 ? <p className="text-xs text-ink-faint">No zone activity was recorded for this worker nearby.</p> : (
+        {events === null ? <Skeleton rows={2} label="Loading the timeline" /> : events.length === 0 ? <p className="text-xs text-ink-faint">No zone activity was recorded for this worker nearby.</p> : (
           <ul className="flex flex-col divide-y divide-line-soft text-xs">
             {events.map((e) => {
               const d = describeZoneEvent({ event_type: e.eventType, worker_key: e.workerKey, details: e.details });
