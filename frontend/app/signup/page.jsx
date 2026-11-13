@@ -9,6 +9,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { ThemeToggle } from '../components/ThemeToggle';
 import AuthAside from '../components/AuthAside';
 import { GoogleButton, Divider, Field, PasswordField, Banner, SubmitButton } from '../components/AuthFormBits';
+import { createConfirmedAccount } from './actions';
 
 const ASIDE = {
   eyebrow: 'setup // minutes',
@@ -102,6 +103,18 @@ function SignupForm() {
 
     setBusy(true);
     try {
+      // Create the account already confirmed (no verification email), then sign straight in.
+      const created = await createConfirmedAccount({ name, email, password });
+      if (created?.error) { setBanner({ kind: 'error', text: created.error }); return; }
+      if (created?.ok) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+        if (signInError) { setBanner({ kind: 'error', text: describeAuthError(signInError) }); return; }
+        router.replace('/dashboard');
+        router.refresh();
+        return;
+      }
+
+      // Fallback when the server has no service key: the ordinary sign-up.
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,

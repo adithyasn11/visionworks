@@ -6,7 +6,7 @@ This guide walks you through the whole app from nothing to a finished safety rep
 - **Supabase:**
   - no organisations, profiles, members, sites, cameras, zones, rules, events, decisions, actions or reports;
   - no sign-in accounts;
-  - only the three plan limits (Free / Pro / Business) are left.
+  - only the three plan limits (Starter / Growth / Enterprise) are left.
 - **Local pipeline database** (`workplace_analytics.db`): empty.
 - **Evidence pictures** (`backend/evidence/`): empty.
 
@@ -83,9 +83,9 @@ Choose one way.
 
 **Option 1, email:**
 - [ ] Click **Create an account** → fill in name, email and password → submit.
-  - **Expect:** you are told to confirm your email, or you are signed in straight away, depending on the Supabase email settings.
-- [ ] If asked, open the confirmation email and click the link.
-  - **Expect:** you land back in the app, signed in.
+  - **Expect:** you are signed in straight away and land on Home. No verification email is sent.
+- [ ] Try signing up again with the same email.
+  - **Expect:** "An account with that email already exists. Try signing in instead."
 
 **Option 2, Google:**
 - [ ] Click **Continue with Google** → pick your account.
@@ -99,10 +99,10 @@ Choose one way.
 ## 3. Home and plan choice
 
 - [ ] **3.1** On Home, read the **Plans** section.
-  - **Expect:** Free, Pro and Business cards. One is marked **Most popular**.
+  - **Expect:** Starter, Growth and Enterprise cards. One is marked **Most popular**.
 - [ ] **3.2** Flip the **Billing period** switch (monthly ↔ yearly).
   - **Expect:** prices change, and the yearly price says "12 months for the price of 10".
-- [ ] **3.3** Click **Choose a plan** on a paid plan (for example Pro).
+- [ ] **3.3** Click **Choose a plan** on a paid plan (for example Growth).
   - **Expect:** the **Checkout** page opens with:
     - the plan name;
     - the billing period switch;
@@ -380,7 +380,7 @@ The progress bar at the top shows **Organisation · Site · Camera**.
   - **Confirm** the switch;
   - **Expect:** the plan changes and the limits update.
   - Try **Cancel** too.
-- [ ] Go down to Free while using more than Free allows.
+- [ ] Go down to Starter while using more than Starter allows.
   - **Expect:** a clear warning about the limit.
 
 ---
