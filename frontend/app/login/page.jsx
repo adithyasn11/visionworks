@@ -12,7 +12,7 @@ import { GoogleButton, Divider, Field, PasswordField, Banner, SubmitButton } fro
 
 const ASIDE = {
   eyebrow: 'cam_gate_01 // live',
-  headline: 'Every worker checked. Nobody named.',
+  headline: 'Every worker checked.',
   sub: 'Detection, tracking and PPE checks run on your own hardware. What leaves the machine is a verdict, not a frame.',
   facts: [
     { term: 'model',     detail: 'YOLOv8m-pose for people, YOLOv8m for helmets and vests' },
