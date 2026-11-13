@@ -72,7 +72,7 @@ function newWorker(delay) {
     hidden: Math.random() < 0.12,          // partly behind something: the system will not guess
     pace: rand(0.85, 1.25),                // own walking speed
     wobble: rand(0, 10),
-    stride: 0, wait: delay, stop: 0, moving: 0,
+    stride: 0, wait: delay, stop: 0, moving: 0, legTime: 0, life: 0,
     zone: null, checked: false, verdict: null,
     lock: 0, pulse: 0, trail: [],
     fallen: false, fall: 0, fellOnce: false, alerted: false,
@@ -172,15 +172,26 @@ function LiveScene() {
 
       const target = wk.route[wk.leg];
       const px = base();
-      // steer towards the next point, with a little drift so nobody walks a ruler-straight line
+      // Safety nets so the scene can never stall: a leg that takes too long is given up, and a worker who has
+      // been around too long walks off and is replaced.
+      wk.legTime += dt; wk.life += dt;
+      if (wk.life > 70) { Object.assign(wk, newWorker(rand(0.2, 1.2))); return; }
+      if (wk.legTime > 12) {
+        if (target.out) { Object.assign(wk, newWorker(rand(0.2, 1.2))); return; }
+        wk.leg += 1; wk.legTime = 0; return;
+      }
+
+      const dist = Math.hypot((target.x - wk.x) * w, (target.y - wk.y) * h);
+      const near = dist < px * 1.2;
+      // steer towards the next point, with a little drift so nobody walks a ruler-straight line; close to the
+      // point, head straight for it so nobody circles it
       const want = Math.atan2((target.y - wk.y) * h, (target.x - wk.x) * w)
-        + Math.sin(t * 0.9 + wk.wobble) * 0.28;
+        + (near ? 0 : Math.sin(t * 0.9 + wk.wobble) * 0.28);
       let turn = Math.atan2(Math.sin(want - wk.heading), Math.cos(want - wk.heading));
-      const maxTurn = 3.2 * dt;
+      const maxTurn = (near ? 14 : 3.2) * dt;
       turn = Math.max(-maxTurn, Math.min(maxTurn, turn));
       wk.heading += turn;
 
-      const dist = Math.hypot((target.x - wk.x) * w, (target.y - wk.y) * h);
       const sharp = 1 - (Math.abs(turn) / (maxTurn + 1e-6)) * 0.35;                  // slow down in turns
       const arrive = Math.min(1, dist / (px * 0.8));                                  // and near the stop
       const speed = px * 1.15 * wk.pace * depth(wk.y) * sharp * (0.35 + 0.65 * arrive)
@@ -188,20 +199,23 @@ function LiveScene() {
       wk.moving = Math.min(1, wk.moving + dt * 3);
 
       let vx = Math.cos(wk.heading) * speed, vy = Math.sin(wk.heading) * speed;
-      // keep a little personal space
+      // keep a little personal space, easing off near the stop so nobody is pushed away from where they are going
+      const give = Math.min(1, dist / (px * 1.5));
       for (const o of workers) {
         if (o === wk || o.wait > 0) continue;
         const dx = (wk.x - o.x) * w, dy = (wk.y - o.y) * h, d = Math.hypot(dx, dy);
-        if (d > 0 && d < px * 0.8) { vx += (dx / d) * px * 0.9; vy += (dy / d) * px * 0.5; }
+        if (d > 0 && d < px * 0.8) { vx += (dx / d) * px * 0.9 * give; vy += (dy / d) * px * 0.5 * give; }
       }
       wk.x += (vx * dt) / Math.max(w, 1);
       wk.y += (vy * dt) / Math.max(h, 1);
+      wk.x = Math.max(-0.12, Math.min(1.12, wk.x));
+      wk.y = Math.min(1.12, wk.y);
       if (wk.x > 0.02 && wk.x < 0.98) wk.y = Math.max(0.34, wk.y);       // never walk up into the top readouts
       wk.stride += (speed * dt) / (px * 0.22);
 
-      if (dist < px * 0.12) {
+      if (dist < px * 0.3) {
         if (target.out) { Object.assign(wk, newWorker(rand(0.4, 2.2))); return; }
-        wk.stop = target.stop; wk.leg += 1;
+        wk.stop = target.stop; wk.leg += 1; wk.legTime = 0;
       }
 
       const z = zoneAt(wk.x, wk.y);
@@ -302,8 +316,10 @@ function LiveScene() {
       return { left: cx, width: tw };
     };
 
-    const draw = (now) => {
-      const dt = reduced ? 0 : Math.min(0.05, (now - last) / 1000);
+    // One frame. Wrapped by `draw` below, which always books the next frame, so the scene never stops.
+    const paint = (now) => {
+      // Reduced motion slows the scene down rather than freezing it: it is the only thing on this panel.
+      const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)) * (reduced ? 0.5 : 1);
       const t = now / 1000;
       last = now;
       ctx.clearRect(0, 0, w, h);
@@ -425,6 +441,12 @@ function LiveScene() {
       chip(`PERSONS ${persons} · ALERTS ${alerts}`, w - m - 10, h - m - 23,
         alerts ? accent : panel, alerts ? '#FFFFFF' : text, 'right');
 
+    };
+    const draw = (now) => {
+      try { paint(now); } catch (err) {
+        // A bad frame must not end the animation: start the people over and carry on.
+        workers.forEach((wk, i) => Object.assign(wk, newWorker(i * 1.2)));
+      }
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
