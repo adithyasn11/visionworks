@@ -66,11 +66,23 @@ export const BACKEND_WS = BACKEND_HTTP.replace(/^http/, 'ws');
 export async function getAccessToken() {
   if (!supabase) return null;
   try {
-    const { data } = await supabase.auth.getSession();
+    // Bounded: an expired session is refreshed here first, and if that refresh stalls every screen
+    // used to wait on it forever (skeletons that never resolved). After a few seconds the call goes
+    // out without a token and the screen shows "sign in again" instead of loading endlessly.
+    const { data } = await withTimeout(supabase.auth.getSession(), 8000);
     return data?.session?.access_token ?? null;
   } catch {
     return null;
   }
+}
+
+/** Resolve with `promise`, or reject after `ms` so a stalled call can never hang a screen. */
+export function withTimeout(promise, ms, message = 'This is taking too long. Refresh the page to try again.') {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); }),
+  ]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -86,10 +98,17 @@ export async function backendFetch(path, options = {}) {
   const headers = new Headers(options.headers || {});
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
+  // Reads get a time limit so an unreachable backend shows an error instead of a skeleton forever.
+  // Uploads and other writes do not: a large video can legitimately take minutes.
+  const method = (options.method || 'GET').toUpperCase();
+  const signal = options.signal
+    ?? (method === 'GET' && typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined);
+
   return fetch(`${BACKEND_HTTP}${path}`, {
     cache: 'no-store',
     ...options,
     headers,
+    ...(signal ? { signal } : {}),
   });
 }
 

@@ -3,8 +3,10 @@ REM ===========================================================================
 REM  VisionWorks - start the backend (port 8001) and the dashboard (port 3000).
 REM
 REM  Double-click this file, or run it from a terminal:
-REM      start_visionworks.bat          HTTPS (default: a phone can be used as a camera)
-REM      start_visionworks.bat http     plain HTTP, laptop only
+REM      start_visionworks.bat           normal use: fast production dashboard at http://localhost:3000
+REM                                      (built automatically the first time and after code changes)
+REM      start_visionworks.bat phone     HTTPS, so a phone can be paired as a camera
+REM      start_visionworks.bat dev       development server (live reload while editing code)
 REM
 REM  The dashboard opens in your browser once it is ready.
 REM  Close this window, or press Ctrl+C in it, to stop both servers.
@@ -34,15 +36,20 @@ if not exist "frontend\node_modules" (
     popd
 )
 
-set "MODE=--https"
-set "SCHEME=https"
-if /i "%~1"=="http" (
+set "MODE=--prod"
+set "URL=http://localhost:3000"
+if /i "%~1"=="phone" (
+    set "MODE=--https"
+    set "URL=https://localhost:3000"
+)
+if /i "%~1"=="dev" (
     set "MODE="
-    set "SCHEME=http"
+    set "URL=http://localhost:3000"
 )
 
-REM Open the dashboard once the servers have had time to start (the launcher waits for both).
-start "" /b cmd /c "timeout /t 25 /nobreak >nul & start "" %SCHEME%://localhost:3000"
+REM Open the dashboard once it answers (checked every 3 s, up to 5 minutes: the first production
+REM build takes about 2 minutes).
+start "" /b powershell -NoProfile -WindowStyle Hidden -Command "for($i=0;$i -lt 100;$i++){ $c=New-Object Net.Sockets.TcpClient; try { $c.Connect('127.0.0.1',3000); $c.Close(); break } catch { Start-Sleep 3 } }; Start-Sleep 2; Start-Process '%URL%'"
 
 "venv\Scripts\python.exe" run_system.py %MODE%
 

@@ -166,6 +166,42 @@ def lan_ip() -> str:
         s.close()
 
 
+PROD_DIST = ".next-prod"
+
+
+def prod_build_needed() -> bool:
+    """True when there is no production build, or any dashboard source file is newer than it."""
+    marker = os.path.join(FRONTEND_DIR, PROD_DIST, "BUILD_ID")
+    if not os.path.exists(marker):
+        return True
+    built = os.path.getmtime(marker)
+    watched = ["app", "public", "middleware.js", "package.json", "package-lock.json",
+               "next.config.mjs", "next.config.js", "tailwind.config.js", "postcss.config.js", ".env.local"]
+    for name in watched:
+        path = os.path.join(FRONTEND_DIR, name)
+        if os.path.isfile(path):
+            if os.path.getmtime(path) > built:
+                return True
+        elif os.path.isdir(path):
+            for root, _dirs, files in os.walk(path):
+                for f in files:
+                    if os.path.getmtime(os.path.join(root, f)) > built:
+                        return True
+    return False
+
+
+def cert_covers_ip(ip: str):
+    """True / False whether the dev certificate names this IP address; None when it cannot be read."""
+    try:
+        from cryptography import x509
+        with open(CERT_FILE, "rb") as fh:
+            cert = x509.load_pem_x509_certificate(fh.read())
+        san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+        return ipaddress.ip_address(ip) in san.get_values_for_type(x509.IPAddress)
+    except Exception:
+        return None
+
+
 def ensure_cert(verbose: bool = True) -> bool:
     """
     Make sure a usable certificate exists, generating one if not.
@@ -179,19 +215,17 @@ def ensure_cert(verbose: bool = True) -> bool:
     ip = lan_ip()
 
     if not need and ip:
-        try:
-            out = subprocess.check_output(
-                ["openssl", "x509", "-in", CERT_FILE, "-noout", "-text"],
-                text=True, stderr=subprocess.DEVNULL)
-            if f"IP Address:{ip}" not in out:
-                if verbose:
-                    print(f"[SYSTEM] Certificate does not cover {ip} "
-                          "(this laptop changed network). Regenerating ...")
-                need = True
-        except Exception:
-            # openssl missing or the cert unreadable — regenerating is the
-            # safe answer either way.
+        covered = cert_covers_ip(ip)
+        if covered is False:
+            if verbose:
+                print(f"[SYSTEM] Certificate does not cover {ip} "
+                      "(this laptop changed network). Regenerating ...")
             need = True
+        # covered is None: the certificate could not be read. Keep it rather than replacing it:
+        # a new certificate is NOT trusted by the browsers that trusted the old one, so a
+        # needless regeneration silently breaks every dashboard call to the backend. (This used
+        # to shell out to `openssl`, which is not on PATH on Windows, so it regenerated on
+        # every single start.)
 
     if not need:
         return True
@@ -205,6 +239,10 @@ def ensure_cert(verbose: bool = True) -> bool:
         print("[ERROR] Could not generate a certificate:")
         print(result.stdout.strip()[-500:] or result.stderr.strip()[-500:])
         return False
+    # A new certificate is not trusted yet: say so, or the dashboard opens and its data never loads.
+    print("[SYSTEM] A NEW certificate was made. Browsers do not trust it yet, so trust it once:")
+    print(f'           certutil -user -addstore Root "{CERT_FILE}"')
+    print("         then restart the browser.")
     return True
 
 
@@ -216,7 +254,14 @@ def main():
     parser.add_argument(
         "--https", action="store_true",
         help="serve over HTTPS so a phone can be used as a camera")
+    parser.add_argument(
+        "--prod", action="store_true",
+        help="run the dashboard as a production build (built when the code changed): fast pages, "
+             "no compiling on first visit. Plain HTTP only; --https keeps the development server.")
     args = parser.parse_args()
+    if args.prod and args.https:
+        print("[SYSTEM] --prod runs over plain HTTP; --https (phone pairing) uses the development server.")
+        args.prod = False
 
     CYAN   = "\033[96m"
     BLUE   = "\033[94m"
@@ -276,6 +321,22 @@ def main():
     print(f"{YELLOW}[SYSTEM]{RESET} Starting Next.js frontend -> {scheme}://localhost:3000")
 
     frontend_cmd = "npx next dev -p 3000 -H 0.0.0.0"
+    frontend_env = dict(os.environ)
+    if args.prod:
+        # A production build in its OWN folder, so it can never clash with a development server's
+        # `.next` (two Next processes sharing one build folder overwrite each other's output and the
+        # pages start failing). Rebuilt only when the dashboard's code is newer than the last build.
+        frontend_env["NEXT_DIST_DIR"] = PROD_DIST
+        if prod_build_needed():
+            print(f"{YELLOW}[SYSTEM]{RESET} Building the dashboard (only after code changes; about 2 minutes) ...")
+            build = subprocess.run("npx next build", shell=True, cwd=FRONTEND_DIR, env=frontend_env)
+            if build.returncode != 0:
+                print("[ERROR] The dashboard build failed (see above).")
+                kill_proc(backend_proc, "Backend")
+                sys.exit(1)
+        else:
+            print(f"{YELLOW}[SYSTEM]{RESET} Dashboard build is up to date.")
+        frontend_cmd = "npx next start -p 3000 -H 0.0.0.0"
     if args.https:
         # Next generates its own certificate unless pointed at one, and its
         # own would not name this laptop's LAN address — so the phone would
@@ -288,6 +349,7 @@ def main():
         frontend_cmd,
         shell=True,
         cwd=FRONTEND_DIR,
+        env=frontend_env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True, bufsize=1,

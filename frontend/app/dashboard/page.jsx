@@ -37,7 +37,7 @@ import { VideoCanvasPlayer } from '../components/VideoCanvasPlayer';
 import { FloorplanHeatmap } from '../components/FloorplanHeatmap';
 import { ZoneEditor } from '../components/ZoneEditor';
 import { supabase } from '../lib/supabase/browser';
-import { backendFetch } from '../lib/backend';
+import { backendFetch, withTimeout } from '../lib/backend';
 import { getDashboardStart } from '../lib/session';
 import { getBadgeCounts } from '../lib/safety/queries';
 import RangePicker from './RangePicker';
@@ -243,7 +243,21 @@ function DashboardInner() {
   // for all three in a row.
   useEffect(() => {
     let active = true;
-    getDashboardStart(new Date().toLocaleDateString("en-CA")).then((r) => {
+    // Bounded and retried: if the opening call stalls (for example while an expired session is being
+    // refreshed) the screens must not sit on skeletons forever. Three tries, 15 s each, then an error.
+    const start = async () => {
+      let lastError;
+      for (let attempt = 0; attempt < 3 && active; attempt += 1) {
+        try {
+          return await withTimeout(getDashboardStart(new Date().toLocaleDateString("en-CA")), 15000);
+        } catch (err) {
+          lastError = err;
+          await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
+        }
+      }
+      throw lastError || new Error('Could not load the dashboard. Refresh the page to try again.');
+    };
+    start().then((r) => {
       if (!active || !r) return;
       // Resolved on the server so the role the UI draws from is the same one the
       // Server Actions re-check against.
