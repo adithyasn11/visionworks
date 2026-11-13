@@ -125,7 +125,7 @@ This prints the address to open on the phone. Trust the generated certificate on
 
 `Ctrl+C` stops everything.
 
-**On Windows, one click:** double-click `start_visionworks.bat`. It starts both servers over HTTPS (add `http` as an argument for plain HTTP), installs the dashboard's packages on the first run, and opens https://localhost:3000 once it is up. Close its window to stop.
+**On Windows, one click:** double-click `start_visionworks.bat`. It runs the dashboard as a fast production build at http://localhost:3000 (built automatically the first time and after code changes, about a minute), installs the dashboard's packages on the first run, and opens the browser when it is ready. `start_visionworks.bat phone` uses HTTPS so a phone can be paired as a camera; `start_visionworks.bat dev` runs the development server. Close its window to stop.
 
 ---
 
