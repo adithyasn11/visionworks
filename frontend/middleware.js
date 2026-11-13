@@ -47,6 +47,15 @@ export async function middleware(request) {
     return response;
   }
 
+  // An OAuth sign-in that came back to the HOME page with `?code=`: Supabase does that when the address
+  // we asked to return to is not on the project's Redirect URLs list and it falls back to the Site URL.
+  // Hand the code to the real callback instead of dropping it, so the sign-in still completes.
+  if (pathname === '/' && request.nextUrl.searchParams.get('code')) {
+    const callback = request.nextUrl.clone();
+    callback.pathname = '/auth/callback';
+    return NextResponse.redirect(callback);
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
