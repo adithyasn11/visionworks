@@ -609,3 +609,36 @@ html.intro-seen #vw-intro { display: none; }
 @media (prefers-reduced-motion: reduce) {
   #vw-intro { display: none; }
 }
+
+/* ── Sign-in / sign-up entrance ─────────────────────────────────────────────
+   Arriving on the auth pages (from "Log in" on the landing page, say): the
+   side panel glides in a little from the left and the form's parts rise in
+   one after another. Small distances, under half a second: noticeable, not
+   showy. On the first page of a visit it waits for the intro to fade. */
+@keyframes auth-aside-in {
+  0%   { opacity: 0; transform: translateX(-18px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes auth-rise {
+  0%   { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.auth-screen aside {
+  animation: auth-aside-in 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.auth-screen .auth-col > * {
+  animation: auth-rise 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.auth-screen .auth-col > *:nth-child(1) { animation-delay: 60ms; }
+.auth-screen .auth-col > *:nth-child(2) { animation-delay: 120ms; }
+.auth-screen .auth-col > *:nth-child(3) { animation-delay: 180ms; }
+.auth-screen .auth-col > *:nth-child(4) { animation-delay: 240ms; }
+.auth-screen .auth-col > *:nth-child(n+5) { animation-delay: 300ms; }
+html:not(.intro-seen) .auth-screen aside,
+html:not(.intro-seen) .auth-screen .auth-col > * {
+  animation-delay: 1.45s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-screen aside,
+  .auth-screen .auth-col > * { animation: none; }
+}
