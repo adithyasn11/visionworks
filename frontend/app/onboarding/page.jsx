@@ -128,8 +128,9 @@ export default async function OnboardingPage({ searchParams }) {
   //   * a checkout that succeeded and then failed to navigate has the plan
   //     RECORDED, so this guard passes on the next request.
   //
-  // Every path leads somewhere usable. The redirect target is /home#pricing
-  // rather than /home so the reader arrives at the cards, not the hero.
+  // Every path leads somewhere usable. The redirect target is /home, opened at
+  // the top: a new user sees the whole getting-started page (what happens next,
+  // then the plans) rather than being dropped halfway down at the price cards.
   //
   // ── THE `inWizard` CONDITION IS LOAD-BEARING, NOT BELT-AND-BRACES ──
   //
@@ -149,7 +150,7 @@ export default async function OnboardingPage({ searchParams }) {
   // user whose organisation was deleted has a stale pointer AND a spent plan,
   // and trusting the pointer here would keep them in a wizard they cannot
   // finish instead of sending them to /home to choose again.
-  if (!profile?.selectedPlan && !orgReachable) redirect('/home#pricing');
+  if (!profile?.selectedPlan && !orgReachable) redirect('/home');
 
   // Null from step 2 onward, by design — see above. The wizard renders the
   // badge only when it has one, so a spent plan simply stops being advertised
