@@ -225,10 +225,10 @@ html.theme-switching body {
   border-color: var(--line);
 }
 html:not(.dark) .card-dark .text-white:not(.bg-accent):not(.bg-accent *) { color: var(--ink); }
-html:not(.dark) .card-dark :is(.text-white\/40, .text-white\/60, .text-white\/75) { color: var(--ink-muted); }
+html:not(.dark) .card-dark :is(.text-white\/40, .text-white\/60, .text-white\/75) { color: var(--ink); }
 html:not(.dark) .card-dark :is(.bg-white\/5, .bg-white\/10, .bg-white\/\[0\.06\], .bg-white\/\[0\.07\]) { background-color: rgba(26, 24, 28, 0.05); }
 html:not(.dark) .card-dark :is(.bg-white\/20, .bg-white\/30) { background-color: rgba(26, 24, 28, 0.14); }
-html:not(.dark) .card-dark :is(.border-white\/10, .border-white\/15, .border-white\/\[0\.04\]) { border-color: rgba(26, 24, 28, 0.16); }
+html:not(.dark) .card-dark :is(.border-white\/10, .border-white\/15, .border-white\/\[0\.04\]) { border-color: rgba(26, 24, 28, 0.28); }
 
 .bg-ground      { background-color: var(--ground); }
 .bg-surface     { background-color: var(--surface); }
@@ -481,4 +481,124 @@ html:not(.dark) .card-dark :is(.border-white\/10, .border-white\/15, .border-whi
   --chart-grid: #2A272E;
   --chart-axis: #8B8792;
   --chart-tooltip-bg: #1C1A1F;
+}
+
+/* ── Intro splash (components/IntroSplash.jsx) ─────────────────────────────
+   The first page of a visit opens on the brand: the red mark pops in, a scan
+   line sweeps it like a camera reading a frame, the name and tagline rise,
+   a thin red bar runs, then the whole screen fades away (about 1.7 s). Pure
+   CSS, so it runs from the first paint and always ends by itself; skipped on
+   later pages of the visit (html.intro-seen) and for reduced motion. */
+#vw-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--ground);
+  animation: vw-intro-out 420ms cubic-bezier(0.4, 0, 0.2, 1) 1.35s forwards;
+}
+html.intro-seen #vw-intro { display: none; }
+
+.vw-intro-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.vw-intro-mark {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background-color: var(--accent-fill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 12px 30px -12px rgba(220, 38, 38, 0.55);
+  animation: vw-intro-pop 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.vw-intro-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background-color: #FFFFFF;
+  animation: vw-intro-dot 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 220ms both;
+}
+.vw-intro-scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.55);
+  animation: vw-intro-scan 900ms ease-in-out 300ms both;
+}
+.vw-intro-word {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  animation: vw-intro-rise 520ms cubic-bezier(0.16, 1, 0.3, 1) 260ms both;
+}
+.vw-intro-tag {
+  margin-top: -8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  animation: vw-intro-rise 520ms cubic-bezier(0.16, 1, 0.3, 1) 380ms both;
+}
+.vw-intro-bar {
+  width: 120px;
+  height: 3px;
+  margin-top: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background-color: var(--line-soft);
+  animation: vw-intro-rise 400ms ease-out 450ms both;
+}
+.vw-intro-bar > span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background-color: var(--accent);
+  transform-origin: left center;
+  animation: vw-intro-fill 900ms cubic-bezier(0.65, 0, 0.35, 1) 450ms both;
+}
+
+@keyframes vw-intro-pop {
+  0%   { opacity: 0; transform: scale(0.6) rotate(-12deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes vw-intro-dot {
+  0%   { transform: scale(0); }
+  100% { transform: scale(1); }
+}
+@keyframes vw-intro-scan {
+  0%   { transform: translateY(-4px); opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translateY(66px); opacity: 0; }
+}
+@keyframes vw-intro-rise {
+  0%   { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes vw-intro-fill {
+  0%   { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}
+@keyframes vw-intro-out {
+  0%   { opacity: 1; visibility: visible; }
+  100% { opacity: 0; visibility: hidden; pointer-events: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #vw-intro { display: none; }
 }

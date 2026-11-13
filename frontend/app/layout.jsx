@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import RouteProgress from './components/RouteProgress';
+import IntroSplash from './components/IntroSplash';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -21,6 +22,11 @@ const themeInit = `
       : window.matchMedia('(prefers-color-scheme: dark)').matches;
     if (dark) document.documentElement.classList.add('dark');
   } catch (e) {}
+  // The intro (IntroSplash) plays on the first page of a visit only; later pages skip it before paint.
+  try {
+    if (sessionStorage.getItem('vw-intro-seen')) document.documentElement.classList.add('intro-seen');
+    else sessionStorage.setItem('vw-intro-seen', '1');
+  } catch (e) {}
 })();
 `;
 
@@ -31,6 +37,7 @@ export default function RootLayout({ children }) {
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
       </head>
       <body className={`${inter.className} min-h-screen`}>
+        <IntroSplash />
         <Suspense fallback={null}>
           <RouteProgress />
         </Suspense>
