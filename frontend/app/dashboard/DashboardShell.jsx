@@ -61,7 +61,7 @@ export const VIEWS = [
  * the 24px minimum for a pointer and unchanged for touch, where the mobile
  * drawer has room to spare.
  */
-const NAV_ROW = 'relative w-full flex items-center gap-3 rounded-lg px-3 py-[7px] '
+const NAV_ROW = 'nav-row relative w-full flex items-center gap-3 rounded-lg px-3 '
   + 'text-[0.84375rem] font-semibold transition-colors duration-150';
 
 const NAV_ROW_ACTIVE = 'bg-accent-soft text-accent';
@@ -186,7 +186,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
       {/* Brand. `h-16` matches AppHeader and the landing navbar exactly, so the
           sidebar's first rule lines up with the mobile top bar and the eye
           reads one horizontal band across the whole product. */}
-      <div className="h-16 px-5 flex items-center border-b border-line shrink-0">
+      <div className="h-[clamp(2.75rem,7vh,4rem)] px-5 flex items-center border-b border-line shrink-0">
         <Link href="/dashboard" className="flex items-center gap-2.5 w-max group">
           <div className="w-7 h-7 bg-accent flex items-center justify-center rounded-lg shadow-sm shadow-red-600/30 group-hover:shadow-red-600/50 group-hover:rotate-12 transition-all duration-300">
             <div className="w-2 h-2 bg-white rounded-sm" />
@@ -205,7 +205,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
           scroll that reaches the end of the list from continuing into the page
           behind it. */}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain nav-scroll pb-1">
-      <nav className="px-3 pt-3.5 space-y-0.5" aria-label="Dashboard sections">
+      <nav className="px-3 pt-[clamp(0.5rem,1.6vh,0.875rem)] space-y-0.5" aria-label="Dashboard sections">
         {/* Group label. Five unlabelled items and two more below the rule read
             as one long undifferentiated list; naming the groups is what makes
             "where am I" answerable at a glance. */}
@@ -244,7 +244,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
           MembersScreen. Hiding the link would hide information the database
           willingly returns. */}
       {can(role, 'members.view') && (
-      <div className="mt-3 pt-3 border-t border-line px-3 space-y-0.5">
+      <div className="mt-[clamp(0.375rem,1.2vh,0.75rem)] pt-[clamp(0.375rem,1.2vh,0.75rem)] border-t border-line px-3 space-y-0.5">
         <p className="px-3 pb-1 font-mono text-[0.59375rem] uppercase tracking-[0.16em] text-ink-faint">
           Account
         </p>
@@ -292,14 +292,14 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
           can stay short enough to survive the clip. */}
       <p
         title="No continuous video is stored. Frames are discarded after analysis; workers are identified only by an anonymous track, never by name."
-        className="mx-3 mt-3 mb-1 pt-2.5 border-t border-line text-[0.65625rem] leading-snug text-ink-faint"
+        className="mx-3 mt-3 mb-1 pt-2.5 border-t border-line text-[0.65625rem] leading-snug text-ink-faint [@media(max-height:820px)]:hidden"
       >
         <span className="font-semibold text-ink-muted">No video stored.</span>{' '}
         Workers stay anonymous.
       </p>
       </div>{/* end of the single scroll region */}
 
-      <div className="shrink-0 border-t border-line px-3 py-3 space-y-2">
+      <div className="shrink-0 border-t border-line px-3 py-[clamp(0.5rem,1.4vh,0.75rem)] space-y-2">
         <div className="flex items-center gap-2.5 px-1">
           <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center font-bold text-[0.6875rem] shrink-0">
             {initials}
