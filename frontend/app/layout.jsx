@@ -25,7 +25,12 @@ const themeInit = `
   // The intro (IntroSplash) plays on the first page of a visit only; later pages skip it before paint.
   try {
     if (sessionStorage.getItem('vw-intro-seen')) document.documentElement.classList.add('intro-seen');
-    else sessionStorage.setItem('vw-intro-seen', '1');
+    else {
+      sessionStorage.setItem('vw-intro-seen', '1');
+      // Mark it finished once it has faded, so pages reached by an in-app link after it (Log in, say) do not
+      // wait for an intro that is already over.
+      setTimeout(function () { document.documentElement.classList.add('intro-seen'); }, 1800);
+    }
   } catch (e) {}
 })();
 `;

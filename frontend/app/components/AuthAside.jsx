@@ -89,8 +89,13 @@ function Floorplan() {
 
     let lastCount = 0;
 
+    // Read once, then again only when the theme changes (not every frame: a style read per frame forces the
+    // browser to recompute styles 60 times a second, which made the page stutter while it animated in).
+    readTheme();
+    const themeWatch = new MutationObserver(readTheme);
+    themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
     const draw = (time) => {
-      readTheme();
       ctx.clearRect(0, 0, w, h);
 
       // Zone rectangles — hairline, no fills competing with the figures.
@@ -195,7 +200,7 @@ function Floorplan() {
     };
 
     rafRef.current = requestAnimationFrame(draw);
-    return () => { cancelAnimationFrame(rafRef.current); ro.disconnect(); };
+    return () => { cancelAnimationFrame(rafRef.current); ro.disconnect(); themeWatch.disconnect(); };
   }, []);
 
   return (
