@@ -125,6 +125,8 @@ This prints the address to open on the phone. Trust the generated certificate on
 
 `Ctrl+C` stops everything.
 
+**On Windows, one click:** double-click `start_visionworks.bat`. It starts both servers over HTTPS (add `http` as an argument for plain HTTP), installs the dashboard's packages on the first run, and opens https://localhost:3000 once it is up. Close its window to stop.
+
 ---
 
 ## Using the app

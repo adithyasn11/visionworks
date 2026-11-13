@@ -69,7 +69,10 @@ def kill_port(port: int):
         seen: set[str] = set()
         for line in out.strip().splitlines():
             parts = line.strip().split()
-            if not parts:
+            # Only the process LISTENING on this port, matched on the LOCAL address. The findstr
+            # also matches connections whose REMOTE end is this port — a browser with the
+            # dashboard open — and killing those closed the user's browser.
+            if len(parts) < 5 or parts[3].upper() != "LISTENING" or not parts[1].endswith(f":{port}"):
                 continue
             p = parts[-1]
             if p.isdigit() and p != "0" and p not in seen:
