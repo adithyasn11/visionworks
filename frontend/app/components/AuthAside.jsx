@@ -6,8 +6,8 @@
 // Little text, one live scene: what the product does, played out on a camera view. Workers (pose skeletons
 // with their keypoints, faces blurred) wander the floor on routes of their own: in from any edge, through the
 // PPE checkpoint, often into the restricted zone, sometimes loitering, then out. They steer, turn, slow down,
-// pause and keep out of each other's way, and smaller figures are further from the camera. A scan line
-// sweeps the frame, tracking trails follow each person, the helmet and vest are checked, and each worker gets
+// pause and keep out of each other's way, and smaller figures are further from the camera. Tracking
+// trails follow each person, the helmet and vest are checked, and each worker gets
 // the verdict the real pipeline would give: compliant, flagged (missing PPE) or could-not-verify (partly
 // hidden). Now and then someone falls and a critical man-down alert fires until they get up. A live event
 // feed under the scene reads out what just happened. It is an illustration, not live data.
@@ -135,7 +135,6 @@ function LiveScene() {
 
     const workers = [newWorker(0), newWorker(1.2), newWorker(2.8), newWorker(4.4), newWorker(6.5)];
     let last = performance.now();
-    let scan = 0;
     let raf = 0;
 
     // Size of a person at a given depth: smaller near the top (further from the camera).
@@ -355,18 +354,6 @@ function LiveScene() {
         ctx.fillText(z.label, x + 8, y + 18);
       });
 
-      // scan line sweeping across the frame
-      scan = (scan + dt * 0.38) % 1.3;
-      if (scan <= 1) {
-        const sx = scan * w;
-        const g = ctx.createLinearGradient(sx - 50, 0, sx, 0);
-        g.addColorStop(0, 'rgba(220,38,38,0)');
-        g.addColorStop(1, 'rgba(220,38,38,0.16)');
-        ctx.fillStyle = g; ctx.fillRect(sx - 50, 0, 50, h);
-        ctx.strokeStyle = 'rgba(220,38,38,0.6)'; ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
-      }
-
       workers.forEach((wk) => step(wk, dt, t));
       const placed = workers.filter((wk) => wk.wait <= 0).sort((a, b) => a.y - b.y);
 
@@ -385,7 +372,6 @@ function LiveScene() {
         const x = wk.x * w, y = wk.y * h;
         if (x < -s0 || x > w + s0 || y > h + s0) continue;
         const s = s0 * depth(wk.y);
-        if (scan <= 1 && Math.abs(scan * w - x) < 6) wk.lock = Math.max(wk.lock, 0.6);
         figure(wk, x, y, s);
 
         const down = wk.fallen && wk.alerted;
