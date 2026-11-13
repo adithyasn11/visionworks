@@ -43,6 +43,10 @@ _TZ_PATTERN = r"^[A-Za-z0-9_+/-]+$"
 MAX_DAYS = 366
 
 
+class _NotRecorded(Exception):
+    """A download of a report that is already listed: it is served and audited, but not listed again."""
+
+
 def _window(days: int, since: Optional[str], until: Optional[str]):
     end = _when(until, "until") or datetime.now(timezone.utc)
     start = _when(since, "since") or (end - timedelta(days=days))
@@ -89,7 +93,9 @@ def report(days: int = Query(7, ge=1, le=MAX_DAYS), since: Optional[str] = None,
 @router.get("/report/export")
 def export_report(format: str = Query(..., pattern=r"^(pdf|csv)$"), days: int = Query(7, ge=1, le=MAX_DAYS),
                   since: Optional[str] = None, until: Optional[str] = None,
-                  tz: str = Query("UTC", max_length=64, pattern=_TZ_PATTERN), authorization: Optional[str] = Header(default=None)):
+                  tz: str = Query("UTC", max_length=64, pattern=_TZ_PATTERN), record: bool = True,
+                  authorization: Optional[str] = Header(default=None)):
+    """`record=false` downloads a report already listed (a scheduled one, or one made before) without listing it twice."""
     org_id, user_id, token = _who(authorization, "safety.view")
     start, end = _window(days, since, until)
     data = _figures(token, org_id, start, end, tz)
@@ -111,11 +117,15 @@ def export_report(format: str = Query(..., pattern=r"^(pdf|csv)$"), days: int = 
         raise HTTPException(status_code=503, detail="The report could not be recorded, so it was not produced. Try again.")
     recorded = True
     try:
+        if not record:
+            raise _NotRecorded()
         user_request("POST", "reports", token, prefer="return=minimal", body={
             "orgId": org_id, "kind": "SAFETY_SUMMARY", "format": format.upper(), "status": "READY",
             "title": rg.report_title(data)[:200], "rangeStart": start.isoformat(), "rangeEnd": end.isoformat(),
             "zoneIds": [], "siteIds": [], "fileSizeBytes": len(payload), "requestedById": user_id,
             "completedAt": datetime.now(timezone.utc).isoformat()})
+    except _NotRecorded:
+        recorded = True
     except Exception as e:
         recorded = False
         logger.warning("A served report could not be recorded in the reports table: %s", e)

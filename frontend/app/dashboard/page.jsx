@@ -30,6 +30,8 @@ import SafetySummary from './safety/SafetySummary';
 import ReportsScreen from './safety/ReportsScreen';
 import EvaluationScreen from './evaluation/EvaluationScreen';
 import PlanSection from './PlanSection';
+import PlanReminder from './PlanReminder';
+import { getPlanUsage } from './planActions';
 import CamerasScreen from './CamerasScreen';
 import { Skeleton } from './safety/common';
 import { listCameras } from '../lib/platform/cameras';
@@ -136,6 +138,20 @@ function DashboardInner() {
   // The organisation's tier and name, resolved in the SAME round trip as the
   // role (see getViewerRole) so the two can never describe different orgs.
   const [org, setOrg] = useState({ name: null, plan: null, planSelectedAt: null });
+  // The plan's term and usage, for the payment reminder above every screen (and the Plan screen).
+  const [planUsage, setPlanUsage] = useState(null);
+  const loadPlanUsage = useCallback(async () => {
+    try {
+      const r = await getPlanUsage();
+      if (r?.ok) setPlanUsage(r.usage);
+    } catch { /* the reminder is a courtesy: no banner rather than a broken page */ }
+  }, []);
+  useEffect(() => {
+    loadPlanUsage();
+    // A term can end while the page sits open: look again every 10 minutes.
+    const t = setInterval(loadPlanUsage, 10 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [loadPlanUsage]);
 
   const [refreshing, setRefreshing] = useState(false);
   const [summaryTick, setSummaryTick] = useState(0);        // bumped to make the safety summary read again
@@ -374,6 +390,12 @@ function DashboardInner() {
 
   return (
     <DashboardShell view={view} onViewChange={setView} user={user} role={role} alertCount={alerts.count} overdueCount={overdue}>
+      {/* Payment reminder: last 7 days of a paid term, or after it ended. The Plan screen shows its own. */}
+      {view !== 'plan' && role && (
+        <div className="mb-5">
+          <PlanReminder usage={planUsage} canRenew={can(role, 'org.settings')} onRenew={() => setView('plan')} />
+        </div>
+      )}
       {view === 'overview' && (
         <div className="space-y-6 animate-view-in">
           <PageHeader
@@ -528,6 +550,7 @@ function DashboardInner() {
               plan={org.plan}
               orgName={org.name}
               canManage={can(role, 'org.settings')}
+              onChanged={(u) => { setPlanUsage(u); if (u?.plan) setOrg((o) => ({ ...o, plan: u.plan })); }}
             />
           ) : (
             /* `min-h` roughly matches the resolved panel, so the page does not
@@ -571,7 +594,7 @@ function DashboardInner() {
             title="Safety reports"
             subtitle="How the site did over a period, as a PDF or CSV."
           />
-          <ReportsScreen />
+          <ReportsScreen role={role} />
         </div>
       )}
     </DashboardShell>

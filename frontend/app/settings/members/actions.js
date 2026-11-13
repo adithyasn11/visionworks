@@ -48,6 +48,7 @@
 // token-based acceptance route has something to verify against. Email matching
 // is what makes OAuth invitees work, since they never touch a signup form.
 
+import { planName } from '../../lib/plans';
 import crypto from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '../../lib/supabase/server';
@@ -144,7 +145,9 @@ function describeDbError(error, fallback) {
   // change in SQL without silently falling through to the raw error here.
   const planLimit = msg.match(/plan_limit_(cameras|sites|seats):\s*(.+?)(?:\s*CONTEXT:|$)/is);
   if (planLimit) {
-    return `${planLimit[2].trim()} Upgrade the plan to add more.`;
+    // Tier ids (FREE, GROWTH) read as the names people see (Starter, Growth).
+    const text = planLimit[2].trim().replace(/the (FREE|GROWTH|ENTERPRISE) plan/, (_, id) => `the ${planName(id)} plan`);
+    return `${text} Upgrade or renew the plan to add more.`;
   }
 
   if (/row-level security/i.test(msg)) {

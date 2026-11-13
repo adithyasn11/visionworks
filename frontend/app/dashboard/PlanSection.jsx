@@ -37,15 +37,16 @@
 // geometry, so it reads as the most important screen in the workspace without
 // looking like a different product.
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Check, Minus, Loader2, Calendar, TrendingUp, Sparkles,
-  AlertCircle, ArrowRight, Zap,
+  AlertCircle, ArrowRight, Zap, RefreshCw,
 } from 'lucide-react';
 
 import { PLANS, planName, formatPrice, getPlan, yearlyPerMonth, yearlySaving, yearlyEquivalentMonths } from '../lib/plans';
 import { Banner } from '../components/AuthFormBits';
-import { getPlanUsage, changePlan } from './planActions';
+import { getPlanUsage, changePlan, renewPlan } from './planActions';
+import PlanReminder, { REMIND_DAYS } from './PlanReminder';
 
 /* ── Formatting ──────────────────────────────────────────────────────────── */
 
@@ -153,17 +154,22 @@ function UsageTile({ label, used, max, suffix, consumable = true, dark = false }
 
 /* ── Screen ──────────────────────────────────────────────────────────────── */
 
-export default function PlanSection({ plan, orgName, canManage = false }) {
+export default function PlanSection({ plan: planProp, orgName, canManage = false, onChanged }) {
   const [usage, setUsage] = useState(null);
   const [banner, setBanner] = useState(null);
   const [period, setPeriod] = useState('MONTHLY');
   const [pending, setPending] = useState(null);   // tier id awaiting confirmation
   const [busy, setBusy] = useState(false);
+  // Told about every reload (the reminder and the sidebar follow the plan). A ref, so a new function from the
+  // parent on each render does not make `load` (and its effect) run again.
+  const onChangedRef = useRef(onChanged);
+  onChangedRef.current = onChanged;
 
   const load = useCallback(async () => {
     const res = await getPlanUsage();
     if (res.ok) {
       setUsage(res.usage);
+      onChangedRef.current?.(res.usage);
       // Follow the stored term rather than resetting the toggle to monthly on
       // every load — a yearly customer opening this page should see yearly.
       if (res.usage.billingPeriod) setPeriod(res.usage.billingPeriod);
@@ -193,6 +199,24 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
     }
   };
 
+  const renew = async () => {
+    setBanner(null);
+    setBusy(true);
+    try {
+      const res = await renewPlan(period);
+      setBanner({ kind: res.ok ? 'success' : 'error', text: res.message });
+      if (res.ok) await load();
+    } catch {
+      setBanner({ kind: 'error', text: 'Could not reach the server. Check your connection and try again.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // The stored plan once loaded (it changes when the plan is switched here), the page's copy until then.
+  const plan = usage?.plan ?? planProp;
+  const expired = Boolean(usage?.expired);
+
   // Fails closed on an unrecognised tier: planName renders "Unknown" rather
   // than blank, and the allowances come from the database regardless.
   const current = getPlan(plan);
@@ -207,6 +231,15 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
     <div className="flex flex-col gap-5">
 
       {banner && <Banner kind={banner.kind}>{banner.text}</Banner>}
+
+      {/* Payment reminder: the last 7 days of a paid term, or after it ended. Its button jumps to the
+          renewal controls just below. */}
+      <PlanReminder
+        usage={usage}
+        canRenew={canManage}
+        compact
+        onRenew={() => document.getElementById('plan-renew')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+      />
 
       {/* ── HERO: the current subscription ──────────────────────────────── */}
       <section className="card-dark rounded-2xl p-6 sm:p-8 relative overflow-hidden shadow-xl shadow-black/20 group">
@@ -277,7 +310,7 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                   not expire, so a countdown would be inventing one. */}
               {remaining !== null && (
                 <span className="text-[0.71875rem] font-bold text-accent">
-                  {remaining > 0
+                  {expired ? 'Term ended' : remaining > 0
                     ? `${remaining} day${remaining === 1 ? '' : 's'} remaining`
                     : remaining === 0
                       ? 'Renews today'
@@ -297,7 +330,7 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
               </div>
               <div className="sm:text-right">
                 <p className="text-[0.625rem] font-black uppercase tracking-[0.12em] opacity-45">
-                  {isFree ? 'Expires' : 'Renews'}
+                  {isFree ? 'Expires' : expired ? 'Ended' : 'Renews'}
                 </p>
                 <p className="text-[0.9375rem] font-black text-white mt-1">
                   {usage
@@ -329,6 +362,53 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                     className="h-full rounded-full bg-accent transition-all duration-700"
                     style={{ width: `${pct}%` }}
                   />
+                </div>
+              );
+            })()}
+
+            {/* ── Renewal (demo billing: no money moves) ── */}
+            {usage && !isFree && canManage && (() => {
+              const open = expired || (remaining !== null && remaining <= REMIND_DAYS);
+              const opensOn = usage.renewsAt ? new Date(new Date(usage.renewsAt).getTime() - REMIND_DAYS * 86400000) : null;
+              return (
+                <div id="plan-renew" className="mt-5 pt-5 border-t border-white/10 flex flex-wrap items-center justify-between gap-3">
+                  {open ? (
+                    <>
+                      <p className="text-[0.75rem] font-bold opacity-70 max-w-md">
+                        {expired
+                          ? `Renew ${planName(plan)} to get its limits back. A new term starts today.`
+                          : `Renew now and the next term follows on from ${fmtDate(usage.renewsAt)}, so no day is lost.`}
+                      </p>
+                      <div className="flex items-center gap-2">
+                      <div className="inline-flex rounded-lg border border-white/15 p-0.5" role="group" aria-label="Renew for">
+                        {['MONTHLY', 'YEARLY'].map((pp) => (
+                          <button
+                            key={pp}
+                            type="button"
+                            onClick={() => setPeriod(pp)}
+                            aria-pressed={period === pp}
+                            className={`rounded-md px-2.5 py-1.5 text-[0.71875rem] font-black transition ${period === pp ? 'bg-white/15 text-white' : 'opacity-55 hover:opacity-90'}`}
+                          >
+                            {pp === 'MONTHLY' ? 'Month' : 'Year'}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={renew}
+                        disabled={busy}
+                        className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[0.8125rem] font-black text-white hover:brightness-110 transition disabled:opacity-50"
+                      >
+                        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />}
+                        Renew {period === 'YEARLY' ? 'for a year' : 'for a month'} · {formatPrice(plan, period === 'YEARLY' ? 'yearly' : 'monthly')}
+                      </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-[0.75rem] font-bold opacity-55">
+                      Renewal opens {opensOn ? `on ${fmtDate(opensOn.toISOString())}` : 'in the last 7 days of the term'}, and a reminder appears then.
+                    </p>
+                  )}
                 </div>
               );
             })()}

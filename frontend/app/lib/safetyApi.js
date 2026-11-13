@@ -95,7 +95,7 @@ export const downloadExport = ({ since, until, status } = {}) => saveFile('/expo
 /** The figures of a period: `{ since, until, tz }` (ISO instants, an IANA time zone name). */
 export const getReport = ({ since, until, tz }) => call('/report', { query: { since, until, tz } });
 /** The report as a file: format 'pdf' or 'csv'. */
-export const downloadReport = (format, { since, until, tz }) => saveFile('/report/export', { format, since, until, tz }, `safety-report.${format}`);
+export const downloadReport = (format, { since, until, tz, record }) => saveFile('/report/export', { format, since, until, tz, record: record === false ? 'false' : undefined }, `safety-report.${format}`);
 /** The reports made before, newest first. */
 export const getReportHistory = (limit = 20) => call('/report/history', { query: { limit } });
 /** The measured evaluation results (Step 17): the PPE benchmark, the scenario suite and the real-footage run. */

@@ -15,10 +15,13 @@
 // Anyone in the organisation can read and export; every export is audited on the server.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarRange, Camera, ClipboardList, Clock, FileDown, FileSpreadsheet, FileText, HardHat, History, Loader2, PersonStanding, RefreshCw, Shapes, ShieldCheck, SlidersHorizontal, Timer, Wrench } from 'lucide-react';
+import { CalendarClock, CalendarRange, Camera, ClipboardList, Clock, Download, FileDown, FileSpreadsheet, FileText, HardHat, History, Loader2, PersonStanding, RefreshCw, Shapes, ShieldCheck, SlidersHorizontal, Timer, Wrench } from 'lucide-react';
 import { downloadAuditTrail, downloadExport, downloadReport, getReport, getReportHistory } from '../../lib/safetyApi';
 import { durationText, ruleTypeMeta } from '../../lib/safety/ruleTypes';
 import { reasonLabel, BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel, Skeleton } from './common';
+import { getPlanUsage, setReportSchedule } from '../planActions';
+import { can } from '../../lib/permissions';
+import { planName } from '../../lib/plans';
 
 const PRESETS = [
   { id: '24h', label: 'Last 24 hours', hours: 24 },
@@ -310,7 +313,85 @@ function ReportBody({ r }) {
   );
 }
 
-export default function ReportsScreen() {
+const SCHEDULES = [
+  { id: 'OFF', label: 'Off' },
+  { id: 'DAILY', label: 'Daily' },
+  { id: 'WEEKLY', label: 'Weekly' },
+  { id: 'MONTHLY', label: 'Monthly' },
+];
+
+/**
+ * Scheduled PDF reports (Growth and Enterprise, while the plan is in force). The database makes each one when it
+ * is due (029, pg_cron) and lists it with the reports made before; downloading rebuilds it from the data.
+ */
+function ScheduledReports({ role, onSaved }) {
+  const [usage, setUsage] = useState(null);
+  const [busy, setBusy] = useState(null);
+  const [message, setMessage] = useState(null);
+  const canEdit = can(role, 'cameras.edit');           // administrators and managers, as set_report_schedule() checks
+
+  const load = useCallback(async () => {
+    const r = await getPlanUsage();
+    if (r?.ok) setUsage(r.usage);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const choose = async (id) => {
+    setBusy(id);
+    setMessage(null);
+    const r = await setReportSchedule(id);
+    setBusy(null);
+    setMessage({ tone: r.ok ? 'ok' : 'error', text: r.message });
+    if (r.ok) { await load(); onSaved?.(); }
+  };
+
+  if (!usage) return <Panel title="Scheduled reports" icon={CalendarClock}><Skeleton rows={1} label="Loading" /></Panel>;
+
+  const locked = usage.effectivePlan === 'FREE';
+  const current = usage.reportSchedule || 'OFF';
+  return (
+    <Panel title="Scheduled reports" icon={CalendarClock} aside={locked ? 'Growth and Enterprise' : null}>
+      <div className="flex flex-col gap-3">
+        {locked ? (
+          <Notice>
+            {usage.expired
+              ? `Your ${planName(usage.plan)} plan has ended, so scheduled reports are paused. Renew it on the Plan screen to start them again.`
+              : 'Scheduled PDF reports are part of the Growth and Enterprise plans. Upgrade on the Plan screen to have a report made for you every day, week or month.'}
+          </Notice>
+        ) : (
+          <>
+            <p className="text-xs text-ink-muted leading-relaxed">
+              A PDF safety report is made for you on a schedule and added to the reports made before.
+            </p>
+            <div role="group" aria-label="Schedule" className="flex flex-wrap items-center gap-1.5">
+              {SCHEDULES.map((x) => (
+                <button
+                  key={x.id}
+                  type="button"
+                  aria-pressed={current === x.id}
+                  disabled={!canEdit || busy !== null}
+                  onClick={() => current !== x.id && choose(x.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border disabled:opacity-60 ${current === x.id ? 'border-[color:var(--accent)] text-ink bg-surface-alt' : 'border-line text-ink-muted hover:text-ink'}`}
+                >
+                  {busy === x.id ? <Loader2 className="inline w-3 h-3 animate-spin mr-1" aria-hidden="true" /> : null}{x.label}
+                </button>
+              ))}
+            </div>
+            {current !== 'OFF' && usage.reportNextAt && (
+              <p className="text-[0.6875rem] text-ink-faint">
+                Next report: {new Date(usage.reportNextAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}.
+              </p>
+            )}
+            {!canEdit && <p className="text-[0.6875rem] text-ink-faint">Only an administrator or manager can change the schedule.</p>}
+          </>
+        )}
+        {message && <Notice tone={message.tone}>{message.text}</Notice>}
+      </div>
+    </Panel>
+  );
+}
+
+export default function ReportsScreen({ role }) {
   const [tz, setTz] = useState(siteZone);                 // the browser's own zone; UTC if the database does not know its name
   const [tick, setTick] = useState(0);                     // bumped to re-anchor "now" (a preset chosen again, or Refresh)
   const [preset, setPreset] = useState('7d');
@@ -367,6 +448,16 @@ export default function ReportsScreen() {
   useEffect(() => { loadHistory(); }, [loadHistory]);
 
   const choose = (id) => { anchor.current = Date.now(); setPreset(id); setTick((t) => t + 1); setResult(null); };
+
+  // A report from the list, rebuilt for its own period (not listed a second time).
+  const [again, setAgain] = useState(null);
+  async function downloadAgain(h) {
+    setAgain(h.id);
+    setResult(null);
+    const r = await downloadReport(String(h.format || 'PDF').toLowerCase(), { since: h.rangeStart, until: h.rangeEnd, tz, record: false });
+    setAgain(null);
+    setResult(r);
+  }
 
   async function run(kind) {
     setBusy(kind);
@@ -466,6 +557,8 @@ export default function ReportsScreen() {
         </div>
       </Panel>
 
+      <ScheduledReports role={role} onSaved={loadHistory} />
+
       <Panel title="Reports made before" icon={History}>
         {history.loading && <Skeleton rows={3} label="Loading" />}
         {history.error && <Notice tone="error">{history.error}</Notice>}
@@ -473,10 +566,19 @@ export default function ReportsScreen() {
         {history.rows.length > 0 && (
           <ul className="flex flex-col divide-y divide-line-soft text-xs">
             {history.rows.map((h) => (
-              <li key={h.id} className="py-2 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span className="font-mono text-ink-faint w-14">{h.format}</span>
-                <span className="text-ink">{h.title}</span>
-                <span className="text-ink-faint ml-auto">made {fmtWhen(h.createdAt, tz)}{h.fileSizeBytes ? `, ${Math.max(1, Math.round(Number(h.fileSizeBytes) / 1024))} KB` : ''}</span>
+              <li key={h.id} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="font-mono text-ink-faint w-10">{h.format}</span>
+                <span className="text-ink min-w-0 flex-1">
+                  {/^Scheduled /.test(h.title || '') && (
+                    <span className="mr-2 rounded px-1.5 py-[1px] font-mono text-[0.5625rem] font-bold uppercase tracking-wider text-white bg-accent">Scheduled</span>
+                  )}
+                  {h.title}
+                </span>
+                <span className="text-ink-faint">made {fmtWhen(h.createdAt, tz)}{h.fileSizeBytes ? `, ${Math.max(1, Math.round(Number(h.fileSizeBytes) / 1024))} KB` : ''}</span>
+                <button type="button" className={BTN_QUIET} disabled={again !== null} onClick={() => downloadAgain(h)} aria-label={`Download ${h.title}`}>
+                  {again === h.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Download className="w-3.5 h-3.5" aria-hidden="true" />}
+                  <span className="hidden sm:inline">Download</span>
+                </button>
               </li>
             ))}
           </ul>

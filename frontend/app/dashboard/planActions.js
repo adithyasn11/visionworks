@@ -82,6 +82,11 @@ export async function getPlanUsage() {
     ok: true,
     usage: {
       plan: row.plan,
+      // The plan in force: a paid plan whose term has ended counts as Starter until renewed (029).
+      effectivePlan: row.effective_plan,
+      expired: Boolean(row.expired),
+      reportSchedule: row.report_schedule ?? 'OFF',
+      reportNextAt: row.report_next_at ?? null,
       billingPeriod: row.billing_period,
       startedAt: row.started_at,
       renewsAt: row.renews_at,
@@ -134,4 +139,39 @@ export async function changePlan(planId, period = 'MONTHLY') {
   if (!row?.ok) return { ok: false, message: row?.message ?? 'Could not update the plan.' };
 
   return { ok: true, message: row.message };
+}
+
+/**
+ * Renew the current paid plan (demo billing: no money moves). ADMIN only, enforced in `renew_plan()` (029):
+ * allowed in the last 7 days of a term (the next term follows on from its end) or after it has ended (a new
+ * term from today). `period` switches monthly / yearly at renewal; omitted keeps the current one.
+ */
+export async function renewPlan(period) {
+  const { supabase, error: authError } = await requireUser();
+  if (authError) return { ok: false, message: authError };
+  if (period != null && period !== 'MONTHLY' && period !== 'YEARLY') {
+    return { ok: false, message: 'Choose a monthly or yearly term.' };
+  }
+  const { data, error } = await supabase.rpc('renew_plan', period ? { p_period: period } : {});
+  if (error) return { ok: false, message: 'Could not renew the plan. Please try again.' };
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.ok) return { ok: false, message: row?.message ?? 'Could not renew the plan.' };
+  return { ok: true, message: row.message };
+}
+
+/**
+ * Turn scheduled safety reports on (DAILY / WEEKLY / MONTHLY) or OFF. Growth and Enterprise only, and only
+ * while the plan is in force; ADMIN or MANAGER. All enforced in `set_report_schedule()` (029).
+ */
+export async function setReportSchedule(schedule) {
+  const { supabase, error: authError } = await requireUser();
+  if (authError) return { ok: false, message: authError };
+  if (!['OFF', 'DAILY', 'WEEKLY', 'MONTHLY'].includes(schedule)) {
+    return { ok: false, message: 'Choose off, daily, weekly or monthly.' };
+  }
+  const { data, error } = await supabase.rpc('set_report_schedule', { p_schedule: schedule });
+  if (error) return { ok: false, message: 'Could not save the schedule. Please try again.' };
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.ok) return { ok: false, message: row?.message ?? 'Could not save the schedule.' };
+  return { ok: true, message: row.message, nextAt: row.next_at };
 }

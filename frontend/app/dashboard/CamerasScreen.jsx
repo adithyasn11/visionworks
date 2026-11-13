@@ -6,10 +6,10 @@
 // reach Review, Events, Reports or the Overview (decisions and zones are matched to it by name), so the Live
 // feed and Zones screens point here when there is none.
 
-import React, { useState } from 'react';
-import { Camera, Loader2, Plus, Trash2, Video, Upload } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Camera, Loader2, Plus, Trash2, Video, Upload, MapPin } from 'lucide-react';
 
-import { addCamera, removeCamera } from '../lib/platform/cameras';
+import { addCamera, removeCamera, listSites, addSite, removeSite } from '../lib/platform/cameras';
 import { can, denialMessage } from '../lib/permissions';
 import { Panel, Notice, Skeleton, BTN_PRIMARY, BTN_QUIET, INPUT, fmtTime } from './safety/common';
 
@@ -23,13 +23,64 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
   const [message, setMessage] = useState(null);           // { tone, text }
   const [confirming, setConfirming] = useState(null);     // camera id waiting for a second click
   const [removing, setRemoving] = useState(null);
+  // Sites: a camera belongs to one. The plan sets how many there can be.
+  const [sites, setSites] = useState({ status: 'loading', rows: [], error: null });
+  const [siteId, setSiteId] = useState('');
+  const [siteName, setSiteName] = useState('');
+  const [siteBusy, setSiteBusy] = useState(false);
+  const [siteConfirm, setSiteConfirm] = useState(null);
+  const canEditSites = can(role, 'sites.edit');
+  const isAdmin = role === 'ADMIN';
+
+  const loadSites = useCallback(async () => {
+    const r = await listSites();
+    setSites(r.error ? { status: 'error', rows: [], error: r.error } : { status: 'ready', rows: r.sites, error: null });
+    setSiteId((cur) => (cur && r.sites?.some((x) => x.id === cur) ? cur : r.sites?.[0]?.id ?? ''));
+  }, []);
+  useEffect(() => { loadSites(); }, [loadSites]);
+
+  const submitSite = async (e) => {
+    e.preventDefault();
+    setSiteBusy(true);
+    setMessage(null);
+    try {
+      let tz = null;
+      try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { tz = null; }
+      const r = await addSite({ name: siteName, timezone: tz });
+      if (!r?.ok) { setMessage({ tone: 'error', text: r?.message || 'The site could not be added.' }); return; }
+      setSiteName('');
+      setMessage({ tone: 'ok', text: `Added the site “${r.site.name}”. Choose it when you add a camera.` });
+      await loadSites();
+    } catch {
+      setMessage({ tone: 'error', text: 'The site could not be added. Check the connection and try again.' });
+    } finally {
+      setSiteBusy(false);
+    }
+  };
+
+  const dropSite = async (site) => {
+    if (siteConfirm !== site.id) { setSiteConfirm(site.id); return; }
+    setSiteBusy(true);
+    setMessage(null);
+    try {
+      const r = await removeSite(site.id);
+      setMessage(r?.ok ? { tone: 'ok', text: `Removed the site “${site.name}”.` } : { tone: 'error', text: r?.message || 'The site could not be removed.' });
+      if (r?.ok) await loadSites();
+    } catch {
+      setMessage({ tone: 'error', text: 'The site could not be removed. Check the connection and try again.' });
+    } finally {
+      setSiteBusy(false);
+      setSiteConfirm(null);
+    }
+  };
+  const siteNameOf = (id) => sites.rows.find((x) => x.id === id)?.name;
 
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
     setMessage(null);
     try {
-      const r = await addCamera({ name, sourceType: source });
+      const r = await addCamera({ name, sourceType: source, siteId: siteId || undefined });
       if (!r?.ok) {
         setMessage({ tone: 'error', text: r?.message || 'The camera could not be added.' });
         return;
@@ -37,6 +88,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
       setName('');
       setMessage({ tone: 'ok', text: `Added “${r.camera.name}”. Draw its zones on the Zones screen, then run it from the Live feed.` });
       await onChanged?.(r.camera.name);
+      loadSites();
     } catch {
       setMessage({ tone: 'error', text: 'The camera could not be added. Check the connection and try again.' });
     } finally {
@@ -59,6 +111,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
       }
       setMessage({ tone: 'ok', text: `Removed “${cam.name}”.` });
       await onChanged?.();
+      loadSites();
     } catch {
       setMessage({ tone: 'error', text: 'The camera could not be removed. Check the connection and try again.' });
     } finally {
@@ -95,7 +148,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                     )}
                   </div>
                   <p className="text-[0.71875rem] text-ink-faint mt-0.5">
-                    {SOURCE_LABEL[cam.sourceType] || cam.sourceType} · added {fmtTime(cam.createdAt)}
+                    {SOURCE_LABEL[cam.sourceType] || cam.sourceType}{siteNameOf(cam.siteId) ? ` · ${siteNameOf(cam.siteId)}` : ''} · added {fmtTime(cam.createdAt)}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -133,7 +186,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
 
       {canEdit ? (
         <Panel title="Add a camera" icon={Plus}>
-          <form onSubmit={submit} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_200px_auto] items-end">
+          <form onSubmit={submit} className={`grid gap-3 items-end ${sites.rows.length > 1 ? 'sm:grid-cols-[minmax(0,1fr)_180px_180px_auto]' : 'sm:grid-cols-[minmax(0,1fr)_200px_auto]'}`}>
             <label className="grid gap-1 text-[0.71875rem] font-semibold text-ink-muted">
               Name
               <input
@@ -152,6 +205,14 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                 <option value="UPLOAD">{SOURCE_LABEL.UPLOAD}</option>
               </select>
             </label>
+            {sites.rows.length > 1 && (
+              <label className="grid gap-1 text-[0.71875rem] font-semibold text-ink-muted">
+                Site
+                <select className={INPUT} value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+                  {sites.rows.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                </select>
+              </label>
+            )}
             <button type="submit" className={BTN_PRIMARY} disabled={busy || !name.trim()}>
               {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Plus className="w-3.5 h-3.5" aria-hidden="true" />}
               Add camera
@@ -164,6 +225,58 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
       ) : (
         role && <Notice>You have view-only access here. {denialMessage('cameras.edit')}</Notice>
       )}
+
+      <Panel title="Sites" icon={MapPin} aside={sites.status === 'ready' ? `${sites.rows.length} site${sites.rows.length === 1 ? '' : 's'}` : null}>
+        {sites.status === 'loading' && <Skeleton rows={2} label="Loading sites" />}
+        {sites.status === 'error' && <Notice tone="error">{sites.error}</Notice>}
+        {sites.status === 'ready' && sites.rows.length > 0 && (
+          <ul className="divide-y divide-[color:var(--line-soft)]">
+            {sites.rows.map((site) => (
+              <li key={site.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <span className="text-[0.8125rem] font-bold text-ink break-all">{site.name}</span>
+                  <p className="text-[0.71875rem] text-ink-faint mt-0.5">
+                    {site.cameras} camera{site.cameras === 1 ? '' : 's'}{site.timezone ? ` · ${site.timezone}` : ''}
+                  </p>
+                </div>
+                {isAdmin && sites.rows.length > 1 && (
+                  <button
+                    type="button"
+                    className={siteConfirm === site.id ? BTN_PRIMARY : BTN_QUIET}
+                    onClick={() => dropSite(site)}
+                    disabled={siteBusy}
+                    onBlur={() => { if (siteConfirm === site.id && !siteBusy) setSiteConfirm(null); }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                    {siteConfirm === site.id ? 'Click again to remove' : 'Remove'}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {canEditSites && (
+          <form onSubmit={submitSite} className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] items-end">
+            <label className="grid gap-1 text-[0.71875rem] font-semibold text-ink-muted">
+              New site
+              <input
+                className={INPUT}
+                value={siteName}
+                onChange={(e) => setSiteName(e.target.value)}
+                maxLength={160}
+                placeholder="e.g. Plant 2, Warehouse"
+              />
+            </label>
+            <button type="submit" className={BTN_PRIMARY} disabled={siteBusy || !siteName.trim()}>
+              {siteBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Plus className="w-3.5 h-3.5" aria-hidden="true" />}
+              Add site
+            </button>
+          </form>
+        )}
+        <p className="mt-3 text-[0.71875rem] text-ink-faint leading-relaxed">
+          Your plan sets how many sites you can have. A site with cameras on it, or the only site, cannot be removed.
+        </p>
+      </Panel>
     </div>
   );
 }

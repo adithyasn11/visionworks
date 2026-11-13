@@ -382,6 +382,36 @@ The progress bar at the top shows **Organisation · Site · Camera**.
   - Try **Cancel** too.
 - [ ] Go down to Starter while using more than Starter allows.
   - **Expect:** a clear warning about the limit.
+- [ ] **Limits** (Growth: 10 cameras, 5 sites, 25 members, 90 days of history; Starter: 1, 1, 3, 7):
+  - **Cameras** screen → add cameras until the limit. **Expect:** the next one is refused with "The Growth plan allows 10 cameras…".
+  - **Cameras** screen → **Sites** panel → **Add site** until the limit. **Expect:** the next one is refused the same way. With more than one site, **Add a camera** shows a **Site** picker.
+  - **Members** → invite until the limit. **Expect:** the next invitation is refused. Suspend a member, fill the seat, then **Restore access**. **Expect:** also refused.
+- [ ] **Scheduled PDF reports** (Growth and Enterprise only): **Reports** → **Scheduled reports** → **Weekly**.
+  - **Expect:** "Scheduled. The first report is made on …" and a "Next report" time.
+  - On Starter, the panel says it is part of Growth and Enterprise instead.
+  - When one is made it appears under **Reports made before** with a red **Scheduled** tag; **Download** rebuilds it as a PDF.
+
+### 11.1 Expiry and payment reminders
+A term lasts a month or a year from the day it starts. You can't wait a month, so move the end date with one of these from `frontend/` (replace the organisation name):
+
+```bash
+node scripts/sql.mjs "update organisations set \"planRenewsAt\" = now() + interval '3 days' where name = 'Test Plant Ltd'"
+```
+```bash
+node scripts/sql.mjs "update organisations set \"planRenewsAt\" = now() - interval '1 minute' where name = 'Test Plant Ltd'"
+```
+
+- [ ] **3 days left** (first command), then reload the dashboard.
+  - **Expect:** an amber banner on every screen: "Your Growth plan ends in 3 days, on …". **Renew now** opens **Plan**. The **×** hides it for this browser session.
+  - On **Plan**, the renewal box offers **Month / Year** and **Renew for …**. Renewing adds the new term on to the old end date.
+- [ ] **Expired** (second command), then reload.
+  - **Expect:** a red banner that can't be closed: "Your Growth plan ended on … Until it is renewed you are on Starter limits…".
+  - Plan screen shows **Term ended**, and the allowances drop to Starter's (1 / 1 / 3 / 7 days).
+  - Nothing is removed, but adding a camera, site or member over Starter's limit is refused, and **Scheduled reports** says they are paused.
+- [ ] **Renew** from Plan while expired.
+  - **Expect:** "Renewed. Your plan now runs until …" (a new term from today), the banner disappears and the Growth limits come back.
+- [ ] More than 7 days before the end, Plan says "Renewal opens on …" instead of a renew button.
+- [ ] As a **Manager** or **Viewer**: the banner says "Ask an administrator to renew it." and has no button.
 
 ---
 

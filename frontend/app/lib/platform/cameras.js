@@ -41,15 +41,20 @@ async function requireCapability(capability) {
     .from('memberships').select('role').eq('orgId', orgId).eq('profileId', data.user.id).eq('status', 'ACTIVE').maybeSingle();
   if (!membership) return { error: 'You are not an active member of this organisation.' };
   if (!can(membership.role, capability)) return { error: denialMessage(capability) };
-  return { supabase, orgId };
+  return { supabase, orgId, role: membership.role };
 }
 
 function sentence(error, fallback) {
   const msg = String(error?.message ?? '');
+  const siteLimit = msg.match(/plan_limit_sites: the (\w+) plan allows (\d+)/);
+  if (siteLimit) {
+    return `The ${planName(siteLimit[1])} plan allows ${siteLimit[2]} site${siteLimit[2] === '1' ? '' : 's'}. `
+      + 'Remove one, or upgrade or renew the plan, to add another.';
+  }
   const limit = msg.match(/plan_limit_cameras: the (\w+) plan allows (\d+)/);
   if (limit) {
     return `The ${planName(limit[1])} plan allows ${limit[2]} camera${limit[2] === '1' ? '' : 's'}. `
-      + 'Remove one, or change the plan, to add another.';
+      + 'Remove one, or upgrade or renew the plan, to add another.';
   }
   if (/row-level security/i.test(msg)) return 'You do not have permission to do that.';
   if (msg) console.error('[cameras] unhandled database error:', msg);
@@ -63,7 +68,7 @@ export async function listCameras() {
   try {
     const { data, error } = await supabase
       .from('cameras')
-      .select('id, name, sourceType, status, createdAt')
+      .select('id, name, sourceType, status, createdAt, siteId')
       .is('deletedAt', null)
       .order('createdAt', { ascending: true })
       .limit(200);
@@ -75,7 +80,7 @@ export async function listCameras() {
 }
 
 /** Add a camera. `sourceType`: WEBCAM (a webcam or a paired phone) or UPLOAD (recorded videos). */
-export async function addCamera({ name, sourceType }) {
+export async function addCamera({ name, sourceType, siteId }) {
   const ctx = await requireCapability('cameras.edit');
   if (ctx.error) return fail(ctx.error);
   const clean = String(name || '').trim().replace(/\s+/g, ' ');
@@ -88,8 +93,16 @@ export async function addCamera({ name, sourceType }) {
   const { data: same } = await ctx.supabase.from('cameras').select('id').eq('name', clean).is('deletedAt', null).limit(1);
   if (same && same.length) return fail('There is already a camera with that name.');
 
-  // Attach it to the organisation's site (the first one), as onboarding does.
-  const { data: site } = await ctx.supabase.from('sites').select('id').eq('orgId', ctx.orgId).order('createdAt', { ascending: true }).limit(1).maybeSingle();
+  // The site chosen on the screen, or the organisation's first site, as onboarding does.
+  let site = null;
+  if (siteId) {
+    const { data } = await ctx.supabase.from('sites').select('id').eq('id', siteId).is('deletedAt', null).maybeSingle();
+    if (!data) return fail('That site was not found. Choose another.');
+    site = data;
+  } else {
+    const { data } = await ctx.supabase.from('sites').select('id').eq('orgId', ctx.orgId).is('deletedAt', null).order('createdAt', { ascending: true }).limit(1).maybeSingle();
+    site = data;
+  }
 
   const row = {
     orgId: ctx.orgId, siteId: site?.id ?? null, name: clean, sourceType, updatedAt: new Date().toISOString(),
@@ -111,5 +124,65 @@ export async function removeCamera(id) {
   const { data, error } = await ctx.supabase.from('cameras').delete().eq('id', id).select('id');
   if (error) return fail(sentence(error, 'The camera could not be removed.'));
   if (!data || !data.length) return fail('That camera was not found. It may already have been removed.');
+  return { ok: true };
+}
+
+/* ── Sites ──────────────────────────────────────────────────────────────── */
+// A site is a building or work area. Onboarding makes the first; more are added here, up to the plan's limit
+// (enforced by the site_plan_limit trigger, 029). Cameras belong to a site.
+
+/** The organisation's sites, oldest first, with how many cameras each has. */
+export async function listSites() {
+  const supabase = createClient();
+  if (!supabase) return { sites: [], error: 'You are not signed in, or the database is not configured.' };
+  try {
+    // Two plain reads rather than an embedded count: aggregate embedding is not enabled for signed-in users.
+    const [sitesRes, camsRes] = await Promise.all([
+      supabase.from('sites').select('id, name, timezone, createdAt').is('deletedAt', null)
+        .order('createdAt', { ascending: true }).limit(200),
+      supabase.from('cameras').select('siteId').is('deletedAt', null).limit(1000),
+    ]);
+    if (sitesRes.error) throw new Error(sitesRes.error.message);
+    const perSite = {};
+    for (const c of camsRes.data || []) if (c.siteId) perSite[c.siteId] = (perSite[c.siteId] || 0) + 1;
+    return { sites: (sitesRes.data || []).map((s) => ({ ...s, cameras: perSite[s.id] || 0 })) };
+  } catch (err) {
+    console.error('[sites] could not be listed:', err?.message || err);
+    return { sites: [], error: 'Could not load the sites.' };
+  }
+}
+
+/** Add a site. `timezone` is the browser's (an IANA name); the site's working hours default as in onboarding. */
+export async function addSite({ name, timezone }) {
+  const ctx = await requireCapability('sites.edit');
+  if (ctx.error) return fail(ctx.error);
+  const clean = String(name || '').trim().replace(/\s+/g, ' ');
+  if (!clean) return fail('Enter a name for the site.');
+  if (clean.length > 160) return fail('A site name is limited to 160 characters.');
+  const tz = /^[A-Za-z0-9_+/-]{1,64}$/.test(String(timezone || '')) ? timezone : null;
+  const { data: same } = await ctx.supabase.from('sites').select('id').eq('name', clean).is('deletedAt', null).limit(1);
+  if (same && same.length) return fail('There is already a site with that name.');
+  const { data, error } = await ctx.supabase
+    .from('sites')
+    .insert({ orgId: ctx.orgId, name: clean, timezone: tz, updatedAt: new Date().toISOString() })
+    .select('id, name')
+    .single();
+  if (error) return fail(sentence(error, 'The site could not be added.'));
+  return { ok: true, site: data };
+}
+
+/** Remove a site. Only an empty site (no cameras), never the last one, and only by an administrator. */
+export async function removeSite(id) {
+  const ctx = await requireCapability('sites.edit');
+  if (ctx.error) return fail(ctx.error);
+  if (ctx.role !== 'ADMIN') return fail('Only an administrator can remove a site.');
+  if (!id || typeof id !== 'string') return fail('Choose a site.');
+  const { count: sites } = await ctx.supabase.from('sites').select('id', { count: 'exact', head: true }).is('deletedAt', null);
+  if ((sites ?? 0) <= 1) return fail('An organisation needs at least one site, so the last one cannot be removed.');
+  const { count: cams } = await ctx.supabase.from('cameras').select('id', { count: 'exact', head: true }).eq('siteId', id).is('deletedAt', null);
+  if ((cams ?? 0) > 0) return fail('Move or remove the cameras on this site first.');
+  const { data, error } = await ctx.supabase.from('sites').delete().eq('id', id).select('id');
+  if (error) return fail(sentence(error, 'The site could not be removed.'));
+  if (!data || !data.length) return fail('That site was not found. It may already have been removed.');
   return { ok: true };
 }
