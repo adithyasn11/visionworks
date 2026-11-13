@@ -649,3 +649,11 @@ html:not(.intro-seen) .auth-screen .auth-col > * {
   .auth-screen aside,
   .auth-screen .auth-col > * { animation: none; }
 }
+
+/* Sign-in panel event log: the newest line slides in. */
+@keyframes auth-log-in {
+  0%   { opacity: 0; transform: translateX(-10px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+.auth-log-line:first-child { animation: auth-log-in 320ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) { .auth-log-line:first-child { animation: none; } }
