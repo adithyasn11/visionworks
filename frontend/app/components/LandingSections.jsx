@@ -22,10 +22,10 @@ export const StatsBand = ({ stats, delay = 0 }) => (
           <dd className="text-3xl sm:text-4xl font-black tracking-tight text-ink tabular-nums leading-[1.15]">
             {value}
           </dd>
-          <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-accent">
+          <dt className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-accent">
             {label}
           </dt>
-          <p className="text-[13px] text-ink-muted font-medium leading-snug mt-1">{note}</p>
+          <p className="text-[0.8125rem] text-ink-muted font-medium leading-snug mt-1">{note}</p>
         </div>
       ))}
     </dl>
@@ -37,13 +37,13 @@ export const StatsBand = ({ stats, delay = 0 }) => (
 export const HowItWorks = ({ steps, heading = 'How it works', intro, delay = 0 }) => (
   <section className="themed animate-fade-in-up" style={{ animationDelay: `${delay}ms` }}>
     <div className="max-w-2xl mb-10">
-      <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-accent mb-3">
+      <p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-accent mb-3">
         Getting started
       </p>
       <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-ink leading-[1.15] pb-1 mb-3">
         {heading}
       </h2>
-      {intro && <p className="text-[15px] text-ink-muted font-medium leading-relaxed">{intro}</p>}
+      {intro && <p className="text-[0.9375rem] text-ink-muted font-medium leading-relaxed">{intro}</p>}
     </div>
 
     {/* Numbered because these are genuinely sequential — each step depends on
@@ -54,13 +54,13 @@ export const HowItWorks = ({ steps, heading = 'How it works', intro, delay = 0 }
           key={title}
           className="relative bg-surface border border-line rounded-2xl p-6 flex flex-col gap-2.5 hover:border-[color:var(--accent)] transition-colors duration-300 group"
         >
-          <span className="w-7 h-7 rounded-lg bg-accent-soft text-accent font-black text-[13px] flex items-center justify-center tabular-nums shrink-0">
+          <span className="w-7 h-7 rounded-lg bg-accent-soft text-accent font-black text-[0.8125rem] flex items-center justify-center tabular-nums shrink-0">
             {i + 1}
           </span>
           <h3 className="text-base font-black tracking-tight text-ink group-hover:text-accent transition-colors">
             {title}
           </h3>
-          <p className="text-[14px] text-ink-muted font-medium leading-relaxed">{body}</p>
+          <p className="text-[0.875rem] text-ink-muted font-medium leading-relaxed">{body}</p>
         </li>
       ))}
     </ol>
@@ -75,7 +75,7 @@ export const FAQ = ({ items, heading = 'Common questions', delay = 0 }) => {
   return (
     <section className="themed animate-fade-in-up" style={{ animationDelay: `${delay}ms` }}>
       <div className="max-w-2xl mb-8">
-        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-accent mb-3">FAQ</p>
+        <p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-accent mb-3">FAQ</p>
         <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-ink leading-[1.15] pb-1">
           {heading}
         </h2>
@@ -95,7 +95,7 @@ export const FAQ = ({ items, heading = 'Common questions', delay = 0 }) => {
                 aria-expanded={isOpen}
                 className="w-full flex items-center justify-between gap-4 text-left px-5 sm:px-6 py-4 group"
               >
-                <span className="text-[15px] font-bold tracking-tight text-ink group-hover:text-accent transition-colors">
+                <span className="text-[0.9375rem] font-bold tracking-tight text-ink group-hover:text-accent transition-colors">
                   {q}
                 </span>
                 <span className="w-6 h-6 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0">
@@ -109,7 +109,7 @@ export const FAQ = ({ items, heading = 'Common questions', delay = 0 }) => {
                 }`}
               >
                 <div className="overflow-hidden">
-                  <p className="px-5 sm:px-6 pb-5 text-[14px] text-ink-muted font-medium leading-relaxed max-w-2xl">
+                  <p className="px-5 sm:px-6 pb-5 text-[0.875rem] text-ink-muted font-medium leading-relaxed max-w-2xl">
                     {a}
                   </p>
                 </div>

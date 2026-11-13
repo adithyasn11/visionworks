@@ -54,13 +54,13 @@ function ChartTooltip({ active, payload, label, tokens }) {
       className="rounded-lg border px-3 py-2 shadow-lg"
       style={{ background: tokens.surface, borderColor: tokens.line }}
     >
-      <div className="font-mono text-[10px] uppercase tracking-[0.12em] mb-1" style={{ color: tokens.inkFaint }}>
+      <div className="font-mono text-[0.625rem] uppercase tracking-[0.12em] mb-1" style={{ color: tokens.inkFaint }}>
         {fmtDay(label)}
       </div>
-      <div className="text-[13px] font-bold tabular-nums" style={{ color: tokens.ink }}>
+      <div className="text-[0.8125rem] font-bold tabular-nums" style={{ color: tokens.ink }}>
         {total} total
       </div>
-      <div className="text-[12px] tabular-nums" style={{ color: count > 0 ? tokens.accent : tokens.inkFaint }}>
+      <div className="text-[0.75rem] tabular-nums" style={{ color: count > 0 ? tokens.accent : tokens.inkFaint }}>
         {count === 0 ? 'no signups' : `+${count} signup${count > 1 ? 's' : ''}`}
       </div>
     </div>
@@ -88,14 +88,14 @@ export default function SignupsChart({ data }) {
     <div className="rounded-xl border border-line bg-surface p-4 sm:p-5 themed">
       <div className="flex items-baseline justify-between gap-4 mb-4">
         <div>
-          <h2 className="text-[14px] font-bold tracking-tight text-ink">Organisations over time</h2>
-          <p className="text-[11.5px] text-ink-faint mt-0.5">Last 30 days · cumulative</p>
+          <h2 className="text-[0.875rem] font-bold tracking-tight text-ink">Organisations over time</h2>
+          <p className="text-[0.71875rem] text-ink-faint mt-0.5">Last 30 days · cumulative</p>
         </div>
         <div className="text-right shrink-0">
-          <div className="text-[22px] font-black tracking-tight tabular-nums leading-none text-ink">
+          <div className="text-[1.375rem] font-black tracking-tight tabular-nums leading-none text-ink">
             {peak}
           </div>
-          <div className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-ink-faint mt-1">
+          <div className="font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-ink-faint mt-1">
             total
           </div>
         </div>

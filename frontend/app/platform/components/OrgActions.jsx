@@ -23,7 +23,7 @@ function Result({ result }) {
   return (
     <p
       role="status"
-      className={`flex items-center gap-1.5 text-[12px] font-bold ${ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-accent'}`}
+      className={`flex items-center gap-1.5 text-[0.75rem] font-bold ${ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-accent'}`}
     >
       {ok ? <Check className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
       {ok ? (result.unchanged ? 'No change needed.' : 'Saved.') : result.error}
@@ -70,8 +70,8 @@ export default function OrgActions({ org }) {
   return (
     <section className="rounded-xl border border-line bg-surface themed">
       <div className="px-4 sm:px-5 py-3.5 border-b border-line">
-        <h2 className="text-[14px] font-bold tracking-tight text-ink">Actions</h2>
-        <p className="text-[11.5px] text-ink-faint mt-0.5">
+        <h2 className="text-[0.875rem] font-bold tracking-tight text-ink">Actions</h2>
+        <p className="text-[0.71875rem] text-ink-faint mt-0.5">
           Every change here is written to the platform audit log.
         </p>
       </div>
@@ -82,10 +82,10 @@ export default function OrgActions({ org }) {
           <div className="flex items-start gap-2">
             <Clock className="w-4 h-4 mt-0.5 shrink-0 text-ink-faint" strokeWidth={2.2} />
             <div className="min-w-0">
-              <label htmlFor="retention" className="text-[13px] font-bold text-ink block">
+              <label htmlFor="retention" className="text-[0.8125rem] font-bold text-ink block">
                 Data retention
               </label>
-              <p className="text-[11.5px] text-ink-muted leading-relaxed mt-0.5">
+              <p className="text-[0.71875rem] text-ink-muted leading-relaxed mt-0.5">
                 Minute buckets older than this are deleted by the nightly job.
                 Shortening it destroys data on the next run.
               </p>
@@ -101,13 +101,13 @@ export default function OrgActions({ org }) {
               value={days}
               onChange={(e) => setDays(e.target.value)}
               disabled={pending}
-              className="w-24 rounded-lg border-2 border-field bg-ground px-3 py-1.5 text-[13px] tabular-nums text-ink hover:border-field-hover focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)] transition-colors disabled:opacity-50"
+              className="w-24 rounded-lg border-2 border-field bg-ground px-3 py-1.5 text-[0.8125rem] tabular-nums text-ink hover:border-field-hover focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)] transition-colors disabled:opacity-50"
             />
-            <span className="text-[12.5px] text-ink-muted">days</span>
+            <span className="text-[0.78125rem] text-ink-muted">days</span>
             <button
               type="submit"
               disabled={pending || Number(days) === org.retentionDays}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[12.5px] font-bold text-ink hover:border-field transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[0.78125rem] font-bold text-ink hover:border-field transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {pending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               Save
@@ -123,10 +123,10 @@ export default function OrgActions({ org }) {
               ? <PlayCircle className="w-4 h-4 mt-0.5 shrink-0 text-ink-faint" strokeWidth={2.2} />
               : <PauseCircle className="w-4 h-4 mt-0.5 shrink-0 text-ink-faint" strokeWidth={2.2} />}
             <div className="min-w-0">
-              <h3 className="text-[13px] font-bold text-ink">
+              <h3 className="text-[0.8125rem] font-bold text-ink">
                 {org.isSuspended ? 'Restore access' : 'Suspend organisation'}
               </h3>
-              <p className="text-[11.5px] text-ink-muted leading-relaxed mt-0.5">
+              <p className="text-[0.71875rem] text-ink-muted leading-relaxed mt-0.5">
                 {org.isSuspended
                   ? 'Members will be able to sign in and see their data again.'
                   : 'Members lose access immediately. No data is deleted, and the change is reversible.'}
@@ -140,7 +140,7 @@ export default function OrgActions({ org }) {
                 type="button"
                 onClick={() => runSuspend(false)}
                 disabled={pending}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[12.5px] font-bold text-ink hover:border-field transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[0.78125rem] font-bold text-ink hover:border-field transition-colors disabled:opacity-50"
               >
                 {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlayCircle className="w-3.5 h-3.5" />}
                 Restore access
@@ -149,14 +149,14 @@ export default function OrgActions({ org }) {
               <button
                 type="button"
                 onClick={() => setConfirmOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border-2 border-[color:var(--accent)] bg-transparent px-3 py-1.5 text-[12.5px] font-bold text-accent hover:bg-accent-soft transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg border-2 border-[color:var(--accent)] bg-transparent px-3 py-1.5 text-[0.78125rem] font-bold text-accent hover:bg-accent-soft transition-colors"
               >
                 <PauseCircle className="w-3.5 h-3.5" />
                 Suspend…
               </button>
             ) : (
               <div className="rounded-lg border border-[color:var(--accent)] bg-accent-soft p-3 space-y-2.5">
-                <p className="text-[12px] font-bold text-accent leading-relaxed">
+                <p className="text-[0.75rem] font-bold text-accent leading-relaxed">
                   Type <span className="font-mono">{org.name}</span> to confirm.
                 </p>
                 <input
@@ -165,14 +165,14 @@ export default function OrgActions({ org }) {
                   onChange={(e) => setConfirmText(e.target.value)}
                   autoComplete="off"
                   aria-label={`Type ${org.name} to confirm suspension`}
-                  className="w-full rounded-lg border-2 border-field bg-ground px-3 py-1.5 text-[13px] text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors"
+                  className="w-full rounded-lg border-2 border-field bg-ground px-3 py-1.5 text-[0.8125rem] text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors"
                 />
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => runSuspend(true)}
                     disabled={!nameMatches || pending}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12.5px] font-bold text-white hover:brightness-110 transition-[filter] disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[0.78125rem] font-bold text-white hover:brightness-110 transition-[filter] disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PauseCircle className="w-3.5 h-3.5" />}
                     Suspend
@@ -181,7 +181,7 @@ export default function OrgActions({ org }) {
                     type="button"
                     onClick={() => { setConfirmOpen(false); setConfirmText(''); }}
                     disabled={pending}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[12.5px] font-bold text-ink-muted hover:text-ink transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[0.78125rem] font-bold text-ink-muted hover:text-ink transition-colors"
                   >
                     <X className="w-3.5 h-3.5" />
                     Cancel

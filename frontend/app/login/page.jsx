@@ -252,7 +252,7 @@ function LoginForm() {
           <div className="flex items-center justify-between">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 text-[13px] font-bold text-ink-muted hover:text-accent transition-colors"
+              className="inline-flex items-center gap-2 text-[0.8125rem] font-bold text-ink-muted hover:text-accent transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to site
@@ -267,7 +267,7 @@ function LoginForm() {
                 <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-ink leading-[1.15] pb-1">
                   Sign in
                 </h1>
-                <p className="text-[14px] text-ink-muted font-medium leading-relaxed">
+                <p className="text-[0.875rem] text-ink-muted font-medium leading-relaxed">
                   Pick up where you left off with your live safety dashboard.
                 </p>
               </header>
@@ -317,7 +317,7 @@ function LoginForm() {
                 </SubmitButton>
               </form>
 
-              <p className="text-[13px] text-ink-muted font-medium text-center">
+              <p className="text-[0.8125rem] text-ink-muted font-medium text-center">
                 New to VisionWorks?{' '}
                 <Link href="/signup" className="font-bold text-accent hover:underline">
                   Create an account

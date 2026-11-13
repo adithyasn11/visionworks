@@ -90,7 +90,7 @@ function StatusPill({ member }) {
         : 'Suspended';
 
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${tone}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.6875rem] font-bold ${tone}`}>
       {member.status === 'INVITED' && <Clock className="w-3 h-3" />}
       {label}
     </span>
@@ -136,10 +136,10 @@ function InviteLinkPanel({ invite, onDismiss }) {
     <div className="rounded-xl border-2 border-[color:var(--accent)] bg-accent-soft p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[13px] font-black text-accent">
+          <p className="text-[0.8125rem] font-black text-accent">
             Invitation link for {invite.email}
           </p>
-          <p className="text-[12px] text-ink-muted font-medium mt-0.5 leading-relaxed">
+          <p className="text-[0.75rem] text-ink-muted font-medium mt-0.5 leading-relaxed">
             Send this to them yourself — no email is sent automatically.{' '}
             <strong className="text-ink">This link is shown once</strong> and cannot be
             retrieved later; only a hash of it is stored. Resending issues a new one.
@@ -161,19 +161,19 @@ function InviteLinkPanel({ invite, onDismiss }) {
           value={link}
           onFocus={(e) => e.target.select()}
           aria-label="Invitation link"
-          className="flex-1 min-w-0 rounded-lg bg-ground border-2 border-field px-3 py-2 text-[12px] font-mono text-ink"
+          className="flex-1 min-w-0 rounded-lg bg-ground border-2 border-field px-3 py-2 text-[0.75rem] font-mono text-ink"
         />
         <button
           type="button"
           onClick={copy}
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-accent text-white px-3 py-2 text-[12.5px] font-bold hover:brightness-110 transition-[filter]"
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-accent text-white px-3 py-2 text-[0.78125rem] font-bold hover:brightness-110 transition-[filter]"
         >
           {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
 
-      <p className="text-[11.5px] text-ink-faint font-medium leading-relaxed">
+      <p className="text-[0.71875rem] text-ink-faint font-medium leading-relaxed">
         They accept by signing up with <strong className="text-ink-muted">{invite.email}</strong> —
         including with Google. Their membership activates automatically and they skip
         onboarding entirely.
@@ -199,20 +199,20 @@ function MemberRow({ member, canManage, isLastActiveAdmin, busyId, onAction }) {
 
   return (
     <li className="flex items-center gap-3 px-4 py-3 border-b border-line-soft last:border-b-0">
-      <div className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center font-bold text-[12px] shrink-0">
+      <div className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center font-bold text-[0.75rem] shrink-0">
         {initialsOf(member)}
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[13.5px] font-bold text-ink truncate">
+          <span className="text-[0.84375rem] font-bold text-ink truncate">
             {member.fullName || member.email}
           </span>
           {member.isSelf && (
-            <span className="text-[10px] font-black uppercase tracking-wider text-ink-faint">You</span>
+            <span className="text-[0.625rem] font-black uppercase tracking-wider text-ink-faint">You</span>
           )}
         </div>
-        <div className="text-[12px] text-ink-muted truncate">
+        <div className="text-[0.75rem] text-ink-muted truncate">
           {member.fullName ? member.email : null}
           {member.status === 'ACTIVE' && member.joinedAt && (
             <span className="text-ink-faint">
@@ -228,7 +228,7 @@ function MemberRow({ member, canManage, isLastActiveAdmin, busyId, onAction }) {
         </div>
       </div>
 
-      <span className="hidden sm:inline-flex items-center gap-1.5 text-[12px] font-bold text-ink-muted shrink-0">
+      <span className="hidden sm:inline-flex items-center gap-1.5 text-[0.75rem] font-bold text-ink-muted shrink-0">
         <RoleIcon className="w-3.5 h-3.5" />
         {ROLE_META[member.role]?.label ?? member.role}
       </span>
@@ -268,7 +268,7 @@ function MemberRow({ member, canManage, isLastActiveAdmin, busyId, onAction }) {
                   </>
                 ) : (
                   <>
-                    <p className="px-3 pt-1.5 pb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+                    <p className="px-3 pt-1.5 pb-1 font-mono text-[0.625rem] uppercase tracking-[0.14em] text-ink-faint">
                       Role
                     </p>
                     {ROLE_ORDER.map((role) => (
@@ -335,7 +335,7 @@ function MenuItem({ icon: Icon, children, onClick, danger, disabled, selected, t
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 text-[13px] font-semibold text-left transition-colors ${
+      className={`w-full flex items-center gap-2.5 px-3 py-2 text-[0.8125rem] font-semibold text-left transition-colors ${
         disabled
           ? 'text-ink-faint cursor-not-allowed'
           : danger
@@ -458,13 +458,13 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
 
         {/* Same page header as the dashboard screens (eyebrow, title, line of context, rule underneath). */}
         <header className="flex flex-col gap-2 pb-5 mb-7 border-b border-line">
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent">
+          <p className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-accent">
             {orgName}
           </p>
-          <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight text-ink leading-[1.15]">
+          <h1 className="text-[1.625rem] sm:text-[1.875rem] font-black tracking-tight text-ink leading-[1.15]">
             Members
           </h1>
-          <p className="text-[13.5px] text-ink-muted leading-relaxed max-w-2xl">
+          <p className="text-[0.84375rem] text-ink-muted leading-relaxed max-w-2xl">
             Everyone who can see this organisation’s safety data, and what each person can change.
           </p>
         </header>
@@ -485,11 +485,11 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
             sees the roster below but no way to change it. */}
         {canInvite && (
           <section className="mb-7 rounded-xl border border-line bg-surface p-4 sm:p-5">
-            <h2 className="text-[15px] font-black tracking-tight text-ink mb-1 flex items-center gap-2">
+            <h2 className="text-[0.9375rem] font-black tracking-tight text-ink mb-1 flex items-center gap-2">
               <UserPlus className="w-4 h-4 text-accent" />
               Invite someone
             </h2>
-            <p className="text-[12.5px] text-ink-muted font-medium mb-4 leading-relaxed">
+            <p className="text-[0.78125rem] text-ink-muted font-medium mb-4 leading-relaxed">
               They accept by signing up with this address — no token to paste, and it works
               with Google sign-in too.
             </p>
@@ -508,7 +508,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
               />
 
               <fieldset className="flex flex-col gap-1.5">
-                <legend className="text-[13px] font-bold text-ink mb-1.5">Role</legend>
+                <legend className="text-[0.8125rem] font-bold text-ink mb-1.5">Role</legend>
                 <div className="flex flex-col gap-1.5">
                   {ROLE_ORDER.map((id) => {
                     const meta = ROLE_META[id];
@@ -530,11 +530,11 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
                           className="mt-0.5 accent-[color:var(--accent)]"
                         />
                         <span className="flex flex-col gap-0.5 min-w-0">
-                          <span className={`text-[13px] font-bold flex items-center gap-1.5 ${on ? 'text-accent' : 'text-ink'}`}>
+                          <span className={`text-[0.8125rem] font-bold flex items-center gap-1.5 ${on ? 'text-accent' : 'text-ink'}`}>
                             <Icon className="w-3.5 h-3.5" />
                             {meta.label}
                           </span>
-                          <span className="text-[12px] text-ink-faint font-medium leading-snug">
+                          <span className="text-[0.75rem] text-ink-faint font-medium leading-snug">
                             {meta.blurb}
                           </span>
                         </span>
@@ -554,7 +554,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
         {!canInvite && state.status === 'ready' && (
           <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-line bg-surface-alt px-4 py-3">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-ink-faint" />
-            <p className="text-[12.5px] text-ink-muted font-medium leading-relaxed">
+            <p className="text-[0.78125rem] text-ink-muted font-medium leading-relaxed">
               Only an administrator can invite people or change roles. You can see who is in{' '}
               {orgName}.
             </p>
@@ -576,7 +576,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
         ) : (
           <>
             <section className="mb-6">
-              <h2 className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint mb-2.5">
+              <h2 className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-ink-faint mb-2.5">
                 Members · {activeMembers.length}
               </h2>
               {/* No overflow-hidden: a row's action menu opens below it, and clipping the list cut off the menu of
@@ -597,7 +597,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
 
             {pendingInvites.length > 0 && (
               <section>
-                <h2 className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint mb-2.5">
+                <h2 className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-ink-faint mb-2.5">
                   Pending invitations · {pendingInvites.length}
                 </h2>
                 <ul className="rounded-xl border border-line bg-surface">

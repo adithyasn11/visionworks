@@ -25,7 +25,7 @@ export default function StatTile({
       }`}
     >
       <div className="flex items-start justify-between gap-3 mb-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint leading-tight">
+        <span className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-ink-faint leading-tight">
           {label}
         </span>
         {Icon && (
@@ -37,7 +37,7 @@ export default function StatTile({
       </div>
 
       <div
-        className={`text-[26px] leading-none font-black tracking-tight tabular-nums ${
+        className={`text-[1.625rem] leading-none font-black tracking-tight tabular-nums ${
           active ? 'text-accent' : 'text-ink'
         } ${mono ? 'font-mono' : ''}`}
       >
@@ -45,7 +45,7 @@ export default function StatTile({
       </div>
 
       {hint && (
-        <div className="mt-1.5 text-[11.5px] text-ink-faint leading-snug">{hint}</div>
+        <div className="mt-1.5 text-[0.71875rem] text-ink-faint leading-snug">{hint}</div>
       )}
     </div>
   );

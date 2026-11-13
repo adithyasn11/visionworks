@@ -54,6 +54,13 @@
 }
 
 @layer base {
+  /* Fluid sizing: the base size (and with it every rem-based font size, gap, padding and width) eases from
+     16px on a wide screen down to 14px as the window narrows (1536px -> 896px wide), so the whole layout
+     shrinks smoothly instead of jumping or squeezing text. Below that the layout's own breakpoints take over. */
+  html {
+    font-size: clamp(14px, calc(0.3125vw + 11.2px), 16px);
+  }
+
   /* A `border` with no colour class follows the theme instead of Tailwind's
      fixed light grey (which showed as bright lines in dark mode). */
   *, ::before, ::after {

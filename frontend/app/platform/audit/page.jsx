@@ -123,21 +123,21 @@ export default async function PlatformAuditPage({ searchParams }) {
       <header>
         <Link
           href="/platform"
-          className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint hover:text-accent transition-colors mb-2"
+          className="inline-flex items-center gap-1.5 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-ink-faint hover:text-accent transition-colors mb-2"
         >
           <ArrowLeft className="w-3 h-3" />
           Overview
         </Link>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-[1.15] text-ink">
+          <h1 className="text-[1.625rem] sm:text-[1.875rem] font-black tracking-tight leading-[1.15] text-ink">
             Platform audit log
           </h1>
-          <span className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.1em] font-bold bg-surface-alt text-ink-muted">
+          <span className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 font-mono text-[0.59375rem] uppercase tracking-[0.1em] font-bold bg-surface-alt text-ink-muted">
             <Lock className="w-3 h-3" />
             append-only
           </span>
         </div>
-        <p className="mt-1.5 text-[13.5px] text-ink-muted max-w-2xl leading-relaxed">
+        <p className="mt-1.5 text-[0.84375rem] text-ink-muted max-w-2xl leading-relaxed">
           Every action taken from this console. A platform operator is the one
           actor row-level security does not constrain, so this record is the
           accountability that replaces the missing enforcement.
@@ -150,7 +150,7 @@ export default async function PlatformAuditPage({ searchParams }) {
           className="flex items-start gap-2.5 rounded-xl border border-[color:var(--accent)] bg-accent-soft px-4 py-3"
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-accent" />
-          <p className="text-[13px] leading-relaxed">
+          <p className="text-[0.8125rem] leading-relaxed">
             <span className="font-bold text-accent">Could not load the audit log.</span>{' '}
             <span className="text-ink-muted">{error}</span>
           </p>
@@ -171,9 +171,9 @@ export default async function PlatformAuditPage({ searchParams }) {
         <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-line">
           <div className="flex items-center gap-2">
             <ScrollText className="w-4 h-4 text-ink-faint" strokeWidth={2.2} />
-            <h2 className="text-[14px] font-bold tracking-tight text-ink">Activity</h2>
+            <h2 className="text-[0.875rem] font-bold tracking-tight text-ink">Activity</h2>
           </div>
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint tabular-nums">
+          <span className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-ink-faint tabular-nums">
             {total} total
           </span>
         </div>
@@ -183,8 +183,8 @@ export default async function PlatformAuditPage({ searchParams }) {
             {isFiltered ? (
               <>
                 <SearchX className="w-7 h-7 mx-auto text-ink-faint mb-3" strokeWidth={1.8} />
-                <p className="text-[13.5px] font-bold text-ink">Nothing in this window</p>
-                <p className="text-[12px] text-ink-faint mt-1 max-w-sm mx-auto leading-relaxed">
+                <p className="text-[0.84375rem] font-bold text-ink">Nothing in this window</p>
+                <p className="text-[0.75rem] text-ink-faint mt-1 max-w-sm mx-auto leading-relaxed">
                   No platform action matches these filters. Widen the date range
                   or clear them to see the full log.
                 </p>
@@ -192,8 +192,8 @@ export default async function PlatformAuditPage({ searchParams }) {
             ) : (
               <>
                 <Inbox className="w-7 h-7 mx-auto text-ink-faint mb-3" strokeWidth={1.8} />
-                <p className="text-[13.5px] font-bold text-ink">No platform actions yet</p>
-                <p className="text-[12px] text-ink-faint mt-1 max-w-md mx-auto leading-relaxed">
+                <p className="text-[0.84375rem] font-bold text-ink">No platform actions yet</p>
+                <p className="text-[0.75rem] text-ink-faint mt-1 max-w-md mx-auto leading-relaxed">
                   Suspending an organisation, changing its retention, or granting
                   and revoking operator access all appear here.
                 </p>
@@ -225,18 +225,18 @@ export default async function PlatformAuditPage({ searchParams }) {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-                        <span className="font-bold text-[13.5px] text-ink">{meta.label}</span>
+                        <span className="font-bold text-[0.84375rem] text-ink">{meta.label}</span>
                         <time
                           dateTime={e.createdAt}
                           title={fmtFull(e.createdAt)}
-                          className="shrink-0 text-[11.5px] text-ink-faint tabular-nums whitespace-nowrap"
+                          className="shrink-0 text-[0.71875rem] text-ink-faint tabular-nums whitespace-nowrap"
                         >
                           {relative(e.createdAt)}
                         </time>
                       </div>
 
                       {/* Who and against which organisation. */}
-                      <div className="mt-1 flex items-center gap-2 flex-wrap text-[11.5px]">
+                      <div className="mt-1 flex items-center gap-2 flex-wrap text-[0.71875rem]">
                         {e.actorEmail ? (
                           <span className="font-mono text-ink-muted">{e.actorEmail}</span>
                         ) : (
@@ -265,12 +265,12 @@ export default async function PlatformAuditPage({ searchParams }) {
                         )}
 
                         {e.ipAddress && (
-                          <span className="font-mono text-[10.5px] text-ink-faint">· {e.ipAddress}</span>
+                          <span className="font-mono text-[0.65625rem] text-ink-faint">· {e.ipAddress}</span>
                         )}
                       </div>
 
                       {summary && (
-                        <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted">
+                        <p className="mt-1.5 text-[0.78125rem] leading-relaxed text-ink-muted">
                           {summary}
                         </p>
                       )}
@@ -279,10 +279,10 @@ export default async function PlatformAuditPage({ searchParams }) {
                         <dl className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
                           {extraKeys.map((k) => (
                             <div key={k} className="flex items-baseline gap-1.5">
-                              <dt className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-ink-faint">
+                              <dt className="font-mono text-[0.59375rem] uppercase tracking-[0.12em] text-ink-faint">
                                 {k}
                               </dt>
-                              <dd className="font-mono text-[11px] text-ink-muted break-all max-w-[22rem]">
+                              <dd className="font-mono text-[0.6875rem] text-ink-muted break-all max-w-[22rem]">
                                 {String(e.metadata[k])}
                               </dd>
                             </div>
@@ -303,17 +303,17 @@ export default async function PlatformAuditPage({ searchParams }) {
         <div className="flex items-start gap-2.5">
           <Lock className="w-4 h-4 shrink-0 mt-0.5 text-ink-faint" strokeWidth={2.2} />
           <div className="min-w-0">
-            <h2 className="text-[13.5px] font-bold tracking-tight text-ink">
+            <h2 className="text-[0.84375rem] font-bold tracking-tight text-ink">
               This log cannot be edited or cleared
             </h2>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-muted max-w-3xl">
-              <code className="font-mono text-[11.5px] text-ink">platform_audit_logs</code>{' '}
+            <p className="mt-1.5 text-[0.78125rem] leading-relaxed text-ink-muted max-w-3xl">
+              <code className="font-mono text-[0.71875rem] text-ink">platform_audit_logs</code>{' '}
               has no UPDATE or DELETE policy and no grant for either, so there is
               no request an operator can make that changes a past entry — not
               through this page, and not through a hand-crafted call. A log its
               own subject can erase is not evidence.
             </p>
-            <p className="mt-2 text-[11.5px] leading-relaxed text-ink-faint">
+            <p className="mt-2 text-[0.71875rem] leading-relaxed text-ink-faint">
               Customer organisations keep their own separate audit trail, which
               is not readable from a platform session.
             </p>

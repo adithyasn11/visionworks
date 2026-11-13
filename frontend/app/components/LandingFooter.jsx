@@ -49,14 +49,14 @@ export default function LandingFooter() {
                 VisionWorks
               </span>
             </Link>
-            <p className="opacity-70 font-medium text-[14px] leading-relaxed max-w-sm mb-6">
+            <p className="opacity-70 font-medium text-[0.875rem] leading-relaxed max-w-sm mb-6">
               Safety compliance monitoring that checks whether procedures are followed —
               PPE before entry, time limits, workers down — with verdicts that say how
               sure they are, and a person who confirms every flag.
             </p>
             <div className="flex items-center gap-3">
               <span className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse" aria-hidden="true" />
-              <span className="opacity-70 font-bold text-[10px] tracking-widest uppercase">
+              <span className="opacity-70 font-bold text-[0.625rem] tracking-widest uppercase">
                 All systems operational
               </span>
             </div>
@@ -64,7 +64,7 @@ export default function LandingFooter() {
 
           {/* Product links */}
           <nav aria-label="Product">
-            <h4 className="font-black mb-5 uppercase tracking-[0.14em] text-[10px] text-red-500">
+            <h4 className="font-black mb-5 uppercase tracking-[0.14em] text-[0.625rem] text-red-500">
               Product
             </h4>
             <ul className="space-y-3.5">
@@ -72,7 +72,7 @@ export default function LandingFooter() {
                 <li key={href}>
                   <Link
                     href={href}
-                    className="opacity-70 text-[13.5px] font-bold hover:opacity-100 hover:text-red-500 hover:translate-x-1 inline-block transition-all duration-300"
+                    className="opacity-70 text-[0.84375rem] font-bold hover:opacity-100 hover:text-red-500 hover:translate-x-1 inline-block transition-all duration-300"
                   >
                     {label}
                   </Link>
@@ -88,14 +88,14 @@ export default function LandingFooter() {
               <h4 className="text-xl font-black tracking-tight mb-2 group-hover/cta:text-red-500 transition-colors">
                 Check one entrance
               </h4>
-              <p className="opacity-65 font-medium text-[13.5px] leading-relaxed">
+              <p className="opacity-65 font-medium text-[0.84375rem] leading-relaxed">
                 Point a camera at one entrance and see whether the verdicts match what
                 you already know.
               </p>
             </div>
             <Link
               href="/home"
-              className="bg-accent text-white px-5 py-3 rounded-2xl font-bold text-[13.5px] hover:brightness-110 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-red-600/40 transition-all duration-300 flex items-center justify-center gap-2.5 w-max group/btn"
+              className="bg-accent text-white px-5 py-3 rounded-2xl font-bold text-[0.84375rem] hover:brightness-110 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-red-600/40 transition-all duration-300 flex items-center justify-center gap-2.5 w-max group/btn"
             >
               Get started
               <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" aria-hidden="true" />
@@ -104,10 +104,10 @@ export default function LandingFooter() {
         </div>
 
         <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="opacity-55 font-bold text-[12px]">
+          <p className="opacity-55 font-bold text-[0.75rem]">
             &copy; {new Date().getFullYear()} VisionWorks.
           </p>
-          <p className="opacity-45 font-bold text-[11px] tracking-wide text-center sm:text-right">
+          <p className="opacity-45 font-bold text-[0.6875rem] tracking-wide text-center sm:text-right">
             Workplace safety compliance · privacy by design
           </p>
         </div>

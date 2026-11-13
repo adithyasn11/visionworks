@@ -37,17 +37,17 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
           {open
             ? <ShieldAlert className="w-4 h-4 text-accent" strokeWidth={2.2} />
             : <ShieldCheck className="w-4 h-4 text-ink-faint" strokeWidth={2.2} />}
-          <h3 className="text-[13.5px] font-bold tracking-tight text-ink">Open alerts</h3>
+          <h3 className="text-[0.84375rem] font-bold tracking-tight text-ink">Open alerts</h3>
           {(status === 'ready' || (status === 'error' && count > 0)) && (
             <span
-              className={`px-2 py-0.5 rounded-md text-[11px] font-bold tabular-nums ${open ? 'bg-accent text-white' : 'bg-surface-alt text-ink-muted'}`}
+              className={`px-2 py-0.5 rounded-md text-[0.6875rem] font-bold tabular-nums ${open ? 'bg-accent text-white' : 'bg-surface-alt text-ink-muted'}`}
               aria-label={`${count} open`}
             >
               {count}
             </span>
           )}
         </div>
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+        <span className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-ink-faint">
           potential violations waiting for review
         </span>
       </header>
@@ -76,7 +76,7 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
             return (
               <li key={a.id} className="flex flex-col gap-1 py-2.5 text-xs">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className={`px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wide ${BADGE[meta.tone]}`}>
+                  <span className={`px-2 py-0.5 rounded-md border text-[0.625rem] font-bold uppercase tracking-wide ${BADGE[meta.tone]}`}>
                     {meta.label}
                   </span>
                   <span className="text-ink font-medium">{workerLabel(a.workerKey)}</span>
@@ -94,13 +94,13 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
         </ul>
       )}
       {status === 'ready' && open && (
-        <p className="mt-2 text-[11px] text-ink-faint">
+        <p className="mt-2 text-[0.6875rem] text-ink-faint">
           They stay listed until someone reviews them.{onReview ? ' ' : ''}
           {onReview && <button type="button" onClick={onReview} className="underline text-ink hover:text-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)] rounded">Open the Review queue</button>}
         </p>
       )}
       {status === 'ready' && count > alerts.length && (
-        <p className="mt-2 text-[11px] text-ink-faint">Showing the newest {alerts.length} of {count}.</p>
+        <p className="mt-2 text-[0.6875rem] text-ink-faint">Showing the newest {alerts.length} of {count}.</p>
       )}
     </section>
   );

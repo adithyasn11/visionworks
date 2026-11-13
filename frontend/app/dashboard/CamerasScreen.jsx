@@ -89,12 +89,12 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                     {cam.sourceType === 'UPLOAD'
                       ? <Upload className="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" />
                       : <Video className="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" />}
-                    <span className="text-[13px] font-bold text-ink break-all">{cam.name}</span>
+                    <span className="text-[0.8125rem] font-bold text-ink break-all">{cam.name}</span>
                     {selected === cam.name && (
-                      <span className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-accent">in use</span>
+                      <span className="font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-accent">in use</span>
                     )}
                   </div>
-                  <p className="text-[11.5px] text-ink-faint mt-0.5">
+                  <p className="text-[0.71875rem] text-ink-faint mt-0.5">
                     {SOURCE_LABEL[cam.sourceType] || cam.sourceType} · added {fmtTime(cam.createdAt)}
                   </p>
                 </div>
@@ -120,7 +120,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                   )}
                 </div>
                 {confirming === cam.id && (
-                  <p className="basis-full text-[11.5px] text-ink-muted">
+                  <p className="basis-full text-[0.71875rem] text-ink-muted">
                     Removing a camera also deletes its zones and every safety decision, zone event and corrective
                     action recorded on it. Click again to confirm.
                   </p>
@@ -134,7 +134,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
       {canEdit ? (
         <Panel title="Add a camera" icon={Plus}>
           <form onSubmit={submit} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_200px_auto] items-end">
-            <label className="grid gap-1 text-[11.5px] font-semibold text-ink-muted">
+            <label className="grid gap-1 text-[0.71875rem] font-semibold text-ink-muted">
               Name
               <input
                 className={INPUT}
@@ -145,7 +145,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                 required
               />
             </label>
-            <label className="grid gap-1 text-[11.5px] font-semibold text-ink-muted">
+            <label className="grid gap-1 text-[0.71875rem] font-semibold text-ink-muted">
               Video comes from
               <select className={INPUT} value={source} onChange={(e) => setSource(e.target.value)}>
                 <option value="WEBCAM">{SOURCE_LABEL.WEBCAM}</option>
@@ -157,7 +157,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
               Add camera
             </button>
           </form>
-          <p className="mt-3 text-[11.5px] text-ink-faint leading-relaxed">
+          <p className="mt-3 text-[0.71875rem] text-ink-faint leading-relaxed">
             The name cannot be changed later. Your plan sets how many cameras you can add.
           </p>
         </Panel>

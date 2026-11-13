@@ -66,7 +66,7 @@ export default function RangePicker({ value, onChange, coverage, busy = false })
                   ? `Only ${available} day${available === 1 ? '' : 's'} of data recorded so far`
                   : range.full
               }
-              className={`px-2.5 py-1 rounded-md text-[12px] font-bold transition-colors duration-150 ${
+              className={`px-2.5 py-1 rounded-md text-[0.75rem] font-bold transition-colors duration-150 ${
                 active
                   ? 'bg-accent text-white'
                   : unsupported

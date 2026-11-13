@@ -36,13 +36,13 @@ export default async function PlatformOverviewPage() {
       {/* ── Header ── */}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent mb-2">
+          <p className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-accent mb-2">
             Platform overview
           </p>
-          <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-[1.15] text-ink">
+          <h1 className="text-[1.625rem] sm:text-[1.875rem] font-black tracking-tight leading-[1.15] text-ink">
             Every organisation, at a glance
           </h1>
-          <p className="mt-1.5 text-[13.5px] text-ink-muted max-w-xl leading-relaxed">
+          <p className="mt-1.5 text-[0.84375rem] text-ink-muted max-w-xl leading-relaxed">
             Configuration and health across the whole platform. Safety data
             stays with the organisations that produced it.
           </p>
@@ -50,7 +50,7 @@ export default async function PlatformOverviewPage() {
 
         <Link
           href="/platform/organisations"
-          className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[13px] font-bold text-white hover:brightness-110 transition-[filter] duration-150"
+          className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-[0.8125rem] font-bold text-white hover:brightness-110 transition-[filter] duration-150"
         >
           All organisations
           <ArrowRight className="w-3.5 h-3.5" />
@@ -65,7 +65,7 @@ export default async function PlatformOverviewPage() {
           className="flex items-start gap-2.5 rounded-xl border border-[color:var(--accent)] bg-accent-soft px-4 py-3"
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-accent" />
-          <div className="text-[13px] leading-relaxed">
+          <div className="text-[0.8125rem] leading-relaxed">
             <span className="font-bold text-accent">Could not load platform data.</span>{' '}
             <span className="text-ink-muted">{error}</span>
           </div>
@@ -134,24 +134,24 @@ export default async function PlatformOverviewPage() {
           <div className="rounded-xl border border-line bg-surface px-4 py-3.5 themed">
             <div className="flex items-center gap-2 mb-3">
               <Activity className="w-4 h-4 text-ink-faint" strokeWidth={2.2} />
-              <h2 className="text-[14px] font-bold tracking-tight text-ink">Right now</h2>
+              <h2 className="text-[0.875rem] font-bold tracking-tight text-ink">Right now</h2>
             </div>
             <dl className="space-y-2.5">
               <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-[12.5px] text-ink-muted">Runs in progress</dt>
-                <dd className="text-[15px] font-bold tabular-nums text-ink">
+                <dt className="text-[0.78125rem] text-ink-muted">Runs in progress</dt>
+                <dd className="text-[0.9375rem] font-bold tabular-nums text-ink">
                   {stats?.runningSessions ?? 0}
                 </dd>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-[12.5px] text-ink-muted">Orgs needing help</dt>
-                <dd className={`text-[15px] font-bold tabular-nums ${attention.length ? 'text-accent' : 'text-ink'}`}>
+                <dt className="text-[0.78125rem] text-ink-muted">Orgs needing help</dt>
+                <dd className={`text-[0.9375rem] font-bold tabular-nums ${attention.length ? 'text-accent' : 'text-ink'}`}>
                   {attention.length}
                 </dd>
               </div>
               <div className="flex items-baseline justify-between gap-3">
-                <dt className="text-[12.5px] text-ink-muted">Pending invites</dt>
-                <dd className="text-[15px] font-bold tabular-nums text-ink">
+                <dt className="text-[0.78125rem] text-ink-muted">Pending invites</dt>
+                <dd className="text-[0.9375rem] font-bold tabular-nums text-ink">
                   {stats?.pendingInvites ?? 0}
                 </dd>
               </div>
@@ -163,11 +163,11 @@ export default async function PlatformOverviewPage() {
           <div className="rounded-xl border border-line bg-surface-alt px-4 py-3.5 themed">
             <div className="flex items-center gap-2 mb-2">
               <PauseCircle className="w-4 h-4 text-ink-faint" strokeWidth={2.2} />
-              <h3 className="text-[13px] font-bold tracking-tight text-ink">
+              <h3 className="text-[0.8125rem] font-bold tracking-tight text-ink">
                 Safety data not accessible
               </h3>
             </div>
-            <p className="text-[11.5px] leading-relaxed text-ink-muted">
+            <p className="text-[0.71875rem] leading-relaxed text-ink-muted">
               Platform operators can read configuration and health — never
               detections, verdicts or alerts. Enforced by row-level security in
               Postgres, not by this interface. A query for safety data from this

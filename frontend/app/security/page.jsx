@@ -80,13 +80,13 @@ export default function SecurityPage() {
           <div className="mt-9 flex flex-col sm:flex-row gap-3.5 justify-center">
             <Link
               href="/dashboard"
-              className="bg-inverse text-inverse px-7 py-3.5 rounded-2xl font-bold text-[15px] hover:bg-accent hover:text-white transition-all duration-300 shadow-lg flex items-center justify-center gap-2.5 group/btn"
+              className="bg-inverse text-inverse px-7 py-3.5 rounded-2xl font-bold text-[0.9375rem] hover:bg-accent hover:text-white transition-all duration-300 shadow-lg flex items-center justify-center gap-2.5 group/btn"
             >
               Open the dashboard <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
             </Link>
             <Link
               href="/features"
-              className="bg-surface text-ink border border-line px-7 py-3.5 rounded-2xl font-bold text-[15px] hover:border-[color:var(--accent)] hover:text-accent transition-all duration-300 flex items-center justify-center gap-2.5"
+              className="bg-surface text-ink border border-line px-7 py-3.5 rounded-2xl font-bold text-[0.9375rem] hover:border-[color:var(--accent)] hover:text-accent transition-all duration-300 flex items-center justify-center gap-2.5"
             >
               Explore the platform
             </Link>
@@ -109,14 +109,14 @@ export default function SecurityPage() {
                 <Server className="w-5 h-5" />
               </div>
               <h3 className="text-xl sm:text-2xl font-black tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors">Local edge processing</h3>
-              <p className="opacity-70 font-medium text-[15px] leading-relaxed mb-6">
+              <p className="opacity-70 font-medium text-[0.9375rem] leading-relaxed mb-6">
                 Frames are analysed on your own hardware. The models extract positions, track IDs and PPE detections, then drop the image from memory before the next frame arrives.
               </p>
             </div>
             <div className="relative z-10 bg-white/5 p-5 rounded-2xl border border-white/10 flex items-center justify-between gap-4 group-hover:border-[color:var(--accent)] transition-colors">
               <div className="flex flex-col items-center gap-1.5">
                 <Video className="w-5 h-5 opacity-70" />
-                <span className="text-[10px] font-bold opacity-80 uppercase tracking-[0.12em]">Raw video</span>
+                <span className="text-[0.625rem] font-bold opacity-80 uppercase tracking-[0.12em]">Raw video</span>
               </div>
               {/* The slash is the point: this path is deliberately severed. */}
               <div className="flex-1 flex items-center justify-center relative" aria-hidden="true">
@@ -125,7 +125,7 @@ export default function SecurityPage() {
               </div>
               <div className="flex flex-col items-center gap-1.5">
                 <Database className="w-5 h-5 opacity-70" />
-                <span className="text-[10px] font-bold opacity-80 uppercase tracking-[0.12em]">Cloud storage</span>
+                <span className="text-[0.625rem] font-bold opacity-80 uppercase tracking-[0.12em]">Cloud storage</span>
               </div>
             </div>
             <p className="sr-only">Raw video is never sent to cloud storage.</p>
@@ -141,13 +141,13 @@ export default function SecurityPage() {
                 <EyeOff className="w-5 h-5" />
               </div>
               <h3 className="text-xl sm:text-2xl font-black text-ink tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors duration-300">No continuous video</h3>
-              <p className="text-ink-muted font-medium text-[15px] leading-relaxed mb-6">
+              <p className="text-ink-muted font-medium text-[0.9375rem] leading-relaxed mb-6">
                 Nothing continuous is written to disk and nothing is streamed off-site. What persists is encrypted data about what was detected, plus short-lived blurred snapshots of flagged events.
               </p>
             </div>
             <ul className="flex flex-col gap-3">
               {['No cloud video storage', 'Workers known by anonymous ID only', 'Faces blurred in snapshots'].map((item, i) => (
-                <li key={i} className="flex items-center gap-3 font-bold text-[13px] text-ink-faint group-hover:translate-x-1 transition-transform" style={{ transitionDelay: `${i * 100}ms` }}>
+                <li key={i} className="flex items-center gap-3 font-bold text-[0.8125rem] text-ink-faint group-hover:translate-x-1 transition-transform" style={{ transitionDelay: `${i * 100}ms` }}>
                   <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
                   {item}
                 </li>
@@ -169,7 +169,7 @@ export default function SecurityPage() {
             </div>
             <div className="relative z-10">
               <h3 className="text-xl sm:text-2xl font-black tracking-tight mb-3 leading-[1.15] pb-1">Encrypted in transit</h3>
-              <p className="text-red-50 font-medium text-[15px] leading-relaxed">
+              <p className="text-red-50 font-medium text-[0.9375rem] leading-relaxed">
                 Every result sent from the local analysis engine to your dashboard travels over TLS 1.3. Nothing moves in the clear.
               </p>
             </div>
@@ -181,7 +181,7 @@ export default function SecurityPage() {
           >
             <Database className="w-10 h-10 text-ink mb-5 group-hover:scale-110 group-hover:text-accent transition-all duration-300" />
             <h3 className="text-lg sm:text-xl font-black text-ink tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors duration-300">Row level security</h3>
-            <p className="text-ink-muted font-medium text-[15px] leading-relaxed">
+            <p className="text-ink-muted font-medium text-[0.9375rem] leading-relaxed">
               Isolation is enforced by the database, not just the app. Row Level Security policies mean one organisation&apos;s query can never return another&apos;s rows — even if the application layer were compromised.
             </p>
           </div>
@@ -205,12 +205,12 @@ export default function SecurityPage() {
           style={{ animationDelay: '650ms' }}
         >
           <h2 className="text-2xl sm:text-3xl font-black text-ink tracking-tight mb-3 relative z-10 leading-[1.15] pb-1">Monitor safety responsibly.</h2>
-          <p className="text-ink-muted font-medium text-[15px] max-w-md mx-auto mb-7 relative z-10">
+          <p className="text-ink-muted font-medium text-[0.9375rem] max-w-md mx-auto mb-7 relative z-10">
             Run safety checks without giving up privacy or compliance.
           </p>
           <Link
             href="/dashboard"
-            className="bg-inverse text-inverse px-7 py-3.5 rounded-2xl font-bold text-[15px] hover:bg-accent hover:text-white transition-all duration-300 shadow-lg flex items-center gap-2.5 relative z-10 group/btn"
+            className="bg-inverse text-inverse px-7 py-3.5 rounded-2xl font-bold text-[0.9375rem] hover:bg-accent hover:text-white transition-all duration-300 shadow-lg flex items-center gap-2.5 relative z-10 group/btn"
           >
             Open the dashboard <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
           </Link>

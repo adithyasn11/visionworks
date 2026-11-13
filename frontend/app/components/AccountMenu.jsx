@@ -88,11 +88,11 @@ export default function AccountMenu({ email, fullName }) {
       >
         <span
           aria-hidden="true"
-          className="w-7 h-7 rounded-lg bg-accent text-white flex items-center justify-center text-[11px] font-black shrink-0 shadow-sm shadow-red-600/30 group-hover:shadow-red-600/50 group-hover:scale-110 transition-all duration-300"
+          className="w-7 h-7 rounded-lg bg-accent text-white flex items-center justify-center text-[0.6875rem] font-black shrink-0 shadow-sm shadow-red-600/30 group-hover:shadow-red-600/50 group-hover:scale-110 transition-all duration-300"
         >
           {initials(fullName, email)}
         </span>
-        <span className="hidden sm:block max-w-[10rem] truncate text-[13px] font-bold text-ink text-left">
+        <span className="hidden sm:block max-w-[10rem] truncate text-[0.8125rem] font-bold text-ink text-left">
           {label}
         </span>
         <ChevronDown
@@ -110,8 +110,8 @@ export default function AccountMenu({ email, fullName }) {
           {/* Identity block. `break-all` because an email has no spaces to wrap
               at and a long one would otherwise widen the whole menu. */}
           <div className="px-4 py-3.5 border-b border-line bg-surface-alt">
-            <p className="text-[13px] font-black text-ink truncate">{label}</p>
-            <p className="text-[12px] text-ink-faint font-medium break-all">{email ?? '—'}</p>
+            <p className="text-[0.8125rem] font-black text-ink truncate">{label}</p>
+            <p className="text-[0.75rem] text-ink-faint font-medium break-all">{email ?? '—'}</p>
           </div>
 
           <div className="py-1.5">
@@ -124,7 +124,7 @@ export default function AccountMenu({ email, fullName }) {
             <button
               type="submit"
               role="menuitem"
-              className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] font-bold text-ink-muted hover:text-accent hover:bg-surface-alt hover:pl-5 transition-all duration-300 text-left"
+              className="w-full flex items-center gap-2.5 px-4 py-3 text-[0.8125rem] font-bold text-ink-muted hover:text-accent hover:bg-surface-alt hover:pl-5 transition-all duration-300 text-left"
             >
               <LogOut className="w-4 h-4 shrink-0" aria-hidden="true" />
               Sign out
@@ -142,7 +142,7 @@ function MenuLink({ href, icon: Icon, children, onNavigate }) {
       href={href}
       role="menuitem"
       onClick={onNavigate}
-      className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-bold text-ink-muted hover:text-accent hover:bg-surface-alt hover:pl-5 transition-all duration-300"
+      className="flex items-center gap-2.5 px-4 py-2.5 text-[0.8125rem] font-bold text-ink-muted hover:text-accent hover:bg-surface-alt hover:pl-5 transition-all duration-300"
     >
       <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
       {children}

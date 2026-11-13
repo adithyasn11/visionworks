@@ -70,7 +70,7 @@ function ReadOnlyNotice({ capability }) {
   return (
     <div className="flex items-start gap-2.5 rounded-xl border border-line bg-surface-alt px-4 py-3">
       <Eye className="w-4 h-4 shrink-0 mt-0.5 text-ink-faint" />
-      <p className="text-[12.5px] text-ink-muted font-medium leading-relaxed">
+      <p className="text-[0.78125rem] text-ink-muted font-medium leading-relaxed">
         You have <strong className="text-ink">view-only</strong> access here. {denialMessage(capability)}
       </p>
     </div>
@@ -92,14 +92,14 @@ function PageHeader({ eyebrow, title, subtitle, action }) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4 pb-5 border-b border-line">
       <div className="min-w-0">
-        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent mb-2">
+        <p className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-accent mb-2">
           {eyebrow}
         </p>
-        <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-[1.15] text-ink">
+        <h1 className="text-[1.625rem] sm:text-[1.875rem] font-black tracking-tight leading-[1.15] text-ink">
           {title}
         </h1>
         {subtitle && (
-          <p className="mt-2 text-[13.5px] text-ink-muted max-w-2xl leading-relaxed">
+          <p className="mt-2 text-[0.84375rem] text-ink-muted max-w-2xl leading-relaxed">
             {subtitle}
           </p>
         )}
@@ -305,13 +305,13 @@ function DashboardInner() {
    */
   const cameraPicker = cameras.length > 0 ? (
     <label className="flex items-center gap-2">
-      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">
+      <span className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-ink-faint">
         camera
       </span>
       <select
         value={cameraId}
         onChange={(e) => setCameraId(e.target.value)}
-        className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12.5px] font-bold text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors"
+        className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[0.78125rem] font-bold text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors"
       >
         {cameras.map((c) => (
           <option key={c.id} value={c.name}>{c.name}</option>
@@ -324,14 +324,14 @@ function DashboardInner() {
   // still work, but nothing they decide can reach the dashboard.
   const noCameraNotice = camerasStatus.status === 'ready' && cameras.length === 0 ? (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[color:var(--accent)] bg-accent-soft px-4 py-3">
-      <p className="text-[12.5px] text-ink-muted font-medium leading-relaxed max-w-2xl">
+      <p className="text-[0.78125rem] text-ink-muted font-medium leading-relaxed max-w-2xl">
         <strong className="text-ink">No camera is registered.</strong> Detection still runs, but its decisions stay on
         this computer and never reach Review, Events, Reports or the Overview.
       </p>
       <button
         type="button"
         onClick={() => setView('cameras')}
-        className="rounded-lg bg-accent px-3.5 py-2 text-[12.5px] font-bold text-white hover:brightness-110 transition"
+        className="rounded-lg bg-accent px-3.5 py-2 text-[0.78125rem] font-bold text-white hover:brightness-110 transition"
       >
         {can(role, 'cameras.edit') ? 'Add a camera' : 'See cameras'}
       </button>
@@ -351,7 +351,7 @@ function DashboardInner() {
       onClick={refreshOverview}
       disabled={refreshing}
       aria-label="Refresh"
-      className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3.5 py-2 text-[12.5px] font-bold text-ink-muted hover:text-ink hover:border-field transition-colors disabled:opacity-50"
+      className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3.5 py-2 text-[0.78125rem] font-bold text-ink-muted hover:text-ink hover:border-field transition-colors disabled:opacity-50"
     >
       {refreshing
         ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

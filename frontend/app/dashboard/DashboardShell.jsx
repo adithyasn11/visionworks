@@ -62,7 +62,7 @@ export const VIEWS = [
  * drawer has room to spare.
  */
 const NAV_ROW = 'relative w-full flex items-center gap-3 rounded-lg px-3 py-[7px] '
-  + 'text-[13.5px] font-semibold transition-colors duration-150';
+  + 'text-[0.84375rem] font-semibold transition-colors duration-150';
 
 const NAV_ROW_ACTIVE = 'bg-accent-soft text-accent';
 const NAV_ROW_IDLE = 'text-ink-muted hover:text-ink hover:bg-surface-alt';
@@ -82,7 +82,7 @@ function NavItem({ view, active, onSelect, asLink = false, badge = 0 }) {
   const Icon = view.icon;
   // A count of things waiting (open alerts). Shown as a number, never as colour alone.
   const pill = badge > 0 ? (
-    <span className="ml-auto shrink-0 min-w-[20px] px-1.5 py-0.5 rounded-md bg-accent text-white text-[11px] font-bold tabular-nums text-center">
+    <span className="ml-auto shrink-0 min-w-[20px] px-1.5 py-0.5 rounded-md bg-accent text-white text-[0.6875rem] font-bold tabular-nums text-center">
       {badge > 99 ? '99+' : badge}
       <span className="sr-only">{view.id === 'actions' ? ' overdue actions' : ' waiting for review'}</span>
     </span>
@@ -191,7 +191,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
           <div className="w-7 h-7 bg-accent flex items-center justify-center rounded-lg shadow-sm shadow-red-600/30 group-hover:shadow-red-600/50 group-hover:rotate-12 transition-all duration-300">
             <div className="w-2 h-2 bg-white rounded-sm" />
           </div>
-          <span className="font-extrabold text-[16px] tracking-tight text-ink group-hover:text-accent transition-colors duration-300">
+          <span className="font-extrabold text-[1rem] tracking-tight text-ink group-hover:text-accent transition-colors duration-300">
             VisionWorks
           </span>
         </Link>
@@ -209,7 +209,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
         {/* Group label. Five unlabelled items and two more below the rule read
             as one long undifferentiated list; naming the groups is what makes
             "where am I" answerable at a glance. */}
-        <p className="px-3 pb-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-ink-faint">
+        <p className="px-3 pb-1 font-mono text-[0.59375rem] uppercase tracking-[0.16em] text-ink-faint">
           Monitor
         </p>
         {VIEWS.filter((v) => !v.capability || can(role, v.capability)).map((v) => (
@@ -245,7 +245,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
           willingly returns. */}
       {can(role, 'members.view') && (
       <div className="mt-3 pt-3 border-t border-line px-3 space-y-0.5">
-        <p className="px-3 pb-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-ink-faint">
+        <p className="px-3 pb-1 font-mono text-[0.59375rem] uppercase tracking-[0.16em] text-ink-faint">
           Account
         </p>
         <Link
@@ -292,7 +292,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
           can stay short enough to survive the clip. */}
       <p
         title="No continuous video is stored. Frames are discarded after analysis; workers are identified only by an anonymous track, never by name."
-        className="mx-3 mt-3 mb-1 pt-2.5 border-t border-line text-[10.5px] leading-snug text-ink-faint"
+        className="mx-3 mt-3 mb-1 pt-2.5 border-t border-line text-[0.65625rem] leading-snug text-ink-faint"
       >
         <span className="font-semibold text-ink-muted">No video stored.</span>{' '}
         Workers stay anonymous.
@@ -301,14 +301,14 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
 
       <div className="shrink-0 border-t border-line px-3 py-3 space-y-2">
         <div className="flex items-center gap-2.5 px-1">
-          <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center font-bold text-[11px] shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center font-bold text-[0.6875rem] shrink-0">
             {initials}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[12.5px] font-bold text-ink truncate">
+            <div className="text-[0.78125rem] font-bold text-ink truncate">
               {user?.fullName || (user?.email ? user.email.split('@')[0] : 'Account')}
             </div>
-            <div className="text-[11px] text-ink-faint truncate">{user?.email}</div>
+            <div className="text-[0.6875rem] text-ink-faint truncate">{user?.email}</div>
           </div>
         </div>
 
@@ -316,7 +316,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
           <ThemeToggle />
           <Link
             href="/"
-            className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl border border-line bg-surface text-[12px] font-semibold text-ink-muted hover:text-ink hover:border-field transition-colors"
+            className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl border border-line bg-surface text-[0.75rem] font-semibold text-ink-muted hover:text-ink hover:border-field transition-colors"
             title="Open the public site"
           >
             Site <ExternalLink className="w-3 h-3" />
@@ -347,7 +347,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
       >
         Skip to the page content
       </a>
-      <aside className="hidden lg:block fixed inset-y-0 left-0 w-[248px] z-30">
+      <aside className="hidden lg:block fixed inset-y-0 left-0 w-[15.5rem] z-30">
         {sidebar}
       </aside>
 
@@ -362,7 +362,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
           }`}
         />
         <div
-          className={`absolute inset-y-0 left-0 w-[264px] max-w-[82vw] transition-transform duration-250 ease-out ${
+          className={`absolute inset-y-0 left-0 w-[16.5rem] max-w-[82vw] transition-transform duration-250 ease-out ${
             open ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -378,7 +378,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
         </div>
       </div>
 
-      <div className="lg:pl-[248px]">
+      <div className="lg:pl-[15.5rem]">
         <div className="lg:hidden sticky top-0 z-20 flex items-center gap-3 h-14 px-4 border-b border-line bg-ground/90 backdrop-blur-sm themed">
           <button
             type="button"
@@ -388,8 +388,8 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span className="font-extrabold text-[15px] tracking-tight">VisionWorks</span>
-          <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-accent">
+          <span className="font-extrabold text-[0.9375rem] tracking-tight">VisionWorks</span>
+          <span className="font-mono text-[0.5625rem] uppercase tracking-[0.16em] text-accent">
             Safety
           </span>
         </div>

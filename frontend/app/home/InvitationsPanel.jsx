@@ -116,7 +116,7 @@ export default function InvitationsPanel() {
           <h2 id="invitations-heading" className="text-xl font-black tracking-tight text-ink">
             {invites.length === 1 ? 'You have an invitation' : `You have ${invites.length} invitations`}
           </h2>
-          <p className="text-[13px] text-ink-muted font-medium">
+          <p className="text-[0.8125rem] text-ink-muted font-medium">
             Join an existing organisation — no plan needed.
           </p>
         </div>
@@ -134,8 +134,8 @@ export default function InvitationsPanel() {
               className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-line bg-surface-alt px-5 py-4"
             >
               <div className="min-w-0">
-                <p className="text-[15px] font-black text-ink truncate">{inv.orgName}</p>
-                <p className="text-[12.5px] text-ink-muted font-medium mt-0.5">
+                <p className="text-[0.9375rem] font-black text-ink truncate">{inv.orgName}</p>
+                <p className="text-[0.78125rem] text-ink-muted font-medium mt-0.5">
                   You’ll join as {ROLE_COPY[inv.role] ?? inv.role.toLowerCase()}
                   {inv.invitedBy ? <> · invited by {inv.invitedBy}</> : null}
                 </p>
@@ -143,7 +143,7 @@ export default function InvitationsPanel() {
                     one, but a NULL means "does not expire" and printing
                     "Expires Invalid Date" would be worse than saying nothing. */}
                 {inv.expiresAt && (
-                  <p className="text-[11.5px] text-ink-faint font-medium mt-1">
+                  <p className="text-[0.71875rem] text-ink-faint font-medium mt-1">
                     Expires{' '}
                     {new Date(inv.expiresAt).toLocaleDateString(undefined, {
                       day: 'numeric', month: 'long', year: 'numeric',
@@ -157,7 +157,7 @@ export default function InvitationsPanel() {
                   type="button"
                   onClick={() => decline(inv.id)}
                   disabled={anyWorking}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border-2 border-line text-[13px] font-bold text-ink-muted hover:text-accent hover:border-[color:var(--accent)] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border-2 border-line text-[0.8125rem] font-bold text-ink-muted hover:text-accent hover:border-[color:var(--accent)] transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <X className="w-3.5 h-3.5" aria-hidden="true" />
                   Decline
@@ -166,7 +166,7 @@ export default function InvitationsPanel() {
                   type="button"
                   onClick={() => accept(inv.id)}
                   disabled={anyWorking}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-white text-[13px] font-bold hover:brightness-110 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-red-600/30 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0 group/btn"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-white text-[0.8125rem] font-bold hover:brightness-110 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-red-600/30 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0 group/btn"
                 >
                   {working ? (
                     <>

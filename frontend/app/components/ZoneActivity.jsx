@@ -30,7 +30,7 @@ export default function ZoneActivity({ events, zones = [] }) {
           <MapPin className="w-4 h-4 text-accent" />
           <h3 className="font-semibold">Zone activity</h3>
         </div>
-        <span className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint">
+        <span className="text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint">
           Times are from the video
         </span>
       </header>
@@ -55,7 +55,7 @@ export default function ZoneActivity({ events, zones = [] }) {
               <li key={ev.id} className="flex items-center gap-3 py-1.5 text-xs">
                 <span className="w-11 shrink-0 font-mono text-ink-faint tabular-nums">{clock(ev.video_time_s)}</span>
                 <span
-                  className="inline-flex items-center gap-1.5 shrink-0 max-w-[40%] rounded-md border border-line px-1.5 py-0.5 text-[10px] font-mono text-ink-muted"
+                  className="inline-flex items-center gap-1.5 shrink-0 max-w-[40%] rounded-md border border-line px-1.5 py-0.5 text-[0.625rem] font-mono text-ink-muted"
                   title={`${meta.label} zone`}
                 >
                   <span aria-hidden="true" className="w-2 h-2 rounded-full shrink-0 border border-line" style={{ background: meta.color }} />

@@ -67,7 +67,7 @@ export default async function OrganisationDetailPage({ params }) {
       <header>
         <Link
           href="/platform/organisations"
-          className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint hover:text-accent transition-colors mb-2"
+          className="inline-flex items-center gap-1.5 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-ink-faint hover:text-accent transition-colors mb-2"
         >
           <ArrowLeft className="w-3 h-3" />
           Organisations
@@ -75,11 +75,11 @@ export default async function OrganisationDetailPage({ params }) {
 
         <div className="flex flex-wrap items-center gap-3">
           <Building2 className="w-6 h-6 text-ink-faint shrink-0" strokeWidth={2} />
-          <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-[1.15] text-ink">
+          <h1 className="text-[1.625rem] sm:text-[1.875rem] font-black tracking-tight leading-[1.15] text-ink">
             {org.name}
           </h1>
           <span
-            className={`rounded px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.1em] font-bold ${
+            className={`rounded px-2 py-0.5 font-mono text-[0.59375rem] uppercase tracking-[0.1em] font-bold ${
               HEALTH_STYLE[health.level] ?? HEALTH_STYLE.ok
             }`}
           >
@@ -90,10 +90,10 @@ export default async function OrganisationDetailPage({ params }) {
         <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
           {facts.map(([term, detail]) => (
             <div key={term} className="flex items-baseline gap-2">
-              <dt className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-ink-faint">
+              <dt className="font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-ink-faint">
                 {term}
               </dt>
-              <dd className="text-[13px] font-semibold text-ink">{detail}</dd>
+              <dd className="text-[0.8125rem] font-semibold text-ink">{detail}</dd>
             </div>
           ))}
         </dl>
@@ -105,7 +105,7 @@ export default async function OrganisationDetailPage({ params }) {
           className="flex items-start gap-2.5 rounded-xl border border-[color:var(--accent)] bg-accent-soft px-4 py-3"
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-accent" />
-          <p className="text-[13px] leading-relaxed">
+          <p className="text-[0.8125rem] leading-relaxed">
             <span className="font-bold text-accent">Partial load.</span>{' '}
             <span className="text-ink-muted">{error}</span>
           </p>
@@ -122,13 +122,13 @@ export default async function OrganisationDetailPage({ params }) {
           ['Zones', zones.length, zones.length === 0 ? 'none drawn' : null],
         ].map(([label, value, hint]) => (
           <div key={label} className="rounded-xl border border-line bg-surface px-4 py-3 themed">
-            <div className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-ink-faint">
+            <div className="font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-ink-faint">
               {label}
             </div>
-            <div className="mt-1 text-[22px] font-black tracking-tight tabular-nums leading-none text-ink">
+            <div className="mt-1 text-[1.375rem] font-black tracking-tight tabular-nums leading-none text-ink">
               {value}
             </div>
-            {hint && <div className="mt-1 text-[11px] text-ink-faint">{hint}</div>}
+            {hint && <div className="mt-1 text-[0.6875rem] text-ink-faint">{hint}</div>}
           </div>
         ))}
       </div>

@@ -120,12 +120,12 @@ function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
       )}
 
       {featured && (
-        <span className="absolute -top-3 left-7 bg-accent text-white text-[10px] font-black uppercase tracking-[0.14em] px-3 py-1 rounded-full shadow-lg shadow-red-600/30 z-20">
+        <span className="absolute -top-3 left-7 bg-accent text-white text-[0.625rem] font-black uppercase tracking-[0.14em] px-3 py-1 rounded-full shadow-lg shadow-red-600/30 z-20">
           Most popular
         </span>
       )}
       {isPending && (
-        <span className="absolute -top-3 right-7 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-[0.14em] px-3 py-1 rounded-full shadow-lg shadow-emerald-600/30 z-20">
+        <span className="absolute -top-3 right-7 bg-emerald-500 text-white text-[0.625rem] font-black uppercase tracking-[0.14em] px-3 py-1 rounded-full shadow-lg shadow-emerald-600/30 z-20">
           Chosen
         </span>
       )}
@@ -135,7 +135,7 @@ function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
           <h3 className={`text-2xl font-black tracking-tight transition-colors ${dark ? 'text-white group-hover:text-accent' : 'text-ink group-hover:text-accent'}`}>
             {plan.name}
           </h3>
-          <p className={`text-[13px] font-bold ${dark ? 'opacity-60' : 'text-ink-faint'}`}>
+          <p className={`text-[0.8125rem] font-bold ${dark ? 'opacity-60' : 'text-ink-faint'}`}>
             {plan.tagline}
           </p>
         </div>
@@ -145,7 +145,7 @@ function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
             {formatPrice(plan.id, period)}
           </span>
           {plan.priceMonthly > 0 && (
-            <span className={`text-[13px] font-bold ${dark ? 'opacity-60' : 'text-ink-faint'}`}>
+            <span className={`text-[0.8125rem] font-bold ${dark ? 'opacity-60' : 'text-ink-faint'}`}>
               /{period === 'yearly' ? 'year' : 'month'}
             </span>
           )}
@@ -153,7 +153,7 @@ function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
         {/* The per-month equivalent, because "$490/year" beside a rival's
             "$49/month" is not comparable at a glance. */}
         {period === 'yearly' && plan.priceMonthly > 0 && (
-          <p className={`text-[12px] font-bold mt-1.5 ${dark ? 'opacity-60' : 'text-ink-faint'}`}>
+          <p className={`text-[0.75rem] font-bold mt-1.5 ${dark ? 'opacity-60' : 'text-ink-faint'}`}>
             {money(yearlyPerMonth(plan.id))}/month, billed yearly
           </p>
         )}
@@ -168,13 +168,13 @@ function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
           if (!sv) return null;
           const months = yearlyEquivalentMonths(plan.id);
           return (
-            <p className="text-[12px] font-black text-emerald-500 mt-1 uppercase tracking-wider">
+            <p className="text-[0.75rem] font-black text-emerald-500 mt-1 uppercase tracking-wider">
               {months ? `${12 - months} months free` : `Save ${sv.percent}%`}
             </p>
           );
         })()}
 
-        <p className={`text-[14px] font-medium leading-relaxed mt-5 transition-colors ${dark ? 'opacity-70 group-hover:opacity-90' : 'text-ink-muted group-hover:text-ink'}`}>
+        <p className={`text-[0.875rem] font-medium leading-relaxed mt-5 transition-colors ${dark ? 'opacity-70 group-hover:opacity-90' : 'text-ink-muted group-hover:text-ink'}`}>
           {plan.blurb}
         </p>
 
@@ -196,7 +196,7 @@ function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
               {/* Excluded rows are dimmed AND prefixed for screen readers, so
                   the distinction never rests on colour or the icon alone. */}
               <span
-                className={`text-[13.5px] font-bold ${
+                className={`text-[0.84375rem] font-bold ${
                   f.included
                     ? dark ? 'opacity-80' : 'text-ink-muted'
                     : dark ? 'opacity-35 line-through' : 'text-ink-faint line-through'
@@ -213,7 +213,7 @@ function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
           type="button"
           onClick={() => onChoose(plan.id)}
           disabled={anyBusy}
-          className={`mt-8 w-full flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-2xl text-[14px] font-bold transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60 group/btn ${
+          className={`mt-8 w-full flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-2xl text-[0.875rem] font-bold transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60 group/btn ${
             dark
               ? 'bg-accent text-white hover:brightness-110 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-red-600/40'
               : 'bg-inverse text-inverse hover:bg-accent hover:text-white hover:-translate-y-0.5 hover:shadow-xl hover:shadow-red-600/30'
@@ -307,7 +307,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
 
             <div className="inline-flex items-center gap-2 bg-accent-soft text-accent px-3 py-1.5 rounded-full mb-6 w-max relative z-10">
               <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
-              <span className="text-[10px] font-black uppercase tracking-[0.14em]">
+              <span className="text-[0.625rem] font-black uppercase tracking-[0.14em]">
                 {firstName ? `Welcome, ${firstName}` : 'Welcome to VisionWorks'}
               </span>
             </div>
@@ -371,7 +371,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
                 <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2 group-hover:text-accent transition-colors">
                   Organisation
                 </h3>
-                <p className="font-bold text-ink-muted uppercase tracking-widest text-[10px]">
+                <p className="font-bold text-ink-muted uppercase tracking-widest text-[0.625rem]">
                   Your private boundary
                 </p>
               </div>
@@ -384,7 +384,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
               <Video className="w-10 h-10 text-white mb-4 group-hover:scale-110 group-hover:-rotate-12 transition-transform duration-300" aria-hidden="true" />
               <div>
                 <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2">Any camera</h3>
-                <p className="font-bold text-red-50 uppercase tracking-widest text-[10px]">
+                <p className="font-bold text-red-50 uppercase tracking-widest text-[0.625rem]">
                   Upload · Webcam · RTSP
                 </p>
               </div>
@@ -397,14 +397,14 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <div aria-hidden="true" className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                  <span className="font-extrabold text-[10px] tracking-widest uppercase text-ink-muted">
+                  <span className="font-extrabold text-[0.625rem] tracking-widest uppercase text-ink-muted">
                     Ready when you are
                   </span>
                 </div>
                 <h3 className="text-lg font-black text-ink tracking-tight mb-2 group-hover:text-accent transition-colors">
                   Live in minutes
                 </h3>
-                <p className="text-ink-muted font-medium text-[14px]">
+                <p className="text-ink-muted font-medium text-[0.875rem]">
                   Pick a plan, name your organisation, and point it at a site.
                 </p>
               </div>
@@ -419,12 +419,12 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
           className="mt-2 mb-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-ink-muted animate-fade-in-up"
           style={{ animationDelay: '500ms' }}
         >
-          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+          <span className="text-[0.6875rem] font-bold uppercase tracking-[0.14em] text-ink-faint">
             What you get
           </span>
           <span aria-hidden="true" className="hidden sm:block w-px h-4 bg-[color:var(--line-soft)]" />
           {['Runs on your hardware', 'No footage retained', 'Anonymous by design'].map((t) => (
-            <span key={t} className="flex items-center gap-2 text-[13px] font-bold">
+            <span key={t} className="flex items-center gap-2 text-[0.8125rem] font-bold">
               <CheckCircle2 className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
               {t}
             </span>
@@ -434,7 +434,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
         {/* ── SETUP STEPS ─────────────────────────────────────────────────── */}
         <section className="py-12">
           <div className="flex flex-col gap-3 mb-8">
-            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-ink-faint">
+            <span className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-ink-faint">
               What happens next
             </span>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-ink max-w-2xl leading-[1.15]">
@@ -453,14 +453,14 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
                   <div className="w-12 h-12 bg-surface-alt text-ink border border-line rounded-xl flex items-center justify-center group-hover:bg-accent group-hover:text-white group-hover:border-[color:var(--accent)] transition-colors duration-300">
                     <Icon className="w-6 h-6 group-hover:scale-110 transition-transform" aria-hidden="true" />
                   </div>
-                  <span className="font-mono text-[11px] font-black text-ink-faint tracking-widest">
+                  <span className="font-mono text-[0.6875rem] font-black text-ink-faint tracking-widest">
                     0{i + 1}
                   </span>
                 </div>
                 <h3 className="text-xl font-black text-ink tracking-tight mb-3 group-hover:translate-x-1 transition-transform duration-300">
                   {title}
                 </h3>
-                <p className="text-ink-muted font-medium text-[14px] leading-relaxed group-hover:text-ink transition-colors">
+                <p className="text-ink-muted font-medium text-[0.875rem] leading-relaxed group-hover:text-ink transition-colors">
                   {body}
                 </p>
               </div>
@@ -473,13 +473,13 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
             with the heading hidden behind the navbar. */}
         <section id="pricing" className="scroll-mt-20 py-12">
           <div className="flex flex-col items-center text-center gap-4 mb-12">
-            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-ink-faint">
+            <span className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-ink-faint">
               Plans
             </span>
             <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink max-w-2xl leading-[1.1]">
               Priced by how much you monitor.
             </h2>
-            <p className="text-[15px] text-ink-muted font-medium max-w-xl leading-relaxed">
+            <p className="text-[0.9375rem] text-ink-muted font-medium max-w-xl leading-relaxed">
               Every plan includes the full analysis pipeline and the same privacy guarantees.
               Higher tiers raise the limits, not the capabilities.
             </p>
@@ -502,7 +502,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
                   role="radio"
                   aria-checked={period === id}
                   onClick={() => setPeriod(id)}
-                  className={`px-5 py-2 rounded-xl text-[13px] font-bold transition-all duration-300 ${
+                  className={`px-5 py-2 rounded-xl text-[0.8125rem] font-bold transition-all duration-300 ${
                     period === id
                       ? 'bg-accent text-white shadow-lg shadow-red-600/30'
                       : 'text-ink-muted hover:text-ink'
@@ -545,7 +545,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
               <h3 className="text-xl font-black text-ink tracking-tight">
                 Private by design, on every plan
               </h3>
-              <p className="text-[14px] text-ink-muted font-medium leading-relaxed max-w-2xl group-hover:text-ink transition-colors">
+              <p className="text-[0.875rem] text-ink-muted font-medium leading-relaxed max-w-2xl group-hover:text-ink transition-colors">
                 Frames are discarded the moment inference finishes. What is kept is a count
                 per zone per minute — no faces, no track ids, no coordinates — so the
                 database physically cannot answer what any individual did. That guarantee is

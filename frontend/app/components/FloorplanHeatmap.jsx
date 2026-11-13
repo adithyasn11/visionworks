@@ -184,11 +184,11 @@ export const FloorplanHeatmap = () => {
   return (
     <div className="glass-panel p-5 flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-ink font-bold text-[13.5px] tracking-tight">
+        <div className="flex items-center gap-2 text-ink font-bold text-[0.84375rem] tracking-tight">
           <MapPin className="w-4 h-4 text-accent" />
           <span>Where people were seen</span>
         </div>
-        <span className="text-[11px] text-ink-muted font-mono whitespace-nowrap">
+        <span className="text-[0.6875rem] text-ink-muted font-mono whitespace-nowrap">
           {samples > 0 ? `${samples.toLocaleString()} samples · ${WINDOW_HOURS}h` : `last ${WINDOW_HOURS}h`}
         </span>
       </div>
@@ -209,8 +209,8 @@ export const FloorplanHeatmap = () => {
       </div>
 
       {hasPoints && (
-        <div className="flex items-center gap-2.5 text-[11px] text-ink-muted">
-          <span className="font-mono uppercase tracking-[0.14em] text-[9.5px] text-ink-faint">
+        <div className="flex items-center gap-2.5 text-[0.6875rem] text-ink-muted">
+          <span className="font-mono uppercase tracking-[0.14em] text-[0.59375rem] text-ink-faint">
             Density
           </span>
           <span

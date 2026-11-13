@@ -47,14 +47,14 @@ export function TriageSection({
             strokeWidth={2.2}
           />
           <div className="min-w-0">
-            <h2 className="text-[14px] font-bold tracking-tight text-ink">{title}</h2>
+            <h2 className="text-[0.875rem] font-bold tracking-tight text-ink">{title}</h2>
             {subtitle && (
-              <p className="text-[11.5px] text-ink-faint mt-0.5 leading-snug">{subtitle}</p>
+              <p className="text-[0.71875rem] text-ink-faint mt-0.5 leading-snug">{subtitle}</p>
             )}
           </div>
         </div>
         <span
-          className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] font-bold tabular-nums ${
+          className={`shrink-0 rounded px-2 py-0.5 font-mono text-[0.625rem] uppercase tracking-[0.1em] font-bold tabular-nums ${
             hot
               ? severity === 'critical'
                 ? 'bg-accent text-white'
@@ -69,7 +69,7 @@ export function TriageSection({
       {error ? (
         <div className="px-4 sm:px-5 py-4 flex items-start gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-accent" />
-          <p className="text-[12.5px] leading-relaxed">
+          <p className="text-[0.78125rem] leading-relaxed">
             <span className="font-bold text-accent">Could not load this section.</span>{' '}
             <span className="text-ink-muted">{error}</span>
           </p>
@@ -77,7 +77,7 @@ export function TriageSection({
       ) : count === 0 ? (
         <div className="px-4 sm:px-5 py-6 flex items-start gap-2.5">
           <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-500" strokeWidth={2.2} />
-          <p className="text-[12.5px] leading-relaxed text-ink-muted">{allClear}</p>
+          <p className="text-[0.78125rem] leading-relaxed text-ink-muted">{allClear}</p>
         </div>
       ) : (
         children
@@ -89,7 +89,7 @@ export function TriageSection({
 const OrgLink = ({ id, name }) => (
   <Link
     href={`/platform/organisations/${id}`}
-    className="font-mono text-[10.5px] text-ink-faint hover:text-accent transition-colors"
+    className="font-mono text-[0.65625rem] text-ink-faint hover:text-accent transition-colors"
   >
     {name}
   </Link>
@@ -134,22 +134,22 @@ export function CamerasInErrorSection({ cameras, error }) {
           <li key={c.id} className="px-4 sm:px-5 py-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="font-bold text-[13.5px] text-ink truncate">{c.name}</div>
+                <div className="font-bold text-[0.84375rem] text-ink truncate">{c.name}</div>
                 <div className="mt-0.5 flex items-center gap-2 flex-wrap">
                   <OrgLink id={c.orgId} name={c.orgName} />
-                  <span className="font-mono text-[10.5px] text-ink-faint">
+                  <span className="font-mono text-[0.65625rem] text-ink-faint">
                     · {c.sourceType}
                     {c.sourceType === 'RTSP' ? (c.hasRtspUrl ? ' · url set' : ' · no url') : ''}
                   </span>
                 </div>
               </div>
-              <span className="shrink-0 text-[11.5px] text-ink-muted whitespace-nowrap">
+              <span className="shrink-0 text-[0.71875rem] text-ink-muted whitespace-nowrap">
                 seen {fmtDateTime(c.lastSeenAt)}
               </span>
             </div>
 
             {c.lastErrorMessage && (
-              <p className="mt-2 rounded-lg bg-accent-soft px-3 py-2 font-mono text-[11px] leading-relaxed text-accent break-words">
+              <p className="mt-2 rounded-lg bg-accent-soft px-3 py-2 font-mono text-[0.6875rem] leading-relaxed text-accent break-words">
                 {c.lastErrorMessage}
               </p>
             )}
@@ -183,12 +183,12 @@ export function FailedSessionsSection({ sessions, error }) {
             <li key={s.id} className="px-4 sm:px-5 py-3.5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-bold text-[13.5px] text-ink truncate max-w-[26rem]">
+                  <div className="font-bold text-[0.84375rem] text-ink truncate max-w-[26rem]">
                     {s.sourceFilename || s.kind.replace(/_/g, ' ').toLowerCase()}
                   </div>
                   <div className="mt-0.5 flex items-center gap-2 flex-wrap">
                     <OrgLink id={s.orgId} name={s.orgName} />
-                    <span className="font-mono text-[10.5px] text-ink-faint">
+                    <span className="font-mono text-[0.65625rem] text-ink-faint">
                       · {s.kind}
                       {s.cameraName ? ` · ${s.cameraName}` : ''}
                     </span>
@@ -197,13 +197,13 @@ export function FailedSessionsSection({ sessions, error }) {
 
                 <div className="shrink-0 text-right">
                   <span
-                    className={`rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] font-bold ${
+                    className={`rounded px-1.5 py-0.5 font-mono text-[0.5625rem] uppercase tracking-[0.1em] font-bold ${
                       s.status === 'ERROR' ? 'bg-accent text-white' : 'bg-surface-alt text-ink-faint'
                     }`}
                   >
                     {s.status.toLowerCase()}
                   </span>
-                  <div className="mt-1 text-[11px] text-ink-faint whitespace-nowrap">
+                  <div className="mt-1 text-[0.6875rem] text-ink-faint whitespace-nowrap">
                     {age(s.queuedAt)} ago
                   </div>
                 </div>
@@ -223,14 +223,14 @@ export function FailedSessionsSection({ sessions, error }) {
                       style={{ width: `${Math.max(2, pct)}%` }}
                     />
                   </div>
-                  <span className="font-mono text-[10px] tabular-nums text-ink-faint whitespace-nowrap">
+                  <span className="font-mono text-[0.625rem] tabular-nums text-ink-faint whitespace-nowrap">
                     {s.processedFrames.toLocaleString()} / {s.totalFrames.toLocaleString()} ({pct}%)
                   </span>
                 </div>
               )}
 
               {s.errorMessage && (
-                <p className="mt-2 rounded-lg bg-accent-soft px-3 py-2 font-mono text-[11px] leading-relaxed text-accent break-words">
+                <p className="mt-2 rounded-lg bg-accent-soft px-3 py-2 font-mono text-[0.6875rem] leading-relaxed text-accent break-words">
                   {s.errorMessage}
                 </p>
               )}
@@ -265,19 +265,19 @@ export function RunningSessionsSection({ sessions, error }) {
             <li key={s.id} className="px-4 sm:px-5 py-3.5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-bold text-[13.5px] text-ink truncate max-w-[26rem]">
+                  <div className="font-bold text-[0.84375rem] text-ink truncate max-w-[26rem]">
                     {s.sourceFilename || s.kind.replace(/_/g, ' ').toLowerCase()}
                   </div>
                   <div className="mt-0.5 flex items-center gap-2 flex-wrap">
                     <OrgLink id={s.orgId} name={s.orgName} />
                     {s.cameraName && (
-                      <span className="font-mono text-[10.5px] text-ink-faint">· {s.cameraName}</span>
+                      <span className="font-mono text-[0.65625rem] text-ink-faint">· {s.cameraName}</span>
                     )}
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
                   <span
-                    className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] font-bold ${
+                    className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-mono text-[0.5625rem] uppercase tracking-[0.1em] font-bold ${
                       s.status === 'PROCESSING'
                         ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
                         : 'bg-surface-alt text-ink-muted'
@@ -288,7 +288,7 @@ export function RunningSessionsSection({ sessions, error }) {
                     )}
                     {s.status.toLowerCase()}
                   </span>
-                  <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-ink-faint whitespace-nowrap">
+                  <div className="mt-1 flex items-center justify-end gap-1 text-[0.6875rem] text-ink-faint whitespace-nowrap">
                     <Clock className="w-3 h-3" />
                     {age(s.startedAt ?? s.queuedAt)}
                   </div>
@@ -303,7 +303,7 @@ export function RunningSessionsSection({ sessions, error }) {
                       style={{ width: `${Math.max(2, pct)}%` }}
                     />
                   </div>
-                  <span className="font-mono text-[10px] tabular-nums text-ink-faint">{pct}%</span>
+                  <span className="font-mono text-[0.625rem] tabular-nums text-ink-faint">{pct}%</span>
                 </div>
               )}
             </li>
@@ -331,14 +331,14 @@ function StalledList({ orgs, metric }) {
             className="group flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-surface-alt transition-colors duration-150"
           >
             <div className="min-w-0 flex-1">
-              <div className="font-bold text-[13.5px] text-ink truncate group-hover:text-accent transition-colors">
+              <div className="font-bold text-[0.84375rem] text-ink truncate group-hover:text-accent transition-colors">
                 {o.name}
               </div>
-              <div className="font-mono text-[10.5px] text-ink-faint truncate mt-0.5">
+              <div className="font-mono text-[0.65625rem] text-ink-faint truncate mt-0.5">
                 {o.slug} · {metric(o)}
               </div>
             </div>
-            <span className="shrink-0 text-[11.5px] text-ink-muted tabular-nums">
+            <span className="shrink-0 text-[0.71875rem] text-ink-muted tabular-nums">
               {age(o.createdAt)} old
             </span>
             <ChevronRight className="w-4 h-4 shrink-0 text-ink-faint group-hover:text-accent group-hover:translate-x-0.5 transition-all duration-150" />

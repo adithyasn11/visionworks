@@ -41,9 +41,9 @@ export default async function CheckoutPage({ searchParams }) {
       <div className="themed min-h-screen bg-ground text-ink flex items-center justify-center px-6">
         <div className="max-w-md text-center">
           <h1 className="text-xl font-black tracking-tight mb-2">Not connected</h1>
-          <p className="text-[14px] text-ink-muted leading-relaxed">
+          <p className="text-[0.875rem] text-ink-muted leading-relaxed">
             Add your Supabase URL and anon key to{' '}
-            <code className="font-mono text-[13px]">frontend/.env.local</code>, then restart the
+            <code className="font-mono text-[0.8125rem]">frontend/.env.local</code>, then restart the
             dev server.
           </p>
         </div>

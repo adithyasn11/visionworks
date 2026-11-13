@@ -42,15 +42,15 @@ export default async function OrganisationsPage({ searchParams }) {
         <div>
           <Link
             href="/platform"
-            className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint hover:text-accent transition-colors mb-2"
+            className="inline-flex items-center gap-1.5 font-mono text-[0.625rem] uppercase tracking-[0.16em] text-ink-faint hover:text-accent transition-colors mb-2"
           >
             <ArrowLeft className="w-3 h-3" />
             Overview
           </Link>
-          <h1 className="text-[26px] sm:text-[30px] font-black tracking-tight leading-[1.15] text-ink">
+          <h1 className="text-[1.625rem] sm:text-[1.875rem] font-black tracking-tight leading-[1.15] text-ink">
             Organisations
           </h1>
-          <p className="mt-1.5 text-[13.5px] text-ink-muted max-w-xl leading-relaxed">
+          <p className="mt-1.5 text-[0.84375rem] text-ink-muted max-w-xl leading-relaxed">
             {total === 0
               ? 'No customers yet.'
               : `${total} organisation${total === 1 ? '' : 's'} on the platform. Configuration and health only — safety data stays with the customer.`}
@@ -64,7 +64,7 @@ export default async function OrganisationsPage({ searchParams }) {
           className="flex items-start gap-2.5 rounded-xl border border-[color:var(--accent)] bg-accent-soft px-4 py-3"
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-accent" />
-          <div className="text-[13px] leading-relaxed">
+          <div className="text-[0.8125rem] leading-relaxed">
             <span className="font-bold text-accent">Could not load organisations.</span>{' '}
             <span className="text-ink-muted">{error}</span>
           </div>

@@ -179,7 +179,7 @@ function SignupForm() {
           <div className="flex items-center justify-between">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 text-[13px] font-bold text-ink-muted hover:text-accent transition-colors"
+              className="inline-flex items-center gap-2 text-[0.8125rem] font-bold text-ink-muted hover:text-accent transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               Back to site
@@ -200,7 +200,7 @@ function SignupForm() {
                   </Banner>
                   <Link
                     href="/login"
-                    className="w-full flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-accent text-white font-bold text-[14px] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-red-600/30 transition-all duration-200"
+                    className="w-full flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-accent text-white font-bold text-[0.875rem] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-red-600/30 transition-all duration-200"
                   >
                     Go to sign in <ArrowRight className="w-4 h-4" />
                   </Link>
@@ -211,7 +211,7 @@ function SignupForm() {
                     <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-ink leading-[1.15] pb-1">
                       Create your account
                     </h1>
-                    <p className="text-[14px] text-ink-muted font-medium leading-relaxed">
+                    <p className="text-[0.875rem] text-ink-muted font-medium leading-relaxed">
                       Connect a camera and start checking safety compliance — usually within the hour.
                     </p>
                   </header>
@@ -269,7 +269,7 @@ function SignupForm() {
                         {ruleState.map(({ id, label, ok }) => (
                           <li
                             key={id}
-                            className={`flex items-center gap-2 text-[12px] font-bold transition-colors ${
+                            className={`flex items-center gap-2 text-[0.75rem] font-bold transition-colors ${
                               ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-ink-faint'
                             }`}
                           >
@@ -291,13 +291,13 @@ function SignupForm() {
                       {!busy && <ArrowRight className="w-4 h-4" />}
                     </SubmitButton>
 
-                    <p className="text-[12px] text-ink-faint font-medium leading-relaxed text-center">
+                    <p className="text-[0.75rem] text-ink-faint font-medium leading-relaxed text-center">
                       By creating an account you agree to our{' '}
                       <Link href="/security" className="font-bold text-ink-muted hover:text-accent">privacy approach</Link>.
                     </p>
                   </form>
 
-                  <p className="text-[13px] text-ink-muted font-medium text-center">
+                  <p className="text-[0.8125rem] text-ink-muted font-medium text-center">
                     Already have an account?{' '}
                     <Link href="/login" className="font-bold text-accent hover:underline">
                       Sign in

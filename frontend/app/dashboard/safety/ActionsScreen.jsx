@@ -58,7 +58,7 @@ function ActionCard({ action, people, canEdit, onChanged }) {
         <span className="text-ink-faint">{assignee ? `Assigned to ${assignee.name}` : 'Not assigned'}</span>
       </div>
       {action.description && <p className="text-xs text-ink-muted leading-relaxed">{action.description}</p>}
-      <p className="text-[11px] text-ink-faint">
+      <p className="text-[0.6875rem] text-ink-faint">
         About {action.workerKey ? workerLabel(action.workerKey) : 'a worker'}{action.zone ? ` in ${action.zone}` : ''}{action.observedAt ? `, ${fmtTime(action.observedAt)}` : ''}: {action.reason}
       </p>
       {action.status === 'CLOSED' && (
@@ -70,13 +70,13 @@ function ActionCard({ action, people, canEdit, onChanged }) {
         <div className="flex flex-wrap items-end gap-2">
           {active && (
             <>
-              <label className="flex flex-col gap-1 text-[11px] text-ink-faint">Assigned to
+              <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">Assigned to
                 <select value={action.assignedToId || ''} disabled={busy} onChange={(e) => run({ assignedToId: e.target.value || null })} className={INPUT}>
                   <option value="">Nobody</option>
                   {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </label>
-              <label className="flex flex-col gap-1 text-[11px] text-ink-faint">Due
+              <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">Due
                 <input type="date" value={action.dueDate ? String(action.dueDate).slice(0, 10) : ''} disabled={busy} onChange={(e) => run({ dueDate: e.target.value || null })} className={INPUT} />
               </label>
             </>
@@ -90,7 +90,7 @@ function ActionCard({ action, people, canEdit, onChanged }) {
       )}
       {closing && (
         <div className="flex flex-col gap-2">
-          <label className="flex flex-col gap-1 text-[11px] text-ink-faint">What was done
+          <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">What was done
             <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} rows={2} className={`${INPUT} resize-y`} autoFocus />
           </label>
           <div className="flex gap-2">

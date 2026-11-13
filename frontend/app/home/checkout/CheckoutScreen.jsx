@@ -112,7 +112,7 @@ export default function CheckoutScreen({
 
         <Link
           href="/home#pricing"
-          className="inline-flex items-center gap-2 text-[13px] font-bold text-ink-muted hover:text-accent transition-colors mb-8 group"
+          className="inline-flex items-center gap-2 text-[0.8125rem] font-bold text-ink-muted hover:text-accent transition-colors mb-8 group"
         >
           <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" aria-hidden="true" />
           Back to plans
@@ -134,7 +134,7 @@ export default function CheckoutScreen({
 
             <div className="relative z-10 flex flex-col gap-7">
               <div className="flex flex-col gap-3">
-                <span className="text-[11px] font-black uppercase tracking-[0.16em] text-ink-faint">
+                <span className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-ink-faint">
                   Your plan
                 </span>
                 <div className="flex items-baseline justify-between gap-4 flex-wrap">
@@ -147,7 +147,7 @@ export default function CheckoutScreen({
                         {formatPrice(plan.id, period)}
                       </span>
                       {!isFree && (
-                        <span className="text-[13px] font-bold text-ink-faint">
+                        <span className="text-[0.8125rem] font-bold text-ink-faint">
                           /{period === 'yearly' ? 'year' : 'month'}
                         </span>
                       )}
@@ -160,7 +160,7 @@ export default function CheckoutScreen({
                       const sv = yearlySaving(plan.id);
                       const cents = pm !== null && Math.round(pm * 100) % 100 !== 0;
                       return (
-                        <p className="text-[12px] font-bold text-ink-faint mt-1">
+                        <p className="text-[0.75rem] font-bold text-ink-faint mt-1">
                           ${pm?.toLocaleString('en-US', {
                             minimumFractionDigits: cents ? 2 : 0,
                             maximumFractionDigits: 2,
@@ -171,7 +171,7 @@ export default function CheckoutScreen({
                     })()}
                   </div>
                 </div>
-                <p className="text-[15px] text-ink-muted font-medium leading-relaxed max-w-lg">
+                <p className="text-[0.9375rem] text-ink-muted font-medium leading-relaxed max-w-lg">
                   {plan.blurb}
                 </p>
               </div>
@@ -181,7 +181,7 @@ export default function CheckoutScreen({
                   and a disabled one just raises the question. */}
               {!isFree && (
                 <div className="flex flex-col gap-2.5">
-                  <span className="text-[13px] font-black text-ink">Billing period</span>
+                  <span className="text-[0.8125rem] font-black text-ink">Billing period</span>
                   <div
                     role="radiogroup"
                     aria-label="Billing period"
@@ -198,7 +198,7 @@ export default function CheckoutScreen({
                         aria-checked={period === id}
                         onClick={() => setPeriod(id)}
                         disabled={busy || done}
-                        className={`px-4 py-2 rounded-xl text-[12.5px] font-bold transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed ${
+                        className={`px-4 py-2 rounded-xl text-[0.78125rem] font-bold transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed ${
                           period === id
                             ? 'bg-accent text-white shadow-lg shadow-red-600/30'
                             : 'text-ink-muted hover:text-ink'
@@ -214,12 +214,12 @@ export default function CheckoutScreen({
               <div aria-hidden="true" className="h-px bg-[color:var(--line-soft)]" />
 
               <div className="flex flex-col gap-4">
-                <span className="text-[13px] font-black text-ink">What’s included</span>
+                <span className="text-[0.8125rem] font-black text-ink">What’s included</span>
                 <ul className="grid sm:grid-cols-2 gap-3">
                   {included.map((f) => (
                     <li key={f.text} className="flex items-start gap-3">
                       <CheckCircle2 className="w-[18px] h-[18px] text-accent shrink-0 mt-0.5" aria-hidden="true" />
-                      <span className="text-[13.5px] text-ink-muted font-bold">{f.text}</span>
+                      <span className="text-[0.84375rem] text-ink-muted font-bold">{f.text}</span>
                     </li>
                   ))}
                 </ul>
@@ -231,7 +231,7 @@ export default function CheckoutScreen({
                   the price above is illustrative and this is what would
                   actually be charged. */}
               <div className="flex items-baseline justify-between gap-4">
-                <span className="text-[15px] font-black text-ink">Total charged today</span>
+                <span className="text-[0.9375rem] font-black text-ink">Total charged today</span>
                 <span className="text-3xl font-black tracking-tight text-emerald-500">
                   $0.00
                 </span>
@@ -265,7 +265,7 @@ export default function CheckoutScreen({
                   an input. See the file header for why no card field exists
                   anywhere on this screen. */}
               <div className="flex flex-col gap-2.5">
-                <span className="text-[12px] font-black uppercase tracking-[0.14em] opacity-60">
+                <span className="text-[0.75rem] font-black uppercase tracking-[0.14em] opacity-60">
                   Payment method
                 </span>
                 <div
@@ -274,10 +274,10 @@ export default function CheckoutScreen({
                 >
                   <CreditCard className="w-5 h-5 opacity-40 shrink-0" aria-hidden="true" />
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[13.5px] font-black opacity-70">
+                    <span className="text-[0.84375rem] font-black opacity-70">
                       None required
                     </span>
-                    <span className="text-[12px] font-medium opacity-45">
+                    <span className="text-[0.75rem] font-medium opacity-45">
                       Start now and add billing details later.
                     </span>
                   </div>
@@ -288,7 +288,7 @@ export default function CheckoutScreen({
                 <button
                   type="submit"
                   disabled={busy || done}
-                  className="w-full flex items-center justify-center gap-2.5 px-5 py-4 rounded-2xl bg-accent text-white font-bold text-[15px] hover:brightness-110 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-red-600/40 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:translate-y-0 group/btn"
+                  className="w-full flex items-center justify-center gap-2.5 px-5 py-4 rounded-2xl bg-accent text-white font-bold text-[0.9375rem] hover:brightness-110 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-red-600/40 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:translate-y-0 group/btn"
                 >
                   {done ? (
                     <>
@@ -309,7 +309,7 @@ export default function CheckoutScreen({
                 </button>
 
                 {/* aria-live so the outcome is announced, not just shown. */}
-                <p className="text-[12px] font-medium text-center leading-relaxed opacity-55" aria-live="polite">
+                <p className="text-[0.75rem] font-medium text-center leading-relaxed opacity-55" aria-live="polite">
                   {done
                     ? 'Taking you to set up your organisation…'
                     : 'Next you’ll name your organisation, then you’re in.'}
@@ -320,14 +320,14 @@ export default function CheckoutScreen({
 
               <div className="flex items-start gap-3">
                 <ShieldCheck className="w-[18px] h-[18px] text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
-                <p className="text-[12.5px] font-medium leading-relaxed opacity-70">
+                <p className="text-[0.78125rem] font-medium leading-relaxed opacity-70">
                   <span className="font-black opacity-100">Change or cancel any time.</span>{' '}
                   Your plan can be switched from the dashboard whenever you need a different
                   tier.
                 </p>
               </div>
 
-              <p className="text-[12px] font-medium leading-relaxed opacity-45">
+              <p className="text-[0.75rem] font-medium leading-relaxed opacity-45">
                 Change plan any time from{' '}
                 <Link href="/home#pricing" className="font-black text-red-500 hover:underline">
                   Plans

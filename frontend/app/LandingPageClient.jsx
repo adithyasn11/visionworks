@@ -83,7 +83,7 @@ export default function LandingPageClient() {
               <Cpu className="w-10 h-10 text-accent mb-4 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-300" />
               <div>
                 <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2 group-hover:text-accent transition-colors">Explainable</h3>
-                <p className="font-bold text-ink-muted uppercase tracking-widest text-[10px]">Every verdict shows why</p>
+                <p className="font-bold text-ink-muted uppercase tracking-widest text-[0.625rem]">Every verdict shows why</p>
               </div>
             </div>
             
@@ -95,7 +95,7 @@ export default function LandingPageClient() {
               <Video className="w-10 h-10 text-white mb-4 group-hover:scale-110 group-hover:-rotate-12 transition-transform duration-300" />
               <div>
                 <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2">Any camera</h3>
-                <p className="font-bold text-red-50 uppercase tracking-widest text-[10px]">RTSP, webcam or phone</p>
+                <p className="font-bold text-red-50 uppercase tracking-widest text-[0.625rem]">RTSP, webcam or phone</p>
               </div>
             </div>
             
@@ -107,10 +107,10 @@ export default function LandingPageClient() {
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
-                  <span className="font-extrabold text-[10px] tracking-widest uppercase text-ink-muted">Review loop</span>
+                  <span className="font-extrabold text-[0.625rem] tracking-widest uppercase text-ink-muted">Review loop</span>
                 </div>
                 <h3 className="text-lg font-black text-ink tracking-tight mb-2 group-hover:text-accent transition-colors">People decide</h3>
-                <p className="text-ink-muted font-medium text-[14px]">A supervisor confirms or dismisses every flag.</p>
+                <p className="text-ink-muted font-medium text-[0.875rem]">A supervisor confirms or dismisses every flag.</p>
               </div>
               <Activity className="w-16 h-16 text-ink-muted/30 group-hover:text-accent group-hover:scale-110 transition-all duration-500 hidden sm:block" />
             </div>
@@ -122,12 +122,12 @@ export default function LandingPageClient() {
             useful instead of empty ground, and hands the eye off to the
             sections beneath. */}
         <div className="mt-2 mb-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-ink-muted animate-fade-in-up" style={{ animationDelay: '500ms' }}>
-          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+          <span className="text-[0.6875rem] font-bold uppercase tracking-[0.14em] text-ink-faint">
             Built for safety teams
           </span>
           <span className="hidden sm:block w-px h-4 bg-[color:var(--line-soft)]" aria-hidden="true"></span>
           {['Runs on your hardware', 'No continuous video stored', 'Workers stay anonymous'].map((t) => (
-            <span key={t} className="flex items-center gap-2 text-[13px] font-bold">
+            <span key={t} className="flex items-center gap-2 text-[0.8125rem] font-bold">
               <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
               {t}
             </span>
@@ -148,7 +148,7 @@ export default function LandingPageClient() {
                   <BarChart className="w-6 h-6 group-hover:scale-110 transition-transform" />
                 </div>
                 <h3 className="text-xl sm:text-2xl font-black text-ink tracking-tight mb-4 group-hover:translate-x-2 transition-transform duration-300">Rules that follow your procedure</h3>
-                <p className="text-ink-muted font-medium text-[15px] leading-relaxed max-w-md group-hover:text-ink transition-colors">
+                <p className="text-ink-muted font-medium text-[0.9375rem] leading-relaxed max-w-md group-hover:text-ink transition-colors">
                   Draw zones on your camera feed, then set the rules that apply to them: helmet and vest before the restricted area, a time limit inside, the right exit afterwards.
                 </p>
               </div>
@@ -166,7 +166,7 @@ export default function LandingPageClient() {
                   <Shield className="w-6 h-6" />
                 </div>
                 <h3 className="text-3xl font-black tracking-tight mb-4 text-white group-hover:text-accent transition-colors">Privacy first.</h3>
-                <p className="opacity-70 font-medium text-[15px] leading-relaxed mb-8 group-hover:opacity-90 transition-colors">
+                <p className="opacity-70 font-medium text-[0.9375rem] leading-relaxed mb-8 group-hover:opacity-90 transition-colors">
                   Video is analysed on your own hardware and then discarded. Workers are tracked as anonymous IDs, never named, and nothing continuous is saved.
                 </p>
               </div>
@@ -189,7 +189,7 @@ export default function LandingPageClient() {
             >
               <Activity className="w-10 h-10 text-accent mb-4 group-hover:scale-125 group-hover:rotate-12 transition-transform duration-300" />
               <h3 className="text-2xl font-black text-ink tracking-tight mb-2 group-hover:text-accent transition-colors">Safety alerts</h3>
-              <p className="text-ink-muted font-medium text-[14px] leading-relaxed">Get notified when someone enters a restricted area without a helmet or vest, or stays past the time limit.</p>
+              <p className="text-ink-muted font-medium text-[0.875rem] leading-relaxed">Get notified when someone enters a restricted area without a helmet or vest, or stays past the time limit.</p>
             </div>
             
             {/* Feature 4 */}
@@ -214,7 +214,7 @@ export default function LandingPageClient() {
           <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
           
           <h2 className="text-2xl sm:text-3xl font-black text-ink tracking-tight mb-4 relative z-10 group-hover:scale-105 transition-transform duration-500">Ready to get started?</h2>
-          <p className="text-ink-muted font-medium text-[15px] max-w-xl mx-auto mb-8 relative z-10 group-hover:text-ink transition-colors duration-300">
+          <p className="text-ink-muted font-medium text-[0.9375rem] max-w-xl mx-auto mb-8 relative z-10 group-hover:text-ink transition-colors duration-300">
             Connect your cameras and see whether your safety procedures are actually being followed.
           </p>
           <Link 

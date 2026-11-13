@@ -101,7 +101,7 @@ export default function OrgFilters({ counts, resultCount }) {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name or slug…"
             aria-label="Search organisations"
-            className="w-full rounded-lg border-2 border-field bg-ground pl-9 pr-9 py-2 text-[13.5px] text-ink placeholder:text-ink-faint hover:border-field-hover focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)] transition-colors duration-150"
+            className="w-full rounded-lg border-2 border-field bg-ground pl-9 pr-9 py-2 text-[0.84375rem] text-ink placeholder:text-ink-faint hover:border-field-hover focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)] transition-colors duration-150"
           />
           {pending ? (
             <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-faint animate-spin" />
@@ -127,7 +127,7 @@ export default function OrgFilters({ counts, resultCount }) {
             value={activeSort}
             onChange={(e) => write({ sort: e.target.value === 'newest' ? null : e.target.value })}
             aria-label="Sort organisations"
-            className="appearance-none rounded-lg border-2 border-field bg-ground pl-9 pr-8 py-2 text-[13px] font-semibold text-ink hover:border-field-hover focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)] transition-colors duration-150 cursor-pointer"
+            className="appearance-none rounded-lg border-2 border-field bg-ground pl-9 pr-8 py-2 text-[0.8125rem] font-semibold text-ink hover:border-field-hover focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)] transition-colors duration-150 cursor-pointer"
           >
             {SORTS.map((s) => (
               <option key={s.key} value={s.key}>{s.label}</option>
@@ -135,7 +135,7 @@ export default function OrgFilters({ counts, resultCount }) {
           </select>
           <span
             aria-hidden="true"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint text-[10px] pointer-events-none"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint text-[0.625rem] pointer-events-none"
           >
             ▼
           </span>
@@ -154,7 +154,7 @@ export default function OrgFilters({ counts, resultCount }) {
               type="button"
               onClick={() => write({ filter: f.key === 'all' ? null : f.key })}
               aria-pressed={on}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-bold border transition-colors duration-150 ${
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[0.78125rem] font-bold border transition-colors duration-150 ${
                 on
                   ? 'border-[color:var(--accent)] bg-accent-soft text-accent'
                   : 'border-line bg-surface text-ink-muted hover:text-ink hover:border-field'
@@ -162,7 +162,7 @@ export default function OrgFilters({ counts, resultCount }) {
             >
               {f.label}
               <span
-                className={`tabular-nums font-mono text-[10.5px] ${
+                className={`tabular-nums font-mono text-[0.65625rem] ${
                   on ? 'text-accent' : isAttention ? 'text-accent' : 'text-ink-faint'
                 }`}
               >
@@ -174,7 +174,7 @@ export default function OrgFilters({ counts, resultCount }) {
 
         {/* Result count, so a filtered-to-empty list is obviously filtered
             rather than looking like a data failure. */}
-        <span className="ml-auto font-mono text-[10.5px] uppercase tracking-[0.12em] text-ink-faint tabular-nums">
+        <span className="ml-auto font-mono text-[0.65625rem] uppercase tracking-[0.12em] text-ink-faint tabular-nums">
           {resultCount} shown
         </span>
       </div>

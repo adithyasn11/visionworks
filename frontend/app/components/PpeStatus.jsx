@@ -25,7 +25,7 @@ export default function PpeStatus({ entities, unavailable }) {
           <HardHat className="w-4 h-4 text-accent" />
           <h3 className="font-semibold">PPE check</h3>
         </div>
-        <span className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint">
+        <span className="text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint">
           Judged over several frames
         </span>
       </header>

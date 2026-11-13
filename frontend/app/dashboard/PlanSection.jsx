@@ -111,20 +111,20 @@ function UsageTile({ label, used, max, suffix, consumable = true, dark = false }
 
   return (
     <div className={`rounded-xl px-4 py-3.5 ${dark ? 'bg-white/[0.06] border border-white/10' : 'bg-surface-alt border border-line'}`}>
-      <dt className={`text-[10px] font-black uppercase tracking-[0.12em] ${dark ? 'opacity-55' : 'text-ink-faint'}`}>
+      <dt className={`text-[0.625rem] font-black uppercase tracking-[0.12em] ${dark ? 'opacity-55' : 'text-ink-faint'}`}>
         {label}
       </dt>
       <dd className={`mt-1 flex items-baseline gap-1.5 ${dark ? 'text-white' : 'text-ink'}`}>
-        <span className="text-[19px] font-black tracking-tight">
+        <span className="text-[1.1875rem] font-black tracking-tight">
           {used === null ? '—' : `${used}${suffix ?? ''}`}
         </span>
         {!unlimited && used !== null && (
-          <span className={`text-[12px] font-bold ${dark ? 'opacity-55' : 'text-ink-faint'}`}>
+          <span className={`text-[0.75rem] font-bold ${dark ? 'opacity-55' : 'text-ink-faint'}`}>
             / {max}{suffix ?? ''}
           </span>
         )}
         {unlimited && (
-          <span className={`text-[10px] font-black uppercase tracking-wider ${dark ? 'opacity-55' : 'text-ink-faint'}`}>
+          <span className={`text-[0.625rem] font-black uppercase tracking-wider ${dark ? 'opacity-55' : 'text-ink-faint'}`}>
             unlimited
           </span>
         )}
@@ -220,7 +220,7 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
             <div>
               <div className="flex items-center gap-2 mb-2.5">
                 <Sparkles className="w-3.5 h-3.5 text-accent" aria-hidden="true" />
-                <span className="text-[10px] font-black uppercase tracking-[0.16em] opacity-55">
+                <span className="text-[0.625rem] font-black uppercase tracking-[0.16em] opacity-55">
                   {orgName ? `${orgName} · current plan` : 'Current plan'}
                 </span>
               </div>
@@ -235,7 +235,7 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                   {formatPrice(plan, period === 'YEARLY' ? 'yearly' : 'monthly')}
                 </span>
                 {!isFree && (
-                  <span className="text-[13px] font-bold opacity-55">
+                  <span className="text-[0.8125rem] font-bold opacity-55">
                     /{period === 'YEARLY' ? 'year' : 'month'}
                   </span>
                 )}
@@ -247,13 +247,13 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                   equivalent answers "is this a good deal" without making the
                   reader divide. */}
               {!isFree && period === 'YEARLY' && (
-                <p className="text-[11.5px] font-bold text-accent/80 mt-1">
+                <p className="text-[0.71875rem] font-bold text-accent/80 mt-1">
                   {fmtMoney(yearlyPerMonth(plan))}/month equivalent
                 </p>
               )}
 
               {usage && !isFree && (
-                <p className="text-[11.5px] font-bold opacity-45 mt-1">
+                <p className="text-[0.71875rem] font-bold opacity-45 mt-1">
                   Billed {usage.billingPeriod === 'YEARLY' ? 'yearly' : 'monthly'}
                   {usage.billingPeriod === 'YEARLY' && (() => {
                     const s = yearlySaving(plan);
@@ -269,14 +269,14 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
               <div className="flex items-center gap-2.5">
                 <Calendar className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
-                <span className="text-[12px] font-black uppercase tracking-[0.12em] opacity-55">
+                <span className="text-[0.75rem] font-black uppercase tracking-[0.12em] opacity-55">
                   Billing period
                 </span>
               </div>
               {/* Only meaningful when there IS an end date. The free tier does
                   not expire, so a countdown would be inventing one. */}
               {remaining !== null && (
-                <span className="text-[11.5px] font-bold text-accent">
+                <span className="text-[0.71875rem] font-bold text-accent">
                   {remaining > 0
                     ? `${remaining} day${remaining === 1 ? '' : 's'} remaining`
                     : remaining === 0
@@ -288,18 +288,18 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.12em] opacity-45">
+                <p className="text-[0.625rem] font-black uppercase tracking-[0.12em] opacity-45">
                   Started
                 </p>
-                <p className="text-[15px] font-black text-white mt-1">
+                <p className="text-[0.9375rem] font-black text-white mt-1">
                   {usage ? fmtDate(usage.startedAt) : '—'}
                 </p>
               </div>
               <div className="sm:text-right">
-                <p className="text-[10px] font-black uppercase tracking-[0.12em] opacity-45">
+                <p className="text-[0.625rem] font-black uppercase tracking-[0.12em] opacity-45">
                   {isFree ? 'Expires' : 'Renews'}
                 </p>
-                <p className="text-[15px] font-black text-white mt-1">
+                <p className="text-[0.9375rem] font-black text-white mt-1">
                   {usage
                     ? (usage.renewsAt ? fmtDate(usage.renewsAt) : 'Does not expire')
                     : '—'}
@@ -365,11 +365,11 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
       <section className="glass-panel p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
-            <h2 className="flex items-center gap-2 text-[16px] font-black tracking-tight text-ink">
+            <h2 className="flex items-center gap-2 text-[1rem] font-black tracking-tight text-ink">
               <TrendingUp className="w-4 h-4 text-accent" aria-hidden="true" />
               {canManage ? 'Change plan' : 'All plans'}
             </h2>
-            <p className="text-[12.5px] text-ink-muted font-medium mt-1 leading-relaxed max-w-xl">
+            <p className="text-[0.78125rem] text-ink-muted font-medium mt-1 leading-relaxed max-w-xl">
               Every tier includes the full analysis pipeline and the same privacy guarantees.
               Higher tiers raise the limits, not the capabilities.
             </p>
@@ -395,7 +395,7 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                   aria-checked={period === id}
                   onClick={() => setPeriod(id)}
                   disabled={busy}
-                  className={`px-4 py-1.5 rounded-lg text-[12.5px] font-bold transition-all duration-200 disabled:opacity-50 ${
+                  className={`px-4 py-1.5 rounded-lg text-[0.78125rem] font-bold transition-all duration-200 disabled:opacity-50 ${
                     period === id
                       ? 'bg-accent text-white shadow-sm shadow-red-600/30'
                       : 'text-ink-muted hover:text-ink'
@@ -428,27 +428,27 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                 }`}
               >
                 {active && (
-                  <span className="absolute -top-2.5 left-4 bg-accent text-white text-[9px] font-black uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full">
+                  <span className="absolute -top-2.5 left-4 bg-accent text-white text-[0.5625rem] font-black uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full">
                     Current
                   </span>
                 )}
                 {!active && p.featured && (
-                  <span className="absolute -top-2.5 right-4 bg-inverse text-inverse text-[9px] font-black uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full">
+                  <span className="absolute -top-2.5 right-4 bg-inverse text-inverse text-[0.5625rem] font-black uppercase tracking-[0.14em] px-2.5 py-0.5 rounded-full">
                     Popular
                   </span>
                 )}
 
                 <div className="flex items-start justify-between gap-3 mb-1">
-                  <h3 className={`text-[16px] font-black tracking-tight ${active ? 'text-accent' : 'text-ink'}`}>
+                  <h3 className={`text-[1rem] font-black tracking-tight ${active ? 'text-accent' : 'text-ink'}`}>
                     {p.name}
                   </h3>
                   <div className="text-right shrink-0">
                     <div className="flex items-baseline gap-1 justify-end">
-                      <span className={`text-[17px] font-black ${active ? 'text-accent' : 'text-ink'}`}>
+                      <span className={`text-[1.0625rem] font-black ${active ? 'text-accent' : 'text-ink'}`}>
                         {formatPrice(p.id, period === 'YEARLY' ? 'yearly' : 'monthly')}
                       </span>
                       {p.priceMonthly > 0 && (
-                        <span className="text-[10.5px] font-bold text-ink-faint">
+                        <span className="text-[0.65625rem] font-bold text-ink-faint">
                           /{period === 'YEARLY' ? 'yr' : 'mo'}
                         </span>
                       )}
@@ -457,13 +457,13 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                         would actually be taken — but it is not comparable to a
                         monthly figure without this line. */}
                     {period === 'YEARLY' && p.priceMonthly > 0 && (
-                      <p className="text-[10px] font-bold text-ink-faint mt-0.5 whitespace-nowrap">
+                      <p className="text-[0.625rem] font-bold text-ink-faint mt-0.5 whitespace-nowrap">
                         {fmtMoney(yearlyPerMonth(p.id))}/mo
                       </p>
                     )}
                   </div>
                 </div>
-                <p className="text-[11.5px] text-ink-faint font-bold mb-3">{p.tagline}</p>
+                <p className="text-[0.71875rem] text-ink-faint font-bold mb-3">{p.tagline}</p>
 
                 {/* Stated as the arithmetic rather than a vague "save more":
                     twelve months for the price of ten is checkable, and it
@@ -473,7 +473,7 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                   if (!sv) return null;
                   const months = yearlyEquivalentMonths(p.id);
                   return (
-                    <p className="text-[10.5px] font-black text-emerald-600 dark:text-emerald-400 mb-3 uppercase tracking-wide">
+                    <p className="text-[0.65625rem] font-black text-emerald-600 dark:text-emerald-400 mb-3 uppercase tracking-wide">
                       {months
                         ? `12 months for the price of ${months}`
                         : `Save ${sv.percent}%`}
@@ -492,7 +492,7 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                       )}
                       {/* Prefixed for screen readers so included/excluded never
                           rests on the icon alone. */}
-                      <span className={`text-[12px] font-medium ${f.included ? 'text-ink-muted' : 'text-ink-faint line-through'}`}>
+                      <span className={`text-[0.75rem] font-medium ${f.included ? 'text-ink-muted' : 'text-ink-faint line-through'}`}>
                         <span className="sr-only">{f.included ? 'Included: ' : 'Not included: '}</span>
                         {f.text}
                       </span>
@@ -503,7 +503,7 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                 {canManage && (
                   <div className="mt-5">
                     {active ? (
-                      <div className="w-full text-center py-2.5 rounded-lg border border-line text-[12.5px] font-bold text-ink-faint">
+                      <div className="w-full text-center py-2.5 rounded-lg border border-line text-[0.78125rem] font-bold text-ink-faint">
                         Your current plan
                       </div>
                     ) : confirming ? (
@@ -511,7 +511,7 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                       // organisation over its new limits and an upgrade starts
                       // a fresh term. One click is too few for either.
                       <div className="flex flex-col gap-2">
-                        <p className="text-[11.5px] text-ink-muted font-medium leading-relaxed text-center">
+                        <p className="text-[0.71875rem] text-ink-muted font-medium leading-relaxed text-center">
                           Switch to {p.name}, billed {period === 'YEARLY' ? 'yearly' : 'monthly'}?
                         </p>
                         <div className="flex gap-2">
@@ -519,7 +519,7 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                             type="button"
                             onClick={() => setPending(null)}
                             disabled={busy}
-                            className="flex-1 py-2.5 rounded-lg border border-line text-[12.5px] font-bold text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
+                            className="flex-1 py-2.5 rounded-lg border border-line text-[0.78125rem] font-bold text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
                           >
                             Cancel
                           </button>
@@ -527,7 +527,7 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                             type="button"
                             onClick={() => apply(p.id)}
                             disabled={busy}
-                            className="flex-1 py-2.5 rounded-lg bg-accent text-white text-[12.5px] font-bold hover:brightness-110 transition-[filter] disabled:opacity-60 flex items-center justify-center gap-1.5"
+                            className="flex-1 py-2.5 rounded-lg bg-accent text-white text-[0.78125rem] font-bold hover:brightness-110 transition-[filter] disabled:opacity-60 flex items-center justify-center gap-1.5"
                           >
                             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Check className="w-3.5 h-3.5" strokeWidth={3} aria-hidden="true" />}
                             Confirm
@@ -539,7 +539,7 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
                         type="button"
                         onClick={() => { setBanner(null); setPending(p.id); }}
                         disabled={busy}
-                        className={`w-full py-2.5 rounded-lg text-[12.5px] font-bold transition-all duration-200 flex items-center justify-center gap-1.5 group/btn disabled:opacity-50 ${
+                        className={`w-full py-2.5 rounded-lg text-[0.78125rem] font-bold transition-all duration-200 flex items-center justify-center gap-1.5 group/btn disabled:opacity-50 ${
                           isUpgrade
                             ? 'bg-accent text-white hover:brightness-110'
                             : 'border border-line text-ink-muted hover:text-ink hover:border-field'
@@ -564,7 +564,7 @@ export default function PlanSection({ plan, orgName, canManage = false }) {
         {!canManage && (
           <div className="flex items-start gap-2.5 mt-5 rounded-lg border border-line bg-surface-alt px-4 py-3">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-ink-faint" aria-hidden="true" />
-            <p className="text-[12.5px] text-ink-muted font-medium leading-relaxed">
+            <p className="text-[0.78125rem] text-ink-muted font-medium leading-relaxed">
               Only an <strong className="text-ink">administrator</strong> can change the plan.
               Ask one of your organisation’s admins if you need a different tier.
             </p>

@@ -49,7 +49,7 @@ export default function AlertBanners({ banners, zones = [], flaggedCount = 0, on
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
             <div className="min-w-0 flex-1 text-xs leading-relaxed">
               <p className="font-bold">
-                Potential violation <span className="font-mono text-[10px] uppercase tracking-[0.12em] opacity-80">· {meta.label}</span>
+                Potential violation <span className="font-mono text-[0.625rem] uppercase tracking-[0.12em] opacity-80">· {meta.label}</span>
               </p>
               <p className="opacity-95">
                 {(zone && (zone.zone_name || zone.zone_id)) || b.zone_id || 'Zone'} · {workerLabel(b.worker_key)} — {b.reason}
@@ -67,7 +67,7 @@ export default function AlertBanners({ banners, zones = [], flaggedCount = 0, on
         );
       })}
       {list.length > 0 && (
-        <p className="self-start rounded bg-ground/80 px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.12em] text-ink-muted">
+        <p className="self-start rounded bg-ground/80 px-2 py-0.5 text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-muted">
           {flaggedCount} flagged in this run · for review, not a final verdict · listed below
         </p>
       )}

@@ -50,7 +50,7 @@ export default function EvidencePicture({ decisionId }) {
       <button
         type="button"
         onClick={open}
-        className="inline-flex items-center gap-1.5 self-start rounded-md border border-line px-2 py-1 text-[11px] font-medium text-ink hover:border-[color:var(--accent)] hover:text-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
+        className="inline-flex items-center gap-1.5 self-start rounded-md border border-line px-2 py-1 text-[0.6875rem] font-medium text-ink hover:border-[color:var(--accent)] hover:text-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
       >
         <ImageIcon className="w-3.5 h-3.5" aria-hidden="true" />
         View evidence picture
@@ -61,7 +61,7 @@ export default function EvidencePicture({ decisionId }) {
   return (
     <figure className="flex flex-col gap-1.5 rounded-lg border border-line bg-surface-alt p-2" aria-live="polite">
       <div className="flex items-center justify-between gap-2">
-        <figcaption className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint">
+        <figcaption className="text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint">
           Evidence picture · faces blurred
         </figcaption>
         <button

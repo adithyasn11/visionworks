@@ -38,7 +38,7 @@ function Table({ caption, head, children }) {
           screen the table scrolls sideways inside its card instead. */}
       <table className="w-full text-xs min-w-[760px] [&_td:first-child]:min-w-[11rem] [&_th:first-child]:min-w-[11rem]">
         <caption className="sr-only">{caption}</caption>
-        <thead><tr className="text-left text-[10px] font-mono uppercase tracking-[0.08em] text-ink-faint">{head}</tr></thead>
+        <thead><tr className="text-left text-[0.625rem] font-mono uppercase tracking-[0.08em] text-ink-faint">{head}</tr></thead>
         <tbody className="[&>tr]:border-t [&>tr]:border-line-soft">{children}</tbody>
       </table>
     </div>
@@ -106,7 +106,7 @@ function Sweep({ sweep, baselines }) {
           </g>
         )}
       </svg>
-      <figcaption className="mt-1.5 text-[12px] text-ink-faint leading-relaxed">
+      <figcaption className="mt-1.5 text-[0.75rem] text-ink-faint leading-relaxed">
         Lower is better; further right decides more often. The red dot is the shipped setting; open marks are the other settings tried.
       </figcaption>
     </figure>
@@ -122,7 +122,7 @@ function PpeSection({ seg }) {
   const nice = { 'B0 per-frame': 'Per-frame (one frame decides)', 'B1 majority vote': 'Majority vote over the window', ours: 'Ours (clear frames, 60 % / 90 %, may abstain)' };
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[13px] text-ink-muted leading-relaxed max-w-3xl">
+      <p className="text-[0.8125rem] text-ink-muted leading-relaxed max-w-3xl">
         {main.segments} people from {main.images} images the model never saw, judged by three systems.
       </p>
       <Table caption="Helmet and vest: three systems compared" head={<><Th>System</Th><Th right>Segments</Th><Th right>False accusations (of those wearing it)</Th><Th right>False compliance (of those without it)</Th><Th right>Abstained</Th><Th right>Coverage</Th><Th right>Error among verdicts</Th></>}>
@@ -191,7 +191,7 @@ function ScenarioSection({ scen }) {
   };
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-[13px] text-ink-muted leading-relaxed max-w-3xl">
+      <p className="text-[0.8125rem] text-ink-muted leading-relaxed max-w-3xl">
         <strong className="text-ink">{t.correct} correct, {t.abstained} abstained, {t.wrong} wrong</strong> in {t.runs} scripted runs through the real engine.
       </p>
       <MoreInfo summary={`See all ${scen.scenarios.length} scenarios`}>
@@ -227,7 +227,7 @@ function FootageSection({ real, scen }) {
   const md = real.man_down_overall || {};
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-[13px] text-ink-muted leading-relaxed max-w-3xl">
+      <p className="text-[0.8125rem] text-ink-muted leading-relaxed max-w-3xl">
         Real CCTV clips through the full system on <strong className="text-ink">{hw.gpu}</strong>.
       </p>
       <Table caption="Speed on real video" head={<><Th>Clip</Th><Th right>Seconds</Th><Th right>Input</Th><Th right>Frames a second</Th><Th right>ms per frame (95th pct)</Th><Th right>Pose / PPE / safety ms</Th><Th right>Man-down flags</Th></>}>
@@ -243,7 +243,7 @@ function FootageSection({ real, scen }) {
           </tr>
         ))}
       </Table>
-      <ul className="text-[13px] text-ink-muted leading-relaxed list-disc pl-5 flex flex-col gap-1.5">
+      <ul className="text-[0.8125rem] text-ink-muted leading-relaxed list-disc pl-5 flex flex-col gap-1.5">
         <li>Man-down false alarms: <strong className="text-ink">{md.false_alarms} in {md.video_minutes} minutes</strong> of normal activity (target: at most 1 an hour).</li>
         {m1?.time_to_alert_s && <li>Fall to alert: <strong className="text-ink">{m1.time_to_alert_s.median} s</strong> median, {m1.time_to_alert_s.max} s at most (target 8 s).</li>}
         <li>10 frames a second target: <strong className="text-ink">{real.clips.every((c) => c.speed.processed_fps >= 10) ? 'met on every clip' : 'not met on every clip'}</strong>.</li>
@@ -265,7 +265,7 @@ function ReviewSection({ report, error }) {
   const judged = report.confirmed + report.dismissed;
   if (!report.flagged_by_system) return <p className="text-xs text-ink-muted">No flag has been raised for this organisation in the last year, so there is nothing for people to have judged.</p>;
   return (
-    <div className="flex flex-col gap-3 text-[13px] text-ink-muted leading-relaxed">
+    <div className="flex flex-col gap-3 text-[0.8125rem] text-ink-muted leading-relaxed">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Flags raised" value={report.flagged_by_system} note="last 12 months" />
         <Stat label="Judged by a person" value={judged} note={`${report.pending} still waiting`} />
@@ -323,7 +323,7 @@ export default function EvaluationScreen() {
       )}
 
       <Panel title="How to read this page" icon={FlaskConical} aside={updated}>
-        <dl className="grid gap-3 sm:grid-cols-3 text-[13px] leading-relaxed">
+        <dl className="grid gap-3 sm:grid-cols-3 text-[0.8125rem] leading-relaxed">
           <div><dt className="font-bold text-ink">False accusation</dt><dd className="text-ink-muted">Flagging someone who was wearing the item. The error that matters most.</dd></div>
           <div><dt className="font-bold text-ink">Abstaining</dt><dd className="text-ink-muted">Saying it could not tell. Not an error: the system refuses to guess.</dd></div>
           <div><dt className="font-bold text-ink">Coverage</dt><dd className="text-ink-muted">How often the system gave a verdict. A zero is shown with its 95 % upper bound.</dd></div>
@@ -336,7 +336,7 @@ export default function EvaluationScreen() {
       <Panel title="The human review loop (your organisation)" icon={Users}><ReviewSection report={review.report} error={review.error} /></Panel>
 
       <Panel title="Not measured yet">
-        <ul className="text-[13px] text-ink-muted leading-relaxed list-disc pl-5 flex flex-col gap-1.5">
+        <ul className="text-[0.8125rem] text-ink-muted leading-relaxed list-disc pl-5 flex flex-col gap-1.5">
           <li><strong className="text-ink">Your own footage.</strong> The benchmark uses still images, not people walking and turning in your lighting.</li>
           <li><strong className="text-ink">Real falls.</strong> No staged falls recorded yet; man-down is tested on scripted poses.</li>
           <li><strong className="text-ink">Precision on reviewed clips.</strong> The review numbers above grow as your team judges flags.</li>

@@ -646,7 +646,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         <div className="flex items-center gap-2 text-ink font-semibold text-sm">
           <Eye className="w-4 h-4 text-accent" />
           <span>Live Camera Feed — Detection View</span>
-          <span className="ml-2 px-2 py-0.5 rounded bg-accent/10 border border-line text-[10px] text-accent font-mono font-bold flex items-center gap-1">
+          <span className="ml-2 px-2 py-0.5 rounded bg-accent/10 border border-line text-[0.625rem] text-accent font-mono font-bold flex items-center gap-1">
             <Cpu className="w-3 h-3" />
             <span>YOLOv8m pose</span>
           </span>
@@ -654,7 +654,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
 
         <div className="flex flex-wrap items-center gap-2">
           {readOnly && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-line text-[10px] font-bold text-ink-faint">
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-line text-[0.625rem] font-bold text-ink-faint">
               <Eye className="w-3 h-3" />
               VIEW ONLY
             </span>
@@ -694,7 +694,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           </button>
           {!readOnly && (
           <label
-            className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint"
+            className="flex items-center gap-1.5 text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint"
             title="When this footage was recorded. Safety events are stamped with it. Leave empty to use the upload time."
           >
             <span>Recorded</span>
@@ -704,7 +704,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
               max={localNowValue()}
               onChange={(e) => setRecordedAt(e.target.value)}
               disabled={phase === 'uploading' || isWebcamActive}
-              className="rounded-lg bg-ground border border-field hover:border-field-hover px-2 py-1 text-[11px] normal-case tracking-normal font-sans text-ink [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-[color:var(--accent)] disabled:opacity-40 transition-colors"
+              className="rounded-lg bg-ground border border-field hover:border-field-hover px-2 py-1 text-[0.6875rem] normal-case tracking-normal font-sans text-ink [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-[color:var(--accent)] disabled:opacity-40 transition-colors"
             />
           </label>
           )}
@@ -846,7 +846,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       <div className="glass-card p-3 flex flex-col gap-2.5 bg-surface/90 border-line">
         {/* Interactive Timeline Scrubber Slider (disabled during live webcam) */}
         <div className="flex items-center gap-3">
-          <span className="text-[11px] font-mono text-ink-muted shrink-0 w-12 text-right">
+          <span className="text-[0.6875rem] font-mono text-ink-muted shrink-0 w-12 text-right">
             {formatTime(currentTimeSec)}
           </span>
           <div className="relative flex-1 flex items-center">
@@ -863,7 +863,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
               className="w-full h-2 bg-surface-alt rounded-lg appearance-none cursor-pointer accent-[color:var(--accent)] hover:accent-[color:var(--accent)] transition-all disabled:cursor-not-allowed disabled:opacity-30"
             />
           </div>
-          <span className="text-[11px] font-mono text-ink-muted shrink-0 w-12">
+          <span className="text-[0.6875rem] font-mono text-ink-muted shrink-0 w-12">
             {isWebcamActive ? 'LIVE' : formatTime(durationSec)}
           </span>
         </div>
@@ -978,7 +978,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           ].map(({ label, value, color }) => (
             <div key={label} className="glass-card p-2.5 text-center">
               <p className={`text-xl font-bold ${color}`}>{value}</p>
-              <p className="text-[10px] text-ink-faint uppercase tracking-wider">{label}</p>
+              <p className="text-[0.625rem] text-ink-faint uppercase tracking-wider">{label}</p>
             </div>
           ))}
         </div>

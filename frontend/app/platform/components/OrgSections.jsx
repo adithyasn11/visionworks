@@ -22,10 +22,10 @@ export function Section({ title, icon: Icon, count, error, children, empty, empt
       <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-line">
         <div className="flex items-center gap-2 min-w-0">
           <Icon className="w-4 h-4 shrink-0 text-ink-faint" strokeWidth={2.2} />
-          <h2 className="text-[14px] font-bold tracking-tight text-ink truncate">{title}</h2>
+          <h2 className="text-[0.875rem] font-bold tracking-tight text-ink truncate">{title}</h2>
         </div>
         {count != null && (
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint tabular-nums shrink-0">
+          <span className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-ink-faint tabular-nums shrink-0">
             {count}
           </span>
         )}
@@ -34,7 +34,7 @@ export function Section({ title, icon: Icon, count, error, children, empty, empt
       {error ? (
         <div className="px-4 sm:px-5 py-4 flex items-start gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-accent" />
-          <p className="text-[12.5px] leading-relaxed">
+          <p className="text-[0.78125rem] leading-relaxed">
             <span className="font-bold text-accent">Could not load.</span>{' '}
             <span className="text-ink-muted">{error}</span>
           </p>
@@ -42,9 +42,9 @@ export function Section({ title, icon: Icon, count, error, children, empty, empt
       ) : empty ? (
         <div className="px-5 py-8 text-center">
           <Inbox className="w-6 h-6 mx-auto text-ink-faint mb-2.5" strokeWidth={1.8} />
-          <p className="text-[13px] font-bold text-ink">{empty}</p>
+          <p className="text-[0.8125rem] font-bold text-ink">{empty}</p>
           {emptyHint && (
-            <p className="text-[11.5px] text-ink-faint mt-1 max-w-sm mx-auto leading-relaxed">
+            <p className="text-[0.71875rem] text-ink-faint mt-1 max-w-sm mx-auto leading-relaxed">
               {emptyHint}
             </p>
           )}
@@ -59,7 +59,7 @@ export function Section({ title, icon: Icon, count, error, children, empty, empt
 const Th = ({ children, align = 'left' }) => (
   <th
     scope="col"
-    className={`px-4 py-2.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-ink-faint font-semibold whitespace-nowrap ${
+    className={`px-4 py-2.5 font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-ink-faint font-semibold whitespace-nowrap ${
       align === 'right' ? 'text-right' : 'text-left'
     }`}
   >
@@ -75,7 +75,7 @@ const Chip = ({ tone = 'muted', children, dot = false }) => {
     good:   'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
   };
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.1em] font-bold whitespace-nowrap ${tones[tone]}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 font-mono text-[0.59375rem] uppercase tracking-[0.1em] font-bold whitespace-nowrap ${tones[tone]}`}>
       {dot && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
       {children}
     </span>
@@ -118,7 +118,7 @@ export function MembersSection({ members, error }) {
       emptyHint="A member row appears when someone signs up and creates or joins this organisation."
     >
       <div className="overflow-x-auto">
-        <table className="w-full text-[13px] border-collapse">
+        <table className="w-full text-[0.8125rem] border-collapse">
           <thead>
             <tr className="border-b border-line">
               <Th>Email</Th>
@@ -137,13 +137,13 @@ export function MembersSection({ members, error }) {
                       {m.fullName || m.email}
                     </div>
                     {m.fullName && (
-                      <div className="font-mono text-[10.5px] text-ink-faint truncate mt-0.5">
+                      <div className="font-mono text-[0.65625rem] text-ink-faint truncate mt-0.5">
                         {m.email}
                       </div>
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-muted">
+                    <span className="inline-flex items-center gap-1.5 text-[0.78125rem] font-semibold text-ink-muted">
                       <RoleIcon className="w-3.5 h-3.5 text-ink-faint" strokeWidth={2.2} />
                       {m.role}
                     </span>
@@ -155,7 +155,7 @@ export function MembersSection({ members, error }) {
                         ? <Chip tone="muted">suspended</Chip>
                         : <Chip tone="good">active</Chip>}
                   </td>
-                  <td className="px-4 py-3 text-right text-ink-muted whitespace-nowrap text-[12.5px]">
+                  <td className="px-4 py-3 text-right text-ink-muted whitespace-nowrap text-[0.78125rem]">
                     {m.isPending ? `invited ${fmtDate(m.invitedAt)}` : fmtDate(m.joinedAt)}
                   </td>
                 </tr>
@@ -181,7 +181,7 @@ export function SitesSection({ sites, error }) {
       emptyHint="A site is created during onboarding and groups the cameras in one building or work area."
     >
       <div className="overflow-x-auto">
-        <table className="w-full text-[13px] border-collapse">
+        <table className="w-full text-[0.8125rem] border-collapse">
           <thead>
             <tr className="border-b border-line">
               <Th>Site</Th>
@@ -194,12 +194,12 @@ export function SitesSection({ sites, error }) {
               <tr key={s.id} className="hover:bg-surface-alt transition-colors duration-150">
                 <td className="px-4 py-3 min-w-0">
                   <div className="font-semibold text-ink truncate">{s.name}</div>
-                  <div className="text-[11.5px] text-ink-faint truncate mt-0.5">
+                  <div className="text-[0.71875rem] text-ink-faint truncate mt-0.5">
                     {s.location || '—'}
                     {s.timezone ? ` · ${s.timezone}` : ''}
                   </div>
                 </td>
-                <td className="px-4 py-3 font-mono text-[12px] text-ink-muted whitespace-nowrap">
+                <td className="px-4 py-3 font-mono text-[0.75rem] text-ink-muted whitespace-nowrap">
                   {fmtMinute(s.workdayStartMinute)}–{fmtMinute(s.workdayEndMinute)}
                 </td>
                 <td className="px-4 py-3">
@@ -210,7 +210,7 @@ export function SitesSection({ sites, error }) {
                         <span
                           key={d}
                           title={DAY_NAMES[d]}
-                          className={`w-[18px] h-[18px] rounded flex items-center justify-center font-mono text-[8.5px] font-bold ${
+                          className={`w-[18px] h-[18px] rounded flex items-center justify-center font-mono text-[0.53125rem] font-bold ${
                             on ? 'bg-accent-soft text-accent' : 'bg-surface-alt text-ink-faint'
                           }`}
                         >
@@ -246,7 +246,7 @@ export function CamerasSection({ cameras, error }) {
       emptyHint="Until a camera is added, nothing can be processed for this organisation."
     >
       <div className="overflow-x-auto">
-        <table className="w-full text-[13px] border-collapse">
+        <table className="w-full text-[0.8125rem] border-collapse">
           <thead>
             <tr className="border-b border-line">
               <Th>Camera</Th>
@@ -262,7 +262,7 @@ export function CamerasSection({ cameras, error }) {
                 <tr key={c.id} className="hover:bg-surface-alt transition-colors duration-150 align-top">
                   <td className="px-4 py-3 min-w-0">
                     <div className="font-semibold text-ink truncate">{c.name}</div>
-                    <div className="font-mono text-[10.5px] text-ink-faint truncate mt-0.5">
+                    <div className="font-mono text-[0.65625rem] text-ink-faint truncate mt-0.5">
                       {c.siteName ? `${c.siteName} · ` : ''}
                       {c.frameWidth && c.frameHeight ? `${c.frameWidth}×${c.frameHeight} · ` : ''}
                       {c.fpsTarget}fps
@@ -271,19 +271,19 @@ export function CamerasSection({ cameras, error }) {
                     {/* An error message is the single most useful thing on a
                         support call, so it is shown in full rather than truncated. */}
                     {c.lastErrorMessage && (
-                      <p className="mt-1.5 font-mono text-[10.5px] leading-relaxed text-accent break-words max-w-md">
+                      <p className="mt-1.5 font-mono text-[0.65625rem] leading-relaxed text-accent break-words max-w-md">
                         {c.lastErrorMessage}
                       </p>
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-muted whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5 text-[0.78125rem] font-semibold text-ink-muted whitespace-nowrap">
                       <SrcIcon className="w-3.5 h-3.5 text-ink-faint" strokeWidth={2.2} />
                       {c.sourceType}
                     </span>
                     {/* Presence of a credential, never its value. */}
                     {c.sourceType === 'RTSP' && (
-                      <div className="font-mono text-[10px] text-ink-faint mt-0.5">
+                      <div className="font-mono text-[0.625rem] text-ink-faint mt-0.5">
                         {c.hasRtspUrl ? 'url set' : 'no url'}
                       </div>
                     )}
@@ -293,7 +293,7 @@ export function CamerasSection({ cameras, error }) {
                     {c.status === 'ERROR'    && <Chip tone="accent">error</Chip>}
                     {c.status === 'INACTIVE' && <Chip tone="muted">inactive</Chip>}
                   </td>
-                  <td className="px-4 py-3 text-right text-ink-muted whitespace-nowrap text-[12.5px]">
+                  <td className="px-4 py-3 text-right text-ink-muted whitespace-nowrap text-[0.78125rem]">
                     {fmtDateTime(c.lastSeenAt)}
                   </td>
                 </tr>
@@ -319,7 +319,7 @@ export function ZonesSection({ zones, error }) {
       emptyHint="Without zones the pipeline runs but no rule can apply — every detection falls outside every area. This is the most common reason a customer sees no verdicts."
     >
       <div className="overflow-x-auto">
-        <table className="w-full text-[13px] border-collapse">
+        <table className="w-full text-[0.8125rem] border-collapse">
           <thead>
             <tr className="border-b border-line">
               <Th>Zone</Th>
@@ -342,10 +342,10 @@ export function ZonesSection({ zones, error }) {
                     <span className="font-semibold text-ink truncate">{z.name}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-[12.5px] font-semibold text-ink-muted">
+                <td className="px-4 py-3 text-[0.78125rem] font-semibold text-ink-muted">
                   {z.zoneType}
                 </td>
-                <td className="px-4 py-3 font-mono text-[11.5px] text-ink-muted truncate">
+                <td className="px-4 py-3 font-mono text-[0.71875rem] text-ink-muted truncate">
                   {z.cameraName ?? '—'}
                 </td>
               </tr>
@@ -378,7 +378,7 @@ export function SessionsSection({ sessions, error }) {
       emptyHint="A run is recorded whenever a video is uploaded or a live stream is analysed."
     >
       <div className="overflow-x-auto">
-        <table className="w-full text-[13px] border-collapse">
+        <table className="w-full text-[0.8125rem] border-collapse">
           <thead>
             <tr className="border-b border-line">
               <Th>Source</Th>
@@ -400,13 +400,13 @@ export function SessionsSection({ sessions, error }) {
                     <div className="font-semibold text-ink truncate max-w-[22rem]">
                       {s.sourceFilename || s.kind.replace(/_/g, ' ').toLowerCase()}
                     </div>
-                    <div className="font-mono text-[10.5px] text-ink-faint truncate mt-0.5">
+                    <div className="font-mono text-[0.65625rem] text-ink-faint truncate mt-0.5">
                       {s.kind}
                       {s.cameraName ? ` · ${s.cameraName}` : ''}
                       {s.fpsAchieved ? ` · ${s.fpsAchieved.toFixed(1)}fps` : ''}
                     </div>
                     {s.errorMessage && (
-                      <p className="mt-1.5 font-mono text-[10.5px] leading-relaxed text-accent break-words max-w-md">
+                      <p className="mt-1.5 font-mono text-[0.65625rem] leading-relaxed text-accent break-words max-w-md">
                         {s.errorMessage}
                       </p>
                     )}
@@ -424,10 +424,10 @@ export function SessionsSection({ sessions, error }) {
                       </span>
                     )}
                     {pct != null && pct < 100 && (
-                      <div className="font-mono text-[10px] text-ink-faint mt-0.5">{pct}%</div>
+                      <div className="font-mono text-[0.625rem] text-ink-faint mt-0.5">{pct}%</div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-right text-ink-muted whitespace-nowrap text-[12.5px]">
+                  <td className="px-4 py-3 text-right text-ink-muted whitespace-nowrap text-[0.78125rem]">
                     {fmtDateTime(s.queuedAt)}
                   </td>
                 </tr>
@@ -447,11 +447,11 @@ export function SafetyDataNotice({ orgName }) {
     <div className="rounded-xl border border-line bg-surface-alt px-4 sm:px-5 py-4 themed">
       <div className="flex items-center gap-2 mb-2">
         <CircleDot className="w-4 h-4 text-ink-faint" strokeWidth={2.2} />
-        <h2 className="text-[13.5px] font-bold tracking-tight text-ink">
+        <h2 className="text-[0.84375rem] font-bold tracking-tight text-ink">
           Safety data not accessible
         </h2>
       </div>
-      <p className="text-[12px] leading-relaxed text-ink-muted max-w-2xl">
+      <p className="text-[0.75rem] leading-relaxed text-ink-muted max-w-2xl">
         This page shows configuration and health only. {orgName}&rsquo;s
         detections, verdicts, alerts and reports are not readable from a platform
         session — no row-level-security policy grants a platform operator access

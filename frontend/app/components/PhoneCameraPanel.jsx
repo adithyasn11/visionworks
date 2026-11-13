@@ -363,13 +363,13 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
           type="button"
           onClick={startPairing}
           disabled={disabled || busy}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border-2 border-field text-ink font-bold text-[13px] hover:border-field-hover transition-colors disabled:opacity-60"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border-2 border-field text-ink font-bold text-[0.8125rem] hover:border-field-hover transition-colors disabled:opacity-60"
         >
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
           Use my phone as a camera
         </button>
         {error && (
-          <p className="text-[12px] text-accent font-medium flex items-start gap-1.5">
+          <p className="text-[0.75rem] text-accent font-medium flex items-start gap-1.5">
             <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
             {error}
           </p>
@@ -381,7 +381,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
   return (
     <div className="rounded-xl border border-line bg-surface p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="text-[14px] font-black text-ink flex items-center gap-2">
+        <h3 className="text-[0.875rem] font-black text-ink flex items-center gap-2">
           <Smartphone className="w-4 h-4 text-accent" />
           Phone camera
         </h3>
@@ -401,12 +401,12 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
           able to load the page but not use its camera. */}
       {insecure && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
-          <p className="text-[12px] text-ink-muted font-medium leading-relaxed">
+          <p className="text-[0.75rem] text-ink-muted font-medium leading-relaxed">
             <span className="font-bold text-ink">This page is not on HTTPS.</span>{' '}
             The QR address is correct and the phone will load the page — but it
             will then be refused access to its camera, because browsers only
             allow that on a secure origin. Restart with{' '}
-            <code className="font-mono text-[11px] bg-ground px-1 rounded">
+            <code className="font-mono text-[0.6875rem] bg-ground px-1 rounded">
               python run_system.py --https
             </code>{' '}
             and reload the dashboard.
@@ -424,31 +424,31 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
               />
             )}
             <div className="min-w-0 flex flex-col gap-1.5">
-              <p className="text-[12.5px] text-ink-muted font-medium leading-relaxed">
+              <p className="text-[0.78125rem] text-ink-muted font-medium leading-relaxed">
                 Scan this with your phone&apos;s camera. Tap through the
                 security warning once — the certificate is self-signed, so the
                 phone has not seen it before.
               </p>
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint mt-1">
+              <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-ink-faint mt-1">
                 or type this address
               </p>
-              <p className="font-mono text-[11.5px] text-ink break-all">
+              <p className="font-mono text-[0.71875rem] text-ink break-all">
                 {code ? phoneUrlFor(code, lanHost) : ''}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-[12px] text-ink-muted font-medium">
+          <div className="flex items-center gap-2 text-[0.75rem] text-ink-muted font-medium">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
             Waiting for the phone to connect…
           </div>
         </>
       ) : (
         <>
-          <div className="flex items-center gap-2 text-[12.5px] font-bold text-emerald-700 dark:text-emerald-400">
+          <div className="flex items-center gap-2 text-[0.78125rem] font-bold text-emerald-700 dark:text-emerald-400">
             <CheckCircle2 className="w-4 h-4" />
             Phone paired
             {streaming && (
-              <span className="ml-1 font-mono text-[11px] font-medium text-ink-faint">
+              <span className="ml-1 font-mono text-[0.6875rem] font-medium text-ink-faint">
                 · {analysed}/{frames} analysed
               </span>
             )}
@@ -487,7 +487,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
             )}
             {!streaming && (
               <div className="absolute inset-0 grid place-items-center px-6 text-center">
-                <p className="text-[12.5px] text-ink-muted font-medium">
+                <p className="text-[0.78125rem] text-ink-muted font-medium">
                   Press start and the phone opens its camera.
                 </p>
               </div>
@@ -499,7 +499,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
               <button
                 type="button"
                 onClick={stopPhoneCamera}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border-2 border-field text-ink font-bold text-[13px] hover:border-field-hover transition-colors"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border-2 border-field text-ink font-bold text-[0.8125rem] hover:border-field-hover transition-colors"
               >
                 <Square className="w-3.5 h-3.5" />
                 Stop
@@ -508,7 +508,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
               <button
                 type="button"
                 onClick={startPhoneCamera}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-accent text-white font-bold text-[13px] hover:brightness-110 transition-[filter]"
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-accent text-white font-bold text-[0.8125rem] hover:brightness-110 transition-[filter]"
               >
                 <Play className="w-3.5 h-3.5" />
                 Turn on phone camera
@@ -517,7 +517,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
             <button
               type="button"
               onClick={startPairing}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-line text-ink-muted font-bold text-[12px] hover:text-ink hover:border-field transition-colors"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-line text-ink-muted font-bold text-[0.75rem] hover:text-ink hover:border-field transition-colors"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               New code
@@ -527,7 +527,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
       )}
 
       {error && (
-        <p className="text-[12px] text-accent font-medium flex items-start gap-1.5" role="alert">
+        <p className="text-[0.75rem] text-accent font-medium flex items-start gap-1.5" role="alert">
           <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           {error}
         </p>

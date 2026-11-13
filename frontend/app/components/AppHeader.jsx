@@ -53,7 +53,7 @@ export default function AppHeader({ email, fullName }) {
           </span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-8 font-bold text-[13px] text-ink-muted">
+        <nav className="hidden md:flex items-center gap-8 font-bold text-[0.8125rem] text-ink-muted">
           {links.map(({ href, label }) => {
             // `#pricing` lives on /home, so compare paths only — otherwise the
             // Plans link could never match and Home would stay lit while the

@@ -201,10 +201,10 @@ function Floorplan() {
   return (
     <div className="flex flex-col gap-3 min-h-0 flex-1">
       <div className="flex items-baseline justify-between">
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
+        <span className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-white/40">
           cam_gate_01 · top-down
         </span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/40 flex items-center gap-1.5">
+        <span className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-white/40 flex items-center gap-1.5">
           <span className="w-1 h-1 rounded-full bg-emerald-400" />
           tracking
         </span>
@@ -218,7 +218,7 @@ function Floorplan() {
       />
 
       {/* Zone counts read out of the same simulation that drives the canvas. */}
-      <div className="grid grid-cols-3 font-mono text-[10px] uppercase tracking-[0.12em] border-t border-white/10 pt-3">
+      <div className="grid grid-cols-3 font-mono text-[0.625rem] uppercase tracking-[0.12em] border-t border-white/10 pt-3">
         {ZONES.map((z) => (
           <div key={z.id} className="flex flex-col gap-1">
             <span className="text-white/40">{z.id}</span>
@@ -247,13 +247,13 @@ export const AuthAside = ({ eyebrow, headline, sub, facts }) => (
 
     <div className="relative z-10 auth-aside-stack flex-1 justify-center min-h-0">
       <div>
-        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-accent mb-4">
+        <p className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-accent mb-4">
           {eyebrow}
         </p>
         <h2 className="text-2xl xl:text-[1.75rem] font-black tracking-tight leading-[1.2] text-balance max-w-sm">
           {headline}
         </h2>
-        <p className="mt-3 text-[14px] leading-relaxed text-white/60 max-w-sm">
+        <p className="mt-3 text-[0.875rem] leading-relaxed text-white/60 max-w-sm">
           {sub}
         </p>
       </div>
@@ -265,10 +265,10 @@ export const AuthAside = ({ eyebrow, headline, sub, facts }) => (
     <dl className="relative z-10 shrink-0 border-t border-white/10 pt-[clamp(0.85rem,2vh,1.5rem)] flex flex-col gap-2">
       {facts.map(({ term, detail }) => (
         <div key={term} className="grid grid-cols-[7.5rem_1fr] gap-3 items-baseline">
-          <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+          <dt className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-white/40">
             {term}
           </dt>
-          <dd className="text-[13px] text-white/75 leading-snug">{detail}</dd>
+          <dd className="text-[0.8125rem] text-white/75 leading-snug">{detail}</dd>
         </div>
       ))}
     </dl>

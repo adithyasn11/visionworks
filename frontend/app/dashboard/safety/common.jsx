@@ -11,7 +11,7 @@ import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
 import { decisionStatus } from '../../lib/decisions';
 import { severityMeta } from '../../lib/alerts';
 
-const CHIP = 'inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wide whitespace-nowrap';
+const CHIP = 'inline-flex items-center px-2 py-0.5 rounded-md border text-[0.625rem] font-bold uppercase tracking-wide whitespace-nowrap';
 const TONE = {
   ok: 'border-line text-ink bg-surface-alt',
   alert: 'border-[color:var(--accent)] text-white bg-accent',
@@ -131,9 +131,9 @@ export function MoreInfo({ summary = 'More detail', children, className = '' }) 
 export function Stat({ value, label, note, tone }) {
   return (
     <div className="glass-panel px-4 py-4 flex flex-col gap-1 min-w-0">
-      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">{label}</span>
-      <span className={`text-[26px] font-black tracking-tight leading-none tabular-nums ${tone === 'accent' ? 'text-accent' : 'text-ink'}`}>{value}</span>
-      {note && <span className="text-[11.5px] text-ink-muted leading-snug">{note}</span>}
+      <span className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-ink-faint">{label}</span>
+      <span className={`text-[1.625rem] font-black tracking-tight leading-none tabular-nums ${tone === 'accent' ? 'text-accent' : 'text-ink'}`}>{value}</span>
+      {note && <span className="text-[0.71875rem] text-ink-muted leading-snug">{note}</span>}
     </div>
   );
 }
@@ -146,9 +146,9 @@ export function Panel({ title, icon: Icon, aside, children, className = '' }) {
         <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3">
           <div className="flex items-center gap-2">
             {Icon && <Icon className="w-4 h-4 text-accent" strokeWidth={2.2} aria-hidden="true" />}
-            <h3 className="text-[13.5px] font-bold tracking-tight text-ink">{title}</h3>
+            <h3 className="text-[0.84375rem] font-bold tracking-tight text-ink">{title}</h3>
           </div>
-          {aside && <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-ink-faint">{aside}</div>}
+          {aside && <div className="text-[0.625rem] font-mono uppercase tracking-[0.14em] text-ink-faint">{aside}</div>}
         </header>
       )}
       {children}

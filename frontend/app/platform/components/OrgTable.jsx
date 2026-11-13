@@ -27,7 +27,7 @@ function HealthBadge({ org }) {
   const h = orgHealth(org);
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.1em] font-bold whitespace-nowrap ${
+      className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 font-mono text-[0.59375rem] uppercase tracking-[0.1em] font-bold whitespace-nowrap ${
         HEALTH_STYLE[h.level] ?? HEALTH_STYLE.ok
       }`}
     >
@@ -66,10 +66,10 @@ function EmptyState({ filtered }) {
   return (
     <div className="px-5 py-16 text-center">
       <Icon className="w-8 h-8 mx-auto text-ink-faint mb-3" strokeWidth={1.8} />
-      <p className="text-[14px] font-bold text-ink">
+      <p className="text-[0.875rem] font-bold text-ink">
         {filtered ? 'No organisations match' : 'No organisations yet'}
       </p>
-      <p className="text-[12.5px] text-ink-faint mt-1 max-w-sm mx-auto leading-relaxed">
+      <p className="text-[0.78125rem] text-ink-faint mt-1 max-w-sm mx-auto leading-relaxed">
         {filtered
           ? 'Try a different search term, or clear the filters above.'
           : 'Organisations appear here once customers sign up and complete onboarding.'}
@@ -91,7 +91,7 @@ export default function OrgTable({ orgs, filtered }) {
     <div className="rounded-xl border border-line bg-surface overflow-hidden themed">
       {/* ── Desktop table ── */}
       <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-[13px] border-collapse">
+        <table className="w-full text-[0.8125rem] border-collapse">
           <caption className="sr-only">
             Organisations with member, site, camera and zone counts, health status and signup date
           </caption>
@@ -109,7 +109,7 @@ export default function OrgTable({ orgs, filtered }) {
                 <th
                   key={label}
                   scope="col"
-                  className={`px-4 py-2.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-ink-faint font-semibold ${
+                  className={`px-4 py-2.5 font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-ink-faint font-semibold ${
                     align === 'right' ? 'text-right' : 'text-left'
                   }`}
                 >
@@ -124,10 +124,10 @@ export default function OrgTable({ orgs, filtered }) {
               <tr key={o.id} className="group hover:bg-surface-alt transition-colors duration-150">
                 <th scope="row" className="px-4 py-3 text-left font-normal">
                   <Link href={`/platform/organisations/${o.id}`} className="block min-w-0">
-                    <div className="font-bold text-[13.5px] text-ink truncate group-hover:text-accent transition-colors">
+                    <div className="font-bold text-[0.84375rem] text-ink truncate group-hover:text-accent transition-colors">
                       {o.name}
                     </div>
-                    <div className="font-mono text-[10.5px] text-ink-faint truncate mt-0.5">
+                    <div className="font-mono text-[0.65625rem] text-ink-faint truncate mt-0.5">
                       {o.slug} · {o.timezone}
                     </div>
                   </Link>
@@ -135,7 +135,7 @@ export default function OrgTable({ orgs, filtered }) {
                 <td className="px-4 py-3 text-right">
                   <Num value={o.activeMembers} />
                   {o.pendingInvites > 0 && (
-                    <span className="ml-1 font-mono text-[10px] text-ink-faint">
+                    <span className="ml-1 font-mono text-[0.625rem] text-ink-faint">
                       +{o.pendingInvites}
                     </span>
                   )}
@@ -144,14 +144,14 @@ export default function OrgTable({ orgs, filtered }) {
                 <td className="px-4 py-3 text-right">
                   <Num value={o.cameraCount} />
                   {o.camerasInError > 0 && (
-                    <span className="ml-1 font-mono text-[10px] font-bold text-accent">
+                    <span className="ml-1 font-mono text-[0.625rem] font-bold text-accent">
                       ⚠{o.camerasInError}
                     </span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-right"><Num value={o.zoneCount} /></td>
                 <td className="px-4 py-3"><HealthBadge org={o} /></td>
-                <td className="px-4 py-3 text-right text-ink-muted whitespace-nowrap text-[12.5px]">
+                <td className="px-4 py-3 text-right text-ink-muted whitespace-nowrap text-[0.78125rem]">
                   {fmtDate(o.createdAt)}
                 </td>
                 <td className="pr-3">
@@ -179,8 +179,8 @@ export default function OrgTable({ orgs, filtered }) {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-bold text-[14px] text-ink truncate">{o.name}</div>
-                  <div className="font-mono text-[10.5px] text-ink-faint truncate mt-0.5">
+                  <div className="font-bold text-[0.875rem] text-ink truncate">{o.name}</div>
+                  <div className="font-mono text-[0.65625rem] text-ink-faint truncate mt-0.5">
                     {o.slug}
                   </div>
                 </div>
@@ -189,16 +189,16 @@ export default function OrgTable({ orgs, filtered }) {
 
               <div className="mt-2.5 flex items-center gap-3.5 flex-wrap">
                 <HealthBadge org={o} />
-                <span className="flex items-center gap-1 text-[11.5px] text-ink-muted">
+                <span className="flex items-center gap-1 text-[0.71875rem] text-ink-muted">
                   <Users className="w-3 h-3 text-ink-faint" /> {o.activeMembers}
                 </span>
-                <span className="flex items-center gap-1 text-[11.5px] text-ink-muted">
+                <span className="flex items-center gap-1 text-[0.71875rem] text-ink-muted">
                   <MapPin className="w-3 h-3 text-ink-faint" /> {o.siteCount}
                 </span>
-                <span className="flex items-center gap-1 text-[11.5px] text-ink-muted">
+                <span className="flex items-center gap-1 text-[0.71875rem] text-ink-muted">
                   <Camera className="w-3 h-3 text-ink-faint" /> {o.cameraCount}
                 </span>
-                <span className="flex items-center gap-1 text-[11.5px] text-ink-muted">
+                <span className="flex items-center gap-1 text-[0.71875rem] text-ink-muted">
                   <Shapes className="w-3 h-3 text-ink-faint" /> {o.zoneCount}
                 </span>
               </div>

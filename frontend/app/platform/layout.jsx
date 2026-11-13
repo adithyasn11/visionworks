@@ -39,10 +39,10 @@ export default async function PlatformLayout({ children }) {
       <div className="min-h-screen bg-ground text-ink flex items-center justify-center px-6 themed">
         <div className="max-w-md text-center">
           <h1 className="text-xl font-black tracking-tight mb-2">Not connected</h1>
-          <p className="text-[14px] text-ink-muted leading-relaxed">
-            Add <code className="font-mono text-[13px] text-accent">NEXT_PUBLIC_SUPABASE_URL</code>{' '}
-            and <code className="font-mono text-[13px] text-accent">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>{' '}
-            to <code className="font-mono text-[13px]">frontend/.env.local</code>, then restart the
+          <p className="text-[0.875rem] text-ink-muted leading-relaxed">
+            Add <code className="font-mono text-[0.8125rem] text-accent">NEXT_PUBLIC_SUPABASE_URL</code>{' '}
+            and <code className="font-mono text-[0.8125rem] text-accent">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>{' '}
+            to <code className="font-mono text-[0.8125rem]">frontend/.env.local</code>, then restart the
             dev server.
           </p>
         </div>

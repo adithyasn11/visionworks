@@ -21,7 +21,7 @@ export const GoogleButton = ({ onClick, disabled, label }) => (
     type="button"
     onClick={onClick}
     disabled={disabled}
-    className="w-full flex items-center justify-center gap-2.5 px-3.5 py-2.5 rounded-lg border-2 border-field bg-ground text-ink font-semibold text-[14px] hover:border-field-hover hover:bg-surface transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+    className="w-full flex items-center justify-center gap-2.5 px-3.5 py-2.5 rounded-lg border-2 border-field bg-ground text-ink font-semibold text-[0.875rem] hover:border-field-hover hover:bg-surface transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
   >
     <GoogleMark />
     <span>{label}</span>
@@ -31,7 +31,7 @@ export const GoogleButton = ({ onClick, disabled, label }) => (
 export const Divider = ({ children }) => (
   <div className="flex items-center gap-3" role="separator">
     <span className="h-px flex-1 bg-[color:var(--line-soft)]" />
-    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-faint">
+    <span className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-ink-faint">
       {children}
     </span>
     <span className="h-px flex-1 bg-[color:var(--line-soft)]" />
@@ -44,7 +44,7 @@ export const Field = ({
 }) => (
   <div className="flex flex-col gap-1.5">
     <div className="flex items-center justify-between gap-3">
-      <label htmlFor={id} className="text-[13px] font-bold text-ink">
+      <label htmlFor={id} className="text-[0.8125rem] font-bold text-ink">
         {label}
       </label>
       {children}
@@ -59,18 +59,18 @@ export const Field = ({
       autoComplete={autoComplete}
       aria-invalid={error ? 'true' : undefined}
       aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
-      className={`w-full rounded-lg bg-ground border-2 px-3.5 py-2.5 text-[14px] text-ink placeholder:text-ink-faint transition-colors duration-150 focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)] ${
+      className={`w-full rounded-lg bg-ground border-2 px-3.5 py-2.5 text-[0.875rem] text-ink placeholder:text-ink-faint transition-colors duration-150 focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)] ${
         error ? 'border-[color:var(--accent)]' : 'border-field hover:border-field-hover'
       }`}
       {...rest}
     />
     {error ? (
-      <p id={`${id}-error`} className="text-[12px] font-bold text-accent flex items-center gap-1.5">
+      <p id={`${id}-error`} className="text-[0.75rem] font-bold text-accent flex items-center gap-1.5">
         <AlertCircle className="w-3.5 h-3.5 shrink-0" />
         {error}
       </p>
     ) : hint ? (
-      <p id={`${id}-hint`} className="text-[12px] text-ink-faint font-medium">{hint}</p>
+      <p id={`${id}-hint`} className="text-[0.75rem] text-ink-faint font-medium">{hint}</p>
     ) : null}
   </div>
 );
@@ -95,7 +95,7 @@ export const PasswordField = ({ id, label, value, onChange, error, hint, autoCom
         <button
           type="button"
           onClick={() => setShow((s) => !s)}
-          className="text-[12px] font-bold text-ink-muted hover:text-accent transition-colors flex items-center gap-1"
+          className="text-[0.75rem] font-bold text-ink-muted hover:text-accent transition-colors flex items-center gap-1"
           aria-pressed={show}
         >
           {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -115,7 +115,7 @@ export const Banner = ({ kind = 'error', children }) => {
       ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
       : 'border-[color:var(--accent)] bg-accent-soft text-accent';
   return (
-    <div role="alert" className={`flex items-start gap-2.5 rounded-xl border px-4 py-3 text-[13px] font-bold ${tone}`}>
+    <div role="alert" className={`flex items-start gap-2.5 rounded-xl border px-4 py-3 text-[0.8125rem] font-bold ${tone}`}>
       <Icon className="w-4 h-4 shrink-0 mt-0.5" />
       <span className="leading-relaxed">{children}</span>
     </div>
@@ -126,7 +126,7 @@ export const SubmitButton = ({ busy, children }) => (
   <button
     type="submit"
     disabled={busy}
-    className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-lg bg-accent text-white font-bold text-[14px] hover:brightness-110 transition-[filter,opacity] duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
+    className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-lg bg-accent text-white font-bold text-[0.875rem] hover:brightness-110 transition-[filter,opacity] duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
   >
     {busy && <Loader2 className="w-4 h-4 animate-spin" />}
     {children}

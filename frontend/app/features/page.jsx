@@ -82,13 +82,13 @@ export default function FeaturesPage() {
           <div className="mt-9 flex flex-col sm:flex-row gap-3.5 justify-center">
             <Link
               href="/dashboard"
-              className="bg-inverse text-inverse px-7 py-3.5 rounded-2xl font-bold text-[15px] hover:bg-accent hover:text-white transition-all duration-300 shadow-lg flex items-center justify-center gap-2.5 group/btn"
+              className="bg-inverse text-inverse px-7 py-3.5 rounded-2xl font-bold text-[0.9375rem] hover:bg-accent hover:text-white transition-all duration-300 shadow-lg flex items-center justify-center gap-2.5 group/btn"
             >
               Open the dashboard <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
             </Link>
             <Link
               href="/security"
-              className="bg-surface text-ink border border-line px-7 py-3.5 rounded-2xl font-bold text-[15px] hover:border-[color:var(--accent)] hover:text-accent transition-all duration-300 flex items-center justify-center gap-2.5"
+              className="bg-surface text-ink border border-line px-7 py-3.5 rounded-2xl font-bold text-[0.9375rem] hover:border-[color:var(--accent)] hover:text-accent transition-all duration-300 flex items-center justify-center gap-2.5"
             >
               How we handle privacy
             </Link>
@@ -109,12 +109,12 @@ export default function FeaturesPage() {
               <Maximize className="w-6 h-6" />
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-ink tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors duration-300">Safety zones</h2>
-            <p className="text-[15px] text-ink-muted font-medium leading-relaxed mb-6">
+            <p className="text-[0.9375rem] text-ink-muted font-medium leading-relaxed mb-6">
               Draw polygonal zones straight onto your video feed and give each one a meaning: PPE checkpoint, restricted area or exit. Rules attach to zones, so VisionWorks checks only what matters and ignores the rest of the frame.
             </p>
             <ul className="flex flex-col gap-3">
               {['Unlimited zones per camera', 'Checkpoint, restricted and exit zones', 'Drag-and-drop boundary editing'].map((item, i) => (
-                <li key={i} className="flex items-center gap-3 font-bold text-[13px] text-ink-faint group-hover:translate-x-1 transition-transform" style={{ transitionDelay: `${i * 100}ms` }}>
+                <li key={i} className="flex items-center gap-3 font-bold text-[0.8125rem] text-ink-faint group-hover:translate-x-1 transition-transform" style={{ transitionDelay: `${i * 100}ms` }}>
                   <div className="w-1.5 h-1.5 rounded-full bg-accent shrink-0"></div>
                   {item}
                 </li>
@@ -130,7 +130,7 @@ export default function FeaturesPage() {
               <BarChart className="w-8 h-8 text-accent mb-4 group-hover:scale-110 transition-all duration-300" />
               <div>
                 <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2 leading-[1.15] group-hover:text-accent transition-colors">Time limits</h3>
-                <p className="opacity-70 font-medium text-[14px] leading-relaxed">See exactly how long a worker stays in a zone, with a warning before the limit is reached and a flag when it is passed.</p>
+                <p className="opacity-70 font-medium text-[0.875rem] leading-relaxed">See exactly how long a worker stays in a zone, with a warning before the limit is reached and a flag when it is passed.</p>
               </div>
             </div>
 
@@ -141,7 +141,7 @@ export default function FeaturesPage() {
               <Layers className="w-8 h-8 text-white mb-4 group-hover:scale-110 group-hover:-rotate-12 transition-transform duration-300" />
               <div>
                 <h3 className="text-lg sm:text-xl font-black tracking-tight mb-2 leading-[1.15]">Evidence you can review</h3>
-                <p className="text-red-50 font-medium text-[14px] leading-relaxed">Every flag keeps its reason, the numbers behind it and a snapshot, so a supervisor can check it in seconds.</p>
+                <p className="text-red-50 font-medium text-[0.875rem] leading-relaxed">Every flag keeps its reason, the numbers behind it and a snapshot, so a supervisor can check it in seconds.</p>
               </div>
             </div>
           </div>
@@ -159,12 +159,12 @@ export default function FeaturesPage() {
               <Activity className="w-6 h-6" />
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-ink tracking-tight mb-3 leading-[1.15] pb-1 group-hover:text-accent transition-colors duration-300">PPE and procedure checks</h2>
-            <p className="text-[15px] text-ink-muted font-medium leading-relaxed mb-6">
+            <p className="text-[0.9375rem] text-ink-muted font-medium leading-relaxed mb-6">
               Helmet and vest detection is combined across many frames, so one missed detection can never create a violation. When the evidence is weak the answer is unverifiable, not guilty.
             </p>
             <ul className="flex flex-col gap-3">
               {['Evidence over time, not single frames', 'Three-way verdicts', 'Human review of every flag'].map((item, i) => (
-                <li key={i} className="flex items-center gap-3 font-bold text-[13px] text-ink-faint group-hover:translate-x-1 transition-transform" style={{ transitionDelay: `${i * 100}ms` }}>
+                <li key={i} className="flex items-center gap-3 font-bold text-[0.8125rem] text-ink-faint group-hover:translate-x-1 transition-transform" style={{ transitionDelay: `${i * 100}ms` }}>
                   <div className="w-1.5 h-1.5 rounded-full bg-ink shrink-0"></div>
                   {item}
                 </li>
@@ -177,8 +177,8 @@ export default function FeaturesPage() {
              <Zap className="w-20 h-20 text-accent opacity-10 group-hover:scale-150 transition-all duration-700 absolute inset-0 m-auto pointer-events-none" aria-hidden="true" />
              <div className="relative z-10">
                <h3 className="text-4xl sm:text-5xl font-black text-ink tracking-tight leading-[1.15] pb-1 mb-2 tabular-nums">95%</h3>
-               <p className="font-bold text-ink-faint uppercase tracking-[0.12em] text-[11px] mb-3">Helmet recall</p>
-               <p className="text-ink-muted font-medium text-[14px] max-w-xs mx-auto leading-relaxed">Measured on 213 public test images with a YOLOv8 model. Your own cameras are measured separately before you rely on it.</p>
+               <p className="font-bold text-ink-faint uppercase tracking-[0.12em] text-[0.6875rem] mb-3">Helmet recall</p>
+               <p className="text-ink-muted font-medium text-[0.875rem] max-w-xs mx-auto leading-relaxed">Measured on 213 public test images with a YOLOv8 model. Your own cameras are measured separately before you rely on it.</p>
              </div>
           </div>
 
@@ -201,12 +201,12 @@ export default function FeaturesPage() {
           style={{ animationDelay: '750ms' }}
         >
           <h2 className="text-2xl sm:text-3xl font-black text-ink tracking-tight mb-3 relative z-10 leading-[1.15] pb-1">Make safety checks routine.</h2>
-          <p className="text-ink-muted font-medium text-[15px] max-w-md mx-auto mb-7 relative z-10">
+          <p className="text-ink-muted font-medium text-[0.9375rem] max-w-md mx-auto mb-7 relative z-10">
             Set up PPE and procedure checks on the cameras you already have.
           </p>
           <Link
             href="/dashboard"
-            className="bg-inverse text-inverse px-7 py-3.5 rounded-2xl font-bold text-[15px] hover:bg-accent hover:text-white transition-all duration-300 shadow-lg flex items-center gap-2.5 relative z-10 group/btn"
+            className="bg-inverse text-inverse px-7 py-3.5 rounded-2xl font-bold text-[0.9375rem] hover:bg-accent hover:text-white transition-all duration-300 shadow-lg flex items-center gap-2.5 relative z-10 group/btn"
           >
             Open the dashboard <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
           </Link>

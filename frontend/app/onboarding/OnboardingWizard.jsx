@@ -101,7 +101,7 @@ function StepRail({ current, orgCreated }) {
           <li key={step.id} className="flex items-center gap-2">
             <span
               aria-current={active ? 'step' : undefined}
-              className={`flex items-center gap-2 rounded-full pl-1.5 pr-3 py-1.5 text-[12px] font-bold transition-colors duration-200 ${
+              className={`flex items-center gap-2 rounded-full pl-1.5 pr-3 py-1.5 text-[0.75rem] font-bold transition-colors duration-200 ${
                 active
                   ? 'bg-accent-soft text-accent'
                   : done
@@ -110,7 +110,7 @@ function StepRail({ current, orgCreated }) {
               }`}
             >
               <span
-                className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-black transition-colors duration-200 ${
+                className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[0.625rem] font-black transition-colors duration-200 ${
                   done
                     ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                     : active
@@ -140,7 +140,7 @@ function SkipButton({ onClick, disabled, children }) {
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="w-full text-center text-[13px] font-bold text-ink-muted hover:text-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed py-1"
+      className="w-full text-center text-[0.8125rem] font-bold text-ink-muted hover:text-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed py-1"
     >
       {children}
     </button>
@@ -401,7 +401,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                     >
                       {firstName ? `Welcome, ${firstName}.` : 'Create your organisation'}
                     </h1>
-                    <p className="text-[14px] text-ink-muted font-medium leading-relaxed">
+                    <p className="text-[0.875rem] text-ink-muted font-medium leading-relaxed">
                       Everything you measure lives inside an organisation. You’ll be its
                       administrator.
                     </p>
@@ -412,7 +412,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                         organisation is still created, on the free tier (see the
                         note in page.jsx). */}
                     {pendingPlan && (
-                      <p className="inline-flex items-center gap-1.5 self-start bg-accent-soft text-accent px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-[0.1em]">
+                      <p className="inline-flex items-center gap-1.5 self-start bg-accent-soft text-accent px-2.5 py-1 rounded-full text-[0.6875rem] font-black uppercase tracking-[0.1em]">
                         <Check className="w-3 h-3" strokeWidth={3} aria-hidden="true" />
                         {planName(pendingPlan)} plan
                       </p>
@@ -435,7 +435,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                     />
 
                     <div className="flex flex-col gap-1.5">
-                      <label htmlFor="timezone" className="text-[13px] font-bold text-ink">
+                      <label htmlFor="timezone" className="text-[0.8125rem] font-bold text-ink">
                         Timezone
                       </label>
                       <select
@@ -443,7 +443,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                         name="timezone"
                         value={timezone}
                         onChange={(e) => setTimezone(e.target.value)}
-                        className="w-full rounded-lg bg-ground border-2 border-field hover:border-field-hover px-3.5 py-2.5 text-[14px] text-ink transition-colors duration-150 focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)]"
+                        className="w-full rounded-lg bg-ground border-2 border-field hover:border-field-hover px-3.5 py-2.5 text-[0.875rem] text-ink transition-colors duration-150 focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)]"
                       >
                         {/* Populated from the browser's own timezone database
                             where available, so the list is complete and current
@@ -456,7 +456,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                           <option key={tz} value={tz}>{tz}</option>
                         ))}
                       </select>
-                      <p className="text-[12px] text-ink-faint font-medium">
+                      <p className="text-[0.75rem] text-ink-faint font-medium">
                         Times are stored in UTC and shown in this zone, so alerts and reports
                         match your site’s clock.
                       </p>
@@ -468,7 +468,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                     </SubmitButton>
                   </form>
 
-                  <p className="text-[12px] text-ink-faint font-medium leading-relaxed text-center">
+                  <p className="text-[0.75rem] text-ink-faint font-medium leading-relaxed text-center">
                     Signed in as {email ?? 'your account'}.
                   </p>
                 </>
@@ -485,7 +485,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                     >
                       Describe the site
                     </h1>
-                    <p className="text-[14px] text-ink-muted font-medium leading-relaxed">
+                    <p className="text-[0.875rem] text-ink-muted font-medium leading-relaxed">
                       A site is a building, plant or work area. Its working hours tell the
                       system when people are expected to be there.
                     </p>
@@ -505,28 +505,28 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                     />
 
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-[13px] font-bold text-ink">Working hours</span>
+                      <span className="text-[0.8125rem] font-bold text-ink">Working hours</span>
                       <div className="flex items-center gap-2">
                         <input
                           type="time"
                           aria-label="Working day starts"
                           value={startTime}
                           onChange={(e) => { setStartTime(e.target.value); setErrors((s) => ({ ...s, hours: undefined })); }}
-                          className="flex-1 min-w-0 rounded-lg bg-ground border-2 border-field hover:border-field-hover px-3 py-2.5 text-[14px] text-ink transition-colors duration-150 focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)]"
+                          className="flex-1 min-w-0 rounded-lg bg-ground border-2 border-field hover:border-field-hover px-3 py-2.5 text-[0.875rem] text-ink transition-colors duration-150 focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)]"
                         />
-                        <span className="text-[13px] font-bold text-ink-faint shrink-0">to</span>
+                        <span className="text-[0.8125rem] font-bold text-ink-faint shrink-0">to</span>
                         <input
                           type="time"
                           aria-label="Working day ends"
                           value={endTime}
                           onChange={(e) => { setEndTime(e.target.value); setErrors((s) => ({ ...s, hours: undefined })); }}
-                          className="flex-1 min-w-0 rounded-lg bg-ground border-2 border-field hover:border-field-hover px-3 py-2.5 text-[14px] text-ink transition-colors duration-150 focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)]"
+                          className="flex-1 min-w-0 rounded-lg bg-ground border-2 border-field hover:border-field-hover px-3 py-2.5 text-[0.875rem] text-ink transition-colors duration-150 focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)]"
                         />
                       </div>
                       {errors.hours ? (
-                        <p className="text-[12px] font-bold text-accent">{errors.hours}</p>
+                        <p className="text-[0.75rem] font-bold text-accent">{errors.hours}</p>
                       ) : (
-                        <p className="text-[12px] text-ink-faint font-medium">
+                        <p className="text-[0.75rem] text-ink-faint font-medium">
                           Detections outside these hours are left out of the site overview, so a
                           night patrol doesn’t skew the daytime picture.
                         </p>
@@ -534,7 +534,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                     </div>
 
                     <fieldset className="flex flex-col gap-1.5">
-                      <legend className="text-[13px] font-bold text-ink mb-1.5">Working days</legend>
+                      <legend className="text-[0.8125rem] font-bold text-ink mb-1.5">Working days</legend>
                       <div className="flex flex-wrap gap-1.5">
                         {WEEKDAYS.map(({ n, short }) => {
                           const on = workdays.includes(n);
@@ -544,7 +544,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                               type="button"
                               onClick={() => toggleWorkday(n)}
                               aria-pressed={on}
-                              className={`px-2.5 py-1.5 rounded-lg border-2 text-[12px] font-bold transition-colors duration-150 ${
+                              className={`px-2.5 py-1.5 rounded-lg border-2 text-[0.75rem] font-bold transition-colors duration-150 ${
                                 on
                                   ? 'border-[color:var(--accent)] bg-accent-soft text-accent'
                                   : 'border-field text-ink-muted hover:border-field-hover'
@@ -556,7 +556,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                         })}
                       </div>
                       {errors.workdays && (
-                        <p className="text-[12px] font-bold text-accent mt-1">{errors.workdays}</p>
+                        <p className="text-[0.75rem] font-bold text-accent mt-1">{errors.workdays}</p>
                       )}
                     </fieldset>
 
@@ -588,7 +588,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                     >
                       Add a camera
                     </h1>
-                    <p className="text-[14px] text-ink-muted font-medium leading-relaxed">
+                    <p className="text-[0.875rem] text-ink-muted font-medium leading-relaxed">
                       The video source. Nothing is connected yet — you’ll draw its zones on
                       the dashboard next.
                     </p>
@@ -608,7 +608,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                     />
 
                     <fieldset className="flex flex-col gap-1.5">
-                      <legend className="text-[13px] font-bold text-ink mb-1.5">Video source</legend>
+                      <legend className="text-[0.8125rem] font-bold text-ink mb-1.5">Video source</legend>
                       <div className="flex flex-col gap-1.5">
                         {SOURCES.map(({ id, label, hint }) => {
                           const on = sourceType === id;
@@ -630,10 +630,10 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
                                 className="mt-0.5 accent-[color:var(--accent)]"
                               />
                               <span className="flex flex-col gap-0.5 min-w-0">
-                                <span className={`text-[13px] font-bold ${on ? 'text-accent' : 'text-ink'}`}>
+                                <span className={`text-[0.8125rem] font-bold ${on ? 'text-accent' : 'text-ink'}`}>
                                   {label}
                                 </span>
-                                <span className="text-[12px] text-ink-faint font-medium leading-snug">
+                                <span className="text-[0.75rem] text-ink-faint font-medium leading-snug">
                                   {hint}
                                 </span>
                               </span>

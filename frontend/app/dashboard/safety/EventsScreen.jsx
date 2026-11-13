@@ -79,23 +79,23 @@ export default function EventsScreen({ role }) {
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 items-end gap-2 mb-3">
         {tab === 'decisions' ? (
           <>
-            <label className="flex flex-col gap-1 min-w-0 text-[11px] text-ink-faint">Result
+            <label className="flex flex-col gap-1 min-w-0 text-[0.6875rem] text-ink-faint">Result
               <select value={filters.status} onChange={(e) => set({ status: e.target.value })} className={`${INPUT} w-full`}>{STATUS_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-            <label className="flex flex-col gap-1 min-w-0 text-[11px] text-ink-faint">Review
+            <label className="flex flex-col gap-1 min-w-0 text-[0.6875rem] text-ink-faint">Review
               <select value={filters.reviewState} onChange={(e) => set({ reviewState: e.target.value })} className={`${INPUT} w-full`}>{REVIEW_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
           </>
         ) : (
-          <label className="flex flex-col gap-1 min-w-0 text-[11px] text-ink-faint">Activity
+          <label className="flex flex-col gap-1 min-w-0 text-[0.6875rem] text-ink-faint">Activity
             <select value={filters.eventType} onChange={(e) => set({ eventType: e.target.value })} className={`${INPUT} w-full`}>{EVENT_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
         )}
-        <label className="flex flex-col gap-1 min-w-0 text-[11px] text-ink-faint">Zone
+        <label className="flex flex-col gap-1 min-w-0 text-[0.6875rem] text-ink-faint">Zone
           <select value={filters.zoneId} onChange={(e) => set({ zoneId: e.target.value })} className={`${INPUT} w-full`}>
             <option value="">Any zone</option>
             {zones.map((z) => <option key={z.id} value={z.id}>{z.name}{z.camera ? ` (${z.camera})` : ''}</option>)}
           </select></label>
-        <label className="flex flex-col gap-1 min-w-0 text-[11px] text-ink-faint">From
+        <label className="flex flex-col gap-1 min-w-0 text-[0.6875rem] text-ink-faint">From
           <input type="date" value={filters.from} max={filters.to || undefined} onChange={(e) => set({ from: e.target.value })} className={`${INPUT} w-full`} /></label>
-        <label className="flex flex-col gap-1 min-w-0 text-[11px] text-ink-faint">To
+        <label className="flex flex-col gap-1 min-w-0 text-[0.6875rem] text-ink-faint">To
           <input type="date" value={filters.to} min={filters.from || undefined} onChange={(e) => set({ to: e.target.value })} className={`${INPUT} w-full`} /></label>
         {tab === 'decisions' && (
           <button type="button" onClick={exportCsv} disabled={exporting && exporting.busy} className={`${BTN_QUIET} col-span-2 md:col-span-1 xl:col-start-6 xl:justify-self-end`}>

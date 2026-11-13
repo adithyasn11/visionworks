@@ -45,7 +45,7 @@ export default function RevokeOperatorButton({ operator, activeCount }) {
 
   if (!operator.isActive) {
     return (
-      <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-faint whitespace-nowrap">
+      <span className="font-mono text-[0.625rem] uppercase tracking-[0.1em] text-ink-faint whitespace-nowrap">
         revoked
       </span>
     );
@@ -55,7 +55,7 @@ export default function RevokeOperatorButton({ operator, activeCount }) {
     return (
       <span
         title="The database refuses to revoke the final operator: access can only be granted back from the SQL editor."
-        className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface-alt px-2.5 py-1.5 text-[11.5px] font-bold text-ink-faint cursor-not-allowed whitespace-nowrap"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface-alt px-2.5 py-1.5 text-[0.71875rem] font-bold text-ink-faint cursor-not-allowed whitespace-nowrap"
       >
         <ShieldOff className="w-3.5 h-3.5" />
         Last operator
@@ -68,7 +68,7 @@ export default function RevokeOperatorButton({ operator, activeCount }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[11.5px] font-bold text-ink-muted hover:text-accent hover:border-[color:var(--accent)] transition-colors whitespace-nowrap"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[0.71875rem] font-bold text-ink-muted hover:text-accent hover:border-[color:var(--accent)] transition-colors whitespace-nowrap"
       >
         <ShieldOff className="w-3.5 h-3.5" />
         Revoke
@@ -81,12 +81,12 @@ export default function RevokeOperatorButton({ operator, activeCount }) {
       <div className="flex items-start gap-2">
         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-accent" strokeWidth={2.2} />
         <div className="min-w-0">
-          <p className="text-[12.5px] font-bold text-accent leading-snug">
+          <p className="text-[0.78125rem] font-bold text-accent leading-snug">
             {operator.isSelf
               ? 'Revoke your own access?'
               : `Revoke ${operator.email ?? 'this operator'}?`}
           </p>
-          <p className="text-[11.5px] text-ink-muted leading-relaxed mt-1">
+          <p className="text-[0.71875rem] text-ink-muted leading-relaxed mt-1">
             {operator.isSelf
               ? 'You will lose access to this console immediately. Only someone with the database password can grant it back.'
               : 'They lose console access immediately. The record is kept so past actions stay attributable.'}
@@ -95,7 +95,7 @@ export default function RevokeOperatorButton({ operator, activeCount }) {
       </div>
 
       {error && (
-        <p role="alert" className="mt-2 text-[11.5px] font-bold text-accent leading-relaxed">
+        <p role="alert" className="mt-2 text-[0.71875rem] font-bold text-accent leading-relaxed">
           {error}
         </p>
       )}
@@ -105,7 +105,7 @@ export default function RevokeOperatorButton({ operator, activeCount }) {
           type="button"
           onClick={run}
           disabled={pending}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-bold text-white hover:brightness-110 transition-[filter] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[0.75rem] font-bold text-white hover:brightness-110 transition-[filter] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldOff className="w-3.5 h-3.5" />}
           {operator.isSelf ? 'Revoke my access' : 'Revoke'}
@@ -114,7 +114,7 @@ export default function RevokeOperatorButton({ operator, activeCount }) {
           type="button"
           onClick={() => { setOpen(false); setError(null); }}
           disabled={pending}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[12px] font-bold text-ink-muted hover:text-ink transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[0.75rem] font-bold text-ink-muted hover:text-ink transition-colors"
         >
           <X className="w-3.5 h-3.5" />
           Cancel

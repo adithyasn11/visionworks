@@ -60,7 +60,7 @@ export default function AuditFilters({ actions, actors, counts, resultCount }) {
     activeAction !== 'all' || activeActor !== 'all' || activeRange !== '30d';
 
   const selectClass =
-    'appearance-none rounded-lg border-2 border-field bg-ground pl-9 pr-8 py-2 text-[13px] font-semibold text-ink hover:border-field-hover focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)] transition-colors duration-150 cursor-pointer disabled:opacity-50';
+    'appearance-none rounded-lg border-2 border-field bg-ground pl-9 pr-8 py-2 text-[0.8125rem] font-semibold text-ink hover:border-field-hover focus:outline-none focus:border-[color:var(--accent)] focus:ring-2 focus:ring-[color:var(--accent-soft)] transition-colors duration-150 cursor-pointer disabled:opacity-50';
 
   return (
     <div className={`space-y-3 transition-opacity duration-150 ${pending ? 'opacity-60' : ''}`}>
@@ -85,7 +85,7 @@ export default function AuditFilters({ actions, actors, counts, resultCount }) {
               </option>
             ))}
           </select>
-          <span aria-hidden="true" className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint text-[10px] pointer-events-none">▼</span>
+          <span aria-hidden="true" className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint text-[0.625rem] pointer-events-none">▼</span>
         </div>
 
         {/* Actor. Only rendered when there is more than one — a dropdown with a
@@ -110,7 +110,7 @@ export default function AuditFilters({ actions, actors, counts, resultCount }) {
                 </option>
               ))}
             </select>
-            <span aria-hidden="true" className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint text-[10px] pointer-events-none">▼</span>
+            <span aria-hidden="true" className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint text-[0.625rem] pointer-events-none">▼</span>
           </div>
         )}
 
@@ -131,7 +131,7 @@ export default function AuditFilters({ actions, actors, counts, resultCount }) {
               <option key={r.key} value={r.key}>{r.label}</option>
             ))}
           </select>
-          <span aria-hidden="true" className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint text-[10px] pointer-events-none">▼</span>
+          <span aria-hidden="true" className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint text-[0.625rem] pointer-events-none">▼</span>
         </div>
       </div>
 
@@ -141,14 +141,14 @@ export default function AuditFilters({ actions, actors, counts, resultCount }) {
             type="button"
             onClick={() => write({ action: 'all', actor: 'all', range: '30d' })}
             disabled={pending}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12px] font-bold text-ink-muted hover:text-accent hover:border-[color:var(--accent)] transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[0.75rem] font-bold text-ink-muted hover:text-accent hover:border-[color:var(--accent)] transition-colors"
           >
             <X className="w-3 h-3" />
             Clear filters
           </button>
         )}
 
-        <span className="ml-auto flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.12em] text-ink-faint tabular-nums">
+        <span className="ml-auto flex items-center gap-2 font-mono text-[0.65625rem] uppercase tracking-[0.12em] text-ink-faint tabular-nums">
           {pending && <Loader2 className="w-3 h-3 animate-spin" />}
           {resultCount} {resultCount === 1 ? 'entry' : 'entries'}
         </span>

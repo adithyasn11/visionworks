@@ -108,14 +108,14 @@ function Evidence({ evidence, ruleType }) {
   return (
     <div className="overflow-x-auto">
       {ruleType === 'PPE_CONTINUOUS' && Number.isFinite(Number(evidence.run_seconds)) && (
-        <p className="mb-2 text-[11px] text-ink-muted">
+        <p className="mb-2 text-[0.6875rem] text-ink-muted">
           Checked all the time the person was inside. A required item was clearly not seen without a break for {durationText(evidence.run_seconds)} (flagged after {durationText(evidence.grace_seconds)}).
         </p>
       )}
       <table className="w-full text-xs">
         <caption className="sr-only">What was measured for each required item</caption>
         <thead>
-          <tr className="text-left text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint">
+          <tr className="text-left text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint">
             <th scope="col" className="py-1 pr-3 font-medium">Item</th>
             <th scope="col" className="py-1 pr-3 font-medium">Result</th>
             <th scope="col" className="py-1 pr-3 font-medium">Clear frames</th>
@@ -136,7 +136,7 @@ function Evidence({ evidence, ruleType }) {
         </tbody>
       </table>
       {evidence.helmet_region_obscured && (
-        <p className="mt-2 text-[11px] text-ink-faint">The head was hidden in the saved picture, so the helmet may not be visible in it.</p>
+        <p className="mt-2 text-[0.6875rem] text-ink-faint">The head was hidden in the saved picture, so the helmet may not be visible in it.</p>
       )}
     </div>
   );
@@ -174,7 +174,7 @@ function Thresholds({ thresholds }) {
 function Section({ title, icon: Icon, children }) {
   return (
     <section className="flex flex-col gap-2">
-      <h4 className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.14em] text-ink-faint">
+      <h4 className="flex items-center gap-1.5 text-[0.625rem] font-mono uppercase tracking-[0.14em] text-ink-faint">
         {Icon && <Icon className="w-3 h-3" aria-hidden="true" />}
         {title}
       </h4>
@@ -220,14 +220,14 @@ function ReviewForm({ decision, onDone }) {
         ))}
       </fieldset>
       <div className="flex flex-col sm:flex-row gap-2">
-        <label className="flex flex-col gap-1 text-[11px] text-ink-faint sm:w-1/2">
+        <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint sm:w-1/2">
           Reason (optional)
           <select value={reason} onChange={(e) => setReason(e.target.value)} className={INPUT}>
             <option value="">No reason given</option>
             {REVIEW_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-[11px] text-ink-faint flex-1">
+        <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint flex-1">
           Note (optional, up to 500 characters)
           <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} rows={2} className={`${INPUT} resize-y`} />
         </label>
@@ -271,29 +271,29 @@ function ActionForm({ decision, onCreated }) {
   }
   return (
     <form onSubmit={submit} className="flex flex-col gap-2 rounded-lg border border-line p-3" aria-label="New corrective action">
-      <label className="flex flex-col gap-1 text-[11px] text-ink-faint">
+      <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">
         What will be done
         <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={200} required placeholder="For example: re-brief the shift on helmet use" className={INPUT} />
       </label>
-      <label className="flex flex-col gap-1 text-[11px] text-ink-faint">
+      <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">
         Details (optional)
         <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={2000} rows={2} className={`${INPUT} resize-y`} />
       </label>
       <div className="flex flex-wrap gap-2">
-        <label className="flex flex-col gap-1 text-[11px] text-ink-faint">
+        <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">
           Priority
           <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className={INPUT}>
             <option value="INFO">Info</option><option value="WARNING">Warning</option><option value="CRITICAL">Critical</option>
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-[11px] text-ink-faint">
+        <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">
           Assigned to
           <select value={form.assignedToId} onChange={(e) => setForm({ ...form, assignedToId: e.target.value })} className={INPUT}>
             <option value="">Nobody yet</option>
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-[11px] text-ink-faint">
+        <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">
           Due
           <input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className={INPUT} />
         </label>
@@ -363,12 +363,12 @@ export default function DecisionDetail({ decisionId, role, onChanged }) {
         {confidenceText(decision) && <span className="text-xs text-ink-faint">{confidenceText(decision)}</span>}
       </div>
       <p className="text-sm text-ink leading-relaxed">{decision.reason}</p>
-      <p className="text-[11px] text-ink-faint">
+      <p className="text-[0.6875rem] text-ink-faint">
         A flag is a prompt for a person to look at the evidence, never a final verdict. {decision.status === 'UNVERIFIABLE' && 'The system could not tell, and did not guess.'}
       </p>
 
       {decision.has_picture && canEvidence && <EvidencePicture decisionId={decision.id} />}
-      {decision.has_picture && !canEvidence && <p className="text-[11px] text-ink-faint">A picture was kept. Only an administrator or manager can open it.</p>}
+      {decision.has_picture && !canEvidence && <p className="text-[0.6875rem] text-ink-faint">A picture was kept. Only an administrator or manager can open it.</p>}
 
       <Section title="What was measured" icon={ListChecks}><Evidence evidence={decision.evidence} ruleType={decision.ruleType} /></Section>
       {decision.thresholds && <Section title="The limits it was judged by"><Thresholds thresholds={decision.thresholds} /></Section>}

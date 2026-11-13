@@ -17,7 +17,7 @@ export default function ShellSkeleton({ label = 'Loading', narrow = false, panel
     <div className="min-h-screen bg-ground themed" role="status" aria-live="polite" aria-busy="true">
       <span className="sr-only">{label}…</span>
 
-      <aside className="hidden lg:flex fixed inset-y-0 left-0 w-[248px] flex-col bg-surface border-r border-line">
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 w-[15.5rem] flex-col bg-surface border-r border-line">
         <div className="h-16 px-5 flex items-center gap-2.5 border-b border-line">
           <div className="w-8 h-8 rounded-lg bg-accent" aria-hidden="true" />
           <Bar className="h-3.5 w-24" />
@@ -29,7 +29,7 @@ export default function ShellSkeleton({ label = 'Loading', narrow = false, panel
 
       <div className="lg:hidden h-14 border-b border-line bg-ground" aria-hidden="true" />
 
-      <div className="lg:pl-[248px]">
+      <div className="lg:pl-[15.5rem]">
         <div className="px-5 sm:px-7 lg:px-9 py-6 lg:py-8 max-w-[1400px] mx-auto">
           <div className={`${narrow ? 'mx-auto max-w-3xl' : ''} space-y-6`}>
             <div className="pb-5 border-b border-line space-y-3">

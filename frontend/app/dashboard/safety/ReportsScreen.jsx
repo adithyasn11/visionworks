@@ -49,9 +49,9 @@ function fmtWhen(iso, tz) {
 function Tile({ label, value, hint, strong }) {
   return (
     <div className="rounded-lg border border-line bg-surface-alt/40 px-3 py-2.5">
-      <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint">{label}</div>
+      <div className="text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint">{label}</div>
       <div className={`mt-1 text-2xl font-extrabold tabular-nums ${strong ? 'text-accent' : 'text-ink'}`}>{value}</div>
-      {hint && <div className="text-[11px] text-ink-faint leading-snug">{hint}</div>}
+      {hint && <div className="text-[0.6875rem] text-ink-faint leading-snug">{hint}</div>}
     </div>
   );
 }
@@ -83,7 +83,7 @@ function Breakdown({ title, first, rows, label, empty }) {
       <table className="w-full text-xs">
         <caption className="sr-only">{title}</caption>
         <thead>
-          <tr className="text-left text-[10px] font-mono uppercase tracking-[0.1em] text-ink-faint">
+          <tr className="text-left text-[0.625rem] font-mono uppercase tracking-[0.1em] text-ink-faint">
             <th scope="col" className="py-1 pr-3 font-medium min-w-[9rem]">{first}</th>
             {HEADERS.map((h) => <th key={h} scope="col" className="py-1 px-2 font-medium text-right align-bottom leading-tight">{h}</th>)}
           </tr>
@@ -100,7 +100,7 @@ function Breakdown({ title, first, rows, label, empty }) {
         </tbody>
       </table>
       {rows.length > 8 && (
-        <button type="button" className="mt-2 text-[11px] text-ink-muted underline hover:text-ink" onClick={() => setAll((a) => !a)}>
+        <button type="button" className="mt-2 text-[0.6875rem] text-ink-muted underline hover:text-ink" onClick={() => setAll((a) => !a)}>
           {all ? 'Show fewer' : `Show all ${rows.length}`}
         </button>
       )}
@@ -122,7 +122,7 @@ function Bars({ items, ariaLabel, every = 1 }) {
           </div>
         ))}
       </div>
-      <div className="mt-1 flex gap-[3px] text-[9px] font-mono text-ink-faint">
+      <div className="mt-1 flex gap-[3px] text-[0.5625rem] font-mono text-ink-faint">
         {items.map((x, i) => <span key={x.label} className="flex-1 min-w-[3px] text-center overflow-visible whitespace-nowrap">{i % every === 0 ? x.short : ''}</span>)}
       </div>
     </div>
@@ -141,7 +141,7 @@ function FlagSplit({ r }) {
         <div style={{ width: `${part(r.dismissed)}%`, background: 'var(--field)' }} title={`${r.dismissed} dismissed`} />
         <div style={{ width: `${part(r.pending)}%`, backgroundImage: 'repeating-linear-gradient(45deg, var(--field) 0 3px, transparent 3px 7px)' }} title={`${r.pending} waiting`} />
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-faint" aria-hidden="true">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[0.6875rem] text-ink-faint" aria-hidden="true">
         <span className="flex items-center gap-1.5"><i className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--accent)' }} /> confirmed</span>
         <span className="flex items-center gap-1.5"><i className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--field)' }} /> dismissed</span>
         <span className="flex items-center gap-1.5"><i className="inline-block w-2.5 h-2.5 rounded-sm" style={{ backgroundImage: 'repeating-linear-gradient(45deg, var(--field) 0 2px, transparent 2px 4px)' }} /> waiting for review</span>
@@ -163,7 +163,7 @@ function FlagSplit({ r }) {
       </p>
       {r.review_reasons.length > 0 && (
         <div>
-          <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint mb-1">Why reviewers decided as they did</div>
+          <div className="text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint mb-1">Why reviewers decided as they did</div>
           <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-muted">
             {r.review_reasons.map((x) => (
               <li key={`${x.state}-${x.reason}`}><span className="text-ink">{x.state === 'CONFIRMED' ? 'Confirmed' : 'Dismissed'}</span>: {x.reason === 'NONE' ? 'no reason given' : reasonLabel(x.reason)} <span className="tabular-nums">({x.count})</span></li>
@@ -196,7 +196,7 @@ function ReportBody({ r }) {
               <Tile label="Flagged by system" value={num(r.flagged_by_system)} hint="potential violations, for a person to judge" strong={r.flagged_by_system > 0} />
               <Tile label="Insufficient evidence" value={num(r.insufficient_evidence)} hint={`${pct(r.unverifiable_rate)} of decisions: the system did not guess`} />
             </div>
-            <p className="text-[11px] text-ink-faint leading-relaxed">
+            <p className="text-[0.6875rem] text-ink-faint leading-relaxed">
               Compliance rate is compliant divided by (compliant plus flagged): of the decisions where the system made a claim. A flag is a potential violation until a person confirms it.
             </p>
           </div>
@@ -220,12 +220,12 @@ function ReportBody({ r }) {
           <Panel title="When" icon={Clock} aside={`site time, ${tz}`}>
             <div className="flex flex-col gap-4">
               <div>
-                <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint mb-1.5">By hour of the day (grey: decisions, red: flagged by system)</div>
+                <div className="text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint mb-1.5">By hour of the day (grey: decisions, red: flagged by system)</div>
                 <Bars items={hours} every={3} ariaLabel={`Decisions by hour of the day: ${hours.filter((h) => h.total).map((h) => `${h.label} ${h.total}`).join(', ') || 'none'}`} />
               </div>
               {days.length > 1 && (
                 <div>
-                  <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint mb-1.5">By day (the first and last day may be partial)</div>
+                  <div className="text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint mb-1.5">By day (the first and last day may be partial)</div>
                   <Bars items={days} every={Math.max(1, Math.ceil(days.length / 14))} ariaLabel={`Decisions by day: ${days.map((d) => `${d.label} ${d.total}`).join(', ')}`} />
                 </div>
               )}
@@ -243,7 +243,7 @@ function ReportBody({ r }) {
           ['… with neither seen', num(r.ppe.missing_both)],
           ['Could not verify', num(r.ppe.could_not_verify)],
         ]} />
-        <p className="mt-2 text-[11px] text-ink-faint leading-relaxed">"Not seen" means the system found none. It is a potential violation until a person confirms it.</p>
+        <p className="mt-2 text-[0.6875rem] text-ink-faint leading-relaxed">"Not seen" means the system found none. It is a potential violation until a person confirms it.</p>
       </Panel>
 
       <Panel title="Time inside restricted zones" icon={Timer}>
@@ -268,7 +268,7 @@ function ReportBody({ r }) {
             ))}
           </ul>
         )}
-        <p className="mt-2 text-[11px] text-ink-faint leading-relaxed">
+        <p className="mt-2 text-[0.6875rem] text-ink-faint leading-relaxed">
           "Seen only in part": already inside at the start, lost from view, or the video stopped. Those stays count as "at least" and are not averaged.
         </p>
       </Panel>
@@ -278,7 +278,7 @@ function ReportBody({ r }) {
           <table className="w-full text-xs">
             <caption className="sr-only">Man-down and head-count incidents</caption>
             <thead>
-              <tr className="text-left text-[10px] font-mono uppercase tracking-[0.1em] text-ink-faint">
+              <tr className="text-left text-[0.625rem] font-mono uppercase tracking-[0.1em] text-ink-faint">
                 <th scope="col" className="py-1 pr-3 font-medium">Incident</th>
                 {['Flagged by system', 'Confirmed', 'Dismissed', 'Waiting'].map((h) => <th key={h} scope="col" className="py-1 px-2 font-medium text-right whitespace-nowrap">{h}</th>)}
               </tr>
@@ -293,7 +293,7 @@ function ReportBody({ r }) {
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-[11px] text-ink-faint">Could not verify: man-down {m.could_not_verify}, head count {r.occupancy.could_not_verify}.</p>
+        <p className="mt-2 text-[0.6875rem] text-ink-faint">Could not verify: man-down {m.could_not_verify}, head count {r.occupancy.could_not_verify}.</p>
       </Panel>
 
       <Panel title="Corrective actions" icon={Wrench}>
@@ -304,7 +304,7 @@ function ReportBody({ r }) {
           ['Open now', num(r.actions.open_now)],
           ['Overdue now', num(r.actions.overdue_now)],
         ]} />
-        <p className="mt-2 text-[11px] text-ink-faint">Open and overdue are counted as of now.</p>
+        <p className="mt-2 text-[0.6875rem] text-ink-faint">Open and overdue are counted as of now.</p>
       </Panel>
     </div>
   );
@@ -406,14 +406,14 @@ export default function ReportsScreen() {
           </div>
           {preset === 'custom' && (
             <div className="flex flex-wrap items-end gap-2">
-              <label className="flex flex-col gap-1 text-[11px] text-ink-faint">First day
+              <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">First day
                 <input type="date" value={custom.from} max={custom.to || undefined} onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))} className={INPUT} /></label>
-              <label className="flex flex-col gap-1 text-[11px] text-ink-faint">Last day
+              <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">Last day
                 <input type="date" value={custom.to} min={custom.from || undefined} onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))} className={INPUT} /></label>
             </div>
           )}
           {invalid && <Notice tone="error">{period.error}</Notice>}
-          <p className="text-[11px] text-ink-faint leading-relaxed">
+          <p className="text-[0.6875rem] text-ink-faint leading-relaxed">
             Counts and times only, never video or names. Hours follow the site's time zone.
           </p>
         </div>
@@ -426,7 +426,7 @@ export default function ReportsScreen() {
       <Panel title="Download" icon={FileDown}>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint">This report, for the period above</div>
+            <div className="text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint">This report, for the period above</div>
             <div className="flex flex-wrap gap-2">
               <button type="button" className={BTN_PRIMARY} disabled={invalid || busy !== null} onClick={() => run('pdf')}>
                 {busy === 'pdf' ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <FileText className="w-3.5 h-3.5" aria-hidden="true" />} PDF report
@@ -441,12 +441,12 @@ export default function ReportsScreen() {
           </div>
 
           <div className="flex flex-col gap-2 border-t border-line-soft pt-3">
-            <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-ink-faint">Audit trail for a shift</div>
+            <div className="text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint">Audit trail for a shift</div>
             <p className="text-xs text-ink-muted leading-relaxed">Every decision and zone event in the period you choose, in order.</p>
             <div className="flex flex-wrap items-end gap-2">
-              <label className="flex flex-col gap-1 text-[11px] text-ink-faint">Starts
+              <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">Starts
                 <input type="datetime-local" value={shift.from} onChange={(e) => setShift((s) => ({ ...s, from: e.target.value }))} className={INPUT} /></label>
-              <label className="flex flex-col gap-1 text-[11px] text-ink-faint">Ends
+              <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">Ends
                 <input type="datetime-local" value={shift.to} min={shift.from || undefined} onChange={(e) => setShift((s) => ({ ...s, to: e.target.value }))} className={INPUT} /></label>
               <button type="button" className={BTN_QUIET} disabled={shiftBad || busy !== null} onClick={() => run('trail')}>
                 {busy === 'trail' ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <FileSpreadsheet className="w-3.5 h-3.5" aria-hidden="true" />} Audit trail (CSV)
@@ -481,7 +481,7 @@ export default function ReportsScreen() {
             ))}
           </ul>
         )}
-        <p className="mt-2 text-[11px] text-ink-faint">Each report is rebuilt from the data when you download it.</p>
+        <p className="mt-2 text-[0.6875rem] text-ink-faint">Each report is rebuilt from the data when you download it.</p>
       </Panel>
     </div>
   );

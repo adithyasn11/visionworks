@@ -387,7 +387,7 @@ export default function CameraClient({ code }) {
           <div className="w-6 h-6 bg-[#dc2626] rounded-md grid place-items-center">
             <div className="w-1.5 h-1.5 bg-white rounded-[2px]" />
           </div>
-          <span className="font-extrabold text-[15px] tracking-tight">VisionWorks</span>
+          <span className="font-extrabold text-[0.9375rem] tracking-tight">VisionWorks</span>
         </div>
         <div className="flex items-center gap-2">
           {online
@@ -396,7 +396,7 @@ export default function CameraClient({ code }) {
           {/* nowrap and shrink-0: without them the flex row squeezes this to
               its icon width and the word wraps one letter per line, which is
               how "Ready" ended up printed vertically down the corner. */}
-          <span className={`inline-flex items-center gap-1.5 text-[12px] font-bold whitespace-nowrap shrink-0 ${tone.cls}`}>
+          <span className={`inline-flex items-center gap-1.5 text-[0.75rem] font-bold whitespace-nowrap shrink-0 ${tone.cls}`}>
             <StatusIcon className={`w-3.5 h-3.5 ${spinClass}`} />
             {tone.label}
           </span>
@@ -416,17 +416,17 @@ export default function CameraClient({ code }) {
         {status !== 'streaming' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center">
             <StatusIcon className={`w-8 h-8 ${tone.cls} ${spinClass}`} strokeWidth={1.8} />
-            <p className="text-[15px] font-bold">{message}</p>
+            <p className="text-[0.9375rem] font-bold">{message}</p>
 
             {status === 'waiting' && (
-              <p className="text-[13px] text-white/50 leading-relaxed max-w-xs">
+              <p className="text-[0.8125rem] text-white/50 leading-relaxed max-w-xs">
                 Leave this page open. Press <strong className="text-white/80">Turn On
                 Camera</strong> on your laptop and the feed starts here.
               </p>
             )}
 
             {status === 'denied' && (
-              <p className="text-[13px] text-white/50 leading-relaxed max-w-xs">
+              <p className="text-[0.8125rem] text-white/50 leading-relaxed max-w-xs">
                 Tap the padlock or ⓘ in your browser&apos;s address bar, allow
                 Camera for this site, then reload this page.
               </p>
@@ -434,7 +434,7 @@ export default function CameraClient({ code }) {
 
             {status === 'expired' && (
               <>
-                <p className="text-[13px] text-white/50 leading-relaxed max-w-xs">
+                <p className="text-[0.8125rem] text-white/50 leading-relaxed max-w-xs">
                   Codes last five minutes. Press{' '}
                   <strong className="text-white/80">New code</strong> on the
                   laptop, then scan again — or retry if you have just done that.
@@ -446,7 +446,7 @@ export default function CameraClient({ code }) {
                 <button
                   type="button"
                   onClick={() => window.location.reload()}
-                  className="mt-1 inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-[14px] font-bold active:bg-white/10 transition-colors"
+                  className="mt-1 inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-[0.875rem] font-bold active:bg-white/10 transition-colors"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Try again
@@ -458,7 +458,7 @@ export default function CameraClient({ code }) {
               <button
                 type="button"
                 onClick={() => window.location.reload()}
-                className="mt-1 inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-[14px] font-bold active:bg-white/10 transition-colors"
+                className="mt-1 inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-[0.875rem] font-bold active:bg-white/10 transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
                 Try again
@@ -473,7 +473,7 @@ export default function CameraClient({ code }) {
           // breaks, but the detector gets far fewer pixels of the room, so
           // it is worth one line telling the user how to fix it.
           <div className="absolute bottom-3 left-3 right-3 rounded-lg bg-black/70 backdrop-blur px-3 py-2">
-            <p className="text-[12px] text-white/80 text-center">
+            <p className="text-[0.75rem] text-white/80 text-center">
               Turn the phone sideways — a landscape view sees far more of the room.
             </p>
           </div>
@@ -482,8 +482,8 @@ export default function CameraClient({ code }) {
         {status === 'streaming' && (
           <div className="absolute top-3 left-3 flex items-center gap-2 rounded-full bg-black/60 backdrop-blur px-3 py-1.5">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-[12px] font-bold">REC</span>
-            <span className="text-[11px] text-white/50 font-mono">
+            <span className="text-[0.75rem] font-bold">REC</span>
+            <span className="text-[0.6875rem] text-white/50 font-mono">
               {framesSent} frames
             </span>
           </div>
@@ -492,15 +492,15 @@ export default function CameraClient({ code }) {
 
       <footer className="px-4 py-3 border-t border-white/10 flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">
+          <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-white/35">
             paired as
           </p>
-          <p className="font-mono text-[13px] font-bold tracking-[0.16em]">{code}</p>
+          <p className="font-mono text-[0.8125rem] font-bold tracking-[0.16em]">{code}</p>
         </div>
         <button
           type="button"
           onClick={flipCamera}
-          className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-[13px] font-bold active:bg-white/10 transition-colors"
+          className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-[0.8125rem] font-bold active:bg-white/10 transition-colors"
         >
           <SwitchCamera className="w-4 h-4" />
           {facing === 'environment' ? 'Back' : 'Front'}
@@ -508,7 +508,7 @@ export default function CameraClient({ code }) {
       </footer>
 
       {status === 'streaming' && (
-        <p className="px-4 pb-3 text-[11px] text-white/35 leading-relaxed">
+        <p className="px-4 pb-3 text-[0.6875rem] text-white/35 leading-relaxed">
           Keep this screen on. If the phone locks, the camera stops — the page
           asks Android to stay awake, but not every browser honours it.
         </p>
