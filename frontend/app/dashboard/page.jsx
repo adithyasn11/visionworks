@@ -129,6 +129,17 @@ function DashboardInner() {
   // fight the sidebar: clicking a section sets state without touching the URL,
   // and an effect watching `searchParams` would immediately reset it back.
   const [view, setView] = useState(initialView);
+  // Keep the address in step with the screen shown, so a refresh, a copied link or the back button lands on the
+  // same screen (it used to keep whichever ?view= the page was opened with). replaceState, so no navigation and
+  // no history entry per click; the state above stays the one source of truth.
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('view') === view) return;
+      url.searchParams.set('view', view);
+      window.history.replaceState(window.history.state, '', url);
+    } catch { /* the address is a convenience */ }
+  }, [view]);
   const [user, setUser] = useState(null);
   // LAYER 1 input. Null until resolved; every capability check below reads
   // false while it is, so a control never flashes visible before we know the

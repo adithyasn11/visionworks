@@ -154,6 +154,15 @@ export async function createOrganisation(formData) {
   if (!validTimezone(timezone)) return fail('That timezone is not recognised.');
   if (siteName.length > 160) return fail('That site name is too long — 160 characters at most.');
 
+  // One organisation per account. Reopening onboarding (back button, a bookmark, a refresh) used to show this
+  // form again, and submitting it made a second organisation. RLS-filtered read: an organisation that was deleted
+  // does not count, so someone whose organisation was deleted can still start over.
+  const { data: me } = await supabase.from('profiles').select('currentOrgId').eq('id', user.id).maybeSingle();
+  if (me?.currentOrgId) {
+    const { data: existing } = await supabase.from('organisations').select('id').eq('id', me.currentOrgId).maybeSingle();
+    if (existing) return fail('You already have an organisation. Open the dashboard to carry on setting it up.');
+  }
+
   const { data, error } = await supabase.rpc('create_organisation', {
     p_name: name,
     p_timezone: timezone,

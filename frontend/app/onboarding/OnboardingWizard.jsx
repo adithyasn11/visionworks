@@ -149,10 +149,11 @@ function SkipButton({ onClick, disabled, children }) {
 
 /* ── Wizard ──────────────────────────────────────────────────────────────── */
 
-export default function OnboardingWizard({ firstName, email, pendingPlan = null }) {
+export default function OnboardingWizard({ firstName, email, pendingPlan = null, resume = null }) {
   const router = useRouter();
 
-  const [step, setStep] = useState(1);
+  // `resume` (from the page) means the organisation already exists: start at the step asked for, on it.
+  const [step, setStep] = useState(resume?.step ?? 1);
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState(null);
   const [errors, setErrors] = useState({});
@@ -160,7 +161,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null 
   // Ids returned by create_organisation(). `siteId` is the site that function
   // created inside its own transaction — step 2 updates that row rather than
   // inserting a second one.
-  const [ids, setIds] = useState({ orgId: null, siteId: null });
+  const [ids, setIds] = useState({ orgId: resume?.orgId ?? null, siteId: resume?.siteId ?? null });
 
   // Step 1
   const [orgName, setOrgName] = useState('');

@@ -108,7 +108,10 @@ function LoginForm() {
       kind: 'error',
       text: /provider is not enabled/i.test(authError)
         ? 'Google sign-in is not enabled on this project yet. Enable the Google provider in Supabase → Authentication → Providers.'
-        : describeAuthError({ message: authError }),
+        // A stale, reused or tampered return link (the PKCE state is gone): say so in words, not Supabase's.
+        : /flow state|code verifier|invalid.*code|expired|access_denied|cancel/i.test(authError)
+          ? 'That sign-in didn’t finish (it was cancelled, expired or already used). Please sign in again.'
+          : describeAuthError({ message: authError }),
     });
   }, [searchParams]);
 
@@ -310,6 +313,9 @@ function LoginForm() {
                   autoComplete="current-password"
                   error={errors.password}
                 />
+                <Link href="/forgot-password" className="-mt-2 self-end text-[0.78125rem] font-bold text-ink-muted hover:text-accent transition-colors">
+                  Forgot password?
+                </Link>
 
                 <SubmitButton busy={busy}>
                   {busy ? 'Signing in…' : 'Sign in'}

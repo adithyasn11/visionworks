@@ -404,7 +404,16 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
     }
   };
 
+  // Deleting a zone also deletes the safety rules set for it, and past records lose its name, so the first
+  // click asks and a second one (within a few seconds) deletes.
+  const [confirmDelete, setConfirmDelete] = useState(null);
   const deleteZone = async (zoneId) => {
+    if (confirmDelete !== zoneId) {
+      setConfirmDelete(zoneId);
+      setTimeout(() => setConfirmDelete((cur) => (cur === zoneId ? null : cur)), 6000);
+      return;
+    }
+    setConfirmDelete(null);
     setError(null);
     try {
       const res = await backendFetch(`/api/v1/zones/${zoneId}`, { method: 'DELETE' });
@@ -710,11 +719,17 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
                       <button
                         type="button"
                         onClick={() => deleteZone(zone.zone_id)}
-                        aria-label={`Delete ${zone.zone_name}`}
-                        className="p-1 rounded text-ink-faint hover:text-accent transition-colors"
+                        aria-label={confirmDelete === zone.zone_id ? `Click again to delete ${zone.zone_name}` : `Delete ${zone.zone_name}`}
+                        title={confirmDelete === zone.zone_id ? 'Click again to delete. Its rules are deleted too.' : 'Delete'}
+                        className={`p-1 rounded transition-colors ${confirmDelete === zone.zone_id ? 'bg-accent text-white' : 'text-ink-faint hover:text-accent'}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
+                      {confirmDelete === zone.zone_id && (
+                        <span className="basis-full text-[0.6875rem] text-accent">
+                          Click the bin again to delete. Rules for this zone are deleted too.
+                        </span>
+                      )}
                     </>
                   )}
                 </>

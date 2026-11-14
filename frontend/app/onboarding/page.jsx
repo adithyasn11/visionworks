@@ -110,6 +110,17 @@ export default async function OnboardingPage({ searchParams }) {
   const inWizard = searchParams?.step === '2' || searchParams?.step === '3';
   if (orgReachable && !inWizard) redirect('/dashboard');
 
+  // Reopened mid-way (refresh, back button, bookmark) with the organisation already made: resume at the step
+  // asked for, on THAT organisation and its first site. Without this the wizard restarted at step 1, and
+  // submitting it again created a second organisation.
+  let resume = null;
+  if (orgReachable && inWizard) {
+    const { data: site } = await supabase
+      .from('sites').select('id').eq('orgId', profile.currentOrgId).is('deletedAt', null)
+      .order('createdAt', { ascending: true }).limit(1).maybeSingle();
+    resume = { step: Number(searchParams.step), orgId: profile.currentOrgId, siteId: site?.id ?? null };
+  }
+
   // THE PLAN GATE. Nobody creates an organisation without choosing a tier.
   //
   // This is the second half of the rule /home enforces from the other side:
@@ -165,6 +176,7 @@ export default async function OnboardingPage({ searchParams }) {
       firstName={(profile?.fullName ?? '').trim().split(/\s+/)[0] || null}
       email={profile?.email ?? data.user.email ?? null}
       pendingPlan={pendingPlan}
+      resume={resume}
     />
   );
 }
