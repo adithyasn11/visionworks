@@ -102,6 +102,11 @@ function LoginForm() {
   }, [searchParams]);
 
   useEffect(() => {
+    if (searchParams.get('expired') !== '1') return;
+    setBanner({ kind: 'error', text: 'You were signed out. Sign in again to carry on where you were.' });
+  }, [searchParams]);
+
+  useEffect(() => {
     const authError = searchParams.get('authError');
     if (!authError) return;
     setBanner({

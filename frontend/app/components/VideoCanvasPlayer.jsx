@@ -203,7 +203,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     if (connectionEpochRef.current !== epoch) { ws.close(); return; }
     wsRef.current = ws;
 
-    ws.onopen  = () => setStatusMsg('Connected — detection running...');
+    ws.onopen  = () => { setStatusMsg('Connected — detection running...'); applyBlurChoice(ws); };
     ws.onclose = () => { setPhase(p => p === 'processing' ? 'done' : p); };
     ws.onerror = () => { setPhase('error'); setStatusMsg('WebSocket error — is the backend running?'); };
 
@@ -413,6 +413,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       };
 
       ws.onopen = () => {
+        applyBlurChoice(ws);
         setStatusMsg('Live camera active — detection running');
         isAwaitingResponse = false;
         sendNextFrame();
@@ -483,6 +484,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     wsRef.current = ws;
 
     ws.onopen = () => {
+      applyBlurChoice(ws);
       setStatusMsg('Server camera active — detection running');
     };
 
@@ -560,10 +562,18 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   };
 
   const toggleBlur = (checked) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(JSON.stringify({ action: 'set_privacy_blur', enabled: checked }));
     pendingBlurRef.current = checked;
     setEnableBlur(checked);
+    // Between runs there is no stream to tell: the choice is kept and sent as the next run opens (applyBlurChoice).
+    // The box used to look clickable after a run and silently ignore the click.
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ action: 'set_privacy_blur', enabled: checked }));
+    }
+  };
+
+  // A choice made while no stream was open, sent to the stream that has just opened.
+  const applyBlurChoice = (ws) => {
+    if (pendingBlurRef.current !== null) ws.send(JSON.stringify({ action: 'set_privacy_blur', enabled: pendingBlurRef.current }));
   };
 
   // Fullscreen targets the CANVAS WRAPPER, not the whole panel: expanding the

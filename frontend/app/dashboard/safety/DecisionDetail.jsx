@@ -183,7 +183,7 @@ function Section({ title, icon: Icon, children }) {
   );
 }
 
-function ReviewForm({ decision, onDone }) {
+function ReviewForm({ decision, onDone, onStale }) {
   const [state, setState] = useState(decision.reviewState === 'CONFIRMED' || decision.reviewState === 'DISMISSED' ? decision.reviewState : '');
   const [reason, setReason] = useState(decision.reviewReasonCode || '');
   const [note, setNote] = useState(decision.reviewNote || '');
@@ -195,8 +195,10 @@ function ReviewForm({ decision, onDone }) {
     e.preventDefault();
     if (!state) { setError('Choose Confirm or Dismiss.'); return; }
     setBusy(true); setError(null);
-    const r = await reviewDecision(decision.id, state, reason, note.trim());
+    // Sent with the state on screen, so a review someone else made in the meantime is not silently replaced.
+    const r = await reviewDecision(decision.id, state, reason, note.trim(), decision.reviewState);
     setBusy(false);
+    if (!r.ok && r.status === 409 && onStale) { onStale(r.message); return; }
     if (!r.ok) { setError(r.message); return; }
     onDone(r.data);
   }
@@ -311,6 +313,8 @@ export default function DecisionDetail({ decisionId, role, onChanged }) {
   const [state, setState] = useState({ loading: true, decision: null, error: null });
   const [events, setEvents] = useState(null);
   const [actions, setActions] = useState([]);
+  // Someone else reviewed this flag while it was open here (the API refused with 409); said above the form.
+  const [stale, setStale] = useState(null);
   const canReview = can(role, 'safety.review');
   const canEvidence = can(role, 'safety.evidence.view');
   const canActions = can(role, 'safety.actions.edit');
@@ -391,7 +395,10 @@ export default function DecisionDetail({ decisionId, role, onChanged }) {
 
       {flag && canReview && (
         <Section title="Your review" icon={ClipboardCheck}>
-          <ReviewForm key={decision.reviewedAt || 'new'} decision={decision} onDone={(updated) => { setState({ loading: false, decision: { ...decision, ...updated }, error: null }); if (onChanged) onChanged(updated); }} />
+          {stale && <Notice tone="error" className="mb-3">{stale}</Notice>}
+          <ReviewForm key={decision.reviewedAt || 'new'} decision={decision}
+            onDone={(updated) => { setStale(null); setState({ loading: false, decision: { ...decision, ...updated }, error: null }); if (onChanged) onChanged(updated); }}
+            onStale={(message) => { setStale(message); load(); }} />
         </Section>
       )}
       {flag && !canReview && <Notice>You have view-only access, so the review controls are not shown. {decision.reviewState === 'PENDING' ? 'An administrator or manager can review this.' : ''}</Notice>}

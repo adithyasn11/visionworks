@@ -93,6 +93,18 @@ export function withTimeout(promise, ms, message = 'This is taking too long. Ref
  * then renders its ordinary empty state instead of an error, which is the
  * right behaviour for a session that expired in a background tab.
  */
+/**
+ * The session is gone (signed out elsewhere, the refresh token was revoked, a password was reset): go to sign-in,
+ * saying so, and come back to this same screen afterwards. Screens used to stay open with empty lists or a
+ * technical "sign in to use the safety API" line instead.
+ */
+export function sessionLost() {
+  if (typeof window === 'undefined') return;
+  if (/^\/(login|signup|forgot-password|reset-password|camera)(\/|$)/.test(window.location.pathname)) return;
+  const next = window.location.pathname + window.location.search;
+  window.location.href = `/login?expired=1&next=${encodeURIComponent(next)}`;
+}
+
 export async function backendFetch(path, options = {}) {
   const token = await getAccessToken();
   const headers = new Headers(options.headers || {});
@@ -104,12 +116,16 @@ export async function backendFetch(path, options = {}) {
   const signal = options.signal
     ?? (method === 'GET' && typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined);
 
-  return fetch(`${BACKEND_HTTP}${path}`, {
+  const response = await fetch(`${BACKEND_HTTP}${path}`, {
     cache: 'no-store',
     ...options,
     headers,
     ...(signal ? { signal } : {}),
   });
+  // Refused with no session to send: the user is signed out. (A 401 WITH a token is about the organisation, and
+  // the screen says that itself.)
+  if (response.status === 401 && !token) sessionLost();
+  return response;
 }
 
 /**

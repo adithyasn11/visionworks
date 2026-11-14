@@ -280,6 +280,8 @@ The progress bar at the top shows **Organisation · Site · Camera**.
   - **Expect:** the numbers and charts change to match.
 
 ### 7.2 Review queue
+- [ ] **Two reviewers at once:** open the same flag in two tabs, confirm it in one, then dismiss it in the other.
+  - **Expect:** the second is refused with "Someone else reviewed this flag a moment ago: it is now confirmed…", and the form then shows their judgement; saving again after that changes it on purpose.
 - [ ] Open **Review**.
   - **Expect:** flagged decisions, oldest first. If there are none: "Nothing to review. New flags will appear here."
   - The sidebar badge shows the waiting count.
@@ -470,6 +472,8 @@ node scripts/sql.mjs "update organisations set \"planRenewsAt\" = now() - interv
   - **Expect:** you are sent to sign in. After signing in you come back to the dashboard.
 - [ ] Sign in again with account A.
   - **Expect:** you land straight on the dashboard, and all data is still there.
+- [ ] Open the dashboard in **two tabs**, and **Sign out** in one. Switch to the other.
+  - **Expect:** it goes to sign-in with "You were signed out. Sign in again to carry on where you were.", and signing in brings you back to the same screen.
 
 ## 15. Clean finish (optional)
 

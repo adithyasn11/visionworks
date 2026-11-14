@@ -101,7 +101,7 @@ export const FloorplanHeatmap = () => {
         ...s,
         status: 'error',
         error: /failed to fetch|networkerror|load failed/i.test(String(err?.message))
-          ? 'Cannot reach the analytics backend. Make sure the FastAPI server is running on port 8001.'
+          ? 'Could not reach the analysis server, so this map cannot be shown. Check your connection, or ask whoever runs VisionWorks to restart it.'
           : String(err?.message || err),
       }));
     }

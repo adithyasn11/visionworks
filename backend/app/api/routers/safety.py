@@ -74,12 +74,12 @@ def _who(authorization: Optional[str], capability: str):
     """(org_id, user_id, token) for a verified caller who holds `capability`, else 401 / 403."""
     org_id, user_id, role = resolve_identity(authorization)
     if org_id is None:
-        raise HTTPException(status_code=401, detail="Sign in to an organisation to use the safety API.")
+        raise HTTPException(status_code=401, detail="You are not signed in to an organisation. Sign in again.")
     if not can(role, capability):
         raise HTTPException(status_code=403, detail=denial_message(capability))
     token = bearer(authorization)
     if not token:
-        raise HTTPException(status_code=401, detail="Sign in to an organisation to use the safety API.")
+        raise HTTPException(status_code=401, detail="You are not signed in to an organisation. Sign in again.")
     return org_id, user_id, token
 
 
@@ -413,6 +413,9 @@ class ReviewIn(BaseModel):
     state: str
     reason: Optional[str] = None
     note: Optional[str] = Field(default=None, max_length=500)
+    # The review state the reviewer was LOOKING AT. When it no longer matches, someone else reviewed the flag in the
+    # meantime and this review is refused, instead of silently replacing theirs. Optional for older clients.
+    expected_state: Optional[str] = None
 
 
 @router.post("/decisions/{decision_id}/review")
@@ -422,6 +425,16 @@ def review_decision(decision_id: str, body: ReviewIn, authorization: Optional[st
     _one_of(body.state, ("CONFIRMED", "DISMISSED"), "state")
     if body.reason is not None:
         _one_of(body.reason, REVIEW_REASONS, "reason")
+    if body.expected_state is not None:
+        _one_of(body.expected_state, ("PENDING", "CONFIRMED", "DISMISSED", "NOT_REQUIRED"), "expected_state")
+        _, _, rows = _pg(lambda: user_request("GET", "safety_decisions", token, params={
+            "select": "reviewState", "id": f"eq.{decision_id}", "limit": "1"}))
+        current = rows[0].get("reviewState") if rows else None
+        if current is not None and current != body.expected_state:
+            words = {"PENDING": "waiting for review", "CONFIRMED": "confirmed", "DISMISSED": "dismissed", "NOT_REQUIRED": "not needing review"}
+            raise HTTPException(status_code=409, detail=(
+                f"Someone else reviewed this flag a moment ago: it is now {words.get(current, current)}. "
+                "Their judgement is shown below; change it only if you still disagree."))
     # review_safety_decision() checks the caller's role and organisation, refuses a COMPLIANT decision, guards
     # CONFIRMED to DISMISSED while actions are open, and writes the audit row in the same transaction
     _, _, row = _pg(lambda: user_request("POST", "review_safety_decision", token, rpc=True,

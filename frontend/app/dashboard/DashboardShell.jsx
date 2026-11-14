@@ -10,7 +10,7 @@
 // one polling data source and a live video session; making them separate routes
 // would tear down the WebSocket on every tab change and re-fetch everything.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import { supabase } from '../lib/supabase/browser';
+import { sessionLost } from '../lib/backend';
 import { can } from '../lib/permissions';
 import { getBadgeCounts } from '../lib/safety/queries';
 
@@ -163,8 +164,29 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
   // where you are — the same job the view marker does on the dashboard.
   const pathname = usePathname();
   const [signingOut, setSigningOut] = useState(false);
+  const signingOutRef = useRef(false);
+
+  // A session that ends while a screen is open (signed out in another tab, refresh token revoked, password reset)
+  // sends the user to sign in, rather than leaving every list quietly empty. Checked when the auth client says so,
+  // and whenever the tab comes back into view.
+  useEffect(() => {
+    if (!supabase) return undefined;
+    let gone = false;
+    const leave = () => { if (!gone && !signingOutRef.current) { gone = true; sessionLost(); } };
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) leave();
+    });
+    const check = () => {
+      if (document.hidden) return;
+      supabase.auth.getSession().then(({ data }) => { if (!data?.session) leave(); }).catch(() => {});
+    };
+    document.addEventListener('visibilitychange', check);
+    window.addEventListener('focus', check);
+    return () => { sub?.subscription?.unsubscribe(); document.removeEventListener('visibilitychange', check); window.removeEventListener('focus', check); };
+  }, []);
 
   const signOut = async () => {
+    signingOutRef.current = true;     // our own sign-out is not a lost session
     setSigningOut(true);
     try {
       if (supabase) await supabase.auth.signOut({ scope: 'global' }).catch(() => {});

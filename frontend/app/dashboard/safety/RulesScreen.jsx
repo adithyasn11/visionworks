@@ -87,10 +87,11 @@ function ParamField({ field, form, setParams, zones }) {
   );
 }
 
-function RuleForm({ initial, zones, onSaved, onCancel }) {
+function RuleForm({ initial, zones, onSaved, onCancel, onGone }) {
   const [form, setForm] = useState(initial);
   const [check, setCheck] = useState({ state: 'idle' });
   const [saving, setSaving] = useState(false);
+  const inFlight = useRef(false);
   const formRef = useRef(null);
   // The form opens below the list: bring it into view (and focus its first field) so the click visibly did something.
   useEffect(() => { const el = formRef.current; if (el) { el.scrollIntoView({ block: "nearest", behavior: "smooth" }); const f = el.querySelector("input, select"); if (f) f.focus({ preventScroll: true }); } }, []);
@@ -128,12 +129,20 @@ function RuleForm({ initial, zones, onSaved, onCancel }) {
     // all); a missing name or a known problem is named here, and the server validates the rule again on save.
     if (!body.name) { setError('Give the rule a name.'); return; }
     if (check.state === 'invalid') { setError(check.errors.map(friendlyRuleError).join(' ')); return; }
+    // A ref, not the `saving` state: a double click sends the second click before React has re-rendered the
+    // button as disabled, and that used to create the rule twice.
+    if (inFlight.current) return;
+    inFlight.current = true;
     setSaving(true); setError(null);
     // An update may not carry `type` (a rule's kind cannot change, and the API refuses unknown fields), so it is left
     // out of the PATCH; validation above still sends it, because the validator needs to know the kind.
     const { type: _kind, ...patch } = body;
     const r = editing ? await updateRule(form.id, patch) : await createRule(body);
+    inFlight.current = false;
     setSaving(false);
+    // Deleted meanwhile (in another window, or by someone else): close the form and refresh the list, rather than
+    // leave "Rule not found." under a form for a rule that is still listed.
+    if (!r.ok && editing && r.status === 404 && onGone) { onGone(); return; }
     if (!r.ok) { setError(friendlyRuleError(r.message)); return; }
     onSaved(r.data);
   }
@@ -224,9 +233,13 @@ export default function RulesScreen({ role }) {
   const [zonesReady, setZonesReady] = useState(false);
   useEffect(() => { load(); listSafetyZones().then((r) => { setZones(r.zones || []); setZonesReady(!r.error); }); }, [load]);
 
+  // A rule deleted elsewhere since this list was loaded.
+  const gone = () => { setEditing(null); setMessage({ tone: 'error', text: 'That rule has been deleted, perhaps in another window. The list is up to date now.' }); load(); };
+
   async function toggle(rule) {
     setMessage(null);
     const r = await updateRule(rule.id, { is_enabled: !rule.isEnabled });
+    if (!r.ok && r.status === 404) { gone(); return; }
     if (!r.ok) { setMessage({ tone: 'error', text: friendlyRuleError(r.message) }); return; }
     load();
   }
@@ -235,6 +248,7 @@ export default function RulesScreen({ role }) {
     setMessage(null);
     const r = await deleteRule(rule.id);
     setConfirmDelete(null);
+    if (!r.ok && r.status === 404) { gone(); return; }
     if (!r.ok) { setMessage({ tone: 'error', text: friendlyRuleError(r.message) }); return; }
     setMessage({ tone: 'ok', text: `"${rule.name}" was deleted. Decisions it made keep their record.` });
     load();
@@ -303,7 +317,7 @@ export default function RulesScreen({ role }) {
       {canEdit && editing && (
         <RuleForm key={editing.id || 'new'} initial={editing} zones={zones}
           onSaved={() => { setEditing(null); setMessage({ tone: 'ok', text: 'The rule was saved. It applies from the next run of a camera.' }); load(); }}
-          onCancel={() => setEditing(null)} />
+          onCancel={() => setEditing(null)} onGone={gone} />
       )}
     </div>
   );

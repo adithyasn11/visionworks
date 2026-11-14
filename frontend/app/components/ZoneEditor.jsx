@@ -173,7 +173,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
       setStatus('error');
       setError(
         /failed to fetch|networkerror|load failed/i.test(String(err?.message))
-          ? 'Cannot reach the backend. Start the FastAPI server on port 8001.'
+          ? 'Could not reach the analysis server, so the zones cannot be loaded. Check your connection and try again.'
           : String(err?.message || err),
       );
     }
@@ -220,7 +220,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
       setSnapState('error');
       setSnapError(
         /failed to fetch|networkerror|load failed/i.test(String(err?.message))
-          ? 'Cannot reach the backend. Start the FastAPI server first.'
+          ? 'Could not reach the analysis server, so there is no picture to draw on. Check your connection and try again.'
           : String(err?.message || err),
       );
     }

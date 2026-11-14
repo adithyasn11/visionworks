@@ -48,8 +48,10 @@ async function call(path, { method = 'GET', body, query } = {}) {
 
 export const listDecisions = (query) => call('/decisions', { query });
 export const getDecision = (id) => call(`/decisions/${encodeURIComponent(id)}`);
-export const reviewDecision = (id, state, reason, note) =>
-  call(`/decisions/${encodeURIComponent(id)}/review`, { method: 'POST', body: { state, reason: reason || null, note: note || null } });
+export const reviewDecision = (id, state, reason, note, expectedState) =>
+  call(`/decisions/${encodeURIComponent(id)}/review`, {
+    method: 'POST', body: { state, reason: reason || null, note: note || null, ...(expectedState ? { expected_state: expectedState } : {}) },
+  });
 export const listEvents = (query) => call('/events', { query });
 export const getSummary = (days, tz) => call('/summary', { query: { days, tz } });
 
