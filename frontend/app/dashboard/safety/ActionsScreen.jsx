@@ -99,6 +99,7 @@ function ActionCard({ action, people, canEdit, onChanged }) {
             </button>
             <button type="button" onClick={() => setClosing(false)} className={BTN_QUIET}>Not yet</button>
           </div>
+          {!note.trim() && <p className="text-[0.6875rem] text-ink-faint">Say what was done, then close it.</p>}
         </div>
       )}
       {error && <Notice tone="error">{error}</Notice>}

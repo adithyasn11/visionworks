@@ -151,6 +151,20 @@ try {
   u = await usage();
   check('Enterprise history is 365 days', u.retention_max === 365);
 
+  console.log('\nHistory follows the plan (030)');
+  const retention = async () => (await q(`SELECT "dataRetentionDays" d FROM organisations WHERE id = $1`, [org]))[0].d;
+  await q(`UPDATE organisations SET plan = 'FREE', "planRenewsAt" = NULL, "dataRetentionDays" = 7 WHERE id = $1`, [org]);
+  await q(`UPDATE organisations SET plan = 'GROWTH', "planRenewsAt" = now() + interval '1 month' WHERE id = $1`, [org]);
+  check('Starter (7 days) upgraded to Growth keeps 90 days', (await retention()) === 90, `${await retention()}`);
+  await q(`UPDATE organisations SET "dataRetentionDays" = 30 WHERE id = $1`, [org]);
+  await q(`UPDATE organisations SET plan = 'ENTERPRISE' WHERE id = $1`, [org]);
+  check('a shorter history someone chose is kept on upgrade', (await retention()) === 30, `${await retention()}`);
+  await q(`UPDATE organisations SET plan = 'GROWTH', "dataRetentionDays" = 90, "planRenewsAt" = now() - interval '1 minute' WHERE id = $1`, [org]);
+  await q(`UPDATE organisations SET "dataRetentionDays" = 7 WHERE id = $1`, [org]);
+  r = await asUser(uid, () => q(`SELECT * FROM renew_plan()`));
+  check('renewing an expired plan brings 90 days back', r.r?.[0]?.ok && (await retention()) === 90, `${await retention()} ${r.r?.[0]?.message}`);
+  await q(`UPDATE organisations SET plan = 'ENTERPRISE' WHERE id = $1`, [org]);            // room for the manager below
+
   console.log('\nOnly an administrator renews, and only a paid plan');
   const mgr = crypto.randomUUID();
   await q(`INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data, raw_app_meta_data)

@@ -1,5 +1,7 @@
 'use server';
 
+import { planName } from '../../lib/plans';
+
 // frontend/app/settings/organisation/actions.js
 //
 // Organisation settings — ADMIN only.
@@ -148,7 +150,17 @@ export async function getOrganisationSettings() {
 
   if (!org) return { ok: false, message: 'Organisation not found.' };
 
-  return { ok: true, organisation: org, viewerRole: membership?.role ?? null };
+  // The plan's history limit (the plan in force, 029), so the screen offers the real range, not 1-730.
+  const historyLimit = await planHistoryLimit(supabase, orgId);
+
+  return { ok: true, organisation: org, viewerRole: membership?.role ?? null, historyLimit };
+}
+
+/** `{ max, plan }`: how many days of history the plan in force keeps. Null when it cannot be read. */
+async function planHistoryLimit(supabase, orgId) {
+  const { data } = await supabase.rpc('plan_usage', { p_org_id: orgId });
+  const row = Array.isArray(data) ? data[0] : data;
+  return row?.retention_max ? { max: row.retention_max, plan: row.effective_plan } : null;
 }
 
 /**
@@ -169,10 +181,11 @@ export async function previewRetentionImpact(nextDays) {
 
   const cutoff = new Date(Date.now() - days * 86400_000).toISOString();
 
+  // The safety events the nightly purge would delete (purge_safety_data); RLS keeps it to this organisation.
   const { count, error: dbError } = await supabase
-    .from('zone_minute_stats')
+    .from('safety_events')
     .select('id', { count: 'exact', head: true })
-    .lt('bucketStart', cutoff);
+    .lt('observedAt', cutoff);
 
   if (dbError) return { ok: false, message: dbError.message };
 
@@ -216,6 +229,13 @@ export async function updateOrganisationSettings(formData) {
     .select('name, timezone, dataRetentionDays, purgeVideoAfterProcessing')
     .eq('id', orgId)
     .maybeSingle();
+
+  // The plan caps history. The database would quietly clamp a higher value, so say so instead. A value already
+  // above the cap (kept from a bigger plan) may stay or shrink, but not grow.
+  const limit = await planHistoryLimit(supabase, orgId);
+  if (limit && retention > limit.max && retention > (before?.dataRetentionDays ?? 0)) {
+    return fail(`The ${planName(limit.plan)} plan keeps up to ${limit.max} days of history. Upgrade the plan to keep more.`);
+  }
 
   const { data: updated, error: dbError } = await supabase
     .from('organisations')

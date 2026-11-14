@@ -20,6 +20,7 @@
 // mirrors `org_select` (all members read) against `org_update` (admins write),
 // the same split the members screen uses.
 
+import { planName } from '../../lib/plans';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Building2, ShieldAlert, Trash2, Loader2, AlertCircle, Info,
@@ -82,7 +83,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
       setBanner({ kind: 'error', text: res.message });
       return;
     }
-    setState({ status: 'ready', org: res.organisation, role: res.viewerRole });
+    setState({ status: 'ready', org: res.organisation, role: res.viewerRole, historyLimit: res.historyLimit ?? null });
     setForm({
       name: res.organisation.name ?? '',
       timezone: res.organisation.timezone ?? 'UTC',
@@ -277,12 +278,12 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
                 label="Keep records for"
                 type="number"
                 min="1"
-                max="730"
+                max={String(Math.max(state.historyLimit?.max ?? 730, Number(state.org?.dataRetentionDays) || 0))}
                 value={form.dataRetentionDays}
                 onChange={(e) => set('dataRetentionDays')(e.target.value)}
                 disabled={!canEdit}
                 error={errors.dataRetentionDays}
-                hint="Days, 1–730. A nightly job permanently deletes detection records older than this."
+                hint={`Days, 1–${state.historyLimit?.max ?? 730}${state.historyLimit ? ` on the ${planName(state.historyLimit.plan)} plan` : ''}. A nightly job permanently deletes detection records older than this.`}
               />
 
               {retentionWarning && (

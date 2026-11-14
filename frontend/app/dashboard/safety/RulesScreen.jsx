@@ -115,6 +115,10 @@ function RuleForm({ initial, zones, onSaved, onCancel }) {
 
   async function save(e) {
     e.preventDefault();
+    // The button stays clickable while the live check runs (a click right after typing used to do nothing at
+    // all); a missing name or a known problem is named here, and the server validates the rule again on save.
+    if (!body.name) { setError('Give the rule a name.'); return; }
+    if (check.state === 'invalid') { setError(check.errors.map(friendlyRuleError).join(' ')); return; }
     setSaving(true); setError(null);
     // An update may not carry `type` (a rule's kind cannot change, and the API refuses unknown fields), so it is left
     // out of the PATCH; validation above still sends it, because the validator needs to know the kind.
@@ -183,7 +187,7 @@ function RuleForm({ initial, zones, onSaved, onCancel }) {
       </div>
       {error && <Notice tone="error">{error}</Notice>}
       <div className="flex gap-2">
-        <button type="submit" disabled={saving || check.state !== 'valid'} className={BTN_PRIMARY}>
+        <button type="submit" disabled={saving} className={BTN_PRIMARY}>
           {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />} {editing ? 'Save changes' : 'Create rule'}
         </button>
         <button type="button" onClick={onCancel} className={BTN_QUIET}>Cancel</button>

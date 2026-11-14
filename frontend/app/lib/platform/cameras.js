@@ -25,9 +25,11 @@ import { can, denialMessage } from '../permissions';
 import { planName } from '../plans';
 
 const fail = (message) => ({ ok: false, message });
+// An ILIKE pattern that matches `s` exactly, ignoring case only (% _ and \ are escaped).
+const likeExact = (s) => s.replace(/[\\%_]/g, (c) => '\\' + c);
 const SOURCES = new Set(['WEBCAM', 'UPLOAD']);
 // Letters (any script), digits, spaces and - _ . : nothing that changes the meaning of a URL path.
-const NAME_OK = /^[\p{L}\p{N}][\p{L}\p{N} _.-]*$/u;
+const NAME_OK = /^[\p{L}\p{N}][\p{L}\p{N} _.–—-]*$/u;   // en and em dashes too, as in onboarding
 
 async function requireCapability(capability) {
   const supabase = createClient();
@@ -90,7 +92,8 @@ export async function addCamera({ name, sourceType, siteId }) {
   if (!SOURCES.has(sourceType)) return fail('Choose where the video comes from.');
 
   // Names must be unique within the organisation: the pipeline finds a camera by its name.
-  const { data: same } = await ctx.supabase.from('cameras').select('id').eq('name', clean).is('deletedAt', null).limit(1);
+  // Case-insensitive: "Gate camera" and "gate camera" would be two cameras nobody can tell apart.
+  const { data: same } = await ctx.supabase.from('cameras').select('id').ilike('name', likeExact(clean)).is('deletedAt', null).limit(1);
   if (same && same.length) return fail('There is already a camera with that name.');
 
   // The site chosen on the screen, or the organisation's first site, as onboarding does.
@@ -160,7 +163,7 @@ export async function addSite({ name, timezone }) {
   if (!clean) return fail('Enter a name for the site.');
   if (clean.length > 160) return fail('A site name is limited to 160 characters.');
   const tz = /^[A-Za-z0-9_+/-]{1,64}$/.test(String(timezone || '')) ? timezone : null;
-  const { data: same } = await ctx.supabase.from('sites').select('id').eq('name', clean).is('deletedAt', null).limit(1);
+  const { data: same } = await ctx.supabase.from('sites').select('id').ilike('name', likeExact(clean)).is('deletedAt', null).limit(1);
   if (same && same.length) return fail('There is already a site with that name.');
   const { data, error } = await ctx.supabase
     .from('sites')
@@ -180,7 +183,7 @@ export async function removeSite(id) {
   const { count: sites } = await ctx.supabase.from('sites').select('id', { count: 'exact', head: true }).is('deletedAt', null);
   if ((sites ?? 0) <= 1) return fail('An organisation needs at least one site, so the last one cannot be removed.');
   const { count: cams } = await ctx.supabase.from('cameras').select('id', { count: 'exact', head: true }).eq('siteId', id).is('deletedAt', null);
-  if ((cams ?? 0) > 0) return fail('Move or remove the cameras on this site first.');
+  if ((cams ?? 0) > 0) return fail('Remove the cameras on this site first.');
   const { data, error } = await ctx.supabase.from('sites').delete().eq('id', id).select('id');
   if (error) return fail(sentence(error, 'The site could not be removed.'));
   if (!data || !data.length) return fail('That site was not found. It may already have been removed.');

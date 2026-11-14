@@ -33,6 +33,7 @@ project yet.
 | `sql/027_safety_summary.sql` | `safety_summary(org, since, until, tz)`: counts of decisions by result, review state (of the flags only) and zone and by day, run as the caller (RLS-scoped), for the overview. |
 | `sql/028_safety_report.sql` | `safety_report(org, since, until, tz)`: every figure of the safety report as one JSON document (honest categories, by rule / zone / camera / hour / day, helmet and vest, time in restricted zones (whole visits and visits seen only in part), man-down and head count, corrective actions), run as the caller (RLS-scoped). |
 | `sql/029_plan_term_enforcement.sql` | **Paid terms end.** A plan past `planRenewsAt` counts as Starter (`effective_plan`) until `renew_plan()` (admin; last 7 days or after it ended). Limit triggers use the plan in force (seat limit also on restore); history purge keeps the smaller of the setting and the plan's limit; billing columns guarded against direct writes; scheduled reports (`set_report_schedule`, `run_scheduled_reports` on pg_cron every 15 min, Growth+). `plan_usage` adds `effective_plan`, `expired`, schedule. Tested by `node scripts/test-plan-terms.mjs` (39 checks, rolled back). |
+| `sql/030_history_follows_plan.sql` | When the plan in force goes up (upgrade, or renewal after expiry) and history was at the old plan's limit, `dataRetentionDays` moves to the new plan's limit; a shorter chosen value is kept. |
 | `seed.ts` | Generates ~826,000 minute buckets of realistic shaped data. |
 
 **Order matters.** 001 → 002 → … → 025. Later files

@@ -420,12 +420,11 @@ node scripts/sql.mjs "update organisations set \"planRenewsAt\" = now() - interv
 - [ ] **12.1** Open **Members** (`/settings/members`). Click **Invite someone**:
   - **Work email** = your second address;
   - **Role** = **Manager**.
-  - **Expect:** an **invitation link** appears with "This link is shown once".
-- [ ] **12.2** Copy the link, then close the box with **×**.
-- [ ] **12.3** In a **private window**, open the link and sign up as account B with the invited email.
-  - **Expect:** Home shows the invitation, with **Accept** and **Decline**.
-- [ ] **12.4** Click **Accept**.
-  - **Expect:** "Joining…", then the dashboard of `Test Plant Ltd`.
+  - **Expect:** it appears under **Pending invitations** with its expiry date. No link is needed: the invitation is matched by email address.
+- [ ] **12.2** Invite an address that is already a member. **Expect:** "You are already a member of this organisation." (or the same for the other member).
+- [ ] **12.3** In a **private window**, sign up as account B with the invited email (email and password, or Google with that address).
+  - **Expect:** B goes straight into the dashboard of `Test Plant Ltd`, without onboarding.
+- [ ] **12.4** If B already had an account: sign in as B. **Expect:** Home shows the invitation with **Accept** and **Decline**; **Accept** shows "Joining…", then the dashboard.
 - [ ] **12.5** As B (Manager), check what B can do:
   - [ ] Review: can confirm and dismiss;
   - [ ] Organisation settings: read-only;

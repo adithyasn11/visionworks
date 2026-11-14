@@ -308,7 +308,12 @@ export async function createCamera(formData) {
   const rtspUrl = String(formData.get('rtspUrl') ?? '').trim();
 
   if (!name) return fail('Enter a name for this camera.');
-  if (name.length > 160) return fail('That camera name is too long — 160 characters at most.');
+  // Same rule as the Cameras screen (lib/platform/cameras.js): the name is the camera's id in the pipeline,
+  // which keeps 64 characters and uses it in URL paths.
+  if (name.length > 64) return fail('A camera name is limited to 64 characters.');
+  if (!/^[\p{L}\p{N}][\p{L}\p{N} _.–—-]*$/u.test(name)) {
+    return fail('Use letters, numbers, spaces, dashes, dots and underscores only, starting with a letter or number.');
+  }
   if (!SOURCE_TYPES.has(sourceType)) return fail('Choose where this camera’s video comes from.');
 
   // The org is read from the caller's own profile, NOT from the form.
