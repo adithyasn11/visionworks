@@ -107,7 +107,7 @@ Choose one way.
     - the plan name;
     - the billing period switch;
     - "What's included";
-    - "Total charged today".
+    - "Total" with the real price for the chosen term (for example $490.00 for a year of Growth) and "Demo billing: no payment is taken."
 - [ ] **3.4** Change the billing period on Checkout.
   - **Expect:** the total updates.
 - [ ] **3.5** Continue.

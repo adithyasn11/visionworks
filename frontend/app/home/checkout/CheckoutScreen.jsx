@@ -227,14 +227,23 @@ export default function CheckoutScreen({
 
               <div aria-hidden="true" className="h-px bg-[color:var(--line-soft)]" />
 
-              {/* The total. Zero for every tier, because that is the truth —
-                  the price above is illustrative and this is what would
-                  actually be charged. */}
-              <div className="flex items-baseline justify-between gap-4">
-                <span className="text-[0.9375rem] font-black text-ink">Total charged today</span>
-                <span className="text-3xl font-black tracking-tight text-emerald-500">
-                  $0.00
-                </span>
+              {/* The total: the plan's real price for the chosen term. Billing is a demo (no processor
+                  is connected, so no money is taken), which the line under it says plainly. */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-baseline justify-between gap-4">
+                  <span className="text-[0.9375rem] font-black text-ink">
+                    Total{!isFree && <span className="text-ink-faint font-bold"> · {period === 'yearly' ? '1 year' : '1 month'}</span>}
+                  </span>
+                  <span className={`text-3xl font-black tracking-tight ${isFree ? 'text-emerald-500' : 'text-ink'}`}>
+                    ${(period === 'yearly' ? plan.priceYearly : plan.priceMonthly)
+                      .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                {!isFree && (
+                  <p className="text-[0.71875rem] font-medium text-ink-faint text-right">
+                    Demo billing: no payment is taken.
+                  </p>
+                )}
               </div>
             </div>
           </div>
