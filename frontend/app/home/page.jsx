@@ -90,16 +90,35 @@ export default async function HomePage() {
       .from('organisations')
       .select('id')
       .eq('id', profile.currentOrgId)
+      // Explicit, not left to RLS: a platform operator can read a suspended organisation, and must not be sent
+      // into its dashboard (which sends them back here).
+      .is('deletedAt', null)
       .maybeSingle();
 
     // Already a member of a working organisation — the gate is closed.
     if (orgRow) redirect('/dashboard');
   }
 
+  // Still an ACTIVE member of an organisation they can no longer reach: the platform suspended it (an
+  // administrator deleting it suspends every membership and clears the pointer instead). Say so, rather than
+  // greeting them with "set up your site" as if they had never had one.
+  let suspendedOrg = false;
+  if (profile?.currentOrgId) {
+    const { data: membership } = await supabase
+      .from('memberships')
+      .select('id')
+      .eq('orgId', profile.currentOrgId)
+      .eq('profileId', data.user.id)
+      .eq('status', 'ACTIVE')
+      .maybeSingle();
+    suspendedOrg = Boolean(membership);
+  }
+
   return (
     <HomeScreen
       email={profile?.email ?? data.user.email ?? null}
       fullName={profile?.fullName ?? null}
+      suspendedOrg={suspendedOrg}
       // A tier chosen but not yet spent on an organisation, so returning here
       // resumes the abandoned checkout rather than starting over.
       pendingPlan={profile?.selectedPlan ?? null}

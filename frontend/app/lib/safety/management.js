@@ -8,6 +8,16 @@
 
 import { createClient } from '../supabase/server';
 
+// Zones and memberships are also filtered on the caller's own organisation: RLS lets a platform operator read
+// every organisation's zones and members, so an operator who is also a member was offered other customers'
+// zones and people in these pickers. (Corrective actions are safety data, which operators cannot read.)
+async function currentOrgId(supabase) {
+  const { data } = await supabase.auth.getUser();
+  if (!data?.user) return null;
+  const { data: profile } = await supabase.from('profiles').select('currentOrgId').eq('id', data.user.id).maybeSingle();
+  return profile?.currentOrgId ?? null;
+}
+
 const ACTION_LIMIT = 100;
 // "Today" is the viewer's own calendar day (the screens pass it); the UTC day is only a fallback.
 const today = (day) => (typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : new Date().toISOString().slice(0, 10));
@@ -17,9 +27,12 @@ export async function listSafetyZones() {
   const supabase = createClient();
   if (!supabase) return { zones: [], error: 'You are not signed in, or the database is not configured.' };
   try {
+    const orgId = await currentOrgId(supabase);
+    if (!orgId) return { zones: [] };
     const { data, error } = await supabase
       .from('zones')
       .select('id, name, safetyType, cameraId, camera:cameras(name)')
+      .eq('orgId', orgId)
       .is('deletedAt', null)
       .order('name', { ascending: true })
       .limit(500);
@@ -97,9 +110,12 @@ export async function listAssignees() {
   const supabase = createClient();
   if (!supabase) return { people: [] };
   try {
+    const orgId = await currentOrgId(supabase);
+    if (!orgId) return { people: [] };
     const { data, error } = await supabase
       .from('memberships')
       .select('profileId, role, profiles:profileId (fullName, email)')
+      .eq('orgId', orgId)
       .eq('status', 'ACTIVE');
     if (error) throw new Error(error.message);
     return {

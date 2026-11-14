@@ -26,6 +26,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient, isPlatformAdmin } from '../../../lib/supabase/server';
+import { planName } from '../../../lib/plans';
 
 /** Same bounds as the organisations_retention_range CHECK constraint in 001. */
 const RETENTION_MIN = 1;
@@ -154,19 +155,33 @@ export async function setRetentionDays(orgId, days) {
     .eq('id', orgId)
     // See the matching comment in setSuspended() above — an RLS-filtered
     // UPDATE returns no error, so the row must be asked for explicitly.
-    .select('id');
+    .select('id, dataRetentionDays, plan');
 
   if (error) return { ok: false, error: error.message };
   if (!updated || updated.length === 0) {
     return { ok: false, error: 'That organisation could not be updated.' };
   }
 
+  // The plan-limit trigger (015/029) clamps a value above the plan's history to that maximum without an error,
+  // so what was STORED is read back: saying "Saved" and auditing the requested number recorded a change that
+  // never happened.
+  const stored = Number(updated[0].dataRetentionDays);
+  const plan = planName(updated[0].plan);
+  if (stored === Number(before.dataRetentionDays)) {
+    return { ok: false, error: `The ${plan} plan keeps at most ${stored} days of history, so retention stays at ${stored} days.` };
+  }
+
   await audit(supabase, {
     action: 'platform.retention_changed',
     orgId,
     orgName: before.name,
-    metadata: { from: Number(before.dataRetentionDays), to: parsed },
+    metadata: { from: Number(before.dataRetentionDays), to: stored, ...(stored !== parsed ? { requested: parsed } : {}) },
   });
+
+  if (stored !== parsed) {
+    revalidatePath(`/platform/organisations/${orgId}`);
+    return { ok: true, notice: `The ${plan} plan keeps at most ${stored} days of history, so retention was set to ${stored} days.` };
+  }
 
   revalidatePath(`/platform/organisations/${orgId}`);
   revalidatePath('/platform/organisations');

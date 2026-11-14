@@ -28,6 +28,15 @@ function formFromRule(rule) {
   };
 }
 
+/** 'exit zone' or 'checkpoint zone' when a rule refers to one that no longer exists, else null. */
+function missingZoneRef(rule, zones) {
+  const p = rule.params || {};
+  const gone = (id) => id && !zones.some((z) => z.id === id);
+  if (gone(p.exit_zone_id)) return 'exit zone';
+  if (p.mode === 'VIA_CHECKPOINT' && gone(p.checkpoint_zone_id)) return 'checkpoint zone';
+  return null;
+}
+
 function ParamField({ field, form, setParams, zones }) {
   const value = form.params[field.key];
   if (field.when && !field.when(form.params)) return null;
@@ -185,7 +194,8 @@ function RuleForm({ initial, zones, onSaved, onCancel }) {
         {check.state === 'invalid' && <Notice tone="error">{check.errors.map(friendlyRuleError).join(' ')}</Notice>}
         {check.state === 'error' && <Notice tone="error">{check.message}</Notice>}
       </div>
-      {error && <Notice tone="error">{error}</Notice>}
+      {/* Not twice: a save refused for the reason the live check above already shows. */}
+      {error && !(check.state === 'invalid' && error === check.errors.map(friendlyRuleError).join(' ')) && <Notice tone="error">{error}</Notice>}
       <div className="flex gap-2">
         <button type="submit" disabled={saving} className={BTN_PRIMARY}>
           {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />} {editing ? 'Save changes' : 'Create rule'}
@@ -210,7 +220,9 @@ export default function RulesScreen({ role }) {
     setState({ loading: false, rules: r.data.rules, error: null });
   }, []);
 
-  useEffect(() => { load(); listSafetyZones().then((r) => setZones(r.zones || [])); }, [load]);
+  // zonesReady: a rule is only called broken once the zone list has actually arrived.
+  const [zonesReady, setZonesReady] = useState(false);
+  useEffect(() => { load(); listSafetyZones().then((r) => { setZones(r.zones || []); setZonesReady(!r.error); }); }, [load]);
 
   async function toggle(rule) {
     setMessage(null);
@@ -256,6 +268,11 @@ export default function RulesScreen({ role }) {
                   <p className="text-[0.6875rem] text-ink-muted">{ruleSummary(rule.type, rule.params, (id) => (zones.find((z) => z.id === id) || {}).name)}</p>
                 )}
                 {!rule.evaluated_by_engine && <p className="text-[0.6875rem] text-ink-faint">Saved, but the safety engine does not act on this kind of rule yet.</p>}
+                {/* A zone this rule names in its settings (the exit, or the checkpoint) was deleted. Deleting a zone removes
+                    the rules ON it, but not this reference, and the engine then skips the rule: say so, here. */}
+                {zonesReady && missingZoneRef(rule, zones) && (
+                  <Notice tone="error">The {missingZoneRef(rule, zones)} this rule uses was deleted, so the rule is not checked. Edit it to choose another, or delete it.</Notice>
+                )}
                 {canEdit && (
                   <div className="flex flex-wrap gap-2">
                     <button type="button" onClick={() => toggle(rule)} className={BTN_QUIET}>{rule.isEnabled ? 'Turn off' : 'Turn on'}</button>

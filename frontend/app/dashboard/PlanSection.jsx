@@ -215,6 +215,8 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
 
   // The stored plan once loaded (it changes when the plan is switched here), the page's copy until then.
   const plan = usage?.plan ?? planProp;
+  // What the organisation actually pays for (the stored term), not the comparison toggle below.
+  const billed = usage?.billingPeriod ?? period;
   const expired = Boolean(usage?.expired);
 
   // Fails closed on an unrecognised tier: planName renders "Unknown" rather
@@ -265,11 +267,11 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
             <div className="text-right">
               <div className="flex items-baseline gap-1.5 justify-end">
                 <span className="text-3xl font-black tracking-tight text-accent">
-                  {formatPrice(plan, period === 'YEARLY' ? 'yearly' : 'monthly')}
+                  {formatPrice(plan, billed === 'YEARLY' ? 'yearly' : 'monthly')}
                 </span>
                 {!isFree && (
                   <span className="text-[0.8125rem] font-bold opacity-55">
-                    /{period === 'YEARLY' ? 'year' : 'month'}
+                    /{billed === 'YEARLY' ? 'year' : 'month'}
                   </span>
                 )}
               </div>
@@ -279,7 +281,7 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
                   "$49/month" is not comparable at a glance. The per-month
                   equivalent answers "is this a good deal" without making the
                   reader divide. */}
-              {!isFree && period === 'YEARLY' && (
+              {!isFree && billed === 'YEARLY' && (
                 <p className="text-[0.71875rem] font-bold text-accent/80 mt-1">
                   {fmtMoney(yearlyPerMonth(plan))}/month equivalent
                 </p>
@@ -303,7 +305,8 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
               <div className="flex items-center gap-2.5">
                 <Calendar className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
                 <span className="text-[0.75rem] font-black uppercase tracking-[0.12em] opacity-55">
-                  Billing period
+                  {/* Nothing is billed on the free tier. */}
+                  {isFree ? 'Plan term' : 'Billing period'}
                 </span>
               </div>
               {/* Only meaningful when there IS an end date. The free tier does
@@ -592,7 +595,9 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
                       // a fresh term. One click is too few for either.
                       <div className="flex flex-col gap-2">
                         <p className="text-[0.71875rem] text-ink-muted font-medium leading-relaxed text-center">
-                          Switch to {p.name}, billed {period === 'YEARLY' ? 'yearly' : 'monthly'}?
+                          {p.priceMonthly === 0
+                            ? `Switch to ${p.name}? It is free and does not expire.`
+                            : `Switch to ${p.name}, billed ${period === 'YEARLY' ? 'yearly' : 'monthly'}?`}
                         </p>
                         <div className="flex gap-2">
                           <button

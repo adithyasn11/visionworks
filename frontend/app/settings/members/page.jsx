@@ -72,6 +72,10 @@ export default async function MembersPage() {
       .eq('status', 'ACTIVE').maybeSingle(),
   ]);
 
+  // Removed or suspended since currentOrgId was set: there is no roster to show them, so send them home (where an
+  // invitation or a new organisation is the way on), as the dashboard does.
+  if (!membership) redirect('/home');
+
   return (
     <MembersScreen
       orgName={org?.name ?? 'your organisation'}

@@ -83,23 +83,33 @@ function ActionCard({ action, people, canEdit, onChanged }) {
           )}
           {action.status === 'OPEN' && <button type="button" disabled={busy} onClick={() => run({ status: 'IN_PROGRESS' })} className={BTN_QUIET}>Start</button>}
           {action.status === 'IN_PROGRESS' && <button type="button" disabled={busy} onClick={() => run({ status: 'OPEN' })} className={BTN_QUIET}>Back to open</button>}
-          {active && !closing && <button type="button" disabled={busy} onClick={() => setClosing(true)} className={BTN_PRIMARY}>Close</button>}
-          {active && <button type="button" disabled={busy} onClick={() => run({ status: 'CANCELLED', closingNote: 'Cancelled' })} className={BTN_QUIET}>Cancel the action</button>}
+          {active && !closing && <button type="button" disabled={busy} onClick={() => setClosing('close')} className={BTN_PRIMARY}>Close</button>}
+          {/* Cancelling asks why, like closing does: it used to cancel at once with "Cancelled" as the only record. */}
+          {active && !closing && <button type="button" disabled={busy} onClick={() => setClosing('cancel')} className={BTN_QUIET}>Cancel the action</button>}
           {!active && <button type="button" disabled={busy} onClick={() => run({ status: 'OPEN' })} className={BTN_QUIET}>Reopen</button>}
         </div>
       )}
       {closing && (
         <div className="flex flex-col gap-2">
-          <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">What was done
+          <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">{closing === 'cancel' ? 'Why is it being cancelled?' : 'What was done'}
             <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} rows={2} className={`${INPUT} resize-y`} autoFocus />
           </label>
           <div className="flex gap-2">
-            <button type="button" disabled={busy || !note.trim()} onClick={() => run({ status: 'CLOSED', closingNote: note })} className={BTN_PRIMARY}>
-              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />} Close the action
+            <button
+              type="button"
+              disabled={busy || !note.trim()}
+              onClick={() => run({ status: closing === 'cancel' ? 'CANCELLED' : 'CLOSED', closingNote: note.trim() })}
+              className={BTN_PRIMARY}
+            >
+              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />} {closing === 'cancel' ? 'Cancel the action' : 'Close the action'}
             </button>
-            <button type="button" onClick={() => setClosing(false)} className={BTN_QUIET}>Not yet</button>
+            <button type="button" onClick={() => { setClosing(false); setNote(''); }} className={BTN_QUIET}>{closing === 'cancel' ? 'Keep it' : 'Not yet'}</button>
           </div>
-          {!note.trim() && <p className="text-[0.6875rem] text-ink-faint">Say what was done, then close it.</p>}
+          {!note.trim() && (
+            <p className="text-[0.6875rem] text-ink-faint">
+              {closing === 'cancel' ? 'Say why, then cancel it.' : 'Say what was done, then close it.'}
+            </p>
+          )}
         </div>
       )}
       {error && <Notice tone="error">{error}</Notice>}

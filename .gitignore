@@ -41,6 +41,7 @@ sample_videos/*.mp4
 sample_videos/*.avi
 sample_videos/*.mkv
 sample_videos/*.mov
+sample_videos/kept/
 
 # ─── Frontend (Next.js / Node) ───────────────────────────────────────────────
 frontend/node_modules/

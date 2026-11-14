@@ -246,8 +246,8 @@ async def pairing_socket(websocket: WebSocket, code: str):
         await _send(websocket, {
             "type": "error",
             "reason": "expired",
-            "message": "This pairing code has expired. Generate a new one on "
-                       "the laptop and scan it again.",
+            "message": "This pairing code has expired or is not valid. Generate a "
+                       "new one on the laptop and scan it again.",
         })
         await websocket.close(code=1008, reason="unknown or expired code")
         return

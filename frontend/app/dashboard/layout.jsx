@@ -78,6 +78,9 @@ export default async function DashboardLayout({ children }) {
     .from('organisations')
     .select('id')
     .eq('id', profile.currentOrgId)
+    // RLS already hides a suspended (soft-deleted) organisation from its members, but not from a platform
+    // operator who is also a member; filter it here so they get the same answer as everyone else.
+    .is('deletedAt', null)
     .maybeSingle();
 
   if (!org) redirect('/onboarding');

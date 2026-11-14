@@ -49,18 +49,25 @@ export default function EventsScreen({ role }) {
 
   const load = useCallback(async () => {
     const mine = ++request.current;
+    // A last day before the first (typed, or picked before the other field limited the calendar) is answered
+    // here in words, not with the server's "until must be after since".
+    if (filters.from && filters.to && filters.to < filters.from) {
+      setData({ loading: false, rows: [], total: null, next: null, error: 'The last day cannot be before the first.' });
+      return;
+    }
     setData((d) => ({ ...d, loading: true }));
     const r = tab === 'decisions' ? await listDecisions(query) : await listEvents(query);
     if (mine !== request.current) return; // a newer filter, tab or page has taken over
     if (!r.ok) { setData({ loading: false, rows: [], total: null, next: null, error: r.message }); return; }
     setData({ loading: false, rows: tab === 'decisions' ? r.data.decisions : r.data.events, total: r.data.total, next: r.data.next_offset, error: null });
-  }, [tab, query]);
+  }, [tab, query, filters.from, filters.to]);
 
   useEffect(() => { load(); }, [load]);
 
   const set = (patch) => { setFilters((f) => ({ ...f, ...patch })); setOffset(0); setOpen(null); };
 
   async function exportCsv() {
+    if (filters.from && filters.to && filters.to < filters.from) { setExporting({ error: 'The last day cannot be before the first.' }); return; }
     setExporting({ busy: true });
     const r = await downloadExport({ since: dayStart(filters.from), until: dayEnd(filters.to), status: filters.status || undefined });
     setExporting(r.ok ? { done: true, truncated: r.truncated } : { error: r.message });
@@ -103,7 +110,8 @@ export default function EventsScreen({ role }) {
           </button>
         )}
       </div>
-      {exporting && exporting.error && <Notice tone="error" className="mb-3">{exporting.error}</Notice>}
+      {/* Not twice: a reversed range already shows the same sentence for the list below. */}
+      {exporting && exporting.error && exporting.error !== data.error && <Notice tone="error" className="mb-3">{exporting.error}</Notice>}
       {exporting && exporting.done && (
         <Notice tone="ok" className="mb-3">
           The file was downloaded. It follows the result and date filters above (the zone and review filters do not apply, and with no dates chosen it covers the last 30 days){exporting.truncated ? '; it holds only the newest 20,000 rows of the period, so choose a shorter one for the rest' : ''}.

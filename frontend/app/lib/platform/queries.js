@@ -110,13 +110,15 @@ export async function getPlatformOverview() {
  * shape.
  */
 function buildSignupSeries(orgs, days) {
+  // UTC throughout: the keys are UTC dates (toISOString), so the days must be UTC days too. Local midnight on a
+  // server east of UTC is the previous UTC date, which left today's sign-ups outside the window.
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
 
   const buckets = new Map();
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today);
-    d.setDate(d.getDate() - i);
+    d.setUTCDate(d.getUTCDate() - i);
     buckets.set(d.toISOString().slice(0, 10), 0);
   }
 
@@ -373,7 +375,7 @@ export async function getOrganisationDetail(orgId) {
       .order('name'),
     supabase
       .from('zones')
-      .select('id, name, zoneType, capacity, colour, excludeFromUtilisation, cameraId, siteId, createdAt')
+      .select('id, name, zoneType, safetyType, capacity, colour, excludeFromUtilisation, cameraId, siteId, createdAt')
       .eq('orgId', orgId)
       .is('deletedAt', null)
       .order('name'),
@@ -450,6 +452,8 @@ export async function getOrganisationDetail(orgId) {
       id: z.id,
       name: z.name,
       zoneType: z.zoneType,
+      // What the safety rules treat the zone as (PPE checkpoint, restricted, ...): the type customers see.
+      safetyType: z.safetyType,
       capacity: z.capacity == null ? null : n(z.capacity),
       colour: z.colour,
       excludeFromUtilisation: Boolean(z.excludeFromUtilisation),

@@ -31,7 +31,7 @@
 // still the real boundary, but failing fast here returns a usable message
 // instead of an opaque policy violation.
 
-import { planName } from '../lib/plans';
+import { planLimitSentence } from '../lib/plans';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '../lib/supabase/server';
 
@@ -73,12 +73,8 @@ function describeDbError(error, fallback) {
   // The `plan_limit_` prefix is the contract between the trigger and this
   // mapper; matching on it rather than on the prose means the wording can
   // change in SQL without silently falling through to the raw error here.
-  const planLimit = msg.match(/plan_limit_(cameras|sites|seats):\s*(.+?)(?:\s*CONTEXT:|$)/is);
-  if (planLimit) {
-    // Tier ids (FREE, GROWTH) read as the names people see (Starter, Growth).
-    const text = planLimit[2].trim().replace(/the (FREE|GROWTH|ENTERPRISE) plan/, (_, id) => `the ${planName(id)} plan`);
-    return `${text} Upgrade or renew the plan to add more.`;
-  }
+  const planLimit = planLimitSentence(msg);
+  if (planLimit) return planLimit;
 
   if (/row-level security/i.test(msg)) {
     return 'You do not have permission to do that in this organisation.';
@@ -159,7 +155,7 @@ export async function createOrganisation(formData) {
   // does not count, so someone whose organisation was deleted can still start over.
   const { data: me } = await supabase.from('profiles').select('currentOrgId').eq('id', user.id).maybeSingle();
   if (me?.currentOrgId) {
-    const { data: existing } = await supabase.from('organisations').select('id').eq('id', me.currentOrgId).maybeSingle();
+    const { data: existing } = await supabase.from('organisations').select('id').eq('id', me.currentOrgId).is('deletedAt', null).maybeSingle();
     if (existing) return fail('You already have an organisation. Open the dashboard to carry on setting it up.');
   }
 

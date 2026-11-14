@@ -79,7 +79,7 @@ function describe(entry) {
   switch (entry.action) {
     case 'platform.retention_changed':
       return m.from != null && m.to != null
-        ? `Changed from ${m.from} to ${m.to} days${m.to < m.from ? ' — shortening deletes data on the next retention run' : ''}`
+        ? `Changed from ${m.from} to ${m.to} days${m.requested != null && m.requested !== m.to ? ` (${m.requested} asked for; the plan allows at most ${m.to})` : ''}${m.to < m.from ? ' — shortening deletes data on the next retention run' : ''}`
         : null;
     case 'platform.admin_granted':
       return m.email ? `Granted to ${m.email}${m.note ? ` (${m.note})` : ''}` : null;
@@ -210,7 +210,8 @@ export default async function PlatformAuditPage({ searchParams }) {
               const summary = describe(e);
               // Anything the summary did not already say.
               const extraKeys = Object.keys(e.metadata ?? {}).filter(
-                (k) => !['from', 'to', 'email', 'note', 'targetEmail', 'selfRevoke', 'previousDeletedAt'].includes(k),
+                // targetProfileId: the summary already names the person by email; the raw id is noise.
+                (k) => !['from', 'to', 'requested', 'email', 'note', 'targetEmail', 'targetProfileId', 'selfRevoke', 'previousDeletedAt'].includes(k),
               );
 
               return (

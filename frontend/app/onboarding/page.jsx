@@ -103,6 +103,9 @@ export default async function OnboardingPage({ searchParams }) {
       .from('organisations')
       .select('id')
       .eq('id', profile.currentOrgId)
+      // Explicit: a platform operator can read a suspended organisation through RLS, and treating it as
+      // reachable bounced them between here and the dashboard (which refuses it).
+      .is('deletedAt', null)
       .maybeSingle();
     orgReachable = Boolean(orgRow);
   }

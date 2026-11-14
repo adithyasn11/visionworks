@@ -88,7 +88,7 @@ export default async function PlatformOverviewPage() {
           <StatTile
             label="Members"
             value={stats?.totalMembers ?? 0}
-            hint={stats?.pendingInvites ? `${stats.pendingInvites} invite(s) pending` : 'across all orgs'}
+            hint={stats?.pendingInvites ? `${stats.pendingInvites} invite${stats.pendingInvites === 1 ? '' : 's'} pending` : 'across all orgs'}
             icon={Users}
           />
           <StatTile

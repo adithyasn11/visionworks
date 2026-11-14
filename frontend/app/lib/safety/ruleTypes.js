@@ -175,7 +175,15 @@ const FRIENDLY = [
 export function friendlyRuleError(message) {
   const text = String(message || '');
   const hit = FRIENDLY.find(([re]) => re.test(text));
-  return hit ? hit[1] : text;
+  if (hit) return hit[1];
+  // "max_seconds must be between 10 and 86400, got 5" -> "Longest stay (seconds) must be between 10 and 86400."
+  const range = text.match(/(\w+) must be between ([\d.]+) and ([\d.]+)/i);
+  if (range) {
+    const field = RULE_TYPES.flatMap((t) => t.fields || []).find((x) => x.key === range[1]);
+    const label = field?.label?.replace(/\s*\(optional\)\s*$/i, '') || 'That value';
+    return `${label} must be between ${range[2]} and ${range[3]}.`;
+  }
+  return text;
 }
 
 /** 125 -> "2 min 5 s". Plain words for a length of time in the rule list. */

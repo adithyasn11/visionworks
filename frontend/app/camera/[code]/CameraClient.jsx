@@ -261,7 +261,7 @@ export default function CameraClient({ code }) {
           if (msg.reason === 'expired') {
             genRef.current += 1;   // do not reconnect into a dead room
             setStatus('expired');
-            setMessage(msg.message || 'This pairing code has expired.');
+            setMessage(msg.message || 'This pairing code has expired or is not valid.');
           }
           break;
         case 'replaced':
@@ -373,7 +373,7 @@ export default function CameraClient({ code }) {
     connecting: { Icon: Loader2, cls: 'text-white/40', label: 'Connecting', spin: true },
     denied: { Icon: CameraOff, cls: 'text-red-400', label: 'Blocked' },
     error: { Icon: AlertTriangle, cls: 'text-red-400', label: 'Error' },
-    expired: { Icon: AlertTriangle, cls: 'text-red-400', label: 'Expired' },
+    expired: { Icon: AlertTriangle, cls: 'text-red-400', label: 'Code not valid' },
     replaced: { Icon: AlertTriangle, cls: 'text-amber-400', label: 'Replaced' },
   }[status] || { Icon: Loader2, cls: 'text-white/40', label: '', spin: true };
 
@@ -493,7 +493,8 @@ export default function CameraClient({ code }) {
       <footer className="px-4 py-3 border-t border-white/10 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-white/35">
-            paired as
+            {/* Only a live pairing is "paired"; an expired or unknown code is just the code that was scanned. */}
+            {status === 'expired' ? 'code' : 'paired as'}
           </p>
           <p className="font-mono text-[0.8125rem] font-bold tracking-[0.16em]">{code}</p>
         </div>

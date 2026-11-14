@@ -77,6 +77,8 @@ This guide walks you through the whole app from nothing to a finished safety rep
   - **Expect:** "invalid credentials"-style error; you stay on the page.
 - [ ] Click **Show** next to the password.
   - **Expect:** the password becomes visible, and **Hide** hides it again.
+- [ ] Click **Forgot password?**, enter an address and send.
+  - **Expect:** the same neutral "if an account exists…" message whether or not the address has an account. The emailed link opens **Set a new password**; after saving, the old password no longer works and the new one does. Opening `/reset-password` without the link says the link is missing or expired.
 
 ### 2.2 Create account A (you, the administrator)
 Choose one way.
@@ -321,8 +323,8 @@ The progress bar at the top shows **Organisation · Site · Camera**.
   - **Close** (marks it done);
   - **Reopen**;
   - **Back to open**;
-  - **Cancel the action**.
-  - **Expect:** each change sticks after a reload.
+  - **Cancel the action**: it asks **Why is it being cancelled?** and stays disabled until you write a reason; **Keep it** backs out.
+  - **Expect:** each change sticks after a reload, and a cancelled action shows "Cancelled: <your reason>".
 - [ ] Set a due date in the past.
   - **Expect:** it shows as overdue.
 
@@ -425,6 +427,7 @@ node scripts/sql.mjs "update organisations set \"planRenewsAt\" = now() - interv
 - [ ] **12.3** In a **private window**, sign up as account B with the invited email (email and password, or Google with that address).
   - **Expect:** B goes straight into the dashboard of `Test Plant Ltd`, without onboarding.
 - [ ] **12.4** If B already had an account: sign in as B. **Expect:** Home shows the invitation with **Accept** and **Decline**; **Accept** shows "Joining…", then the dashboard.
+  - Try **Decline** first. **Expect:** "Invitation declined."; on A's Members page B's row says **Declined** (not counted as a member). Invite B again from the form, or use **Invite again — new link** on the row. **Expect:** it is accepted as a new invitation, and B can now **Accept**.
 - [ ] **12.5** As B (Manager), check what B can do:
   - [ ] Review: can confirm and dismiss;
   - [ ] Organisation settings: read-only;
@@ -438,7 +441,8 @@ node scripts/sql.mjs "update organisations set \"planRenewsAt\" = now() - interv
   - **Expect:** the link stops working.
 - [ ] **12.8** Try to demote or remove yourself while you are the only admin.
   - **Expect:** it is blocked, because the organisation must keep one admin.
-- [ ] **12.9** Make B an Admin. Then **Remove from organisation** B (or decline as B on a fresh invite).
+- [ ] **12.9** Make B an Admin. Then **Remove from organisation** B. **Expect:** the first click changes it to **Click again to remove them**; only the second click removes.
+  - As the removed B, open `/dashboard` or `/settings/members`. **Expect:** you are sent to Home.
 
 ---
 
@@ -451,6 +455,7 @@ node scripts/sql.mjs "update organisations set \"planRenewsAt\" = now() - interv
 - [ ] **Privacy & retention**: change **Keep records for** to a shorter time.
   - **Expect:** a "Yes, shorten retention" confirmation appears first.
 - [ ] Toggle **Delete uploaded video after processing**.
+  - Off, then upload a video on **Live feed**. **Expect:** after processing the file is kept in `sample_videos/kept/<organisation id>/`. On again: the next upload is deleted after processing.
 - [ ] Click **Back to dashboard**.
 - [ ] **Delete this organisation**: do this **last** (step 15), since it ends the test.
 
@@ -477,6 +482,8 @@ node scripts/sql.mjs "update organisations set \"planRenewsAt\" = now() - interv
 `/platform` is for the operator who runs VisionWorks itself, not for customer organisations. After the wipe, nobody has operator access. If you want to test it, tell Claude which account to make an operator. Then check:
 - [ ] **Overview**: stats, signups chart, recent signups.
 - [ ] **Organisations**: filters, table, open one, and its actions.
+  - Set retention above the plan's history (for example 30 on Starter). **Expect:** "The Starter plan keeps at most 7 days of history…" rather than "Saved".
+  - **Suspend…** (type the name). **Expect:** the organisation's members see "Your organisation is suspended" on Home and cannot open the dashboard; **Restore access** brings it back.
 - [ ] **Health**.
 - [ ] **Audit**: filters.
 - [ ] **Operators**: list, revoke.

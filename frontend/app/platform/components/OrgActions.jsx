@@ -26,7 +26,7 @@ function Result({ result }) {
       className={`flex items-center gap-1.5 text-[0.75rem] font-bold ${ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-accent'}`}
     >
       {ok ? <Check className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
-      {ok ? (result.unchanged ? 'No change needed.' : 'Saved.') : result.error}
+      {ok ? (result.unchanged ? 'No change needed.' : result.notice || 'Saved.') : result.error}
     </p>
   );
 }
@@ -86,7 +86,7 @@ export default function OrgActions({ org }) {
                 Data retention
               </label>
               <p className="text-[0.71875rem] text-ink-muted leading-relaxed mt-0.5">
-                Minute buckets older than this are deleted by the nightly job.
+                Detection records older than this are deleted by the nightly job.
                 Shortening it destroys data on the next run.
               </p>
             </div>

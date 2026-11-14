@@ -57,6 +57,9 @@ export default async function OrganisationSettingsPage() {
     .eq('orgId', profile.currentOrgId).eq('profileId', data.user.id)
     .eq('status', 'ACTIVE').maybeSingle();
 
+  // Removed or suspended since currentOrgId was set: nothing here is theirs to see any more.
+  if (!membership) redirect('/home');
+
   return (
     <OrganisationSettingsScreen
       role={membership?.role ?? null}

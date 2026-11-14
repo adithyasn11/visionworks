@@ -8,6 +8,7 @@
 // what would fill it, because "0 cameras" and "we could not load cameras" are
 // completely different support situations.
 
+import { zoneTypeMeta } from '../../lib/zoneTypes';
 import React from 'react';
 import {
   Users, MapPin, Camera, Shapes, History, AlertCircle, Inbox,
@@ -343,7 +344,7 @@ export function ZonesSection({ zones, error }) {
                   </div>
                 </td>
                 <td className="px-4 py-3 text-[0.78125rem] font-semibold text-ink-muted">
-                  {z.zoneType}
+                  {zoneTypeMeta(z.safetyType).label}
                 </td>
                 <td className="px-4 py-3 font-mono text-[0.71875rem] text-ink-muted truncate">
                   {z.cameraName ?? '—'}

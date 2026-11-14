@@ -373,9 +373,48 @@ def delete_zone(
     if not zone:
         raise HTTPException(status_code=404, detail=f"Zone '{zone_id}' not found")
 
+    camera_name = zone.camera_id
     db.delete(zone)
     db.commit()
+    # The other half: the dashboard database's copy of this zone. Without it, a deleted zone stayed in Postgres
+    # with its rules still listed on the Rules screen. Deleting the row removes its rules (ON DELETE CASCADE) and
+    # leaves past decisions and events in place with no zone (ON DELETE SET NULL), as the editor warns.
+    _remove_zone_from_postgres(org_id, camera_name, zone_id)
     return None
+
+
+def _remove_zone_from_postgres(org_id: str, camera_name: str, zone_id: str) -> None:
+    """Best-effort, like `_mirror_zone_to_postgres`: an outage must not undo the local delete."""
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not key or "your-" in key:
+        return
+    import json
+    import urllib.parse
+    import urllib.request
+
+    base = (os.getenv("SUPABASE_URL") or "").rstrip("/")
+    headers = {"apikey": key, "Authorization": f"Bearer {key}", "Accept": "application/json"}
+
+    def call(method: str, table: str, params: dict):
+        url = f"{base}/rest/v1/{table}?{urllib.parse.urlencode(params)}"
+        request = urllib.request.Request(url, headers=headers, method=method)
+        with urllib.request.urlopen(request, timeout=10) as response:
+            body = response.read().decode("utf-8")
+            return json.loads(body) if body else []
+
+    try:
+        cameras = call("GET", "cameras", {"select": "id", "orgId": f"eq.{org_id}", "name": f"eq.{camera_name}", "limit": "1"})
+        if not cameras:
+            return
+        camera_id = cameras[0]["id"]
+        # Matched on the slug (the stable id), or on `name` for rows mirrored before slugs existed.
+        for column in ("slug", "name"):
+            rows = call("GET", "zones", {"select": "id", "orgId": f"eq.{org_id}", "cameraId": f"eq.{camera_id}", column: f"eq.{zone_id}"})
+            if rows:
+                call("DELETE", "zones", {"id": f"eq.{rows[0]['id']}"})
+                return
+    except Exception as e:  # noqa: BLE001 - logged, never raised: the local delete already happened
+        logger.warning("Zone %s was deleted locally but not from the dashboard database: %s", zone_id, e)
 
 @router.post("/", response_model=ZoneResponse, status_code=status.HTTP_201_CREATED)
 def create_or_update_zone(

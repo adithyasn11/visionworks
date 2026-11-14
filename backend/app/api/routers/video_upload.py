@@ -99,6 +99,53 @@ _active_sessions: dict = {}
 # sample_videos/ by hand are left untouched.
 _UPLOAD_NAME_RE = re.compile(r'^[0-9a-f]{8}_')
 ORPHAN_UPLOAD_MAX_AGE_SECONDS = 6 * 3600
+# Where a processed upload goes when its organisation turned "Delete uploaded video after processing" off. A folder
+# per organisation, outside the top level the orphan sweep reads, so a kept video stays until someone removes it.
+KEPT_VIDEOS_DIR = os.path.join(SAMPLE_VIDEOS_DIR, "kept")
+
+
+def _org_keeps_uploads(org_id: Optional[str]) -> bool:
+    """
+    True only when the organisation has explicitly turned purging OFF (organisations.purgeVideoAfterProcessing =
+    false). Any doubt (no org, no service key, the database unreachable) answers False, so the video is deleted.
+    """
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    base = (os.getenv("SUPABASE_URL") or "").rstrip("/")
+    if not org_id or not key or "your-" in key or not base:
+        return False
+    import urllib.parse
+    import urllib.request
+    try:
+        query = urllib.parse.urlencode({"select": "purgeVideoAfterProcessing", "id": f"eq.{org_id}", "limit": "1"})
+        request = urllib.request.Request(
+            f"{base}/rest/v1/organisations?{query}",
+            headers={"apikey": key, "Authorization": f"Bearer {key}", "Accept": "application/json"},
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:
+            rows = json.loads(response.read().decode("utf-8") or "[]")
+        return bool(rows) and rows[0].get("purgeVideoAfterProcessing") is False
+    except Exception as e:  # noqa: BLE001 - deleting is the safe answer
+        logger.warning("Could not read the video-retention setting for %s; the upload will be deleted: %s", org_id, e)
+        return False
+
+
+def _finish_upload_file(session: dict, video_path: str) -> None:
+    """After processing: delete the upload, or move it into the organisation's kept folder when it asked to keep it."""
+    if not video_path or not os.path.exists(video_path):
+        return
+    if session.get("keep_upload") and session.get("org_id"):
+        target_dir = os.path.join(KEPT_VIDEOS_DIR, re.sub(r"[^0-9a-fA-F-]", "", str(session["org_id"])))
+        try:
+            os.makedirs(target_dir, exist_ok=True)
+            shutil.move(video_path, os.path.join(target_dir, os.path.basename(video_path)))
+            logger.info("Kept the processed upload %s (the organisation keeps uploaded video)", os.path.basename(video_path))
+            return
+        except OSError as e:
+            logger.warning("Could not keep the processed upload, deleting it instead: %s", e)
+    try:
+        os.remove(video_path)
+    except OSError:
+        pass
 
 
 # Used when a camera has no zones drawn yet, so a first-time user still sees
@@ -585,6 +632,9 @@ async def upload_video_file(
         # ISO string (UTC) or None; the process socket builds the safety clock
         # from it.
         "recorded_at": recorded_at_utc.isoformat() if recorded_at_utc else None,
+        # Organisation setting "Delete uploaded video after processing". Read once here, so the end of processing
+        # needs no network call. Unknown means delete: the footage is the sensitive part.
+        "keep_upload": await asyncio.to_thread(_org_keeps_uploads, org_id),
     }
 
     # Reclaim uploads that were never processed (client never opened the
@@ -947,8 +997,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         cap.release()
         session["status"] = "DONE"
         try:
-            if os.path.exists(video_path):
-                os.remove(video_path)
+            _finish_upload_file(session, video_path)
         except Exception:
             pass
         _active_sessions.pop(session_id, None)

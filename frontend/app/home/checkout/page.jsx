@@ -87,6 +87,7 @@ export default async function CheckoutPage({ searchParams }) {
       .from('organisations')
       .select('id')
       .eq('id', profile.currentOrgId)
+      .is('deletedAt', null) // explicit, for a platform operator who can read suspended organisations
       .maybeSingle();
 
     if (orgRow) redirect('/dashboard');

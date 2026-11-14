@@ -48,7 +48,7 @@
 // token-based acceptance route has something to verify against. Email matching
 // is what makes OAuth invitees work, since they never touch a signup form.
 
-import { planName } from '../../lib/plans';
+import { planLimitSentence } from '../../lib/plans';
 import crypto from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '../../lib/supabase/server';
@@ -143,12 +143,8 @@ function describeDbError(error, fallback) {
   // The `plan_limit_` prefix is the contract between the trigger and this
   // mapper; matching on it rather than on the prose means the wording can
   // change in SQL without silently falling through to the raw error here.
-  const planLimit = msg.match(/plan_limit_(cameras|sites|seats):\s*(.+?)(?:\s*CONTEXT:|$)/is);
-  if (planLimit) {
-    // Tier ids (FREE, GROWTH) read as the names people see (Starter, Growth).
-    const text = planLimit[2].trim().replace(/the (FREE|GROWTH|ENTERPRISE) plan/, (_, id) => `the ${planName(id)} plan`);
-    return `${text} Upgrade or renew the plan to add more.`;
-  }
+  const planLimit = planLimitSentence(msg);
+  if (planLimit) return planLimit;
 
   if (/row-level security/i.test(msg)) {
     return 'You do not have permission to do that.';
@@ -237,6 +233,8 @@ export async function listMembers() {
       Boolean(row.inviteExpiresAt) &&
       new Date(row.inviteExpiresAt).getTime() < now,
     expiresAt: row.inviteExpiresAt,
+    // Turned the invitation down (decline_invitation leaves the row SUSPENDED, never accepted).
+    declined: row.status === 'SUSPENDED' && !row.acceptedAt,
     isSelf: row.profileId === user.id,
   }));
 
@@ -282,10 +280,17 @@ export async function inviteMember(formData) {
   // situations and deserve different sentences.
   const { data: existing } = await supabase
     .from('memberships')
-    .select('id, status')
+    .select('id, status, acceptedAt')
     .eq('orgId', orgId)
     .eq('invitedEmail', email)
     .maybeSingle();
+
+  // Someone who DECLINED an earlier invitation is a SUSPENDED row that was never accepted. "Restore it" cannot
+  // apply (there is nothing to restore), so inviting them again reopens that row with a new link and the role
+  // chosen now. The seat limit is checked again by the database as the row becomes INVITED.
+  if (existing && existing.status === 'SUSPENDED' && !existing.acceptedAt) {
+    return reopenInvitation(supabase, { orgId, user, membershipId: existing.id, email, role });
+  }
 
   if (existing) {
     return fail(
@@ -343,7 +348,52 @@ export async function inviteMember(formData) {
   };
 }
 
-/** Issue a fresh token and extend the expiry on an outstanding invitation. */
+/**
+ * Send a declined invitation again: the same row goes back to INVITED with a new link and a new expiry. Not a
+ * plain helper export: a 'use server' file may only export async actions, so this stays module-private.
+ */
+async function reopenInvitation(supabase, { orgId, user, membershipId, email, role }) {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const patch = {
+    status: 'INVITED',
+    inviteTokenHash: tokenHash,
+    inviteExpiresAt: new Date(Date.now() + INVITE_TTL_DAYS * 86400_000).toISOString(),
+    invitedById: user.id,
+    updatedAt: new Date().toISOString(),
+  };
+  if (role) patch.role = role;
+
+  const { data: updated, error: dbError } = await supabase
+    .from('memberships')
+    .update(patch)
+    .eq('id', membershipId)
+    .eq('orgId', orgId)
+    .eq('status', 'SUSPENDED')
+    .is('acceptedAt', null)
+    .select('id, role');
+
+  if (dbError) return fail(describeDbError(dbError, 'Could not send the invitation again.'));
+  if (!updated || updated.length === 0) return fail('That invitation could not be sent again.');
+
+  await writeAudit(supabase, {
+    orgId, user,
+    action: 'member.invited',
+    targetType: 'Membership',
+    targetId: membershipId,
+    metadata: { role: updated[0].role, email, again: true },
+  });
+
+  revalidatePath('/settings/members');
+  return {
+    ok: true,
+    message: `${email} turned down the earlier invitation. A new one has been created.`,
+    inviteToken: token,
+    email,
+  };
+}
+
+/** Issue a fresh token and extend the expiry on an outstanding invitation, or send a declined one again. */
 export async function resendInvite(membershipId) {
   const { supabase, user, orgId, error } = await requireCapability('members.invite');
   if (error) return fail(error);
@@ -351,12 +401,15 @@ export async function resendInvite(membershipId) {
 
   const { data: row } = await supabase
     .from('memberships')
-    .select('id, status, invitedEmail')
+    .select('id, status, invitedEmail, acceptedAt')
     .eq('id', membershipId)
     .eq('orgId', orgId)
     .maybeSingle();
 
   if (!row) return fail('That invitation no longer exists.');
+  if (row.status === 'SUSPENDED' && !row.acceptedAt) {
+    return reopenInvitation(supabase, { orgId, user, membershipId, email: row.invitedEmail });
+  }
   if (row.status !== 'INVITED') return fail('That person has already accepted.');
 
   // A new token, not the old one: the point of resending is that the previous

@@ -604,7 +604,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null,
                       value={cameraName}
                       onChange={(e) => { setCameraName(e.target.value); setErrors((s) => ({ ...s, cameraName: undefined })); }}
                       placeholder="Gate 1 — Entrance"
-                      maxLength={160}
+                      maxLength={64}
                       error={errors.cameraName}
                     />
 

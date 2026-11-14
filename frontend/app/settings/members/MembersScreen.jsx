@@ -75,7 +75,9 @@ function StatusPill({ member }) {
   // would be a lie the admin acts on.
   const tone = member.expired
     ? 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400'
-    : member.status === 'ACTIVE'
+    : member.declined
+      ? 'border-[color:var(--line-soft)] bg-surface-alt text-ink-muted'
+      : member.status === 'ACTIVE'
       ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
       : member.status === 'INVITED'
         ? 'border-[color:var(--line-soft)] bg-surface-alt text-ink-muted'
@@ -83,7 +85,9 @@ function StatusPill({ member }) {
 
   const label = member.expired
     ? 'Invite expired'
-    : member.status === 'ACTIVE'
+    : member.declined
+      ? 'Declined'
+      : member.status === 'ACTIVE'
       ? 'Active'
       : member.status === 'INVITED'
         ? 'Invited'
@@ -186,6 +190,9 @@ function InviteLinkPanel({ invite, onDismiss }) {
 
 function MemberRow({ member, canManage, isLastActiveAdmin, busyId, onAction }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // Removing someone takes their access away at once, so it asks twice: the first click turns the item into a
+  // confirmation, the second removes. Closing the menu forgets it.
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const busy = busyId === member.id;
   const RoleIcon = ROLE_META[member.role]?.icon ?? Eye;
 
@@ -194,8 +201,9 @@ function MemberRow({ member, canManage, isLastActiveAdmin, busyId, onAction }) {
   // before the click, instead of surfacing the trigger's exception after it.
   const lockedByLastAdmin = isLastActiveAdmin && member.role === 'ADMIN' && member.status === 'ACTIVE';
 
-  const close = () => setMenuOpen(false);
+  const close = () => { setMenuOpen(false); setConfirmRemove(false); };
   const act = (fn) => { close(); onAction(member.id, fn); };
+  const remove = () => (confirmRemove ? act(() => removeMember(member.id)) : setConfirmRemove(true));
 
   return (
     <li className="flex items-center gap-3 px-4 py-3 border-b border-line-soft last:border-b-0">
@@ -239,7 +247,7 @@ function MemberRow({ member, canManage, isLastActiveAdmin, busyId, onAction }) {
         <div className="relative shrink-0">
           <button
             type="button"
-            onClick={() => setMenuOpen((o) => !o)}
+            onClick={() => { setMenuOpen((o) => !o); setConfirmRemove(false); }}
             disabled={busy}
             aria-label={`Actions for ${member.email}`}
             aria-expanded={menuOpen}
@@ -264,6 +272,16 @@ function MemberRow({ member, canManage, isLastActiveAdmin, busyId, onAction }) {
                     </MenuItem>
                     <MenuItem icon={Trash2} danger onClick={() => act(() => revokeInvite(member.id))}>
                       Withdraw invitation
+                    </MenuItem>
+                  </>
+                ) : member.declined ? (
+                  <>
+                    {/* They turned the invitation down: there is no access to restore, only a new invitation. */}
+                    <MenuItem icon={RotateCw} onClick={() => act(() => resendInvite(member.id))}>
+                      Invite again — new link
+                    </MenuItem>
+                    <MenuItem icon={Trash2} danger onClick={remove}>
+                      {confirmRemove ? 'Click again to remove' : 'Remove from the list'}
                     </MenuItem>
                   </>
                 ) : (
@@ -310,9 +328,9 @@ function MemberRow({ member, canManage, isLastActiveAdmin, busyId, onAction }) {
                       danger
                       disabled={lockedByLastAdmin}
                       title={lockedByLastAdmin ? 'This is the only administrator' : undefined}
-                      onClick={() => act(() => removeMember(member.id))}
+                      onClick={remove}
                     >
-                      Remove from organisation
+                      {confirmRemove ? 'Click again to remove them' : 'Remove from organisation'}
                     </MenuItem>
                   </>
                 )}
@@ -577,7 +595,8 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
           <>
             <section className="mb-6">
               <h2 className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-ink-faint mb-2.5">
-                Members · {activeMembers.length}
+                {/* Someone who declined is listed (so they can be invited again) but is not counted as a member. */}
+                Members · {activeMembers.filter((m) => !m.declined).length}
               </h2>
               {/* No overflow-hidden: a row's action menu opens below it, and clipping the list cut off the menu of
                   the last row (its items could not be reached). The rows have no background, so nothing spills. */}

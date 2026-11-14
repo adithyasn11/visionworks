@@ -239,6 +239,20 @@ export function planName(id) {
   return getPlan(id)?.name ?? 'Unknown';
 }
 
+/**
+ * A plan-limit refusal from the database triggers ("plan_limit_seats: the FREE plan allows 3 member(s); …") as a
+ * sentence: the tier's own name, a capital letter, and real plurals. null when the message is not a plan limit.
+ */
+export function planLimitSentence(message) {
+  const m = String(message ?? '').match(/plan_limit_(cameras|sites|seats):\s*(.+?)(?:\s*CONTEXT:|$)/is);
+  if (!m) return null;
+  let text = m[2].trim()
+    .replace(/the (FREE|GROWTH|ENTERPRISE) plan/, (_, id) => `the ${planName(id)} plan`)
+    .replace(/(\d+) (\w+)\(s\)/g, (_, n, word) => `${n} ${word}${n === '1' ? '' : 's'}`);
+  text = text.charAt(0).toUpperCase() + text.slice(1);
+  return `${text} Upgrade or renew the plan to add more.`;
+}
+
 // Two featured plans renders two "Most popular" badges, which reads as a bug.
 // Checked at module load so it fails during the build rather than in front of
 // whoever is watching the demo.

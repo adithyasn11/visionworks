@@ -231,7 +231,7 @@ function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
 
 /* ── Screen ──────────────────────────────────────────────────────────────── */
 
-export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod }) {
+export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod, suspendedOrg = false }) {
   const router = useRouter();
   const [period, setPeriod] = useState('monthly');
   const [busyPlan, setBusyPlan] = useState(null);
@@ -289,6 +289,16 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
             the div is not empty in CSS terms, it holds a component that
             returned null.) */}
         <InvitationsPanel />
+
+        {suspendedOrg && (
+          <div role="status" className="mb-8 rounded-2xl border border-[color:var(--accent)] bg-accent-soft px-5 py-4">
+            <p className="text-[0.875rem] font-bold text-ink">Your organisation is suspended</p>
+            <p className="mt-1 text-[0.8125rem] text-ink-muted leading-relaxed">
+              Nobody in it can open the dashboard until it is restored. No data has been deleted. Ask your
+              administrator, or contact VisionWorks support.
+            </p>
+          </div>
+        )}
 
         {/* ── HERO ────────────────────────────────────────────────────────
             Text card beside a bento of tiles — the landing hero's shape. */}
