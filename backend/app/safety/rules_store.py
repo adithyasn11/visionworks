@@ -16,8 +16,8 @@ HOW THEY COMBINE WITH THE DEFAULT
     down is allowed) are Postgres ids in the database and slugs in a session; they are translated here.
   * The built-in default still protects every RESTRICTED zone that has no helmet/vest-on-entry rule THE ENGINE
     CAN RUN, enabled or not: only a rule that parsed and is evaluated at entry counts as covering its zone
-    (a disabled one is the deliberate off switch). A rule the engine cannot run (a VIA_CHECKPOINT rule, a rule
-    that does not validate) never removes the default: a zone must not end up with no check at all because a
+    (a disabled one is the deliberate off switch); AT_ENTRY and VIA_CHECKPOINT both judge the entry, so either
+    covers it. A rule the engine cannot run (one that does not validate) never removes the default: a zone must not end up with no check at all because a
     rule beside it is unusable.
   * Disabling a zone's default is therefore a deliberate act: create an AT_ENTRY rule for that zone and
     switch it off. Deleted (soft-deleted) rules do not count.
@@ -114,6 +114,6 @@ def rules_for_session(org_id: Optional[str], zones_config, camera_name: Optional
         _log.warning("safety rule refused: %s", message)
 
     covered = {rule.zone_id for rule, _enabled in parsed
-               if rule.type == "PPE_ENTRY" and rule.params.get("mode", "AT_ENTRY") == "AT_ENTRY"}
+               if rule.type == "PPE_ENTRY" and rule.params.get("mode", "AT_ENTRY") in ("AT_ENTRY", "VIA_CHECKPOINT")}
     active = [rule for rule, enabled in parsed if enabled]
     return active + [d for d in defaults if d.zone_id not in covered]

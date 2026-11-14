@@ -57,8 +57,11 @@ export default async function OrganisationSettingsPage() {
     .eq('orgId', profile.currentOrgId).eq('profileId', data.user.id)
     .eq('status', 'ACTIVE').maybeSingle();
 
-  // Removed or suspended since currentOrgId was set: nothing here is theirs to see any more.
-  if (!membership) redirect('/home');
+  // Removed or suspended since currentOrgId was set: nothing here is theirs to see any more. The organisation is
+  // checked too: a platform operator who is also a member can read a suspended one through RLS.
+  const { data: org } = await supabase
+    .from('organisations').select('id').eq('id', profile.currentOrgId).is('deletedAt', null).maybeSingle();
+  if (!membership || !org) redirect('/home');
 
   return (
     <OrganisationSettingsScreen

@@ -2,8 +2,8 @@
 """
 From zone events and PPE evidence to a verdict with a reason.
 
-Four kinds of rule are judged: PPE_ENTRY in mode AT_ENTRY ("helmet and vest before you
-enter a restricted zone"), PPE_CONTINUOUS (the same items while inside), MAX_DWELL (a
+Four kinds of rule are judged: PPE_ENTRY ("helmet and vest before you enter a restricted
+zone", checked at the entry, or at a PPE checkpoint beforehand: see VIA A CHECKPOINT), PPE_CONTINUOUS (the same items while inside), MAX_DWELL (a
 time limit in a zone) and REQUIRED_EXIT (leave a restricted zone by a named exit). Every
 other rule type parses and validates (rules.py) but is not evaluated yet, and
 `unsupported` says which, so nothing is silently ignored. The three later kinds are
@@ -58,6 +58,18 @@ ONE DECISION PER WORKER PER VISIT PER RULE
 It is an engine component: when the timeline jumps, pending decisions close as
 UNVERIFIABLE ("the video jumped before they could be judged"), stamped at the entry.
 
+VIA A CHECKPOINT (PPE_ENTRY, mode VIA_CHECKPOINT)
+
+  The checkpoint is where the camera gets a good look. While a worker is inside the rule's
+  PPE_CHECKPOINT zone, the same evidence test as an entry is run every frame; a pass (every
+  required item PRESENT, the newest frames agreeing, support at or above the rule's floor) is
+  remembered with its time. Entering the restricted zone within `max_seconds_since_checkpoint`
+  of a pass is COMPLIANT at once ("passed Gate check with helmet and vest seen, 12 s before").
+  Without such a pass (never went through, went through without the items being seen, or too
+  long ago) the entry is judged exactly as AT_ENTRY is, and the sentence says the checkpoint was
+  not passed. Skipping the checkpoint is never an accusation on its own: the tracker can lose
+  and renumber a worker between the two zones, so only what is seen at the entry decides.
+
 THE OTHER THREE RULES
 
   PPE_CONTINUOUS. While a worker is inside the zone the same evidence is read every frame.
@@ -101,7 +113,7 @@ OTHER_ENGINES = ("MAN_DOWN", "OCCUPANCY")          # evaluated, but not by this 
 def is_evaluated(rule_type: str, params: Optional[dict]) -> bool:
     """Does the engine act on a rule of this type and these parameters? (The one place that says so.)"""
     if rule_type == "PPE_ENTRY":
-        return (params or {}).get("mode", "AT_ENTRY") == "AT_ENTRY"
+        return (params or {}).get("mode", "AT_ENTRY") in ("AT_ENTRY", "VIA_CHECKPOINT")
     return rule_type in SUPPORTED or rule_type in ("MAN_DOWN", "OCCUPANCY")   # judged by man_down.py (pose keypoints) and occupancy.py (head counts)
 
 # The PPE evidence item states (ppe_evidence.py).
@@ -117,6 +129,8 @@ class _Pending:
         self.entered_at = entered_at
         self.opened_at = opened_at
         self.first_sighting = first_sighting
+        self.checkpoint_note: Optional[str] = None      # VIA_CHECKPOINT judged at the entry: why the checkpoint did not settle it
+        self.checkpoint_evidence: Optional[dict] = None
 
 
 class _Cont:
@@ -207,6 +221,14 @@ class ComplianceEngine:
                   "MAX_DWELL": self._dwell_by_zone, "REQUIRED_EXIT": self._exit_by_zone}
         for r in self.active:
             groups[r.type].setdefault(r.zone_id, []).append(r)
+        # VIA_CHECKPOINT: the rules watching each checkpoint zone, who is inside one now, and each worker's last pass.
+        self._cp_watch: Dict[str, List[Rule]] = {}
+        for r in self.active:
+            if r.type == "PPE_ENTRY" and r.params.get("mode") == "VIA_CHECKPOINT" and r.params.get("checkpoint_zone_id"):
+                self._cp_watch.setdefault(str(r.params["checkpoint_zone_id"]), []).append(r)
+        self._cp_in: Dict[Tuple[str, str], Rule] = {}                 # (rule key, worker) inside the checkpoint now
+        self._cp_visit: Dict[Tuple[str, str], float] = {}            # (rule key, worker) -> last video time inside it
+        self._cp_pass: Dict[Tuple[str, str], dict] = {}              # (rule key, worker) -> {t, support, items}
         self._cont: Dict[Tuple[str, str], _Cont] = {}
         self._cont_flag_t: Dict[Tuple[str, str], float] = {}  # (rule key, worker) -> video time of the last continuous-PPE flag, across visits
         self._visits: Dict[Tuple[str, str], _Visit] = {}
@@ -235,6 +257,11 @@ class ComplianceEngine:
         """Feed one zone event (never one from a replayed stretch). `now` is the current frame's video time."""
         out: List[Decision] = []
         if event.event_type == "ENTERED_ZONE":
+            for rule in self._cp_watch.get(event.zone_id, ()):
+                key = (rule.key, event.worker_key)
+                self._cp_in[key] = rule
+                self._cp_visit[key] = now
+                self._checkpoint_look(key, rule, now)
             for rule in self._by_zone.get(event.zone_id, ()):
                 self._open(rule, event, now, out)
             for rule in self._cont_by_zone.get(event.zone_id, ()):
@@ -249,6 +276,11 @@ class ComplianceEngine:
                 self._visits[(rule.key, event.worker_key)] = _Visit(rule, event.video_time_s, bool(event.details.get("first_sighting")))
             self._arrived(event, now, out)
         elif event.event_type == "EXITED_ZONE":
+            for rule in self._cp_watch.get(event.zone_id, ()):
+                key = (rule.key, event.worker_key)
+                if self._cp_in.pop(key, None) is not None:
+                    self._cp_visit[key] = now
+                    self._checkpoint_look(key, rule, now)        # a last look on the way out: "passed N s before" counts from here
             for rule in self._by_zone.get(event.zone_id, ()):
                 key = (rule.key, event.worker_key)
                 pending = self._pending.get(key)
@@ -281,7 +313,58 @@ class ComplianceEngine:
             return
         pending = _Pending(rule, event.worker_key, event.video_time_s, now, bool(event.details.get("first_sighting")))
         self._pending[key] = pending
+        if rule.params.get("mode") == "VIA_CHECKPOINT" and self._checkpoint_settles(pending, now, out):
+            return
         self._try(pending, now, out)
+
+    # ── VIA_CHECKPOINT ───────────────────────────────────────────────────────
+
+    def _checkpoint_look(self, key, rule: Rule, t: float) -> None:
+        """A worker inside the checkpoint: remember a pass if the evidence shows every required item now."""
+        if self.ppe is None or getattr(self.ppe, "unavailable_reason", None):
+            return
+        verdict = self.ppe.verdict(key[1], t)
+        if not verdict:
+            return
+        required = rule.params["required_ppe"]
+        items = verdict["items"]
+        if all(items[i]["state"] == PRESENT for i in required) and self._newest_agree(verdict, required):
+            support = min(float(items[i]["seen_fraction"]) for i in required)
+            if support >= rule.min_evidence_confidence:
+                self._cp_pass[key] = {"t": t, "support": support,
+                                      "items": {i: {"clear_frames": items[i]["clear_frames"],
+                                                    "seen_fraction": round(float(items[i]["seen_fraction"]), 3)}
+                                                for i in required}}
+
+    def _checkpoint_settles(self, pending: _Pending, now: float, out: List[Decision]) -> bool:
+        """COMPLIANT at once on a recent pass; otherwise note why, and let the entry be judged as AT_ENTRY."""
+        rule = pending.rule
+        key = (rule.key, pending.worker_key)
+        cp_id = str(rule.params["checkpoint_zone_id"])
+        cp_name = self._zone_name(cp_id)
+        window = float(rule.params.get("max_seconds_since_checkpoint", 60.0))
+        required = rule.params["required_ppe"]
+        passed = self._cp_pass.get(key)
+        ago = None if passed is None else pending.entered_at - float(passed["t"])
+        pending.checkpoint_evidence = {"checkpoint_zone": cp_name, "window_seconds": window,
+                                       "passed_seconds_before": None if ago is None else round(ago, 3)}
+        if passed is not None and -1.0 <= ago <= window:
+            parts = [f"{_NAMES.get(i, i)} seen in {_count(v['seen_fraction'], v['clear_frames'])} of {v['clear_frames']} clear frames"
+                     for i, v in passed["items"].items()]
+            when = "just before" if ago < 1.0 else f"{_dur(ago)} before"
+            where = rule.zone_name or rule.zone_id
+            reason = f"Entered {where} after passing {cp_name} {when}: " + "; ".join(parts) + "."
+            ev = self._evidence(pending, now, None)
+            ev["checkpoint"] = dict(pending.checkpoint_evidence, items=passed["items"])
+            out.append(self._finish(key, self._decision(pending, COMPLIANT, reason, float(passed["support"]), ev)))
+            return True
+        if passed is not None and ago is not None and ago > window:
+            pending.checkpoint_note = f"the last pass through {cp_name} was {_dur(ago)} before, longer than the {_dur(window)} allowed"
+        elif key in self._cp_visit and pending.entered_at - self._cp_visit[key] <= window:
+            pending.checkpoint_note = f"went through {cp_name} without the {_fmt_items(required)} being seen there"
+        else:
+            pending.checkpoint_note = f"was not seen passing {cp_name} first"
+        return False
 
     # ── frames ───────────────────────────────────────────────────────────────
 
@@ -296,6 +379,12 @@ class ComplianceEngine:
         out: List[Decision] = []
         for w in (seen or ()):
             self._seen_at[w] = t
+        for key, rule in list(self._cp_in.items()):
+            self._cp_visit[key] = t
+            self._checkpoint_look(key, rule, t)
+        if len(self._cp_pass) > 2000:                               # forget passes long out of every window
+            for k in [k for k, v in self._cp_pass.items() if t - v["t"] > 900.0]:
+                del self._cp_pass[k]
         if len(self._seen_at) > 2000:                               # forget workers long gone
             for w in [w for w, at in self._seen_at.items() if t - at > 600.0]:
                 del self._seen_at[w]
@@ -379,6 +468,8 @@ class ComplianceEngine:
             "waited_seconds": round(max(0.0, t - pending.opened_at), 3),
             "first_sighting": pending.first_sighting,
         }
+        if pending.checkpoint_evidence is not None:
+            ev["checkpoint"] = dict(pending.checkpoint_evidence, note=pending.checkpoint_note)
         if verdict:
             ev["observed_frames"] = verdict.get("observed_frames")
             ev["items"] = {i: {k: verdict["items"][i][k] for k in
@@ -437,11 +528,14 @@ class ComplianceEngine:
         lead = f"Was already inside {where} when first seen" if pending.first_sighting else f"Entered {where}"
         # "seen" / "not seen", never a statement about what someone is or is not wearing.
         reason = f"{lead}: " + "; ".join(parts) + "." if status == COMPLIANT else f"{lead} with " + "; ".join(parts) + "."
+        if pending.checkpoint_note:
+            reason = reason[:-1] + f" (judged at the entry: {pending.checkpoint_note})."
         return self._decision(pending, status, reason, support, evidence)
 
     def _abstain(self, pending: _Pending, t: float, why: str, verdict: Optional[dict] = None) -> Decision:
         where = pending.rule.zone_name or pending.rule.zone_id
-        return self._decision(pending, UNVERIFIABLE, f"Could not judge PPE for {where}: {why}.", 0.0,
+        note = f"; it {pending.checkpoint_note}" if pending.checkpoint_note else ""
+        return self._decision(pending, UNVERIFIABLE, f"Could not judge PPE for {where}: {why}{note}.", 0.0,
                               self._evidence(pending, t, verdict))
 
     # ── PPE_CONTINUOUS ───────────────────────────────────────────────────────

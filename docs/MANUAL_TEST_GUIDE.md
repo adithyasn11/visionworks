@@ -233,6 +233,7 @@ The progress bar at the top shows **Organisation · Site · Camera**.
 - [ ] **Delete** a rule.
   - **Expect:** "Delete this rule?" appears. **Keep it** cancels; **Yes, delete** removes it.
 - [ ] A rule the engine does not act on yet shows "Saved, but the safety engine does not act on this kind of rule yet."
+- [ ] A **checkpoint** rule ("At a PPE checkpoint beforehand") reads "Helmet and vest seen at the checkpoint … within 1 min before entering; otherwise checked at the entry". On a video where someone walks through the checkpoint and into the zone, **Expect:** "Entered … after passing … N s before".
   - That message is expected, not a bug.
 
 ### 6.4 Live feed: upload a video

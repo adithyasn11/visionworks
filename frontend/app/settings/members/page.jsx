@@ -64,7 +64,8 @@ export default async function MembersPage() {
   if (!profile?.currentOrgId) redirect('/onboarding');
 
   const [{ data: org }, { data: membership }] = await Promise.all([
-    supabase.from('organisations').select('name').eq('id', profile.currentOrgId).maybeSingle(),
+    // deletedAt explicitly: a platform operator can read a suspended organisation through RLS.
+    supabase.from('organisations').select('name').eq('id', profile.currentOrgId).is('deletedAt', null).maybeSingle(),
     // The sidebar needs the role to decide which links to show — the same
     // value MembersScreen re-reads for its own controls.
     supabase.from('memberships').select('role')
@@ -74,7 +75,7 @@ export default async function MembersPage() {
 
   // Removed or suspended since currentOrgId was set: there is no roster to show them, so send them home (where an
   // invitation or a new organisation is the way on), as the dashboard does.
-  if (!membership) redirect('/home');
+  if (!membership || !org) redirect('/home');
 
   return (
     <MembersScreen

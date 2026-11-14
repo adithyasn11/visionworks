@@ -254,10 +254,10 @@ try:
     chk_local = [{"zone_id": f"zone_dup{TAG}", "zone_name": "Dup", "zone_type": "RESTRICTED"}, {"zone_id": f"zone_chk{TAG}", "zone_name": "Gate", "zone_type": "PPE_CHECKPOINT"}]
     r_via = client.post(base + "/rules", headers=M, json={"name": "via gate", "type": "PPE_ENTRY", "zone_id": zDup1,
                                                            "params": {"required_ppe": ["helmet"], "mode": "VIA_CHECKPOINT", "checkpoint_zone_id": zChk}})
-    check("a VIA_CHECKPOINT rule (references the checkpoint by its id) is accepted and flagged as not evaluated yet", r_via.status_code == 201 and r_via.json()["evaluated_by_engine"] is False, r_via.text[:140])
+    check("a VIA_CHECKPOINT rule (references the checkpoint by its id) is accepted and evaluated", r_via.status_code == 201 and r_via.json()["evaluated_by_engine"] is True, r_via.text[:140])
     got = rules_for_session(orgA, chk_local, "Cam A")
-    check("...and it does NOT remove the zone's default: the zone is still checked at entry", any(r.source == "default" and r.zone_id == f"zone_dup{TAG}" for r in got), str([(r.source, r.zone_id, r.params.get("mode")) for r in got]))
-    check("...while the rule itself arrives with its checkpoint translated to the zone's slug, ready for the day the engine runs it",
+    check("...it replaces the zone's default, as any PPE rule for the zone does", not any(r.source == "default" and r.zone_id == f"zone_dup{TAG}" for r in got), str([(r.source, r.zone_id, r.params.get("mode")) for r in got]))
+    check("...and arrives with its checkpoint translated to the zone's slug, which is what the engine matches",
           any(r.source == "database" and r.params.get("checkpoint_zone_id") == f"zone_chk{TAG}" for r in got))
     client.delete(base + f"/rules/{r_via.json()['id']}", headers=M)
     # a rule that no longer validates in the session (the zone's local type is not RESTRICTED) keeps the default too

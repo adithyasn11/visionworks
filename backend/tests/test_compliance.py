@@ -352,10 +352,57 @@ via = Rule(type="PPE_ENTRY", zone_id="press", params={"required_ppe": ["helmet",
                                                        "max_seconds_since_checkpoint": 60.0})
 dwell = Rule(type="WALK_ONLY", zone_id="walk", params={"max_speed_heights_per_s": 1.8, "min_seconds": 2.0})
 off = Rule(type="PPE_ENTRY", zone_id="press", params={"required_ppe": ["helmet"], "mode": "AT_ENTRY"}, enabled=False)
-eng, p = engine(rules=[via, dwell, off])
+eng, p = engine(rules=[dwell, off])
 p.set("trk-1", absent(), absent())
-check("rules not evaluated yet (VIA_CHECKPOINT, WALK_ONLY) and disabled ones make no decisions, and are listed",
-      eng.on_event(enter(), 1.0) == [] and len(eng.unsupported) == 2 and eng.active == [])
+check("rules not evaluated yet (WALK_ONLY) and disabled ones make no decisions, and are listed",
+      eng.on_event(enter(), 1.0) == [] and len(eng.unsupported) == 1 and eng.active == [])
+
+print("B3b. PPE at a checkpoint beforehand (VIA_CHECKPOINT)")
+eng, p = engine(rules=[via])
+check("a VIA_CHECKPOINT rule is evaluated", eng.active == [via] and eng.unsupported == [])
+p.set("trk-1", present(), present())
+eng.on_event(enter(zone="gate", t=5.0), 5.0)
+eng.on_tick(6.0, {"trk-1"})
+eng.on_event(leave(zone="gate", t=8.0), 8.0)
+p.set("trk-1", unknown(2), unknown(2))                       # the restricted zone is too far away to see anything
+out = eng.on_event(enter(t=20.0), 20.0)
+check("passed the checkpoint with helmet and vest seen, entered 12 s later: COMPLIANT at once, from the checkpoint's evidence",
+      len(out) == 1 and out[0].status == COMPLIANT and "after passing gate 12 s before" in out[0].reason
+      and out[0].evidence["checkpoint"]["passed_seconds_before"] == 12.0, out[0].reason if out else "")
+
+eng, p = engine(rules=[via])
+p.set("trk-1", present(), present())
+eng.on_event(enter(zone="gate", t=5.0), 5.0); eng.on_event(leave(zone="gate", t=6.0), 6.0)
+p.set("trk-1", absent(), present())
+out = eng.on_event(enter(t=90.0), 90.0)
+check("a pass older than the window does not count: judged at the entry, and the sentence says why",
+      len(out) == 1 and out[0].status == POTENTIAL_VIOLATION and "the last pass through gate was 1 min 24 s before" in out[0].reason, out[0].reason if out else "")
+
+eng, p = engine(rules=[via])
+p.set("trk-1", absent(), present())
+eng.on_event(enter(zone="gate", t=5.0), 5.0); eng.on_tick(6.0, {"trk-1"}); eng.on_event(leave(zone="gate", t=7.0), 7.0)
+out = eng.on_event(enter(t=10.0), 10.0)
+check("went through the checkpoint without the helmet: no pass, so the entry decides (no helmet: flagged)",
+      len(out) == 1 and out[0].status == POTENTIAL_VIOLATION and "without the helmet and vest being seen there" in out[0].reason, out[0].reason if out else "")
+
+eng, p = engine(rules=[via])
+p.set("trk-1", present(), present())
+out = eng.on_event(enter(t=10.0), 10.0)
+check("never seen at the checkpoint but equipped at the entry: COMPLIANT (skipping it is never an accusation on its own)",
+      len(out) == 1 and out[0].status == COMPLIANT and "was not seen passing gate first" in out[0].reason, out[0].reason if out else "")
+
+eng, p = engine(rules=[via])
+p.set("trk-1", unknown(2), unknown(2))
+out = eng.on_event(enter(t=10.0), 10.0) + eng.on_tick(10.0 + CFG.entry_evidence_wait_s, {"trk-1"})
+check("never seen at the checkpoint and nothing visible at the entry: UNVERIFIABLE, saying both",
+      len(out) == 1 and out[0].status == UNVERIFIABLE and "was not seen passing gate first" in out[0].reason, out[0].reason if out else "")
+
+eng, p = engine(rules=[via])
+p.set("trk-2", present(), present())
+eng.on_event(enter("trk-2", zone="gate", t=5.0), 5.0); eng.on_tick(6.0, {"trk-2"})
+p.set("trk-1", absent(), absent())
+out = eng.on_event(enter("trk-1", t=10.0), 10.0)
+check("one worker's pass does not clear another", len(out) == 1 and out[0].status == POTENTIAL_VIOLATION and out[0].worker_key == "trk-1")
 
 eng = ComplianceEngine([RULE], None, CFG)
 out = eng.on_event(enter(), 1.0)

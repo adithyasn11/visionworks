@@ -78,7 +78,8 @@ export default function OrgActions({ org }) {
 
       <div className="divide-y divide-[color:var(--line-soft)]">
         {/* ── Retention ── */}
-        <form onSubmit={runRetention} className="px-4 sm:px-5 py-4 space-y-2.5">
+        {/* noValidate: an out-of-range number gets the server's sentence on the page, not a browser tooltip. */}
+        <form onSubmit={runRetention} noValidate className="px-4 sm:px-5 py-4 space-y-2.5">
           <div className="flex items-start gap-2">
             <Clock className="w-4 h-4 mt-0.5 shrink-0 text-ink-faint" strokeWidth={2.2} />
             <div className="min-w-0">

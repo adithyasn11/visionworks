@@ -26,9 +26,9 @@ export const RULE_TYPES = [
   {
     value: 'PPE_ENTRY',
     label: 'Helmet and vest on entry',
-    blurb: 'Checks the required items when someone enters the zone.',
+    blurb: 'Checks the required items when someone enters the zone, or accepts a check at a PPE checkpoint shortly before. Someone not seen at the checkpoint is checked at the entry instead; skipping it is not flagged on its own.',
     zoneTypes: ['RESTRICTED'],
-    enforced: (params) => (params.mode || 'AT_ENTRY') === 'AT_ENTRY',
+    enforced: () => true,
     defaults: { required_ppe: ['helmet', 'safety_vest'], mode: 'AT_ENTRY' },
     fields: [
       { key: 'required_ppe', kind: 'ppe', label: 'Required items' },
@@ -206,7 +206,11 @@ export function ruleSummary(type, params, zoneName = () => null) {
   const items = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : '';
   switch (type) {
     case 'PPE_ENTRY':
-      return (p.mode || 'AT_ENTRY') === 'AT_ENTRY' ? `${items || 'Required items'} checked when someone enters` : 'Checked at a PPE checkpoint beforehand';
+      if ((p.mode || 'AT_ENTRY') === 'AT_ENTRY') return `${items || 'Required items'} checked when someone enters`;
+      {
+        const cp = zoneName(p.checkpoint_zone_id);
+        return `${items || 'Required items'} seen at ${cp ? `the checkpoint "${cp}"` : 'the checkpoint'} within ${durationText(p.max_seconds_since_checkpoint ?? 60)} before entering; otherwise checked at the entry`;
+      }
     case 'PPE_CONTINUOUS':
       return `${items || 'Required items'} checked all the time someone is inside; flagged after ${durationText(p.grace_seconds)} without a break`;
     case 'MAX_DWELL':

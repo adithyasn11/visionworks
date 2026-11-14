@@ -17,11 +17,18 @@ export const ThemeToggle = ({ className = '' }) => {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setIsDark(document.documentElement.classList.contains('dark'));
+    const root = document.documentElement;
+    setIsDark(root.classList.contains('dark'));
     setMounted(true);
     // Enable colour transitions only after first paint, so loading the page
     // in dark mode doesn't visibly fade in from light.
-    document.documentElement.classList.add('theme-ready');
+    root.classList.add('theme-ready');
+    // Follow the page, not just this button: the dashboard has two toggles (the sidebar and the phone menu), and
+    // each used to keep its own copy, so after switching with one the other showed the wrong icon and label, and
+    // its first click did nothing visible.
+    const observer = new MutationObserver(() => setIsDark(root.classList.contains('dark')));
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
   }, []);
 
   // Keep following the OS until the visitor makes an explicit choice.
@@ -37,7 +44,7 @@ export const ThemeToggle = ({ className = '' }) => {
   }, []);
 
   const toggle = (event) => {
-    const next = !isDark;
+    const next = !document.documentElement.classList.contains('dark');
     const root = document.documentElement;
 
     const apply = () => {

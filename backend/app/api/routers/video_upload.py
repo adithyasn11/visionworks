@@ -424,9 +424,11 @@ def require_analysis_run(authorization: Optional[str] = Header(default=None)) ->
 @router.get("/samples")
 def list_sample_videos(org_id: str = Depends(require_analysis_run)):
     """Lists all available video files stored in sample_videos/"""
+    # Uploads (named "<session id>_<name>") are left out: they belong to one organisation's processing run, and
+    # this folder is shared, so listing them showed other customers' file names while their videos were processed.
     files = [
         f for f in os.listdir(SAMPLE_VIDEOS_DIR)
-        if f.lower().endswith(('.mp4', '.avi', '.webm', '.mov', '.mkv'))
+        if f.lower().endswith(('.mp4', '.avi', '.webm', '.mov', '.mkv')) and not _UPLOAD_NAME_RE.match(f)
     ]
     return {"sample_videos": files}
 
