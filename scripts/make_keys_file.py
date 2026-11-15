@@ -1,4 +1,4 @@
-"""
+r"""
 Write visionworks-keys.env from this computer's backend/.env and frontend/.env.local, to send PRIVATELY to someone
 setting VisionWorks up on another computer (WhatsApp, email, a USB stick: never git, never a public place).
 

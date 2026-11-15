@@ -50,7 +50,7 @@ major project/
 ├── docs/                     # Documentation, design, evaluation write-up, demo runbook
 ├── scripts/                  # Dev HTTPS certificate and launcher
 ├── sample_videos/            # Test videos (git-ignored)
-├── setup.py                  # Bootstraps everything
+├── setup.py                  # First-run setup (start_visionworks.bat runs it)
 └── run_system.py             # Starts backend and frontend
 ```
 
@@ -58,56 +58,36 @@ major project/
 
 ## Getting started
 
-### Prerequisites
+### On a new computer (Windows): three steps
 
-| Tool | Version |
-|------|---------|
-| Python | 3.10+ |
-| Node.js | 18+ |
-| Git | any |
-| GPU | optional (an NVIDIA GPU makes it real-time; CPU works, slower) |
+You need **Python 3.11** (https://www.python.org/downloads/, tick *Add python.exe to PATH* in the installer), **Node.js LTS** (https://nodejs.org) and **Git** (https://git-scm.com). An NVIDIA graphics card makes video analysis real-time; without one it still works, more slowly.
 
-### 1. Clone and set up
+1. Get the code:
+   ```bash
+   git clone https://github.com/adithyasn11/visionworks.git
+   ```
+2. Put **`visionworks-keys.env`** in the `visionworks` folder, next to `start_visionworks.bat`. The project owner sends you this file privately; it is never in git.
+3. Double-click **`start_visionworks.bat`**.
 
-```bash
-git clone https://github.com/adithyasn11/majorproject.git
-cd majorproject
-python setup.py
-```
+The first run sets everything up by itself (10–20 minutes, a few GB of downloads: PyTorch, the packages, the detection models), then opens http://localhost:3000. After that, double-clicking it starts VisionWorks in about a minute. Close its window to stop.
 
-Setup creates the virtual environment, installs Python and Node packages, downloads the detector weights and writes template `.env` files (3–10 minutes the first time).
+You share the owner's database, so sign in with your own account (or create one at **Create an account**).
 
-### 2. Add credentials
+To update later: `git pull`, then double-click `start_visionworks.bat` again (the dashboard rebuilds itself when the code changed).
 
-**`backend/.env`**
-```env
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_KEY=your-anon-key
-# Writes decisions and events to Postgres. Bypasses RLS: backend only, never in the browser.
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-# Turns the safety rules on. Off, the system only detects and draws zones.
-SAFETY_ENABLED=true
-```
+**For the project owner — making the keys file:** run `venv\Scripts\python scripts\make_keys_file.py`. It writes `visionworks-keys.env` from your `backend/.env` and `frontend/.env.local`. Send it privately (never commit or post it): it holds the Supabase service-role key, which can read and change everything in the database. The database password is not in it; the app does not need it.
 
-**`frontend/.env.local`**
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-DATABASE_URL=postgresql://postgres.<ref>:<password>@<host>:6543/postgres?pgbouncer=true
-DIRECT_URL=postgresql://postgres.<ref>:<password>@<host>:5432/postgres
-```
+**If something goes wrong:**
 
-Supabase → **Settings → API** for the keys, **Settings → Database** for the connection strings.
+| Message | Fix |
+|---------|-----|
+| *Python 3.10 to 3.13 was not found* | Install Python 3.11 with *Add python.exe to PATH* ticked, then run the file again. |
+| *Node.js is not installed* | Install Node.js LTS, then run the file again. |
+| *The keys file is missing* | Put `visionworks-keys.env` next to `start_visionworks.bat`. |
+| A download failed | Run the file again: finished steps are skipped. |
+| Port 3000 or 8001 already in use | Close the other program (or the other VisionWorks window) and run it again. |
 
-### 3. Create the database objects
-
-Run the files in `frontend/prisma/sql/` in numeric order (000 … 028) in the Supabase SQL editor, after `prisma db push` has created the tables. Migrations 025–028 are the safety layer: tables, review function, summary and report functions, nightly retention job.
-
-### 4. Start
-
-```bash
-python run_system.py
-```
+`start_visionworks.bat phone` uses HTTPS so a phone can be paired as a camera (see `docs/DEMO_RUNBOOK.md`); `start_visionworks.bat dev` runs the development server.
 
 | Service | URL |
 |---------|-----|
@@ -115,17 +95,9 @@ python run_system.py
 | API | http://localhost:8001 |
 | API docs | http://localhost:8001/docs |
 
-To use a phone as a camera, a browser needs a secure address:
+### A brand-new Supabase project (only when not sharing the owner's)
 
-```bash
-python run_system.py --https
-```
-
-This prints the address to open on the phone. Trust the generated certificate on the laptop first (see `docs/DEMO_RUNBOOK.md`).
-
-`Ctrl+C` stops everything.
-
-**On Windows, one click:** double-click `start_visionworks.bat`. It runs the dashboard as a fast production build at http://localhost:3000 (built automatically the first time and after code changes, about a minute), installs the dashboard's packages on the first run, and opens the browser when it is ready. `start_visionworks.bat phone` uses HTTPS so a phone can be paired as a camera; `start_visionworks.bat dev` runs the development server. Close its window to stop.
+Create the tables with `npx prisma db push` (needs `DATABASE_URL` and `DIRECT_URL` in `frontend/.env.local`, from Supabase → **Settings → Database**), then run the files in `frontend/prisma/sql/` in numeric order in the Supabase SQL editor. Put the project's URL, anon key and service-role key (Supabase → **Settings → API**) in `visionworks-keys.env` and start as above.
 
 ---
 

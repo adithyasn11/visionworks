@@ -46,8 +46,7 @@ if not exist "venv\.visionworks-setup-done" (
     )
 )
 
-if not exist "frontend
-ode_modules" (
+if not exist "frontend\node_modules" (
     echo [SETUP] Installing the dashboard's packages ^(first run only^)...
     pushd frontend
     call npm install
