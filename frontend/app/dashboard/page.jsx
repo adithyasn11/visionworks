@@ -21,12 +21,11 @@ import { useSearchParams } from 'next/navigation';
 import { RefreshCw, Loader2, Eye } from 'lucide-react';
 
 import DashboardShell, { VIEWS } from './DashboardShell';
-import SafetyAlertsPanel from './SafetyAlertsPanel';
+import OverviewScreen from './OverviewScreen';
 import ReviewQueue from './safety/ReviewQueue';
 import EventsScreen from './safety/EventsScreen';
 import RulesScreen from './safety/RulesScreen';
 import ActionsScreen from './safety/ActionsScreen';
-import SafetySummary from './safety/SafetySummary';
 import ReportsScreen from './safety/ReportsScreen';
 import EvaluationScreen from './evaluation/EvaluationScreen';
 import PlanSection from './PlanSection';
@@ -408,18 +407,26 @@ function DashboardInner() {
         </div>
       )}
       {view === 'overview' && (
-        <div className="space-y-6 animate-view-in">
-          <PageHeader
-            eyebrow="Site overview"
-            title={`Site safety, ${rangeLabel}`}
-            subtitle="What needs a person first, then how the site did."
-            action={overviewActions}
+        <div className="animate-view-in">
+          {/* Greeting, the headline tiles, the period's numbers and trend, then what is waiting. */}
+          <OverviewScreen
+            user={user}
+            orgName={org.name}
+            days={rangeDays}
+            rangeLabel={rangeLabel}
+            actions={overviewActions}
+            refreshKey={`${alerts.count}-${summaryTick}`}
+            alerts={alerts}
+            cameras={cameras}
+            cameraId={cameraId}
+            activeZones={activeZones}
+            planUsage={planUsage}
+            onNavigate={(v) => {
+              // Members lives on its own page; everything else is a section of this one.
+              if (v === 'members') { window.location.assign('/settings/members'); return; }
+              setView(v);
+            }}
           />
-
-          {/* What needs a person first; the numbers follow. */}
-          <SafetyAlertsPanel status={alerts.status} count={alerts.count} alerts={alerts.alerts} error={alerts.error} onReview={() => setView('review')} />
-
-          <SafetySummary days={rangeDays} refreshKey={`${alerts.count}-${summaryTick}`} />
         </div>
       )}
 
