@@ -22,7 +22,7 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '../../lib/supabase/server';
-import { isPlanId, getPlan } from '../../lib/plans';
+import { isPlanId, getPlan, carriedTerm } from '../../lib/plans';
 import CheckoutScreen from './CheckoutScreen';
 
 export const dynamic = 'force-dynamic';
@@ -74,7 +74,7 @@ export default async function CheckoutPage({ searchParams }) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('fullName, email, currentOrgId')
+    .select('fullName, email, currentOrgId, carriedPlan, carriedBillingPeriod, carriedPlanRenewsAt')
     .eq('id', data.user.id)
     .maybeSingle();
 
@@ -103,6 +103,7 @@ export default async function CheckoutPage({ searchParams }) {
       period={period}
       email={profile?.email ?? data.user.email ?? null}
       fullName={profile?.fullName ?? null}
+      carried={carriedTerm(profile)}
     />
   );
 }

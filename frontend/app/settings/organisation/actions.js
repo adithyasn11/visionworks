@@ -140,7 +140,7 @@ export async function getOrganisationSettings() {
       // section, which reads it through getViewerRole() — one source, subject
       // to the same ACTIVE-membership check as the role. Selecting it here too
       // would be a second reader of the same value with different filtering.
-      .select('id, name, slug, timezone, dataRetentionDays, purgeVideoAfterProcessing, createdAt')
+      .select('id, name, slug, timezone, dataRetentionDays, purgeVideoAfterProcessing, createdAt, plan, billingPeriod, planRenewsAt')
       .eq('id', orgId)
       .maybeSingle(),
     supabase

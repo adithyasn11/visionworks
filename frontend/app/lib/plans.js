@@ -266,3 +266,31 @@ if (PLANS.filter((p) => p.featured).length > 1) {
 if (PLANS.length !== PLAN_IDS.length || !PLANS.every((p) => PLAN_IDS.includes(p.id))) {
   throw new Error('plans.js: PLANS and PLAN_IDS have diverged.');
 }
+
+/**
+ * The paid term kept from a deleted organisation (032_carry_paid_term.sql), read from a profile row with the
+ * `carried*` columns. null when there is none or it has already ended. The next organisation this person creates
+ * continues it: same tier, same period, same end date.
+ */
+export function carriedTerm(profile) {
+  const end = profile?.carriedPlanRenewsAt;
+  if (!profile?.carriedPlan || !end || !isPlanId(profile.carriedPlan)) return null;
+  const ms = new Date(end).getTime() - Date.now();
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  return {
+    plan: profile.carriedPlan,
+    name: planName(profile.carriedPlan),
+    period: profile.carriedBillingPeriod === 'YEARLY' ? 'yearly' : 'monthly',
+    renewsAt: end,
+    daysLeft: Math.max(1, Math.ceil(ms / 86400000)),
+  };
+}
+
+/** "15 December 2026" for a term date. */
+export function termDate(iso) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/** "30 days" / "1 day". */
+export const daysText = (n) => `${n} day${n === 1 ? '' : 's'}`;

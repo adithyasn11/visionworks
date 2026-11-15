@@ -39,7 +39,7 @@ import { ArrowRight, Check, Building2, MapPin, Video, Loader2 } from 'lucide-rea
 import AuthAside from '../components/AuthAside';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { Field, Banner, SubmitButton } from '../components/AuthFormBits';
-import { planName } from '../lib/plans';
+import { planName, termDate } from '../lib/plans';
 import { createOrganisation, updateSite, createCamera, finishOnboarding } from './actions';
 
 const ASIDE = {
@@ -149,7 +149,7 @@ function SkipButton({ onClick, disabled, children }) {
 
 /* ── Wizard ──────────────────────────────────────────────────────────────── */
 
-export default function OnboardingWizard({ firstName, email, pendingPlan = null, resume = null }) {
+export default function OnboardingWizard({ firstName, email, pendingPlan = null, paidUntil = null, resume = null }) {
   const router = useRouter();
 
   // `resume` (from the page) means the organisation already exists: start at the step asked for, on it.
@@ -415,7 +415,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null,
                     {pendingPlan && (
                       <p className="inline-flex items-center gap-1.5 self-start bg-accent-soft text-accent px-2.5 py-1 rounded-full text-[0.6875rem] font-black uppercase tracking-[0.1em]">
                         <Check className="w-3 h-3" strokeWidth={3} aria-hidden="true" />
-                        {planName(pendingPlan)} plan
+                        {planName(pendingPlan)} plan{paidUntil ? ` · paid until ${termDate(paidUntil)}` : ''}
                       </p>
                     )}
                   </header>

@@ -40,6 +40,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '../lib/supabase/server';
 import HomeScreen from './HomeScreen';
+import { carriedTerm } from '../lib/plans';
 
 // The whole page is about who is asking. Never cached across visitors.
 export const dynamic = 'force-dynamic';
@@ -74,7 +75,7 @@ export default async function HomePage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('fullName, email, currentOrgId, selectedPlan, selectedBillingPeriod')
+    .select('fullName, email, currentOrgId, selectedPlan, selectedBillingPeriod, carriedPlan, carriedBillingPeriod, carriedPlanRenewsAt')
     .eq('id', data.user.id)
     .maybeSingle();
 
@@ -119,6 +120,8 @@ export default async function HomePage() {
       email={profile?.email ?? data.user.email ?? null}
       fullName={profile?.fullName ?? null}
       suspendedOrg={suspendedOrg}
+      // Paid time kept from an organisation this person deleted: the next one they create continues it.
+      carried={carriedTerm(profile)}
       // A tier chosen but not yet spent on an organisation, so returning here
       // resumes the abandoned checkout rather than starting over.
       pendingPlan={profile?.selectedPlan ?? null}

@@ -18,6 +18,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '../lib/supabase/server';
 import OnboardingWizard from './OnboardingWizard';
+import { carriedTerm } from '../lib/plans';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -51,7 +52,7 @@ export default async function OnboardingPage({ searchParams }) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('currentOrgId, fullName, email, selectedPlan')
+    .select('currentOrgId, fullName, email, selectedPlan, carriedPlan, carriedBillingPeriod, carriedPlanRenewsAt')
     .eq('id', data.user.id)
     .maybeSingle();
 
@@ -164,12 +165,14 @@ export default async function OnboardingPage({ searchParams }) {
   // user whose organisation was deleted has a stale pointer AND a spent plan,
   // and trusting the pointer here would keep them in a wizard they cannot
   // finish instead of sending them to /home to choose again.
-  if (!profile?.selectedPlan && !orgReachable) redirect('/home');
+  // Paid time kept from a deleted organisation counts as a chosen plan: the new organisation continues it (032).
+  const carried = carriedTerm(profile);
+  if (!profile?.selectedPlan && !carried && !orgReachable) redirect('/home');
 
   // Null from step 2 onward, by design — see above. The wizard renders the
   // badge only when it has one, so a spent plan simply stops being advertised
   // rather than showing "null plan".
-  const pendingPlan = profile?.selectedPlan ?? null;
+  const pendingPlan = carried?.plan ?? profile?.selectedPlan ?? null;
 
   // A sensible default beats an empty field, and the browser is the only thing
   // that knows where the user is. Resolved on the client, because the server
@@ -179,6 +182,7 @@ export default async function OnboardingPage({ searchParams }) {
       firstName={(profile?.fullName ?? '').trim().split(/\s+/)[0] || null}
       email={profile?.email ?? data.user.email ?? null}
       pendingPlan={pendingPlan}
+      paidUntil={carried && !orgReachable ? carried.renewsAt : null}
       resume={resume}
     />
   );

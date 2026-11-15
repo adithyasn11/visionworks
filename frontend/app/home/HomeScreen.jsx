@@ -54,7 +54,7 @@ import {
 import AppHeader from '../components/AppHeader';
 import LandingFooter from '../components/LandingFooter';
 import InvitationsPanel from './InvitationsPanel';
-import { PLANS, formatPrice, planName, yearlyPerMonth, yearlySaving, yearlyEquivalentMonths } from '../lib/plans';
+import { PLANS, daysText, formatPrice, planName, termDate, yearlyPerMonth, yearlySaving, yearlyEquivalentMonths } from '../lib/plans';
 
 /* ── Setup steps ─────────────────────────────────────────────────────────── */
 
@@ -88,14 +88,15 @@ const money = (n) => {
   })}`;
 };
 
-export function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
+export function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay, carriedLabel = null }) {
   const busy = busyPlan === plan.id;
   const anyBusy = busyPlan !== null;
   const featured = Boolean(plan.featured);
 
   // "Continue checkout" resumes an abandoned attempt. Without it the pending
   // choice is invisible and the user starts the flow over.
-  const label = isPending ? 'Continue checkout' : plan.cta;
+  // The tier whose paid time is still running (kept from a deleted organisation) says so instead of selling it again.
+  const label = carriedLabel || (isPending ? 'Continue checkout' : plan.cta);
 
   // The featured card is the dark one, mirroring the landing page's bento —
   // where the tall "Privacy first." panel is `card-dark` against light
@@ -223,7 +224,7 @@ export function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay })
 
 /* ── Screen ──────────────────────────────────────────────────────────────── */
 
-export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod, suspendedOrg = false }) {
+export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod, suspendedOrg = false, carried = null }) {
   const router = useRouter();
   const [period, setPeriod] = useState('monthly');
   const [busyPlan, setBusyPlan] = useState(null);
@@ -248,6 +249,8 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
   const choose = (planId) => {
     setBusyPlan(planId);
     try {
+      // The plan they already have time on: straight to naming the new organisation, nothing to confirm or pay.
+      if (carried && planId === carried.plan && period === carried.period) { router.push('/onboarding'); return; }
       // The PERIOD travels with the tier. It used to be client-only state:
       // choosing yearly changed the displayed price and was never sent
       // anywhere, so a yearly customer's organisation was created MONTHLY.
@@ -281,6 +284,26 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
             the div is not empty in CSS terms, it holds a component that
             returned null.) */}
         <InvitationsPanel />
+
+        {carried && !suspendedOrg && (
+          <div role="status" className="mb-8 rounded-2xl border border-[color:var(--accent)] bg-accent-soft px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+            <div className="min-w-0">
+              <p className="text-[0.9375rem] font-bold text-ink">
+                Your {carried.name} plan is still paid until {termDate(carried.renewsAt)}
+              </p>
+              <p className="mt-1 text-[0.84375rem] text-ink-muted leading-relaxed">
+                {daysText(carried.daysLeft)} left from the organisation you deleted. Create a new one and it carries on, with nothing to pay again.
+              </p>
+            </div>
+            <Link
+              href="/onboarding"
+              className="shrink-0 inline-flex items-center justify-center gap-2 bg-accent text-white px-5 py-3 rounded-xl font-bold text-[0.875rem] hover:brightness-110 transition-all"
+            >
+              Create organisation
+              <ArrowRight className="w-4 h-4" aria-hidden="true" />
+            </Link>
+          </div>
+        )}
 
         {suspendedOrg && (
           <div role="status" className="mb-8 rounded-2xl border border-[color:var(--accent)] bg-accent-soft px-5 py-4">
@@ -525,6 +548,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
                 plan={plan}
                 period={period}
                 isPending={pendingPlan === plan.id}
+                carriedLabel={carried && carried.plan === plan.id && carried.period === period ? 'Use your paid time' : null}
                 onChoose={choose}
                 busyPlan={busyPlan}
                 delay={`${900 + i * 100}ms`}

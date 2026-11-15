@@ -20,7 +20,7 @@
 // mirrors `org_select` (all members read) against `org_update` (admins write),
 // the same split the members screen uses.
 
-import { planName } from '../../lib/plans';
+import { daysText, planName, termDate } from '../../lib/plans';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Building2, ShieldAlert, Trash2, Loader2, AlertCircle, Info,
@@ -378,6 +378,17 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
               danger
             >
               <div className="flex flex-col gap-3">
+                {/* Paid time is not lost: it stays with this administrator's account for their next organisation (032). */}
+                {(() => {
+                  const end = state.org.plan && state.org.plan !== 'FREE' ? state.org.planRenewsAt : null;
+                  const left = end ? Math.ceil((new Date(end).getTime() - Date.now()) / 86400000) : 0;
+                  return left > 0 ? (
+                    <p className="text-[0.8125rem] text-ink-muted leading-relaxed">
+                      The {daysText(left)} left on your {planName(state.org.plan)} plan (until {termDate(end)}) stay with
+                      your account. The next organisation you create continues them, with nothing to pay again.
+                    </p>
+                  ) : null;
+                })()}
                 <Field
                   id="confirmDelete"
                   label={`Type “${state.org.name}” to confirm`}

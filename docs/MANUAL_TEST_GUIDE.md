@@ -487,7 +487,10 @@ node scripts/sql.mjs "update organisations set \"planRenewsAt\" = now() - interv
 ## 15. Clean finish (optional)
 
 - [ ] Organisation settings → **Delete organisation** → confirm.
+  - On a paid plan, before you confirm, the box says how many days are left and that they stay with your account.
   - **Expect:** you go back to Home/onboarding, and the organisation and its data are gone.
+  - On a paid plan: setup shows "Growth plan · paid until …", and Home shows "Your Growth plan is still paid until …". Create a new organisation. **Expect:** its Plan screen shows the same plan, billing period and renewal date as before; nothing restarts.
+  - Before creating it, open checkout for a different plan. **Expect:** "You still have N days of … paid. Confirming this plan replaces them." The same plan and period shows "Already paid until …" and **Continue**.
 
 ---
 

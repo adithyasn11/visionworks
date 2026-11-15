@@ -34,11 +34,11 @@ import {
 import AppHeader from '../../components/AppHeader';
 import LandingFooter from '../../components/LandingFooter';
 import { Banner } from '../../components/AuthFormBits';
-import { formatPrice, yearlyPerMonth, yearlySaving } from '../../lib/plans';
+import { daysText, formatPrice, termDate, yearlyPerMonth, yearlySaving } from '../../lib/plans';
 import { confirmPlan } from '../actions';
 
 export default function CheckoutScreen({
-  plan, email, fullName, period: initialPeriod = 'monthly',
+  plan, email, fullName, period: initialPeriod = 'monthly', carried = null,
 }) {
   const router = useRouter();
   // Seeded from the URL, which carries what was chosen on /home. Defaulting to
@@ -50,6 +50,8 @@ export default function CheckoutScreen({
   const [done, setDone] = useState(false);
 
   const isFree = plan.priceMonthly === 0;
+  // Paid time kept from a deleted organisation: the same tier and term continues it; anything else replaces it.
+  const continuesCarried = Boolean(carried && carried.plan === plan.id && carried.period === period);
 
   /**
    * Record the plan, then navigate where the server said to go.
@@ -281,6 +283,22 @@ export default function CheckoutScreen({
                 </div>
               </div>
 
+              {carried && (
+                <div role="status" className={`rounded-2xl border px-4 py-3.5 text-[0.8125rem] leading-relaxed ${continuesCarried ? 'border-white/15 bg-white/5' : 'border-red-400/60 bg-red-500/15'}`}>
+                  {continuesCarried ? (
+                    <>
+                      <span className="font-black">Already paid until {termDate(carried.renewsAt)}.</span>{' '}
+                      <span className="opacity-75">Your new organisation continues this {carried.name} term; nothing new is charged.</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-black">You still have {daysText(carried.daysLeft)} of {carried.name} ({carried.period}) paid.</span>{' '}
+                      <span className="opacity-75">Confirming this plan replaces them. To keep them, choose {carried.name} {carried.period}.</span>
+                    </>
+                  )}
+                </div>
+              )}
+
               <form onSubmit={submit} className="flex flex-col gap-3">
                 <button
                   type="submit"
@@ -299,7 +317,7 @@ export default function CheckoutScreen({
                     </>
                   ) : (
                     <>
-                      {isFree ? 'Start on Starter' : `Confirm ${plan.name}`}
+                      {continuesCarried ? `Continue ${plan.name}` : isFree ? 'Start on Starter' : `Confirm ${plan.name}`}
                       <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" aria-hidden="true" />
                     </>
                   )}

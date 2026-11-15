@@ -219,6 +219,8 @@ model Organisation {
   /// Computed in Postgres by plan_term_end(), never in the browser — two
   /// places computing a renewal date is how they come to disagree.
   planRenewsAt   DateTime?     @db.Timestamptz(6)
+  /// The deleted organisation whose paid term this one continued (032).
+  termCarriedFromOrgId String? @db.Uuid
 
   // ── Privacy & retention controls, surfaced on /settings/organisation ──
   /// ZoneMinuteStat rows older than this are deleted by the retention job.
@@ -302,6 +304,13 @@ model Profile {
   /// so a yearly customer's organisation was created MONTHLY (018).
   selectedBillingPeriod BillingPeriod?
   selectedPlanAt        DateTime?      @db.Timestamptz(6)
+  /// What was left of a paid term when this person deleted a paid organisation (032).
+  /// The next organisation they create continues it; ignored once it has passed.
+  carriedPlan           PlanTier?
+  carriedBillingPeriod  BillingPeriod?
+  carriedPlanStartedAt  DateTime?      @db.Timestamptz(6)
+  carriedPlanRenewsAt   DateTime?      @db.Timestamptz(6)
+  carriedFromOrgId      String?        @db.Uuid
 
   /// Null until the user finishes /onboarding. Distinct from createdAt so you
   /// can measure signup-to-activated drop-off.
