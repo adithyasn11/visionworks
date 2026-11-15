@@ -5,8 +5,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   Eye, Upload, Play, Pause, RefreshCw, Shield,
   Sliders, CheckCircle2, Loader2, AlertCircle, Video,
-  RotateCcw, RotateCw, Cpu, Maximize2, Minimize2, Camera, CameraOff, Smartphone, CalendarClock
-} from 'lucide-react';
+  RotateCcw, RotateCw, Cpu, Maximize2, Minimize2, Camera, CameraOff, Smartphone, CalendarClock, Gauge } from 'lucide-react';
 
 // Backend origin and the token-attaching helpers. Every processing socket
 // carries the Supabase access token so the telemetry it produces is attributed
@@ -104,8 +103,9 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   // with it off nothing here appears.
   // Uploaded videos play at the speed they were filmed; switch off to process as
   // fast as the machine can.
-  const [realtime, setRealtime] = useState(true);
-  const realtimeRef = useRef(true);
+  // Playback speed of an uploaded video: 0.25 to 2 times, or 0 for "as fast as the machine can analyse".
+  const [speed, setSpeed] = useState(1);
+  const speedRef = useRef(1);
   const [zoneEvents, setZoneEvents] = useState([]);
   const [decisions, setDecisions] = useState([]);
   // New alerts raise a short-lived banner over the picture; `openCount` is how many flags this run has raised.
@@ -201,7 +201,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     if (wsRef.current) wsRef.current.close();
 
     const epoch = ++connectionEpochRef.current;
-    const ws = new WebSocket(await backendSocketUrl(`/api/v1/video/process/${sid}${realtimeRef.current ? '' : '?realtime=false'}`));
+    const ws = new WebSocket(await backendSocketUrl(`/api/v1/video/process/${sid}${speedRef.current === 0 ? '?realtime=false' : `?speed=${speedRef.current}`}`));
     // A Reset or a second connect attempt during the await above must win —
     // otherwise this socket overwrites wsRef.current with a connection nothing
     // will ever close.
@@ -582,11 +582,11 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   // never heard about, which is the one direction this control must never lie in.
   // Real time on/off. Remembered for the next upload as well as sent to the live
   // session, so the choice made before pressing Upload is the one that applies.
-  const toggleRealtime = (checked) => {
-    setRealtime(checked);
-    realtimeRef.current = checked;
+  const changeSpeed = (value) => {
+    setSpeed(value);
+    speedRef.current = value;
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ action: 'set_realtime', enabled: checked }));
+      wsRef.current.send(JSON.stringify(value === 0 ? { action: 'set_realtime', enabled: false } : { action: 'set_speed', speed: value }));
     }
   };
 
@@ -881,12 +881,12 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         {phase === 'processing' && !isWebcamActive && (
           <div
             onClick={togglePlayPause}
-            className={`absolute inset-0 bg-ground/30 backdrop-blur-[2px] flex items-center justify-center cursor-pointer transition-opacity duration-200 ${
+            className={`absolute inset-0 flex items-center justify-center cursor-pointer transition-opacity duration-200 ${
               isPaused ? 'opacity-100' : 'opacity-0 hover:opacity-100'
             }`}
           >
-            <div className="p-4 rounded-full bg-surface/90 border border-[color:var(--accent)] text-accent shadow-2xl transform hover:scale-110 transition-transform">
-              {isPaused ? <Play className="w-10 h-10 fill-current ml-1" /> : <Pause className="w-10 h-10 fill-current" />}
+            <div className="p-3 rounded-full bg-black/55 text-white shadow-lg transform hover:scale-110 transition-transform">
+              {isPaused ? <Play className="w-7 h-7 fill-current ml-0.5" /> : <Pause className="w-7 h-7 fill-current" />}
             </div>
           </div>
         )}
@@ -962,18 +962,21 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
             className="accent-[color:var(--accent)] cursor-pointer disabled:cursor-not-allowed"
           />
         </label>
-        <label
-          className="flex items-center gap-1.5 select-none text-[0.8125rem] text-ink-muted cursor-pointer"
-          title="Play an upload at its own speed (off: as fast as possible)"
-        >
-          Real time
-          <input
-            type="checkbox"
-            checked={realtime}
-            onChange={(e) => toggleRealtime(e.target.checked)}
-            className="accent-[color:var(--accent)] cursor-pointer"
-          />
-        </label>
+        {!isWebcamActive && !phoneLive && (
+          <label className="flex items-center gap-1.5 select-none text-[0.8125rem] text-ink-muted" title="Playback speed of an uploaded video">
+            <Gauge className="w-4 h-4 text-ink-faint" aria-hidden="true" />
+            <span className="sr-only">Speed</span>
+            <select
+              value={speed}
+              onChange={(e) => changeSpeed(Number(e.target.value))}
+              aria-label="Playback speed"
+              className="rounded-lg bg-surface border border-line px-1.5 py-1 text-[0.8125rem] text-ink focus:outline-none focus:border-[color:var(--accent)]"
+            >
+              {[0.25, 0.5, 1, 1.5, 2].map((v) => <option key={v} value={v}>{v}×</option>)}
+              <option value={0}>Max</option>
+            </select>
+          </label>
+        )}
       </div>
       </div>
 

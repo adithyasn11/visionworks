@@ -328,6 +328,25 @@ def resolve_initial_realtime(websocket) -> bool:
     return True
 
 
+SPEED_MIN, SPEED_MAX = 0.25, 2.0
+
+
+def clamp_speed(raw, default: float = 1.0) -> float:
+    """A playback speed from the viewer, kept between a quarter and twice the filmed speed."""
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return default
+    if value != value or value <= 0:            # NaN, zero or negative
+        return default
+    return max(SPEED_MIN, min(SPEED_MAX, value))
+
+
+def resolve_initial_speed(websocket) -> float:
+    """The speed an uploaded video starts at (`?speed=`, default 1: as filmed)."""
+    return clamp_speed(websocket.query_params.get("speed"))
+
+
 def resolve_initial_blur(websocket) -> bool:
     """
     The blur state a socket starts in.
@@ -882,7 +901,9 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         "paused": False,
         "seek_frame": None,
         "realtime": resolve_initial_realtime(websocket),
+        "speed": resolve_initial_speed(websocket),
     }
+    skip_debt = 0.0                              # frames owed to a speed above 1x
     # Starting state comes from PRIVACY_BLUR_DEFAULT (or this socket's ?blur=),
     # not from a hardcoded True: a face signal needs an unblurred face
     # signal in development, while a deployment that wants privacy-by-default
@@ -905,6 +926,10 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
                         privacy_state["blur"] = bool(data.get("enabled", privacy_state["blur"]))
                     elif action == "set_realtime":
                         control_state["realtime"] = bool(data.get("enabled", control_state["realtime"]))
+                    elif action == "set_speed":
+                        # A speed is always played in real time; "Max" is set_realtime off.
+                        control_state["speed"] = clamp_speed(data.get("speed"), control_state["speed"])
+                        control_state["realtime"] = True
                     elif action == "seek":
                         target_pct = data.get("pct")
                         if target_pct is not None:
@@ -1055,10 +1080,22 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
 
             await websocket.send_json(payload)
             if control_state["realtime"]:
-                # Play at the speed it was filmed: wait out what is left of this
-                # frame's slot. A frame that took longer than its slot is not
-                # hurried or skipped, it just means no wait.
-                await asyncio.sleep(max(0.001, (1.0 / max(fps, 1.0)) - (time.monotonic() - frame_started)))
+                # Play at the chosen speed: wait out what is left of this frame's
+                # slot. Slower than filmed stretches the slot. Faster than filmed
+                # skips frames (grabbed, not analysed) instead of shrinking the
+                # slot, because analysis cannot keep up with 2x on most machines.
+                # The safety clock runs on the video's own frame numbers, so
+                # durations (a stay, lying still) stay true to the footage.
+                speed = control_state["speed"]
+                if speed > 1.0:
+                    skip_debt += speed - 1.0
+                    while skip_debt >= 1.0 and (not total_frames or frame_idx < total_frames - 1):
+                        if not cap.grab():
+                            break
+                        frame_idx += 1
+                        skip_debt -= 1.0
+                slot = 1.0 / (max(fps, 1.0) * min(speed, 1.0))
+                await asyncio.sleep(max(0.001, slot - (time.monotonic() - frame_started)))
             else:
                 await asyncio.sleep(0.001)
 

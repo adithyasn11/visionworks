@@ -14,6 +14,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { createRule, deleteRule, listRules, updateRule, validateRule } from '../../lib/safetyApi';
 import { listSafetyZones } from '../../lib/safety/management';
+import { backendFetch } from '../../lib/backend';
 import { RULE_TYPES, SEVERITIES, PPE_ITEMS, defaultParams, friendlyRuleError, isEnforced, ruleBody, ruleSummary, ruleTypeMeta } from '../../lib/safety/ruleTypes';
 import { can } from '../../lib/permissions';
 import { BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel, SeverityChip, Skeleton } from './common';
@@ -26,6 +27,26 @@ function formFromRule(rule) {
     id: rule.id, name: rule.name, type: rule.type, zoneId: rule.zoneId || '', severity: rule.severity, isEnabled: rule.isEnabled,
     minEvidenceConfidence: rule.minEvidenceConfidence, params: { ...defaultParams(rule.type), ...(rule.params || {}) },
   };
+}
+
+// A zone drawn on the Zones page starts as General, which no rule attaches to. Such a zone is still offered here
+// (marked), and saving the rule gives it the type the rule needs. Only General zones are offered this way, so
+// saving a rule never turns a zone that already has a safety meaning into something else.
+const mainTarget = (meta) => (meta.zoneTypes.includes('RESTRICTED') ? 'RESTRICTED' : meta.zoneTypes[0]);
+const ZONE_TYPE_ERROR = /must be anchored to a RESTRICTED zone|needs a real zone|checkpoint_zone_id must be|exit_zone_id must be/i;
+
+/** The General zones a rule refers to, each with the type it gets when the rule is saved. */
+function zoneChanges(form, meta, zones) {
+  const out = [];
+  const add = (id, to) => {
+    const z = zones.find((x) => x.id === id);
+    if (z && z.safetyType === 'GENERAL' && !out.some((c) => c.zone.id === z.id)) out.push({ zone: z, to });
+  };
+  if (form.zoneId) add(form.zoneId, mainTarget(meta));
+  meta.fields.forEach((f) => {
+    if (f.kind === 'zone' && (!f.when || f.when(form.params)) && form.params[f.key]) add(form.params[f.key], f.zoneTypes[0]);
+  });
+  return out;
 }
 
 /** 'exit zone' or 'checkpoint zone' when a rule refers to one that no longer exists, else null. */
@@ -69,12 +90,19 @@ function ParamField({ field, form, setParams, zones }) {
   }
   if (field.kind === 'zone') {
     const camera = (zones.find((z) => z.id === form.zoneId) || {}).cameraId;
-    const options = zones.filter((z) => field.zoneTypes.includes(z.safetyType) && (!camera || z.cameraId === camera));
+    const sameCamera = (z) => !camera || z.cameraId === camera;
+    const options = zones.filter((z) => field.zoneTypes.includes(z.safetyType) && sameCamera(z));
+    const general = zones.filter((z) => z.safetyType === 'GENERAL' && z.id !== form.zoneId && sameCamera(z));
     return (
       <label htmlFor={id} className="flex flex-col gap-1 text-xs text-ink-faint">{field.label}
         <select id={id} value={value ?? ''} onChange={(e) => setParams({ [field.key]: e.target.value })} className={INPUT}>
-          <option value="">{options.length ? 'Choose a zone' : `No ${field.zoneTypes.map((t) => ZONE_TYPE_LABELS[t].toLowerCase()).join(' / ')} zone on this camera`}</option>
+          <option value="">{options.length || general.length ? 'Choose a zone' : `No ${field.zoneTypes.map((t) => ZONE_TYPE_LABELS[t].toLowerCase()).join(' / ')} zone on this camera`}</option>
           {options.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
+          {general.length > 0 && (
+            <optgroup label={`General zones (become ${ZONE_TYPE_LABELS[field.zoneTypes[0]]})`}>
+              {general.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
+            </optgroup>
+          )}
         </select>
       </label>
     );
@@ -87,7 +115,7 @@ function ParamField({ field, form, setParams, zones }) {
   );
 }
 
-function RuleForm({ initial, zones, onSaved, onCancel, onGone }) {
+function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged }) {
   const [form, setForm] = useState(initial);
   const [check, setCheck] = useState({ state: 'idle' });
   const [saving, setSaving] = useState(false);
@@ -100,6 +128,8 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone }) {
   const editing = Boolean(form.id);
   const setParams = (patch) => setForm((f) => ({ ...f, params: { ...f.params, ...patch } }));
   const zoneChoices = useMemo(() => zones.filter((z) => meta.zoneTypes.includes(z.safetyType)), [zones, meta]);
+  const generalZones = useMemo(() => zones.filter((z) => z.safetyType === 'GENERAL'), [zones]);
+  const changes = useMemo(() => zoneChanges(form, meta, zones), [form, meta, zones]);
   const body = useMemo(() => ruleBody(form), [form]);
 
   // Ask the server whether this rule is acceptable, shortly after the last change, so a mistake is named
@@ -114,10 +144,11 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone }) {
       if (mine !== token.current) return;
       if (!r.ok) setCheck({ state: 'error', message: friendlyRuleError(r.message) });
       else if (r.data.valid) setCheck({ state: 'valid', enforced: r.data.evaluated_by_engine });
+      else if (changes.length && r.data.errors.every((x) => ZONE_TYPE_ERROR.test(x))) setCheck({ state: 'valid', enforced: true });
       else setCheck({ state: 'invalid', errors: r.data.errors });
     }, 450);
     return () => clearTimeout(timer);
-  }, [body]);
+  }, [body, changes.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function changeType(type) {
     setForm((f) => ({ ...f, type, zoneId: '', params: defaultParams(type) }));
@@ -134,6 +165,19 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone }) {
     if (inFlight.current) return;
     inFlight.current = true;
     setSaving(true); setError(null);
+    for (const c of changes) {
+      try {
+        const res = await backendFetch(`/api/v1/zones/${encodeURIComponent(c.zone.slug)}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ zone_type: c.to }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+      } catch {
+        inFlight.current = false; setSaving(false);
+        setError(`Could not make "${c.zone.name}" a ${ZONE_TYPE_LABELS[c.to]} zone. Change its type on the Zones page, then try again.`);
+        return;
+      }
+    }
+    if (changes.length && onZonesChanged) await onZonesChanged();
     // An update may not carry `type` (a rule's kind cannot change, and the API refuses unknown fields), so it is left
     // out of the PATCH; validation above still sends it, because the validator needs to know the kind.
     const { type: _kind, ...patch } = body;
@@ -166,6 +210,11 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone }) {
           <select value={form.zoneId} onChange={(e) => setForm({ ...form, zoneId: e.target.value, params: { ...form.params, ...(form.params.checkpoint_zone_id !== undefined ? { checkpoint_zone_id: '' } : {}), ...(form.params.exit_zone_id !== undefined ? { exit_zone_id: '' } : {}) } })} className={INPUT}>
             <option value="">{meta.zoneOptional ? 'Everywhere (every camera)' : 'Choose a zone'}</option>
             {zoneChoices.map((z) => <option key={z.id} value={z.id}>{z.name}{z.camera ? ` (${z.camera})` : ''} · {ZONE_TYPE_LABELS[z.safetyType]}</option>)}
+            {generalZones.length > 0 && (
+              <optgroup label={`General zones (become ${ZONE_TYPE_LABELS[mainTarget(meta)]})`}>
+                {generalZones.map((z) => <option key={z.id} value={z.id}>{z.name}{z.camera ? ` (${z.camera})` : ''}</option>)}
+              </optgroup>
+            )}
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-ink-faint">How serious
@@ -180,7 +229,10 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone }) {
           </div>
         </label>
       </div>
-      {zoneChoices.length === 0 && !meta.zoneOptional && (
+      {changes.length > 0 && (
+        <Notice>{changes.map((c) => `"${c.zone.name}" becomes a ${ZONE_TYPE_LABELS[c.to]} zone`).join('; ')} when you save.</Notice>
+      )}
+      {zoneChoices.length === 0 && generalZones.length === 0 && !meta.zoneOptional && (
         <Notice>There is no {meta.zoneTypes.map((t) => ZONE_TYPE_LABELS[t].toLowerCase()).join(' or ')} zone yet. Draw one in Zones and set its type, then come back.</Notice>
       )}
 
@@ -231,7 +283,10 @@ export default function RulesScreen({ role }) {
 
   // zonesReady: a rule is only called broken once the zone list has actually arrived.
   const [zonesReady, setZonesReady] = useState(false);
-  useEffect(() => { load(); listSafetyZones().then((r) => { setZones(r.zones || []); setZonesReady(!r.error); }); }, [load]);
+  const loadZones = useCallback(() => listSafetyZones().then((r) => { setZones(r.zones || []); setZonesReady(!r.error); }), []);
+  useEffect(() => { load(); loadZones(); }, [load, loadZones]);
+  // A zone drawn a moment ago on the Zones page is in the list as soon as the form opens.
+  useEffect(() => { if (editing) loadZones(); }, [Boolean(editing)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A rule deleted elsewhere since this list was loaded.
   const gone = () => { setEditing(null); setMessage({ tone: 'error', text: 'That rule has been deleted, perhaps in another window. The list is up to date now.' }); load(); };
@@ -258,7 +313,7 @@ export default function RulesScreen({ role }) {
     <div className="space-y-5">
       <Panel title="Safety rules" icon={SlidersHorizontal} aside={state.loading ? '' : `${state.rules.length} rule${state.rules.length === 1 ? '' : 's'}`}>
         <Notice className="mb-3">
-          Restricted zones are checked for a helmet and vest by default; a rule you add for a zone replaces that check. Rules apply from a camera's next run.
+          Restricted zones are checked for a helmet and vest on entry by default; your own entry rule for a zone replaces that check. Rules apply from a camera's next run.
         </Notice>
         {!canEdit && !state.loading && <Notice className="mb-3">You have view-only access: you can read the rules, and an administrator or manager changes them.</Notice>}
         {message && <Notice tone={message.tone} className="mb-3">{message.text}</Notice>}
@@ -315,7 +370,7 @@ export default function RulesScreen({ role }) {
       </Panel>
 
       {canEdit && editing && (
-        <RuleForm key={editing.id || 'new'} initial={editing} zones={zones}
+        <RuleForm key={editing.id || 'new'} initial={editing} zones={zones} onZonesChanged={loadZones}
           onSaved={() => { setEditing(null); setMessage({ tone: 'ok', text: 'The rule was saved. It applies from the next run of a camera.' }); load(); }}
           onCancel={() => setEditing(null)} onGone={gone} />
       )}

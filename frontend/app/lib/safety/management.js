@@ -31,7 +31,7 @@ export async function listSafetyZones() {
     if (!orgId) return { zones: [] };
     const { data, error } = await supabase
       .from('zones')
-      .select('id, name, safetyType, cameraId, camera:cameras(name)')
+      .select('id, name, slug, safetyType, cameraId, camera:cameras(name)')
       .eq('orgId', orgId)
       .is('deletedAt', null)
       .order('name', { ascending: true })
@@ -39,7 +39,7 @@ export async function listSafetyZones() {
     if (error) throw new Error(error.message);
     return {
       zones: (data || []).map((z) => ({
-        id: z.id, name: z.name, safetyType: z.safetyType || 'GENERAL', cameraId: z.cameraId, camera: z.camera?.name ?? null,
+        id: z.id, name: z.name, slug: z.slug || z.name, safetyType: z.safetyType || 'GENERAL', cameraId: z.cameraId, camera: z.camera?.name ?? null,
       })),
     };
   } catch {
