@@ -458,6 +458,7 @@ function DashboardInner() {
               activeZones={activeZones}
               readOnly={!can(role, 'analysis.run')}
               cameraId={cameraId}
+              cameraSource={(cameras.find((c) => c.name === cameraId) || {}).sourceType || null}
             />
             <FloorplanHeatmap />
           </div>

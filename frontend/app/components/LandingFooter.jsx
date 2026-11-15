@@ -28,7 +28,7 @@ import { ArrowRight } from 'lucide-react';
 const PRODUCT = [
   { href: '/features', label: 'Features' },
   { href: '/security', label: 'Security' },
-  { href: '/home#pricing', label: 'Plans' },
+  { href: '/plans', label: 'Plans' },
   { href: '/home', label: 'Your dashboard' },
 ];
 

@@ -46,7 +46,9 @@ function localNowValue() {
  * processing WebSockets refuse a VIEWER server-side (layer 2), and any rows
  * that did reach the database are still org-scoped by RLS (layer 3).
  */
-export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = false, cameraId = 'live_webcam' }) => {
+export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = false, cameraId = 'live_webcam', cameraSource = null }) => {
+  // A network (RTSP) camera is opened by the server at its stored address; the browser's webcam is not involved.
+  const isNetworkCamera = cameraSource === 'RTSP';
   const canvasRef   = useRef(null);
   const containerRef = useRef(null);
   const stageRef = useRef(null);      // just the canvas + its overlays
@@ -217,6 +219,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         }
         if (msg.type === 'FRAME')    { handleFrame(msg); }
         if (msg.type === 'CAMERA_LOST') { setStatusMsg(msg.message); }
+        if (msg.type === 'CAMERA_BACK') { setStatusMsg(msg.message); }
         if (msg.type === 'COMPLETE') { setPhase('done'); setProgress(100); setStatusMsg(msg.message); }
         if (msg.type === 'ERROR')    { setPhase('error'); setStatusMsg(msg.error); }
         if (msg.error && !msg.type)  { setPhase('error'); setStatusMsg(msg.error); }
@@ -304,6 +307,14 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     bannerSeenRef.current = new Set();
     setPpeEntities([]);
     setPpeUnavailable(null);
+
+    // The server refuses anything over 2 GB; say so before spending minutes uploading it.
+    if (file.size > 2048 * 1024 * 1024) {
+      setFileName(file.name);
+      setPhase('error');
+      setStatusMsg('Upload error: this video is larger than 2048 MB. Trim it, or upload a shorter part.');
+      return;
+    }
 
     setFileName(file.name);
     setPhase('uploading');
@@ -473,12 +484,12 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   // Fallback: backend direct camera capture.
   // Reached from startLiveWebcam through startBackendDirectWebcamRef, so the
   // call sites above do not depend on this declaration order.
-  const startBackendDirectWebcam = useCallback(async () => {
+  const startBackendDirectWebcam = useCallback(async (network = false) => {
     if (wsRef.current) wsRef.current.close();
     const epoch = connectionEpochRef.current;
 
     const ws = new WebSocket(await backendSocketUrl(
-      `/api/v1/video/live_webcam?camera_id=${encodeURIComponent(cameraId)}`
+      `/api/v1/video/live_webcam?camera_id=${encodeURIComponent(cameraId)}${network === true ? '&source=rtsp' : ''}`
     ));
     if (connectionEpochRef.current !== epoch) { ws.close(); return; }
     wsRef.current = ws;
@@ -497,6 +508,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         }
         if (msg.type === 'FRAME') { handleFrame(msg); }
         if (msg.type === 'CAMERA_LOST') { setStatusMsg(msg.message); }
+        if (msg.type === 'CAMERA_BACK') { setStatusMsg(msg.message); }
         if (msg.error) {
           setPhase('error');
           setStatusMsg(msg.error);
@@ -506,9 +518,23 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
 
     ws.onerror = () => {
       setPhase('error');
-      setStatusMsg('Failed to open camera on backend or browser.');
+      setStatusMsg(network === true ? 'Could not reach the analysis server to open the network camera.' : 'Failed to open camera on backend or browser.');
+    };
+    // The server closes the stream when the camera cannot be opened; the error above says why.
+    ws.onclose = () => {
+      setIsWebcamActive(false);
+      setPhase((p) => (p === 'webcam' ? 'idle' : p));
     };
   }, [handleFrame, cameraId]);
+
+  // A network camera: no browser camera permission, straight to the server's stream for this camera.
+  const startNetworkCamera = useCallback(() => {
+    handleReset();
+    setPhase('webcam');
+    setIsWebcamActive(true);
+    setStatusMsg('Connecting to the network camera...');
+    startBackendDirectWebcam(true);
+  }, [handleReset, startBackendDirectWebcam]);
 
   // Keep the ref pointing at the latest implementation so callers declared
   // earlier in the component can reach it.
@@ -680,11 +706,11 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
             </button>
           ) : (
             <button
-              onClick={startLiveWebcam}
+              onClick={isNetworkCamera ? startNetworkCamera : startLiveWebcam}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 border border-line text-accent text-xs font-bold transition-all shadow-lg shadow-red-600/10"
             >
               <Camera className="w-3.5 h-3.5 animate-pulse" />
-              <span>Turn On Camera</span>
+              <span>{isNetworkCamera ? 'Connect network camera' : 'Turn On Camera'}</span>
             </button>
           )}
 
@@ -751,7 +777,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-alt/80 border border-line-soft text-xs text-ink-muted font-mono">
           {PhaseIcon}
           <span className="truncate">
-            {isWebcamActive ? `🔴 LIVE WEBCAM FEED — ${statusMsg}` : (statusMsg || fileName)}
+            {isWebcamActive ? `🔴 ${isNetworkCamera ? 'NETWORK CAMERA' : 'LIVE WEBCAM FEED'} — ${statusMsg}` : (statusMsg || fileName)}
           </span>
           {phase === 'processing' && !isWebcamActive && (
             <span className="ml-auto text-accent shrink-0 font-bold">{progress.toFixed(1)}%</span>
@@ -912,7 +938,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
             </button>
 
             <span className="text-xs text-ink-muted font-mono ml-2">
-              {isWebcamActive ? '🔴 WEBCAM LIVE' : isPaused ? 'PAUSED' : phase === 'processing' ? 'PLAYING' : 'IDLE'}
+              {isWebcamActive ? (isNetworkCamera ? '🔴 NETWORK CAMERA LIVE' : '🔴 WEBCAM LIVE') : isPaused ? 'PAUSED' : phase === 'processing' ? 'PLAYING' : 'IDLE'}
             </span>
           </div>
 

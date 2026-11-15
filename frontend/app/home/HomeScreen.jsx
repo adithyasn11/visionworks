@@ -88,7 +88,7 @@ const money = (n) => {
   })}`;
 };
 
-function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
+export function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
   const busy = busyPlan === plan.id;
   const anyBusy = busyPlan !== null;
   const featured = Boolean(plan.featured);

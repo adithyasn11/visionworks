@@ -52,7 +52,11 @@ export default async function CheckoutPage({ searchParams }) {
   }
 
   const { data, error } = await supabase.auth.getUser();
-  if (error || !data?.user) redirect('/login?next=/home');
+  // Back to THIS checkout after signing in, with the plan and term that were chosen (it used to be plain /home).
+  if (error || !data?.user) {
+    const back = `/home/checkout?plan=${encodeURIComponent(String(searchParams?.plan ?? ''))}&period=${encodeURIComponent(String(searchParams?.period ?? ''))}`;
+    redirect(`/login?next=${encodeURIComponent(back)}`);
+  }
 
   const requested = String(searchParams?.plan ?? '');
 

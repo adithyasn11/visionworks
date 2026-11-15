@@ -27,6 +27,7 @@ export default function LandingNavbar() {
           <nav className="hidden md:flex items-center gap-8 font-bold text-[0.8125rem] text-ink-muted">
             <Link href="/features" className="hover:text-accent hover:-translate-y-0.5 transition-all duration-300">Features</Link>
             <Link href="/security" className="hover:text-accent hover:-translate-y-0.5 transition-all duration-300">Security</Link>
+            <Link href="/plans" className="hover:text-accent hover:-translate-y-0.5 transition-all duration-300">Plans</Link>
           </nav>
 
           <div className="flex items-center gap-2.5">

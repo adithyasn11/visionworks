@@ -99,6 +99,64 @@ _active_sessions: dict = {}
 # sample_videos/ by hand are left untouched.
 _UPLOAD_NAME_RE = re.compile(r'^[0-9a-f]{8}_')
 ORPHAN_UPLOAD_MAX_AGE_SECONDS = 6 * 3600
+# Largest upload accepted. Without a limit a mistaken multi-gigabyte file was written to disk in full before
+# anything looked at it. VIDEO_UPLOAD_MAX_MB overrides it.
+MAX_UPLOAD_BYTES = int(float(os.getenv("VIDEO_UPLOAD_MAX_MB", "2048")) * 1024 * 1024)
+
+
+RTSP_OPEN_TIMEOUT_MS = 8000
+_RTSP_SCHEME = re.compile(r"^rtsps?://", re.IGNORECASE)
+
+
+def _rtsp_url_for(camera_name: Optional[str], org_id: Optional[str]) -> Optional[str]:
+    """
+    The stored stream address of the organisation's RTSP camera with this name, read with the service key (the
+    address can carry a password, so it is never sent to the browser and users cannot select the column). None when
+    there is no such camera, it is not an RTSP camera, or the address is not rtsp:// or rtsps:// (nothing else is
+    ever opened: OpenCV would also read local files and http addresses).
+    """
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    base = (os.getenv("SUPABASE_URL") or "").rstrip("/")
+    if not camera_name or not org_id or not key or "your-" in key or not base:
+        return None
+    import urllib.parse
+    import urllib.request
+    query = urllib.parse.urlencode({"select": "rtspUrl,sourceType", "orgId": f"eq.{org_id}", "name": f"eq.{camera_name}",
+                                    "deletedAt": "is.null", "limit": "1"})
+    request = urllib.request.Request(f"{base}/rest/v1/cameras?{query}",
+                                     headers={"apikey": key, "Authorization": f"Bearer {key}", "Accept": "application/json"})
+    with urllib.request.urlopen(request, timeout=10) as response:
+        rows = json.loads(response.read().decode("utf-8") or "[]")
+    if not rows or rows[0].get("sourceType") != "RTSP":
+        return None
+    url = str(rows[0].get("rtspUrl") or "").strip()
+    return url if _RTSP_SCHEME.match(url) else None
+
+
+def _open_rtsp(url: str):
+    """Open a network camera with bounded waits, and read one picture. (capture, None) or (None, why)."""
+    cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG, [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT_MS,
+                                                 cv2.CAP_PROP_READ_TIMEOUT_MSEC, RTSP_OPEN_TIMEOUT_MS])
+    if not cap.isOpened():
+        cap.release()
+        return None, "connect"
+    ok, _ = cap.read()
+    if not ok:
+        cap.release()
+        return None, "picture"
+    return cap, None
+
+
+def _readable_video(path: str) -> bool:
+    """Can OpenCV open this file and decode a first frame? (A renamed text file or a cut-off download cannot.)"""
+    cap = cv2.VideoCapture(path)
+    try:
+        if not cap.isOpened():
+            return False
+        ok, _ = cap.read()
+        return bool(ok)
+    finally:
+        cap.release()
 # Where a processed upload goes when its organisation turned "Delete uploaded video after processing" off. A folder
 # per organisation, outside the top level the orphan sweep reads, so a kept video stays until someone removes it.
 KEPT_VIDEOS_DIR = os.path.join(SAMPLE_VIDEOS_DIR, "kept")
@@ -583,14 +641,14 @@ async def upload_video_file(
 
     allowed_exts = ('.mp4', '.avi', '.webm', '.mov', '.mkv')
     if not file.filename or not file.filename.lower().endswith(allowed_exts):
-        raise HTTPException(status_code=400, detail="Invalid format. Supported: " + ", ".join(allowed_exts))
+        raise HTTPException(status_code=400, detail="This is not a video file VisionWorks accepts. Use MP4, AVI, WebM, MOV or MKV.")
 
     # Strip any directory components: a filename like "../../x.mp4" must never
     # be able to escape SAMPLE_VIDEOS_DIR and write elsewhere on disk.
     safe_name = os.path.basename(file.filename.replace("\\", "/"))
     safe_name = re.sub(r'[^A-Za-z0-9._-]', '_', safe_name).lstrip('.')
     if not safe_name.lower().endswith(allowed_exts):
-        raise HTTPException(status_code=400, detail="Invalid format. Supported: " + ", ".join(allowed_exts))
+        raise HTTPException(status_code=400, detail="This is not a video file VisionWorks accepts. Use MP4, AVI, WebM, MOV or MKV.")
     if len(safe_name) > 120:                    # a very long name made the file system refuse the write (a 500)
         stem, ext = os.path.splitext(safe_name)
         safe_name = stem[:120 - len(ext)] + ext
@@ -598,15 +656,42 @@ async def upload_video_file(
     session_id = str(uuid.uuid4())[:8]
     save_path = os.path.join(SAMPLE_VIDEOS_DIR, f"{session_id}_{safe_name}")
 
+    too_big = False
     try:
+        written = 0
         with open(save_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            while True:
+                chunk = file.file.read(1024 * 1024)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > MAX_UPLOAD_BYTES:
+                    too_big = True
+                    break
+                buffer.write(chunk)
     except Exception as e:
         try:
             os.remove(save_path)
         except OSError:
             pass
         raise HTTPException(status_code=500, detail=f"Failed to save video: {e}")
+    if too_big:
+        try:
+            os.remove(save_path)
+        except OSError:
+            pass
+        raise HTTPException(status_code=413, detail=(
+            f"This video is larger than {MAX_UPLOAD_BYTES // (1024 * 1024)} MB. Trim it, or upload a shorter part."))
+
+    # Checked now, not when processing starts: a renamed or cut-off file used to be accepted ("Video ready") and only
+    # failed once the run began.
+    if written == 0 or not await asyncio.to_thread(_readable_video, save_path):
+        try:
+            os.remove(save_path)
+        except OSError:
+            pass
+        raise HTTPException(status_code=400, detail=(
+            "This file could not be read as a video. It may be damaged, cut off, or not a video at all."))
 
     # See resolve_registered_camera(). None (unregistered id, or none given)
     # falls back to the ad-hoc "upload_<session_id>" camera at process time.
@@ -840,6 +925,7 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
 
     frame_idx = 0
     processed_count = 0
+    stopped_early = False                       # the file ended before the frame count it announced
     just_sought = False
 
     try:
@@ -871,6 +957,8 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
             frame_started = time.monotonic()
             ret, frame = cap.read()
             if not ret:
+                # Short of the end the file announced: the rest could not be decoded (a damaged or cut-off file).
+                stopped_early = bool(total_frames) and frame_idx < total_frames - max(2, int(total_frames * 0.02))
                 break
 
             frame_idx += 1
@@ -981,7 +1069,9 @@ async def process_video_websocket(websocket: WebSocket, session_id: str):
         )
         await websocket.send_json({
             "type": "COMPLETE",
-            "message": f"Video analysis complete. Processed {processed_count} frames.",
+            "message": (f"Analysis stopped after {frame_idx} of {total_frames} frames: the rest of the file could not be read "
+                        f"(it may be damaged). What was read has been analysed."
+                        if stopped_early else f"Video analysis complete. Processed {processed_count} frames."),
             "total_processed": processed_count,
             "telemetry_rows_written": activity_writer.rows_written,
         })
@@ -1083,7 +1173,28 @@ async def live_webcam_websocket(websocket: WebSocket):
         return
 
     cap = None
-    for cam_idx in (0, 1, 2):
+    # A camera registered as a network (RTSP) camera is opened at its stored address, not as this computer's webcam.
+    is_rtsp = websocket.query_params.get("source") == "rtsp"
+    if is_rtsp:
+        try:
+            rtsp_url = await asyncio.to_thread(_rtsp_url_for, requested_camera_id, org_id)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Could not read the RTSP address of %s: %s", requested_camera_id, e)
+            rtsp_url = None
+        if not rtsp_url:
+            reason = ("This camera has no network (RTSP) address. Register it as a network camera with an address "
+                      "starting with rtsp:// or rtsps://.")
+        else:
+            cap, why = await asyncio.to_thread(_open_rtsp, rtsp_url)
+            reason = None if cap is not None else (
+                "Could not connect to the network camera. Check that it is switched on, that its address, user name and "
+                "password are right, and that this computer can reach it." if why == "connect"
+                else "Connected to the network camera, but it sent no picture. Check the stream path in its address.")
+        if cap is None:
+            await websocket.send_json({"error": reason})
+            await websocket.close()
+            return
+    for cam_idx in (() if is_rtsp else (0, 1, 2)):
         temp_cap = cv2.VideoCapture(cam_idx, cv2.CAP_DSHOW if os.name == 'nt' else cv2.CAP_ANY)
         if temp_cap.isOpened():
             ret, _ = temp_cap.read()
@@ -1101,7 +1212,8 @@ async def live_webcam_websocket(websocket: WebSocket):
 
     await websocket.send_json({
         "type": "INIT",
-        "message": f"Live webcam detection active on {device.upper()}.",
+        "message": (f"Network camera connected; detection active on {device.upper()}." if is_rtsp
+                    else f"Live webcam detection active on {device.upper()}."),
         "device": device,
         "is_live_cam": True
     })
@@ -1130,10 +1242,13 @@ async def live_webcam_websocket(websocket: WebSocket):
     safety = await _live_safety_session(zones_camera_id, org_id, zones_config)
     no_picture_since = None
     camera_lost = False
+    last_reconnect = 0.0
 
     try:
         while not control_state["stop"]:
-            ret, frame = cap.read()
+            # A network read can wait seconds (bounded by the read timeout); off the event loop, so other sessions
+            # and this one's controls keep running meanwhile.
+            ret, frame = (await asyncio.to_thread(cap.read)) if is_rtsp else cap.read()
             if not ret:
                 # No picture. For a moment that is normal; for `camera_lost_s` it means the camera has stopped:
                 # what is open is closed as UNVERIFIABLE once, and the page is told. If pictures come back,
@@ -1148,8 +1263,22 @@ async def live_webcam_websocket(websocket: WebSocket):
                         await websocket.send_json({"type": "CAMERA_LOST", "message": "The camera stopped sending pictures. Open visits were closed as not verifiable."})
                     except Exception:
                         pass
-                await asyncio.sleep(0.005)
+                # A network camera that dropped (rebooted, network blip) is not read again by OpenCV on its own: open
+                # the address again every few seconds until it answers.
+                if is_rtsp and time.monotonic() - no_picture_since > 3.0 and time.monotonic() - last_reconnect > 5.0:
+                    last_reconnect = time.monotonic()
+                    fresh, _ = await asyncio.to_thread(_open_rtsp, rtsp_url)
+                    if fresh is not None:
+                        cap.release()
+                        cap = fresh
+                        logger.info("Network camera %s reconnected", requested_camera_id)
+                await asyncio.sleep(0.005 if not is_rtsp else 0.2)
                 continue
+            if camera_lost and is_rtsp:
+                try:
+                    await websocket.send_json({"type": "CAMERA_BACK", "message": "The network camera is sending pictures again; detection continues."})
+                except Exception:
+                    pass
             no_picture_since = None
             camera_lost = False
 

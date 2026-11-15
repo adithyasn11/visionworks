@@ -30,7 +30,7 @@ import { planName } from '../plans';
 const fail = (message) => ({ ok: false, message });
 // An ILIKE pattern that matches `s` exactly, ignoring case only (% _ and \ are escaped).
 const likeExact = (s) => s.replace(/[\\%_]/g, (c) => '\\' + c);
-const SOURCES = new Set(['WEBCAM', 'UPLOAD']);
+const SOURCES = new Set(['WEBCAM', 'UPLOAD', 'RTSP']);
 
 /** The signed-in user's current organisation id, or null. */
 async function currentOrgId(supabase) {
@@ -95,8 +95,8 @@ export async function listCameras() {
   }
 }
 
-/** Add a camera. `sourceType`: WEBCAM (a webcam or a paired phone) or UPLOAD (recorded videos). */
-export async function addCamera({ name, sourceType, siteId }) {
+/** Add a camera. `sourceType`: WEBCAM (a webcam or a paired phone), UPLOAD (recorded videos) or RTSP (a network camera). */
+export async function addCamera({ name, sourceType, siteId, rtspUrl }) {
   const ctx = await requireCapability('cameras.edit');
   if (ctx.error) return fail(ctx.error);
   const clean = String(name || '').trim().replace(/\s+/g, ' ');
@@ -104,6 +104,13 @@ export async function addCamera({ name, sourceType, siteId }) {
   if (clean.length > 64) return fail('A camera name is limited to 64 characters.');
   if (!NAME_OK.test(clean)) return fail('Use letters, numbers, spaces, dashes, dots and underscores only, starting with a letter or number.');
   if (!SOURCES.has(sourceType)) return fail('Choose where the video comes from.');
+  // The same check as onboarding: only the scheme, since vendors' paths differ and the address often carries a password.
+  const url = String(rtspUrl || '').trim();
+  if (sourceType === 'RTSP') {
+    if (!url) return fail('Enter the stream address of the network camera.');
+    if (url.length > 1024) return fail('That address is too long.');
+    if (!/^rtsps?:\/\//i.test(url)) return fail('A network camera address starts with rtsp:// or rtsps://.');
+  }
 
   // Names must be unique within the organisation: the pipeline finds a camera by its name.
   // Case-insensitive: "Gate camera" and "gate camera" would be two cameras nobody can tell apart.
@@ -124,6 +131,7 @@ export async function addCamera({ name, sourceType, siteId }) {
   const row = {
     orgId: ctx.orgId, siteId: site?.id ?? null, name: clean, sourceType, updatedAt: new Date().toISOString(),
     ...(sourceType === 'WEBCAM' ? { deviceIndex: 0 } : {}),
+    ...(sourceType === 'RTSP' ? { rtspUrl: url } : {}),
   };
   const { data, error } = await ctx.supabase.from('cameras').insert(row).select('id, name').single();
   if (error) return fail(sentence(error, 'The camera could not be added.'));

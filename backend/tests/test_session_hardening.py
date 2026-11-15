@@ -159,30 +159,21 @@ try:
 
     print()
     print("3. Files that are not videos")
-    for label, data in (("random bytes", os.urandom(4096)), ("zero bytes", b""), ("text", b"this is not a video\n" * 20)):
+    # Refused AT UPLOAD now (it used to accept them and fail only when processing began), with words, and nothing kept.
+    before = set(os.listdir(video_upload.SAMPLE_VIDEOS_DIR))
+    for label, data in (("random bytes", os.urandom(4096)), ("zero bytes", b""), ("text", b"this is not a video\n" * 20),
+                        ("a cut-off video", open(VIDEO, "rb").read(2000))):
         r = upload("bad.mp4", data)
-        check(f"{label}: uploaded (the format is checked when it is opened)", r.status_code == 200, r.text[:80])
-        sid_bad = r.json()["session_id"]; sids.append(sid_bad)
-        bad_path = video_upload._active_sessions[sid_bad]["path"]
-
-        async def open_bad():
-            async with websockets.connect(f"{WS}/api/v1/video/process/{sid_bad}?realtime=false") as ws:
-                out = []
-                try:
-                    while True:
-                        out.append(json.loads(await asyncio.wait_for(ws.recv(), 10)))
-                except websockets.ConnectionClosed:
-                    return out
-
-        msgs = run(open_bad())
-        err = msgs[0].get("error", "") if msgs else ""
-        check(f"{label}: a clear error with no server path in it", "video" in err.lower() and ROOT not in err and "sample_videos" not in err, err)
-        time.sleep(0.3)
-        check(f"{label}: the session is forgotten and its file removed", sid_bad not in video_upload._active_sessions and not os.path.exists(bad_path))
+        detail = r.json().get("detail", "") if r.headers.get("content-type", "").startswith("application/json") else ""
+        check(f"{label}: refused at upload (400) with a sentence about the file, no server path",
+              r.status_code == 400 and "could not be read as a video" in detail and ROOT not in detail, r.text[:120])
+    time.sleep(0.3)
+    check("...and none of them was left on disk", set(os.listdir(video_upload.SAMPLE_VIDEOS_DIR)) <= before,
+          str(set(os.listdir(video_upload.SAMPLE_VIDEOS_DIR)) - before))
 
     print()
     print("4. A very long filename")
-    r = upload("a" * 400 + ".mp4", open(VIDEO, "rb").read(2000))
+    r = upload("a" * 400 + ".mp4", open(VIDEO, "rb").read())
     check("a 400-character name is shortened, not a 500", r.status_code == 200 and len(r.json().get("filename", "x" * 200)) <= 130, f"{r.status_code} {r.text[:80]}")
     if r.status_code == 200:
         sids.append(r.json()["session_id"])

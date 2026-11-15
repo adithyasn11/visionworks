@@ -51,6 +51,8 @@ This guide walks you through the whole app from nothing to a finished safety rep
   - **Expect:** the theme you picked is remembered.
 - [ ] Footer links: open **Features** (`/features`) and **Security** (`/security`).
   - **Expect:** both pages load and are themed.
+- [ ] Signed out, click **Plans** (top bar or footer).
+  - **Expect:** `/plans` shows the three plans with Monthly / Yearly prices. **Choose Growth** → sign-in; **Create an account** there → after signing up you land on Growth's checkout, with the term you picked.
 - [ ] Make the browser window narrow (phone width), then wide.
   - **Expect:** text and layout shrink smoothly, the navbar collapses to a menu, and nothing is cut off.
 
@@ -189,6 +191,11 @@ The progress bar at the top shows **Organisation · Site · Camera**.
   - **Expect:** it becomes the active camera for Live feed and Zones.
 - [ ] Remove the extra camera.
   - **Expect:** it disappears from the list.
+- [ ] **Network camera (RTSP):** Add a camera with **Video comes from** = "Network camera (RTSP)".
+  - An address not starting with `rtsp://` or `rtsps://` is refused. With a real camera's address it is added.
+  - On **Live feed** the button reads **Connect network camera**. **Expect:** "Network camera connected; detection active", with live detection.
+  - Unplug the camera (or stop its stream). **Expect:** "The camera stopped sending pictures…"; plug it back in → "The network camera is sending pictures again".
+  - A wrong address: **Expect:** "Could not connect to the network camera…" within about 10 seconds.
 
 ### 6.2 Zones (do this before uploading video)
 - [ ] Open **Zones**.
@@ -243,6 +250,8 @@ The progress bar at the top shows **Organisation · Site · Camera**.
     - the video plays with pose skeletons, PPE boxes and zone outlines drawn on top.
 - [ ] Use **Pause** / **Play** and the **seek bar**.
   - **Expect:** playback follows your clicks.
+- [ ] Try bad files: a text file renamed to `.mp4`, a cut-off video, a `.txt`.
+  - **Expect:** "Upload error: This file could not be read as a video…" (or "This is not a video file VisionWorks accepts…") straight away. A video over 2 GB is refused before it uploads.
 - [ ] Watch the side panels.
   - **Expect:**
     - the **PPE status** and **zone activity** panels update;

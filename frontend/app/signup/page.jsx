@@ -62,6 +62,11 @@ function SignupForm() {
 
   useEffect(() => setMounted(true), []);
 
+  // Where to go after signing up: the page that sent them here (a chosen plan's checkout, from /plans), if it is a
+  // path on this site; otherwise the dashboard, which sends a new account on to Home.
+  const rawNext = searchParams?.get('next') || '';
+  const nextPath = rawNext.startsWith('/') && !rawNext.startsWith('//') && !rawNext.startsWith('/\\') ? rawNext : '/dashboard';
+
   useEffect(() => {
     if (!supabase) return;
     let active = true;
@@ -69,10 +74,10 @@ function SignupForm() {
     // already revoked would otherwise look valid and redirect away from the
     // signup form.
     supabase.auth.getUser().then(({ data, error }) => {
-      if (active && !error && data?.user) router.replace('/dashboard');
+      if (active && !error && data?.user) router.replace(nextPath);
     });
     return () => { active = false; };
-  }, [router]);
+  }, [router, nextPath]);
 
   const ruleState = useMemo(
     () => RULES.map((r) => ({ ...r, ok: r.test(password) })),
@@ -109,8 +114,9 @@ function SignupForm() {
       if (created?.ok) {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
         if (signInError) { setBanner({ kind: 'error', text: describeAuthError(signInError) }); return; }
-        router.replace('/dashboard');
-        router.refresh();
+        // A full page load, not router.replace(): the very next page is rendered on the server, and a client-side
+        // hop could get there before the new session cookie did, which bounced the new account back to sign-in.
+        window.location.assign(nextPath);
         return;
       }
 
@@ -136,7 +142,7 @@ function SignupForm() {
 
       // With email confirmation on, Supabase returns a user but no session.
       if (data?.session) {
-        router.replace('/dashboard');
+        window.location.assign(nextPath);
       } else {
         setDone(true);
       }

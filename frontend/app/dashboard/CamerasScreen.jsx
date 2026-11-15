@@ -19,6 +19,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
   const canEdit = can(role, 'cameras.edit');
   const [name, setName] = useState('');
   const [source, setSource] = useState('WEBCAM');
+  const [rtspUrl, setRtspUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);           // { tone, text }
   const [confirming, setConfirming] = useState(null);     // camera id waiting for a second click
@@ -80,12 +81,12 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
     setBusy(true);
     setMessage(null);
     try {
-      const r = await addCamera({ name, sourceType: source, siteId: siteId || undefined });
+      const r = await addCamera({ name, sourceType: source, siteId: siteId || undefined, rtspUrl: source === 'RTSP' ? rtspUrl : undefined });
       if (!r?.ok) {
         setMessage({ tone: 'error', text: r?.message || 'The camera could not be added.' });
         return;
       }
-      setName('');
+      setName(''); setRtspUrl('');
       setMessage({ tone: 'ok', text: `Added “${r.camera.name}”. Draw its zones on the Zones screen, then run it from the Live feed.` });
       await onChanged?.(r.camera.name);
       loadSites();
@@ -203,8 +204,24 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
               <select className={INPUT} value={source} onChange={(e) => setSource(e.target.value)}>
                 <option value="WEBCAM">{SOURCE_LABEL.WEBCAM}</option>
                 <option value="UPLOAD">{SOURCE_LABEL.UPLOAD}</option>
+                <option value="RTSP">{SOURCE_LABEL.RTSP}</option>
               </select>
             </label>
+            {source === 'RTSP' && (
+              <label className="grid gap-1 text-[0.71875rem] font-semibold text-ink-muted sm:col-span-full">
+                Stream address (kept on the server; it can include the camera's user name and password)
+                <input
+                  className={INPUT}
+                  value={rtspUrl}
+                  onChange={(e) => setRtspUrl(e.target.value)}
+                  maxLength={1024}
+                  placeholder="rtsp://user:password@192.168.1.50:554/stream1"
+                  autoComplete="off"
+                  spellCheck={false}
+                  required
+                />
+              </label>
+            )}
             {sites.rows.length > 1 && (
               <label className="grid gap-1 text-[0.71875rem] font-semibold text-ink-muted">
                 Site
@@ -213,7 +230,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                 </select>
               </label>
             )}
-            <button type="submit" className={BTN_PRIMARY} disabled={busy || !name.trim()}>
+            <button type="submit" className={BTN_PRIMARY} disabled={busy || !name.trim() || (source === 'RTSP' && !rtspUrl.trim())}>
               {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Plus className="w-3.5 h-3.5" aria-hidden="true" />}
               Add camera
             </button>

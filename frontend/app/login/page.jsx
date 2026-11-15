@@ -330,7 +330,8 @@ function LoginForm() {
 
               <p className="text-[0.8125rem] text-ink-muted font-medium text-center">
                 New to VisionWorks?{' '}
-                <Link href="/signup" className="font-bold text-accent hover:underline">
+                {/* Carries the return address, so someone who chose a plan and has no account yet still reaches its checkout. */}
+                <Link href={searchParams.get('next') ? `/signup?next=${encodeURIComponent(searchParams.get('next'))}` : '/signup'} className="font-bold text-accent hover:underline">
                   Create an account
                 </Link>
               </p>
