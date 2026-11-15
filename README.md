@@ -87,7 +87,7 @@ To update later: `git pull`, then double-click `start_visionworks.bat` again (th
 | A download failed | Run the file again: finished steps are skipped. |
 | Port 3000 or 8001 already in use | Close the other program (or the other VisionWorks window) and run it again. |
 
-`start_visionworks.bat phone` uses HTTPS so a phone can be paired as a camera (see `docs/DEMO_RUNBOOK.md`); `start_visionworks.bat dev` runs the development server.
+**Using a phone as a camera.** A phone only opens its camera on a secure (https) address, so double-click **`start_visionworks_phone.bat`** instead (close the normal window first). The first time on a computer, its window prints one command that makes this computer trust VisionWorks' own certificate; run it in a Command Prompt, confirm in the Windows dialog, and reopen the browser. Then open https://localhost:3000 → **Live feed** → **Use my phone** and scan the code with a phone on the same Wi-Fi (the phone shows a security warning the first time: tap Advanced, then continue). `start_visionworks.bat dev` runs the development server.
 
 | Service | URL |
 |---------|-----|

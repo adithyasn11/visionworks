@@ -239,11 +239,32 @@ def ensure_cert(verbose: bool = True) -> bool:
         print("[ERROR] Could not generate a certificate:")
         print(result.stdout.strip()[-500:] or result.stderr.strip()[-500:])
         return False
-    # A new certificate is not trusted yet: say so, or the dashboard opens and its data never loads.
-    print("[SYSTEM] A NEW certificate was made. Browsers do not trust it yet, so trust it once:")
-    print(f'           certutil -user -addstore Root "{CERT_FILE}"')
-    print("         then restart the browser.")
+    print("[SYSTEM] A new HTTPS certificate was made.")
     return True
+
+
+def warn_if_cert_untrusted() -> None:
+    """
+    Windows: SAY when this user's browsers do not trust the phone-mode certificate (it only reads; nothing is
+    installed). Untrusted, the dashboard at https://localhost:3000 opens behind a warning and every call it makes
+    to the backend fails without one, so nothing loads and the phone never pairs. Trusting it is the user's call.
+    """
+    if sys.platform != "win32" or not os.path.exists(CERT_FILE):
+        return
+    try:
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes
+        with open(CERT_FILE, "rb") as fh:
+            thumb = x509.load_pem_x509_certificate(fh.read()).fingerprint(hashes.SHA1()).hex()
+        if subprocess.run(["certutil", "-user", "-verifystore", "Root", thumb],
+                          capture_output=True, text=True).returncode == 0:
+            return
+    except Exception:
+        return
+    print("[SYSTEM] This computer does not trust VisionWorks' HTTPS certificate yet, so in phone mode the")
+    print("         dashboard will not load its data. Trust it once (Windows asks you to confirm), then reopen")
+    print("         the browser. Run this in a Command Prompt:")
+    print(f'           certutil -user -addstore Root "{CERT_FILE}"')
 
 
 # ── Main ────────────────────────────────────────────────────────────────────
@@ -279,6 +300,7 @@ def main():
     if args.https:
         if not ensure_cert():
             sys.exit(1)
+        warn_if_cert_untrusted()
         if not ip:
             print(f"{YELLOW}[SYSTEM]{RESET} No LAN address found — is this "
                   "laptop on Wi-Fi? A phone will not be able to reach it.")

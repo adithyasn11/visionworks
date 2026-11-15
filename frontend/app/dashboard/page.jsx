@@ -460,7 +460,7 @@ function DashboardInner() {
           {noCameraNotice}
           {!can(role, 'analysis.run') && role && <ReadOnlyNotice capability="analysis.run" />}
 
-          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
+          <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
             <VideoCanvasPlayer
               activeZones={activeZones}
               readOnly={!can(role, 'analysis.run')}

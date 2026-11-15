@@ -169,6 +169,14 @@ export default function CameraClient({ code }) {
   }, []);
 
   const startCapture = useCallback(async () => {
+    // A phone browser only offers the camera on https: on plain http `navigator.mediaDevices` does not exist at
+    // all. Say what to do instead of failing with "Cannot read properties of undefined (reading 'getUserMedia')".
+    if (typeof window !== 'undefined' && (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)) {
+      setStatus('error');
+      setMessage('This phone can only use its camera on a secure (https) address. On the computer, start VisionWorks with start_visionworks_phone.bat, then scan the new code.');
+      wsRef.current?.send(JSON.stringify({ type: 'camera-error', message: 'insecure' }));
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {

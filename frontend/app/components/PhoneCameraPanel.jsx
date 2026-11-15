@@ -32,7 +32,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Smartphone, QrCode, Loader2, CheckCircle2, AlertCircle, X,
-  Play, Square, RefreshCw, Wifi, Maximize2, Minimize2,
+  Play, Square, RefreshCw,
 } from 'lucide-react';
 
 import { backendFetch, backendSocketUrl, BACKEND_HTTP } from '../lib/backend';
@@ -70,7 +70,7 @@ function phoneUrlFor(code, lanHost) {
   return `${window.location.protocol}//${host}${port}/camera/${code}`;
 }
 
-export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, activeZones = [] }) {
+export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, activeZones = [], open: wanted = false, onClose }) {
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState(null);
   const [lanHost, setLanHost] = useState(null);
@@ -84,7 +84,6 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
   // that failure is otherwise completely invisible.
   const [analysed, setAnalysed] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const roomRef = useRef(null);     // socket to the pairing room
   const aiRef = useRef(null);       // socket to the AI pipeline
@@ -92,32 +91,10 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
   const imgRef = useRef(null);
   const pollRef = useRef(null);
   const pendingRef = useRef(false);  // a frame is with the GPU right now
-  const stageRef = useRef(null);     // the preview, for fullscreen
 
-  const host = typeof window !== 'undefined' ? window.location.hostname : '';
-  const isLoopback = ['localhost', '127.0.0.1', '::1'].includes(host);
-
-  // Only one problem is left to warn about. The loopback case — a QR pointing
-  // the phone at its own localhost — used to be the other, and is now fixed
-  // rather than announced: the address comes from the server.
-  const insecure = typeof window !== 'undefined'
-    && window.location.protocol !== 'https:'
-    && !isLoopback;
-
-  const toggleFullScreen = useCallback(() => {
-    const el = stageRef.current;
-    if (!el) return;
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    else el.requestFullscreen?.().catch(() => {});
-  }, []);
-
-  // Escape and F11 leave fullscreen without touching the button, so the flag
-  // follows the DOM rather than the click.
-  useEffect(() => {
-    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
+  // The phone always reaches this laptop by its network address, and a phone browser only opens its camera on
+  // https. So an http dashboard can never pair one, even when it is itself open at localhost.
+  const insecure = typeof window !== 'undefined' && window.location.protocol !== 'https:';
 
   /* ── teardown ───────────────────────────────────────────────────────── */
 
@@ -284,7 +261,9 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
         case 'camera-error':
           setError(msg.message === 'permission denied'
             ? 'The phone refused camera access. Allow it in the phone’s browser settings and reload that page.'
-            : `Phone camera error: ${msg.message}`);
+            : msg.message === 'insecure' || /getUserMedia|mediaDevices/.test(String(msg.message))
+              ? 'The phone cannot open its camera on this address. Start VisionWorks with start_visionworks_phone.bat and pair again.'
+              : `Phone camera error: ${msg.message}`);
           setStreaming(false);
           break;
 
@@ -354,32 +333,50 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
     teardown(true);      // keep the room, so one click restarts it
   }, [teardown]);
 
+  const startedRef = useRef(false);
+  useEffect(() => {
+    if (wanted && !startedRef.current && !insecure) { startedRef.current = true; startPairing(); }
+    if (!wanted) startedRef.current = false;
+  }, [wanted, insecure, startPairing]);
+
+  const close = useCallback(() => {
+    teardown(); setOpen(false); setCode(null); setPaired(false); setStreaming(false); setError(null);
+    if (onClose) onClose();
+  }, [teardown, onClose]);
+
   /* ── rendering ──────────────────────────────────────────────────────── */
 
-  if (!open) {
+  if (!wanted) return null;
+
+  if (insecure) {
     return (
-      <div className="flex flex-col gap-2">
-        <button
-          type="button"
-          onClick={startPairing}
-          disabled={disabled || busy}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border-2 border-field text-ink font-bold text-[0.8125rem] hover:border-field-hover transition-colors disabled:opacity-60"
-        >
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
-          Use my phone as a camera
-        </button>
-        {error && (
-          <p className="text-[0.75rem] text-accent font-medium flex items-start gap-1.5">
-            <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-            {error}
-          </p>
-        )}
+      <div className="rounded-2xl border border-[color:var(--accent)] bg-accent-soft p-5 flex flex-col gap-3" role="status">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-[0.9375rem] font-black text-ink flex items-center gap-2">
+            <Smartphone className="w-4 h-4 text-accent" aria-hidden="true" />
+            Phone cameras need phone mode
+          </h3>
+          <button type="button" onClick={close} aria-label="Close" className="p-1 rounded text-ink-faint hover:text-ink transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-[0.875rem] text-ink-muted leading-relaxed">
+          A phone only opens its camera on a secure (https) address, and VisionWorks is running on plain http right now.
+        </p>
+        <ol className="flex flex-col gap-2 text-[0.875rem] text-ink">
+          <li><span className="font-black text-accent mr-2">1</span>Close the VisionWorks window.</li>
+          <li><span className="font-black text-accent mr-2">2</span>Double-click <span className="font-mono font-bold">start_visionworks_phone.bat</span>. The first time, its window may show one command to trust VisionWorks&apos; certificate on this computer: run it once, then reopen the browser.</li>
+          <li><span className="font-black text-accent mr-2">3</span>Open <span className="font-mono font-bold">https://localhost:3000</span>, then Live feed, then Use my phone.</li>
+        </ol>
+        <p className="text-[0.8125rem] text-ink-faint leading-relaxed">
+          The phone and this computer must be on the same Wi-Fi. The phone shows a security warning the first time: tap Advanced, then continue.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-line bg-surface p-4 flex flex-col gap-3">
+    <div className="rounded-2xl border border-line bg-surface-alt/50 p-5 flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-[0.875rem] font-black text-ink flex items-center gap-2">
           <Smartphone className="w-4 h-4 text-accent" />
@@ -387,7 +384,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
         </h3>
         <button
           type="button"
-          onClick={() => { teardown(); setOpen(false); setCode(null); }}
+          onClick={close}
           aria-label="Close"
           className="p-1 rounded text-ink-faint hover:text-ink transition-colors"
         >
@@ -395,39 +392,19 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
         </button>
       </div>
 
-      {/* The QR now names the address the SERVER reported, so opening the
-          dashboard at localhost is no longer a problem to warn about — it is
-          simply handled. What remains worth saying is when the phone will be
-          able to load the page but not use its camera. */}
-      {insecure && (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
-          <p className="text-[0.75rem] text-ink-muted font-medium leading-relaxed">
-            <span className="font-bold text-ink">This page is not on HTTPS.</span>{' '}
-            The QR address is correct and the phone will load the page — but it
-            will then be refused access to its camera, because browsers only
-            allow that on a secure origin. Restart with{' '}
-            <code className="font-mono text-[0.6875rem] bg-ground px-1 rounded">
-              python run_system.py --https
-            </code>{' '}
-            and reload the dashboard.
-          </p>
-        </div>
-      )}
-
       {!paired ? (
         <>
-          <div className="flex items-start gap-4">
+          <div className="flex flex-col sm:flex-row items-start gap-5">
             {qrSvg && (
               <div
-                className="shrink-0 rounded-lg bg-white p-2"
+                className="shrink-0 rounded-xl bg-white p-2 w-36 h-36 [&>svg]:w-full [&>svg]:h-full"
                 dangerouslySetInnerHTML={{ __html: qrSvg }}
               />
             )}
-            <div className="min-w-0 flex flex-col gap-1.5">
-              <p className="text-[0.78125rem] text-ink-muted font-medium leading-relaxed">
-                Scan this with your phone&apos;s camera. Tap through the
-                security warning once — the certificate is self-signed, so the
-                phone has not seen it before.
+            <div className="min-w-0 flex flex-col gap-2">
+              <p className="text-[0.875rem] text-ink-muted leading-relaxed">
+                Scan this with your phone&apos;s camera (same Wi-Fi as this computer). The first time, the phone shows a
+                security warning: tap Advanced, then continue.
               </p>
               <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-ink-faint mt-1">
                 or type this address
@@ -444,53 +421,14 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
         </>
       ) : (
         <>
-          <div className="flex items-center gap-2 text-[0.78125rem] font-bold text-emerald-700 dark:text-emerald-400">
-            <CheckCircle2 className="w-4 h-4" />
-            Phone paired
+          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-[0.875rem] font-bold text-ink">
+            <CheckCircle2 className="w-4 h-4 text-accent" />
+            {streaming ? 'Phone camera on: its picture is in the player below' : 'Phone paired'}
             {streaming && (
               <span className="ml-1 font-mono text-[0.6875rem] font-medium text-ink-faint">
                 · {analysed}/{frames} analysed
               </span>
-            )}
-          </div>
-
-          <div
-            ref={stageRef}
-            className={`relative overflow-hidden bg-ground ${
-              isFullscreen
-                ? 'flex items-center justify-center w-screen h-screen'
-                : 'rounded-lg border border-line'
-            }`}
-          >
-            {/* Same portrait-frame cap as the main player canvas. This is a
-                side panel, so it gets a tighter ceiling — lifted in
-                fullscreen, where there is no layout left to protect. */}
-            <canvas
-              ref={canvasRef}
-              className={isFullscreen
-                ? 'max-w-full max-h-full w-auto h-auto object-contain block'
-                : 'w-full h-auto max-h-[45vh] object-contain block mx-auto'}
-            />
-
-            {streaming && (
-              <button
-                type="button"
-                onClick={toggleFullScreen}
-                title={isFullscreen ? 'Exit full screen (Esc)' : 'Full screen'}
-                aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
-                className="absolute top-2 right-2 z-20 p-1.5 rounded-md bg-black/55 hover:bg-black/75 text-white backdrop-blur-sm transition-colors"
-              >
-                {isFullscreen
-                  ? <Minimize2 className="w-3.5 h-3.5" />
-                  : <Maximize2 className="w-3.5 h-3.5" />}
-              </button>
-            )}
-            {!streaming && (
-              <div className="absolute inset-0 grid place-items-center px-6 text-center">
-                <p className="text-[0.78125rem] text-ink-muted font-medium">
-                  Press start and the phone opens its camera.
-                </p>
-              </div>
             )}
           </div>
 
@@ -522,6 +460,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
               <RefreshCw className="w-3.5 h-3.5" />
               New code
             </button>
+          </div>
           </div>
         </>
       )}

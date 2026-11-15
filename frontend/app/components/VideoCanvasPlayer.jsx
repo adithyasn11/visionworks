@@ -5,7 +5,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   Eye, Upload, Play, Pause, RefreshCw, Shield,
   Sliders, CheckCircle2, Loader2, AlertCircle, Video,
-  RotateCcw, RotateCw, Cpu, Maximize2, Minimize2, Camera, CameraOff
+  RotateCcw, RotateCw, Cpu, Maximize2, Minimize2, Camera, CameraOff, Smartphone
 } from 'lucide-react';
 
 // Backend origin and the token-attaching helpers. Every processing socket
@@ -75,6 +75,8 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   // ("2026-11-08T09:30"). Optional: sent with the upload so safety events are
   // stamped on the timeline where they really happened. Empty means "now".
   const [recordedAt, setRecordedAt] = useState('');
+  // The phone panel opens from the source buttons; it pairs and controls the phone, its picture lands here.
+  const [phoneOpen, setPhoneOpen] = useState(false);
   const [sessionId, setSessionId] = useState('');
   const [progress, setProgress] = useState(0);
   const [currentTimeSec, setCurrentTimeSec] = useState(0);
@@ -673,102 +675,143 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     : <Video className="w-3.5 h-3.5 text-ink-muted" />;
 
   return (
-    <div ref={containerRef} className="glass-panel p-4 flex flex-col gap-4 relative group">
+    <div ref={containerRef} className="glass-panel p-5 flex flex-col gap-4 relative group min-w-0">
       {/* Hidden HTML5 Video element for webcam capture */}
       <video ref={hiddenVideoRef} className="hidden" playsInline muted />
 
-      {/* Header Bar */}
+      {/* ── Header: what this is, and what it is doing right now ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-ink font-semibold text-sm">
-          <Eye className="w-4 h-4 text-accent" />
-          <span>Live Camera Feed — Detection View</span>
-          <span className="ml-2 px-2 py-0.5 rounded bg-accent/10 border border-line text-[0.625rem] text-accent font-mono font-bold flex items-center gap-1">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-8 h-8 rounded-xl bg-accent-soft text-accent flex items-center justify-center shrink-0">
+            <Eye className="w-4 h-4" strokeWidth={2.4} />
+          </span>
+          <h3 className="text-[1rem] font-black tracking-tight text-ink">Detection view</h3>
+          <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md border border-line text-[0.6875rem] text-ink-faint font-mono font-bold items-center gap-1">
             <Cpu className="w-3 h-3" />
-            <span>YOLOv8m pose</span>
+            YOLOv8m pose
           </span>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           {readOnly && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-line text-[0.625rem] font-bold text-ink-faint">
+            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-line text-[0.6875rem] font-bold text-ink-faint">
               <Eye className="w-3 h-3" />
               VIEW ONLY
             </span>
           )}
-          {/* Turn On Camera Button */}
-          {readOnly ? null : isWebcamActive ? (
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.6875rem] font-black uppercase tracking-[0.1em] ${
+            isWebcamActive ? 'bg-accent text-white' : phase === 'processing' ? 'bg-accent-soft text-accent' : 'bg-surface-alt text-ink-faint border border-line'
+          }`}>
+            {(isWebcamActive || phase === 'processing') && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
+            {isWebcamActive ? 'Live' : phase === 'processing' ? `Analysing ${Math.round(progress)}%` : phase === 'uploading' ? 'Uploading' : phase === 'done' ? 'Finished' : 'Idle'}
+          </span>
+          <button
+            onClick={handleReset}
+            className="p-2 rounded-lg border border-line text-ink-muted hover:text-ink hover:border-field transition-colors"
+            title="Reset the player"
+            aria-label="Reset the player"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="video/mp4,video/webm,video/avi,video/quicktime,.mkv"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+
+      {/* ── Where the picture comes from: three equal choices ── */}
+      {!readOnly && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {isWebcamActive ? (
             <button
               onClick={stopWebcamStream}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/20 border border-[color:var(--accent)] text-accent text-xs font-bold transition-all hover:bg-accent/30"
+              className="flex items-center gap-3 rounded-xl border-2 border-[color:var(--accent)] bg-accent-soft px-4 py-3 text-left transition-colors"
             >
-              <CameraOff className="w-3.5 h-3.5" />
-              <span>Stop Camera</span>
+              <span className="w-9 h-9 rounded-lg bg-accent text-white flex items-center justify-center shrink-0"><CameraOff className="w-4 h-4" /></span>
+              <span className="min-w-0">
+                <span className="block text-[0.875rem] font-black text-ink">Stop camera</span>
+                <span className="block text-[0.75rem] text-ink-muted truncate">{isNetworkCamera ? 'Network camera is live' : 'Webcam is live'}</span>
+              </span>
             </button>
           ) : (
             <button
               onClick={isNetworkCamera ? startNetworkCamera : startLiveWebcam}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 border border-line text-accent text-xs font-bold transition-all shadow-lg shadow-red-600/10"
+              disabled={phase === 'uploading' || phoneOpen}
+              className="flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-left hover:border-[color:var(--accent)] hover:-translate-y-0.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0"
             >
-              <Camera className="w-3.5 h-3.5 animate-pulse" />
-              <span>{isNetworkCamera ? 'Connect network camera' : 'Turn On Camera'}</span>
+              <span className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0"><Camera className="w-4 h-4" /></span>
+              <span className="min-w-0">
+                <span className="block text-[0.875rem] font-black text-ink">{isNetworkCamera ? 'Connect camera' : 'Turn on camera'}</span>
+                <span className="block text-[0.75rem] text-ink-muted truncate">{isNetworkCamera ? 'The network (RTSP) camera' : 'This computer’s webcam'}</span>
+              </span>
             </button>
           )}
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="video/mp4,video/webm,video/avi,video/quicktime,.mkv"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          <button
-            onClick={handleReset}
-            className="p-1.5 rounded-lg bg-surface-alt hover:bg-surface-alt text-ink-muted transition-all"
-            title="Reset Player"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-          {!readOnly && (
-          <label
-            className="flex items-center gap-1.5 text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint"
-            title="When this footage was recorded. Safety events are stamped with it. Leave empty to use the upload time."
-          >
-            <span>Recorded</span>
-            <input
-              type="datetime-local"
-              value={recordedAt}
-              max={localNowValue()}
-              onChange={(e) => setRecordedAt(e.target.value)}
-              disabled={phase === 'uploading' || isWebcamActive}
-              className="rounded-lg bg-ground border border-field hover:border-field-hover px-2 py-1 text-[0.6875rem] normal-case tracking-normal font-sans text-ink [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-[color:var(--accent)] disabled:opacity-40 transition-colors"
-            />
-          </label>
-          )}
-          {!readOnly && (
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={phase === 'uploading' || isWebcamActive}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-accent-soft hover:bg-accent/20 border border-line text-accent text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={phase === 'uploading' || isWebcamActive || phoneOpen}
+            className="flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-left hover:border-[color:var(--accent)] hover:-translate-y-0.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0"
           >
-            <Upload className="w-3.5 h-3.5" />
-            <span>{phase === 'uploading' ? 'Uploading...' : 'Upload Video'}</span>
+            <span className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0">
+              {phase === 'uploading' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[0.875rem] font-black text-ink">{phase === 'uploading' ? 'Uploading…' : 'Upload a video'}</span>
+              <span className="block text-[0.75rem] text-ink-muted truncate">MP4, AVI, MOV, WebM, up to 2 GB</span>
+            </span>
           </button>
-          )}
+          <button
+            onClick={() => setPhoneOpen((o) => !o)}
+            disabled={isWebcamActive || phase === 'uploading'}
+            className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+              phoneOpen ? 'border-2 border-[color:var(--accent)] bg-accent-soft' : 'border border-line bg-surface hover:border-[color:var(--accent)] hover:-translate-y-0.5'
+            }`}
+            aria-expanded={phoneOpen}
+          >
+            <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${phoneOpen ? 'bg-accent text-white' : 'bg-accent-soft text-accent'}`}><Smartphone className="w-4 h-4" /></span>
+            <span className="min-w-0">
+              <span className="block text-[0.875rem] font-black text-ink">Use my phone</span>
+              <span className="block text-[0.75rem] text-ink-muted truncate">{phoneOpen ? 'Pairing panel open' : 'Pair it with a QR code'}</span>
+            </span>
+          </button>
         </div>
-      </div>
+      )}
 
-      {/* Phone as a camera.
-          
+      {/* When the uploaded footage was filmed: only matters for an upload, so it sits quietly under the choices. */}
+      {!readOnly && !isWebcamActive && !phoneOpen && (
+        <label
+          className="flex flex-wrap items-center gap-2 text-[0.8125rem] text-ink-muted -mt-1"
+          title="When this footage was recorded. Safety events are stamped with it. Leave empty to use the upload time."
+        >
+          <span className="font-semibold">Recorded on</span>
+          <input
+            type="datetime-local"
+            value={recordedAt}
+            max={localNowValue()}
+            onChange={(e) => setRecordedAt(e.target.value)}
+            disabled={phase === 'uploading'}
+            className="rounded-lg bg-surface border border-line hover:border-field px-2.5 py-1.5 text-[0.8125rem] text-ink [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-[color:var(--accent)] disabled:opacity-40 transition-colors"
+          />
+          <span className="text-ink-faint">optional, for uploads (otherwise the upload time)</span>
+        </label>
+      )}
+
+      {/* Phone as a camera: pairing and its start/stop. Its picture is drawn on the player below.
+
           A laptop webcam points at your face from 40cm; a CCTV camera looks
           down at a room from a corner. A phone propped on a shelf is the only
-          way to produce the second view without buying hardware, and a worker
-          seen from a corner is exactly what the zone rules are written for. */}
+          way to produce the second view without buying hardware. */}
       {!readOnly && (
         <PhoneCameraPanel
           cameraId={cameraId}
           disabled={isWebcamActive}
           activeZones={activeZones}
           onFrame={handleFrame}
+          open={phoneOpen}
+          onClose={() => setPhoneOpen(false)}
         />
       )}
 
@@ -817,8 +860,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
               // pin the video to 70% of the screen — the one place the user
               // explicitly asked for all of it.
               ? 'max-w-full max-h-full w-auto h-auto object-contain block'
-              : 'w-full h-auto max-h-[70vh] object-contain block mx-auto'
+              : 'w-full h-auto object-contain block mx-auto'
           }
+          // Sized to the window, so the picture AND the play controls under it fit on a 768-pixel laptop screen.
+          style={isFullscreen ? undefined : { maxHeight: 'max(15rem, calc(100vh - 31rem))' }}
         />
 
         {/*
