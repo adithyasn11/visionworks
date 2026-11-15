@@ -45,6 +45,7 @@ the warning logged when a room is created.
 import asyncio
 import ipaddress
 import logging
+import os
 import secrets
 import socket
 import time
@@ -184,6 +185,9 @@ async def create_pairing_session(org_id: str = Depends(require_analysis_run)):
         # only knows the address IT used, which is usually localhost and is
         # useless to another device.
         "lan_host": lan_host(),
+        # The phones' secure entrance started by run_system.py on a normal start (scripts/phone_gateway.py),
+        # e.g. https://192.168.1.20:3443. None when there is none (phone mode serves https itself).
+        "phone_base": os.environ.get("VISIONWORKS_PHONE_BASE") or None,
     }
 
 

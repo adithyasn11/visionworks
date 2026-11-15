@@ -69,7 +69,7 @@ function Overlay({ kind, message }) {
   );
 }
 
-export const FloorplanHeatmap = () => {
+export const FloorplanHeatmap = ({ compact = false }) => {
   const containerRef = useRef(null);
   const heatmapRef = useRef(null);
 
@@ -175,25 +175,25 @@ export const FloorplanHeatmap = () => {
     : state.status === 'error' ? { kind: 'error', message: state.error }
     : !hasPoints ? {
         kind: 'empty',
-        message: 'No positions yet. Run a video or start the camera.',
+        message: 'No positions yet.',
       }
     : null;
 
   const samples = state.data?.total_samples ?? 0;
 
   return (
-    <div className="glass-panel p-5 flex flex-col gap-4">
+    <div className={compact ? 'rounded-xl border border-line bg-surface p-3 flex flex-col gap-2.5' : 'glass-panel p-5 flex flex-col gap-4'}>
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-ink font-bold text-[0.9375rem] tracking-tight">
+        <div className={`flex items-center gap-2 text-ink font-bold tracking-tight ${compact ? 'text-[0.875rem]' : 'text-[0.9375rem]'}`}>
           <MapPin className="w-4 h-4 text-accent" />
-          <span>Where people were seen</span>
+          <span>{compact ? 'Where people were' : 'Where people were seen'}</span>
         </div>
         <span className="text-xs text-ink-muted font-mono whitespace-nowrap">
-          {samples > 0 ? `${samples.toLocaleString()} samples · ${WINDOW_HOURS}h` : `last ${WINDOW_HOURS}h`}
+          {compact ? `${WINDOW_HOURS}h` : samples > 0 ? `${samples.toLocaleString()} samples · ${WINDOW_HOURS}h` : `last ${WINDOW_HOURS}h`}
         </span>
       </div>
 
-      <div className="relative w-full h-72 rounded-xl bg-ground border border-line overflow-hidden">
+      <div className={`relative w-full ${compact ? 'h-40' : 'h-72'} rounded-xl bg-ground border border-line overflow-hidden`}>
         {/* No invented zone labels under the heat layer: they used to name
             areas that did not exist, which is worse than an empty map. The
             real zones are outlined on the Live feed and in the Zones editor. */}

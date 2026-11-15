@@ -5,7 +5,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   Eye, Upload, Play, Pause, RefreshCw, Shield,
   Sliders, CheckCircle2, Loader2, AlertCircle, Video,
-  RotateCcw, RotateCw, Cpu, Maximize2, Minimize2, Camera, CameraOff, Smartphone
+  RotateCcw, RotateCw, Cpu, Maximize2, Minimize2, Camera, CameraOff, Smartphone, CalendarClock
 } from 'lucide-react';
 
 // Backend origin and the token-attaching helpers. Every processing socket
@@ -46,7 +46,7 @@ function localNowValue() {
  * processing WebSockets refuse a VIEWER server-side (layer 2), and any rows
  * that did reach the database are still org-scoped by RLS (layer 3).
  */
-export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = false, cameraId = 'live_webcam', cameraSource = null }) => {
+export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = false, cameraId = 'live_webcam', cameraSource = null, aside = null }) => {
   // A network (RTSP) camera is opened by the server at its stored address; the browser's webcam is not involved.
   const isNetworkCamera = cameraSource === 'RTSP';
   const canvasRef   = useRef(null);
@@ -675,9 +675,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     : <Video className="w-3.5 h-3.5 text-ink-muted" />;
 
   return (
-    <div ref={containerRef} className="glass-panel p-5 flex flex-col gap-4 relative group min-w-0">
+    <div ref={containerRef} className="glass-panel p-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem] items-start relative group min-w-0">
       {/* Hidden HTML5 Video element for webcam capture */}
       <video ref={hiddenVideoRef} className="hidden" playsInline muted />
+      <div className="flex flex-col gap-3 min-w-0">
 
       {/* ── Header: what this is, and what it is doing right now ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -692,6 +693,23 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           </span>
         </div>
         <div className="flex items-center gap-2">
+          {!readOnly && !isWebcamActive && !phoneOpen && (
+            <label
+              className="hidden md:flex items-center gap-1.5 text-ink-faint"
+              title="When an uploaded video was recorded (optional). Its events are stamped with this time."
+            >
+              <CalendarClock className="w-4 h-4" aria-hidden="true" />
+              <span className="sr-only">Recorded on</span>
+              <input
+                type="datetime-local"
+                value={recordedAt}
+                max={localNowValue()}
+                onChange={(e) => setRecordedAt(e.target.value)}
+                disabled={phase === 'uploading'}
+                className="rounded-lg bg-surface border border-line px-2 py-1 text-[0.75rem] text-ink [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-[color:var(--accent)] disabled:opacity-40"
+              />
+            </label>
+          )}
           {readOnly && (
             <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-line text-[0.6875rem] font-bold text-ink-faint">
               <Eye className="w-3 h-3" />
@@ -760,7 +778,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
             </span>
             <span className="min-w-0">
               <span className="block text-[0.875rem] font-black text-ink">{phase === 'uploading' ? 'Uploading…' : 'Upload a video'}</span>
-              <span className="block text-[0.75rem] text-ink-muted truncate">MP4, AVI, MOV, WebM, up to 2 GB</span>
+              <span className="block text-[0.75rem] text-ink-muted truncate">MP4, AVI, MOV · 2 GB</span>
             </span>
           </button>
           <button
@@ -780,24 +798,6 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         </div>
       )}
 
-      {/* When the uploaded footage was filmed: only matters for an upload, so it sits quietly under the choices. */}
-      {!readOnly && !isWebcamActive && !phoneOpen && (
-        <label
-          className="flex flex-wrap items-center gap-2 text-[0.8125rem] text-ink-muted -mt-1"
-          title="When this footage was recorded. Safety events are stamped with it. Leave empty to use the upload time."
-        >
-          <span className="font-semibold">Recorded on</span>
-          <input
-            type="datetime-local"
-            value={recordedAt}
-            max={localNowValue()}
-            onChange={(e) => setRecordedAt(e.target.value)}
-            disabled={phase === 'uploading'}
-            className="rounded-lg bg-surface border border-line hover:border-field px-2.5 py-1.5 text-[0.8125rem] text-ink [color-scheme:light] dark:[color-scheme:dark] focus:outline-none focus:border-[color:var(--accent)] disabled:opacity-40 transition-colors"
-          />
-          <span className="text-ink-faint">optional, for uploads (otherwise the upload time)</span>
-        </label>
-      )}
 
       {/* Phone as a camera: pairing and its start/stop. Its picture is drawn on the player below.
 
@@ -863,7 +863,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
               : 'w-full h-auto object-contain block mx-auto'
           }
           // Sized to the window, so the picture AND the play controls under it fit on a 768-pixel laptop screen.
-          style={isFullscreen ? undefined : { maxHeight: 'max(15rem, calc(100vh - 31rem))' }}
+          style={isFullscreen ? undefined : { maxHeight: `max(12rem, calc(100vh - ${phoneOpen ? 34 : 24}rem))` }}
         />
 
         {/*
@@ -923,147 +923,102 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         />
       </div>
 
-      {/* Movie-Style Video Playback Controls Bar */}
-      <div className="glass-card p-3 flex flex-col gap-2.5 bg-surface/90 border-line">
-        {/* Interactive Timeline Scrubber Slider (disabled during live webcam) */}
-        <div className="flex items-center gap-3">
-          <span className="text-[0.6875rem] font-mono text-ink-muted shrink-0 w-12 text-right">
-            {formatTime(currentTimeSec)}
-          </span>
-          <div className="relative flex-1 flex items-center">
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="0.1"
-              value={progress}
-              onChange={handleSeek}
-              aria-label="Seek the video"
-              aria-valuetext={`${formatTime(currentTimeSec)} of ${formatTime(durationSec)}`}
-              disabled={isWebcamActive || (phase !== 'processing' && phase !== 'done')}
-              className="w-full h-2 bg-surface-alt rounded-lg appearance-none cursor-pointer accent-[color:var(--accent)] hover:accent-[color:var(--accent)] transition-all disabled:cursor-not-allowed disabled:opacity-30"
-            />
-          </div>
-          <span className="text-[0.6875rem] font-mono text-ink-muted shrink-0 w-12">
-            {isWebcamActive ? 'LIVE' : formatTime(durationSec)}
-          </span>
-        </div>
-
-        {/* Playback Control Buttons Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-y-2">
-          <div className="flex items-center gap-2">
-            {/* Rewind 5s */}
-            <button
-              onClick={() => handleSkip(-5)}
-              disabled={isWebcamActive || phase !== 'processing'}
-              className="p-2 rounded-lg bg-surface-alt/80 hover:bg-surface-alt text-ink-muted disabled:opacity-30 transition-all"
-              title="Rewind 5 Seconds"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-
-            {/* Main Play / Pause Button */}
-            <button
-              onClick={togglePlayPause}
-              disabled={isWebcamActive || phase !== 'processing'}
-              className="p-2.5 rounded-xl bg-accent hover:brightness-110 text-white font-bold disabled:opacity-30 shadow-lg shadow-red-600/20 transition-all"
-              title={isPaused ? "Play" : "Pause"}
-            >
-              {isPaused ? <Play className="w-5 h-5 fill-current ml-0.5" /> : <Pause className="w-5 h-5 fill-current" />}
-            </button>
-
-            {/* Skip 5s */}
-            <button
-              onClick={() => handleSkip(5)}
-              disabled={isWebcamActive || phase !== 'processing'}
-              className="p-2 rounded-lg bg-surface-alt/80 hover:bg-surface-alt text-ink-muted disabled:opacity-30 transition-all"
-              title="Skip 5 Seconds Forward"
-            >
-              <RotateCw className="w-4 h-4" />
-            </button>
-
-            <span className="text-xs text-ink-muted font-mono ml-2">
-              {isWebcamActive ? (isNetworkCamera ? '🔴 NETWORK CAMERA LIVE' : '🔴 WEBCAM LIVE') : isPaused ? 'PAUSED' : phase === 'processing' ? 'PLAYING' : 'IDLE'}
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            {/* Privacy Anonymization Toggle.
-                `enableBlur === null` means no frame has arrived yet, so the
-                server's setting is still unknown. The control renders unchecked
-                and disabled rather than guessing — `checked={null}` would also
-                make React treat the input as uncontrolled. */}
-            <label
-              className={`flex items-center gap-2 select-none text-xs text-ink-muted ${
-                enableBlur === null ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-              }`}
-              title={enableBlur === null
-                ? 'Waiting for the analysis stream to report its privacy setting'
-                : 'Blur head regions server-side before frames are sent'}
-            >
-              <Shield className={`w-4 h-4 ${enableBlur ? 'text-accent' : 'text-ink-faint'}`} />
-              <span>Face Anonymisation</span>
-              <input
-                type="checkbox"
-                checked={enableBlur === true}
-                disabled={enableBlur === null}
-                onChange={(e) => toggleBlur(e.target.checked)}
-                className="accent-[color:var(--accent)] cursor-pointer disabled:cursor-not-allowed"
-              />
-            </label>
-
-            {/* Real time: an uploaded video plays at the speed it was filmed, so
-                labels can be read; off processes it as fast as the machine can. */}
-            <label
-              className="flex items-center gap-2 select-none text-xs text-ink-muted cursor-pointer"
-              title="Play an uploaded video at its own speed. Switch off to process it as fast as possible"
-            >
-              <span>Real time</span>
-              <input
-                type="checkbox"
-                checked={realtime}
-                onChange={(e) => toggleRealtime(e.target.checked)}
-                className="accent-[color:var(--accent)] cursor-pointer"
-              />
-            </label>
-
-            {/* Fullscreen Button */}
-            <button
-              onClick={toggleFullScreen}
-              className="p-2 rounded-lg bg-surface-alt hover:bg-surface-alt text-ink-muted transition-all"
-              title="Toggle Fullscreen"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+      {/* Controls: one row */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2">
+        <button
+          onClick={() => handleSkip(-5)}
+          disabled={isWebcamActive || phase !== 'processing'}
+          className="p-1.5 rounded-lg text-ink-muted hover:text-ink disabled:opacity-30 transition-colors"
+          title="Back 5 seconds"
+          aria-label="Back 5 seconds"
+        >
+          <RotateCcw className="w-4 h-4" />
+        </button>
+        <button
+          onClick={togglePlayPause}
+          disabled={isWebcamActive || phase !== 'processing'}
+          className="p-2 rounded-lg bg-accent hover:brightness-110 text-white disabled:opacity-30 transition-all"
+          title={isPaused ? 'Play' : 'Pause'}
+          aria-label={isPaused ? 'Play' : 'Pause'}
+        >
+          {isPaused ? <Play className="w-4 h-4 fill-current" /> : <Pause className="w-4 h-4 fill-current" />}
+        </button>
+        <button
+          onClick={() => handleSkip(5)}
+          disabled={isWebcamActive || phase !== 'processing'}
+          className="p-1.5 rounded-lg text-ink-muted hover:text-ink disabled:opacity-30 transition-colors"
+          title="Forward 5 seconds"
+          aria-label="Forward 5 seconds"
+        >
+          <RotateCw className="w-4 h-4" />
+        </button>
+        <span className="text-[0.75rem] font-mono text-ink-muted tabular-nums">{formatTime(currentTimeSec)}</span>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="0.1"
+          value={progress}
+          onChange={handleSeek}
+          aria-label="Seek the video"
+          aria-valuetext={`${formatTime(currentTimeSec)} of ${formatTime(durationSec)}`}
+          disabled={isWebcamActive || (phase !== 'processing' && phase !== 'done')}
+          className="flex-1 min-w-[6rem] h-1.5 bg-[color:var(--line)] rounded-lg appearance-none cursor-pointer accent-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
+        />
+        <span className="text-[0.75rem] font-mono text-ink-muted tabular-nums">{isWebcamActive ? 'LIVE' : formatTime(durationSec)}</span>
+        <label
+          className={`flex items-center gap-1.5 select-none text-[0.8125rem] text-ink-muted ${enableBlur === null ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          title="Blur faces before frames are shown"
+        >
+          <Shield className={`w-4 h-4 ${enableBlur ? 'text-accent' : 'text-ink-faint'}`} />
+          Blur faces
+          <input
+            type="checkbox"
+            checked={enableBlur === true}
+            disabled={enableBlur === null}
+            onChange={(e) => toggleBlur(e.target.checked)}
+            className="accent-[color:var(--accent)] cursor-pointer disabled:cursor-not-allowed"
+          />
+        </label>
+        <label
+          className="flex items-center gap-1.5 select-none text-[0.8125rem] text-ink-muted cursor-pointer"
+          title="Play an upload at its own speed (off: as fast as possible)"
+        >
+          Real time
+          <input
+            type="checkbox"
+            checked={realtime}
+            onChange={(e) => toggleRealtime(e.target.checked)}
+            className="accent-[color:var(--accent)] cursor-pointer"
+          />
+        </label>
+      </div>
       </div>
 
-      {/* Zone entries and exits, once the safety layer is running */}
-      {safetyOn && (phase === 'processing' || phase === 'done' || isWebcamActive) && (
-        <>
-          <DecisionFeed decisions={decisions} zones={activeZones} />
-          <ZoneActivity events={zoneEvents} zones={activeZones} />
-        </>
-      )}
-      {safetyOn && (phase === 'processing' || isWebcamActive) && (
-        <PpeStatus entities={ppeEntities} unavailable={ppeUnavailable} />
-      )}
-
-      {/* What is in view right now: how many people, and how many of them have an open flag. */}
-      {(phase === 'processing' || isWebcamActive) && (
+      {/* Side column: what is in view now, what was decided, and where people were seen. */}
+      <aside className="flex flex-col gap-3 min-w-0 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pr-1">
         <div className="grid grid-cols-2 gap-2">
           {[
-            { label: 'People in view', value: stats.detected, color: 'text-ink' },
-            { label: 'With an open flag', value: stats.flagged, color: stats.flagged > 0 ? 'text-accent' : 'text-ink' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="glass-card p-2.5 text-center">
-              <p className={`text-xl font-bold ${color}`}>{value}</p>
-              <p className="text-[0.625rem] text-ink-faint uppercase tracking-wider">{label}</p>
+            { label: 'In view', value: stats.detected, accent: false },
+            { label: 'Flagged', value: stats.flagged, accent: stats.flagged > 0 },
+          ].map(({ label, value, accent }) => (
+            <div key={label} className="rounded-xl border border-line bg-surface px-3 py-2.5">
+              <p className={`text-2xl font-black tabular-nums leading-none ${accent ? 'text-accent' : 'text-ink'}`}>{(phase === 'processing' || isWebcamActive) ? value : 0}</p>
+              <p className="mt-1 text-[0.75rem] font-bold text-ink-muted">{label}</p>
             </div>
           ))}
         </div>
-      )}
+        {safetyOn && (phase === 'processing' || isWebcamActive) && (
+          <PpeStatus entities={ppeEntities} unavailable={ppeUnavailable} />
+        )}
+        {safetyOn && (phase === 'processing' || phase === 'done' || isWebcamActive) && (
+          <>
+            <DecisionFeed decisions={decisions} zones={activeZones} />
+            <ZoneActivity events={zoneEvents} zones={activeZones} />
+          </>
+        )}
+        {aside}
+      </aside>
     </div>
   );
 };

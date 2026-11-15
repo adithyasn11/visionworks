@@ -43,6 +43,8 @@ FRONTEND_DIR = os.path.join(ROOT_DIR, "frontend")
 
 CERT_DIR  = os.path.join(ROOT_DIR, "certs")
 CERT_FILE = os.path.join(CERT_DIR, "dev-cert.pem")
+# The phones' secure entrance on a normal start (scripts/phone_gateway.py).
+PHONE_PORT = 3443
 KEY_FILE  = os.path.join(CERT_DIR, "dev-key.pem")
 
 VENV_PYTHON = (
@@ -301,6 +303,12 @@ def main():
         if not ensure_cert():
             sys.exit(1)
         warn_if_cert_untrusted()
+
+    # A normal (http) start also opens a secure entrance for PHONES (scripts/phone_gateway.py): a phone only
+    # opens its camera on https, while this computer keeps using plain http://localhost:3000.
+    phone_base = None
+    if not args.https and ip and ensure_cert(verbose=False):
+        phone_base = f"https://{ip}:{PHONE_PORT}"
         if not ip:
             print(f"{YELLOW}[SYSTEM]{RESET} No LAN address found — is this "
                   "laptop on Wi-Fi? A phone will not be able to reach it.")
@@ -309,6 +317,7 @@ def main():
     print(f"{YELLOW}[SYSTEM]{RESET} Freeing ports 8001 and 3000 ...")
     kill_port(8001)
     kill_port(3000)
+    kill_port(PHONE_PORT)
     time.sleep(1.0)
 
     # ── 2. Start Backend ───────────────────────────────────────────────────
@@ -327,7 +336,8 @@ def main():
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True, bufsize=1,
-        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        # The address the pairing QR sends a phone to (the gateway below), when there is one.
+        env={**os.environ, "PYTHONUNBUFFERED": "1", **({"VISIONWORKS_PHONE_BASE": phone_base} if phone_base else {})},
         creationflags=win_flags,
     )
     threading.Thread(target=stream, args=(backend_proc, "BACKEND ", BLUE), daemon=True).start()
@@ -387,6 +397,15 @@ def main():
         sys.exit(1)
     print(f"{YELLOW}[SYSTEM]{RESET} Frontend is UP ✓")
 
+    gateway_proc = None
+    if phone_base:
+        gateway_proc = subprocess.Popen(
+            [VENV_PYTHON, os.path.join(ROOT_DIR, "scripts", "phone_gateway.py"), CERT_FILE, KEY_FILE, str(PHONE_PORT)],
+            cwd=ROOT_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"}, creationflags=win_flags,
+        )
+        threading.Thread(target=stream, args=(gateway_proc, "GATEWAY ", BLUE), daemon=True).start()
+
     print(f"\n{CYAN}{'='*72}{RESET}")
     print(f"{CYAN} SYSTEM ONLINE — Press Ctrl + C to shut down everything{RESET}")
     print(f"{CYAN}{'='*72}{RESET}\n")
@@ -425,8 +444,8 @@ def main():
         print()
     else:
         print(" Dashboard: http://localhost:3000")
-        print(" To use your phone as a camera, restart with:")
-        print("   python run_system.py --https")
+        if phone_base:
+            print(f" Phones pair through {phone_base} (Live feed -> Use my phone).")
         print()
 
     # ── 4. Keep system running until Ctrl + C ────────────────────────────
@@ -441,8 +460,10 @@ def main():
     finally:
         kill_proc(backend_proc,  "Backend")
         kill_proc(frontend_proc, "Frontend")
+        kill_proc(gateway_proc, "Phone gateway")
         kill_port(8001)
         kill_port(3000)
+        kill_port(PHONE_PORT)
         print(f"\n{YELLOW}[SYSTEM]{RESET} Both servers stopped. System offline.\n")
 
 

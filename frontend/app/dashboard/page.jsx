@@ -89,14 +89,14 @@ function ReadOnlyNotice({ capability }) {
  * group (the range picker plus refresh, wrapped on a narrow window) bottom
  * alignment drags the whole heading block down with it.
  */
-function PageHeader({ eyebrow, title, subtitle, action }) {
+function PageHeader({ eyebrow, title, subtitle, action, compact = false }) {
   return (
-    <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4 pb-5 border-b border-line">
+    <header className={`flex flex-wrap items-start justify-between gap-x-6 gap-y-4 border-b border-line ${compact ? 'pb-3' : 'pb-5'}`}>
       <div className="min-w-0">
         <p className="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-accent mb-2">
           {eyebrow}
         </p>
-        <h1 className="text-[1.625rem] sm:text-[1.875rem] font-black tracking-tight leading-[1.15] text-ink">
+        <h1 className={`${compact ? 'text-[1.5rem]' : 'text-[1.625rem] sm:text-[1.875rem]'} font-black tracking-tight leading-[1.15] text-ink`}>
           {title}
         </h1>
         {subtitle && (
@@ -445,30 +445,19 @@ function DashboardInner() {
           leaving for another page or signing out still releases the
           camera properly. */}
       <div className={view === 'live' ? 'block animate-view-in' : 'hidden'} aria-hidden={view !== 'live'}>
-        <div className="space-y-6">
-          <PageHeader
-            eyebrow="Live feed"
-            title="Camera & detection"
-            subtitle={
-              can(role, 'analysis.run')
-                ? 'Upload a recording or start the camera. This camera’s zones are outlined on the frame.'
-                : 'Live detection for your organisation. Your role can watch but not start a run.'
-            }
-            action={cameraPicker}
-          />
+        <div className="space-y-4">
+          <PageHeader eyebrow="Live feed" title="Camera & detection" action={cameraPicker} compact />
 
           {noCameraNotice}
           {!can(role, 'analysis.run') && role && <ReadOnlyNotice capability="analysis.run" />}
 
-          <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5 items-start">
-            <VideoCanvasPlayer
-              activeZones={activeZones}
-              readOnly={!can(role, 'analysis.run')}
-              cameraId={cameraId}
-              cameraSource={(cameras.find((c) => c.name === cameraId) || {}).sourceType || null}
-            />
-            <FloorplanHeatmap />
-          </div>
+          <VideoCanvasPlayer
+            activeZones={activeZones}
+            readOnly={!can(role, 'analysis.run')}
+            cameraId={cameraId}
+            cameraSource={(cameras.find((c) => c.name === cameraId) || {}).sourceType || null}
+            aside={<FloorplanHeatmap compact />}
+          />
         </div>
       </div>
 

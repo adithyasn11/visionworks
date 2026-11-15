@@ -63,8 +63,10 @@ function wsBase() {
  * The protocol still follows the page, because that is genuinely a property
  * of how the servers were started, not of the network.
  */
-function phoneUrlFor(code, lanHost) {
+function phoneUrlFor(code, lanHost, phoneBase) {
   if (typeof window === 'undefined') return '';
+  // A normal start: the phones' secure entrance (https, port 3443), whatever this page itself runs on.
+  if (phoneBase) return `${phoneBase}/camera/${code}`;
   const host = lanHost || window.location.hostname;
   const port = window.location.port ? `:${window.location.port}` : '';
   return `${window.location.protocol}//${host}${port}/camera/${code}`;
@@ -74,6 +76,9 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState(null);
   const [lanHost, setLanHost] = useState(null);
+  const [phoneBase, setPhoneBase] = useState(null);
+  // The server has no secure entrance for phones (no certificate or no Wi-Fi address): say so, briefly.
+  const [noEntrance, setNoEntrance] = useState(false);
   const [qrSvg, setQrSvg] = useState(null);
   const [paired, setPaired] = useState(false);
   const [streaming, setStreaming] = useState(false);
@@ -92,9 +97,6 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
   const pollRef = useRef(null);
   const pendingRef = useRef(false);  // a frame is with the GPU right now
 
-  // The phone always reaches this laptop by its network address, and a phone browser only opens its camera on
-  // https. So an http dashboard can never pair one, even when it is itself open at localhost.
-  const insecure = typeof window !== 'undefined' && window.location.protocol !== 'https:';
 
   /* ── teardown ───────────────────────────────────────────────────────── */
 
@@ -262,7 +264,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
           setError(msg.message === 'permission denied'
             ? 'The phone refused camera access. Allow it in the phone’s browser settings and reload that page.'
             : msg.message === 'insecure' || /getUserMedia|mediaDevices/.test(String(msg.message))
-              ? 'The phone cannot open its camera on this address. Start VisionWorks with start_visionworks_phone.bat and pair again.'
+              ? 'The phone could not open its camera here. Press New code and scan again.'
               : `Phone camera error: ${msg.message}`);
           setStreaming(false);
           break;
@@ -298,13 +300,16 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
         try { const b = await res.json(); if (b?.detail) detail = b.detail; } catch { /* status will do */ }
         throw new Error(detail);
       }
-      const { code: newCode, lan_host: host } = await res.json();
+      const { code: newCode, lan_host: host, phone_base: base } = await res.json();
+      if (!base && window.location.protocol !== 'https:') { setNoEntrance(true); return; }
+      setNoEntrance(false);
       setCode(newCode);
       setLanHost(host || null);
+      setPhoneBase(base || null);
       setPaired(false);
 
       const QRCode = (await import('qrcode')).default;
-      setQrSvg(await QRCode.toString(phoneUrlFor(newCode, host), {
+      setQrSvg(await QRCode.toString(phoneUrlFor(newCode, host, base), {
         type: 'svg', margin: 1, width: 200,
         color: { dark: '#0b0a0c', light: '#ffffff' },
       }));
@@ -335,9 +340,9 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
 
   const startedRef = useRef(false);
   useEffect(() => {
-    if (wanted && !startedRef.current && !insecure) { startedRef.current = true; startPairing(); }
+    if (wanted && !startedRef.current) { startedRef.current = true; startPairing(); }
     if (!wanted) startedRef.current = false;
-  }, [wanted, insecure, startPairing]);
+  }, [wanted, startPairing]);
 
   const close = useCallback(() => {
     teardown(); setOpen(false); setCode(null); setPaired(false); setStreaming(false); setError(null);
@@ -348,127 +353,65 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
 
   if (!wanted) return null;
 
-  if (insecure) {
-    return (
-      <div className="rounded-2xl border border-[color:var(--accent)] bg-accent-soft p-5 flex flex-col gap-3" role="status">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="text-[0.9375rem] font-black text-ink flex items-center gap-2">
-            <Smartphone className="w-4 h-4 text-accent" aria-hidden="true" />
-            Phone cameras need phone mode
-          </h3>
-          <button type="button" onClick={close} aria-label="Close" className="p-1 rounded text-ink-faint hover:text-ink transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <p className="text-[0.875rem] text-ink-muted leading-relaxed">
-          A phone only opens its camera on a secure (https) address, and VisionWorks is running on plain http right now.
-        </p>
-        <ol className="flex flex-col gap-2 text-[0.875rem] text-ink">
-          <li><span className="font-black text-accent mr-2">1</span>Close the VisionWorks window.</li>
-          <li><span className="font-black text-accent mr-2">2</span>Double-click <span className="font-mono font-bold">start_visionworks_phone.bat</span>. The first time, its window may show one command to trust VisionWorks&apos; certificate on this computer: run it once, then reopen the browser.</li>
-          <li><span className="font-black text-accent mr-2">3</span>Open <span className="font-mono font-bold">https://localhost:3000</span>, then Live feed, then Use my phone.</li>
-        </ol>
-        <p className="text-[0.8125rem] text-ink-faint leading-relaxed">
-          The phone and this computer must be on the same Wi-Fi. The phone shows a security warning the first time: tap Advanced, then continue.
-        </p>
-      </div>
-    );
-  }
+  const BTN = 'inline-flex items-center gap-2 px-3.5 py-2 rounded-lg font-bold text-[0.8125rem] transition-colors';
 
   return (
-    <div className="rounded-2xl border border-line bg-surface-alt/50 p-5 flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-[0.875rem] font-black text-ink flex items-center gap-2">
-          <Smartphone className="w-4 h-4 text-accent" />
-          Phone camera
-        </h3>
-        <button
-          type="button"
-          onClick={close}
-          aria-label="Close"
-          className="p-1 rounded text-ink-faint hover:text-ink transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      {!paired ? (
+    <div className="rounded-2xl border border-line bg-surface-alt/50 px-4 py-3 flex flex-col gap-2">
+    <div className="flex items-center gap-4">
+      {noEntrance ? (
+        <p className="flex-1 flex items-center gap-2 text-[0.875rem] text-ink">
+          <AlertCircle className="w-4 h-4 text-accent shrink-0" />
+          This computer is not on Wi-Fi, so a phone cannot reach it.
+        </p>
+      ) : !paired ? (
         <>
-          <div className="flex flex-col sm:flex-row items-start gap-5">
-            {qrSvg && (
-              <div
-                className="shrink-0 rounded-xl bg-white p-2 w-36 h-36 [&>svg]:w-full [&>svg]:h-full"
-                dangerouslySetInnerHTML={{ __html: qrSvg }}
-              />
-            )}
-            <div className="min-w-0 flex flex-col gap-2">
-              <p className="text-[0.875rem] text-ink-muted leading-relaxed">
-                Scan this with your phone&apos;s camera (same Wi-Fi as this computer). The first time, the phone shows a
-                security warning: tap Advanced, then continue.
-              </p>
-              <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-ink-faint mt-1">
-                or type this address
-              </p>
-              <p className="font-mono text-[0.71875rem] text-ink break-all">
-                {code ? phoneUrlFor(code, lanHost) : ''}
-              </p>
+          {qrSvg ? (
+            <div
+              className="shrink-0 rounded-lg bg-white p-1.5 w-28 h-28 [&>svg]:w-full [&>svg]:h-full"
+              dangerouslySetInnerHTML={{ __html: qrSvg }}
+            />
+          ) : (
+            <div className="shrink-0 w-28 h-28 rounded-lg bg-surface grid place-items-center">
+              <Loader2 className="w-5 h-5 animate-spin text-accent" />
             </div>
-          </div>
-          <div className="flex items-center gap-2 text-[0.75rem] text-ink-muted font-medium">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
-            Waiting for the phone to connect…
+          )}
+          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+            <p className="text-[0.9375rem] font-black text-ink">Scan with your phone</p>
+            <p className="text-[0.8125rem] text-ink-muted">Same Wi-Fi. First time: tap Advanced, then continue.</p>
+            <p className="font-mono text-[0.75rem] text-ink-faint break-all">{code ? phoneUrlFor(code, lanHost, phoneBase) : ''}</p>
+            <p className="flex items-center gap-1.5 text-[0.8125rem] text-ink-muted">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" /> Waiting for the phone…
+            </p>
           </div>
         </>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-[0.875rem] font-bold text-ink">
-            <CheckCircle2 className="w-4 h-4 text-accent" />
-            {streaming ? 'Phone camera on: its picture is in the player below' : 'Phone paired'}
-            {streaming && (
-              <span className="ml-1 font-mono text-[0.6875rem] font-medium text-ink-faint">
-                · {analysed}/{frames} analysed
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {streaming ? (
-              <button
-                type="button"
-                onClick={stopPhoneCamera}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border-2 border-field text-ink font-bold text-[0.8125rem] hover:border-field-hover transition-colors"
-              >
-                <Square className="w-3.5 h-3.5" />
-                Stop
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={startPhoneCamera}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-accent text-white font-bold text-[0.8125rem] hover:brightness-110 transition-[filter]"
-              >
-                <Play className="w-3.5 h-3.5" />
-                Turn on phone camera
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={startPairing}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-line text-ink-muted font-bold text-[0.75rem] hover:text-ink hover:border-field transition-colors"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              New code
+          <p className="flex-1 min-w-0 flex items-center gap-2 text-[0.9375rem] font-bold text-ink">
+            <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
+            {streaming ? 'Phone camera live' : 'Phone paired'}
+            {streaming && <span className="font-mono text-[0.75rem] font-medium text-ink-faint">{analysed}/{frames}</span>}
+          </p>
+          {streaming ? (
+            <button type="button" onClick={stopPhoneCamera} className={`${BTN} border-2 border-field text-ink hover:border-field-hover`}>
+              <Square className="w-3.5 h-3.5" /> Stop
             </button>
-          </div>
-          </div>
+          ) : (
+            <button type="button" onClick={startPhoneCamera} className={`${BTN} bg-accent text-white hover:brightness-110`}>
+              <Play className="w-3.5 h-3.5" /> Start phone camera
+            </button>
+          )}
+          <button type="button" onClick={startPairing} title="New code" aria-label="New code" className="p-2 rounded-lg border border-line text-ink-muted hover:text-ink transition-colors">
+            <RefreshCw className="w-4 h-4" />
+          </button>
         </>
       )}
-
+      <button type="button" onClick={close} aria-label="Close" className="self-start p-1 rounded text-ink-faint hover:text-ink transition-colors">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
       {error && (
-        <p className="text-[0.75rem] text-accent font-medium flex items-start gap-1.5" role="alert">
-          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-          {error}
+        <p className="flex items-center gap-1.5 text-[0.8125rem] text-accent font-medium" role="alert">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
         </p>
       )}
     </div>

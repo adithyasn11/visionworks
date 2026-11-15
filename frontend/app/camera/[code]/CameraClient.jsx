@@ -60,6 +60,9 @@ function backendWsBase() {
   const explicit = process.env.NEXT_PUBLIC_BACKEND_HTTP;
   if (explicit) return explicit.replace(/^http/, 'ws');
   if (typeof window === 'undefined') return '';
+  // Opened through the phones' secure entrance (run_system.py's gateway, port 3443): it carries the backend
+  // too, on the same address, so the phone accepts one certificate warning, not two.
+  if (window.location.port === '3443') return `wss://${window.location.host}`;
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
   return `${proto}://${window.location.hostname}:8001`;
 }
@@ -173,7 +176,7 @@ export default function CameraClient({ code }) {
     // all. Say what to do instead of failing with "Cannot read properties of undefined (reading 'getUserMedia')".
     if (typeof window !== 'undefined' && (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)) {
       setStatus('error');
-      setMessage('This phone can only use its camera on a secure (https) address. On the computer, start VisionWorks with start_visionworks_phone.bat, then scan the new code.');
+      setMessage('This address cannot use the camera. Scan the code on the computer again.');
       wsRef.current?.send(JSON.stringify({ type: 'camera-error', message: 'insecure' }));
       return;
     }
