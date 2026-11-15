@@ -32,7 +32,7 @@ import json
 import logging
 from typing import List, Optional
 
-from app.safety.rules import default_rules, parse_rules
+from app.safety.rules import default_man_down_rule, default_rules, parse_rules
 from app.safety.schemas import Rule
 
 _log = logging.getLogger(__name__)
@@ -70,24 +70,26 @@ def _translate_params(params, slug_of: dict):
 
 
 def rules_for_session(org_id: Optional[str], zones_config, camera_name: Optional[str] = None) -> List[Rule]:
-    """The rules this session runs: the organisation's own plus the default where a zone has none."""
+    """The rules this session runs: the organisation's own plus the defaults (helmet and vest where a zone has
+    none; man-down for the whole camera unless the organisation has its own man-down rule)."""
     defaults = default_rules(zones_config)
+    with_man_down = defaults + [default_man_down_rule()]
     try:
         from app.db.safety_sync import service_role_configured
         if not org_id or not camera_name or not service_role_configured():
-            return defaults
+            return with_man_down
         cameras = _get("cameras", {"select": "id", "orgId": f"eq.{org_id}", "name": f"eq.{camera_name}", "limit": "1"})
         if not cameras:
-            return defaults                              # an unregistered camera has no zones, so no rules, in Postgres
+            return with_man_down                         # an unregistered camera has no zones, so no rules, in Postgres
         camera_id = cameras[0]["id"]
         rows = fetch_rule_rows(org_id)
         if not rows:
-            return defaults
+            return with_man_down
         zones = _get("zones", {"select": "id,slug", "orgId": f"eq.{org_id}", "cameraId": f"eq.{camera_id}", "limit": "1000"})
     except Exception as e:
         _log.warning("The organisation's safety rules could not be read (%s: %s); running on the default rule",
                      type(e).__name__, e)
-        return defaults
+        return with_man_down
 
     slug_of = {str(z["id"]): z.get("slug") for z in zones if z.get("slug")}      # this camera's zones only
     local_ids = {str(z["zone_id"]) for z in (zones_config or [])}
@@ -115,5 +117,8 @@ def rules_for_session(org_id: Optional[str], zones_config, camera_name: Optional
 
     covered = {rule.zone_id for rule, _enabled in parsed
                if rule.type == "PPE_ENTRY" and rule.params.get("mode", "AT_ENTRY") in ("AT_ENTRY", "VIA_CHECKPOINT")}
+    # The organisation's own man-down rule (on or off) replaces the built-in one.
+    own_man_down = any(rule.type == "MAN_DOWN" for rule, _enabled in parsed)
     active = [rule for rule, enabled in parsed if enabled]
-    return active + [d for d in defaults if d.zone_id not in covered]
+    return (active + [d for d in defaults if d.zone_id not in covered]
+            + ([] if own_man_down else [default_man_down_rule()]))

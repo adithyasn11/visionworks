@@ -52,7 +52,7 @@ export default function AlertBanners({ banners, zones = [], flaggedCount = 0, on
                 Potential violation <span className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] opacity-80">· {meta.label}</span>
               </p>
               <p className="opacity-95">
-                {(zone && (zone.zone_name || zone.zone_id)) || b.zone_id || 'Zone'} · {workerLabel(b.worker_key)} — {b.reason}
+                {(() => { const z = (zone && (zone.zone_name || zone.zone_id)) || (b.zone_id && b.zone_id !== 'TRANSIT_ZONE' ? b.zone_id : null); return z ? `${z} · ` : ''; })()}{workerLabel(b.worker_key)} — {b.reason}
               </p>
             </div>
             <button

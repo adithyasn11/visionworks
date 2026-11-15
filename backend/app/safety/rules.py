@@ -204,6 +204,7 @@ def default_rules(zones_config) -> List[Rule]:
     """
     The built-in rule: every RESTRICTED zone requires helmet and vest at the moment
     of entry. It exists so the system produces a verdict with zero configuration.
+    (The built-in man-down rule is default_man_down_rule(), added per session.)
     """
     out = []
     for z in zones_config or []:
@@ -215,6 +216,16 @@ def default_rules(zones_config) -> List[Rule]:
                 name="Helmet and vest to enter", zone_name=str(z.get("zone_name") or zid),
                 severity="WARNING", min_evidence_confidence=DEFAULT_MIN_EVIDENCE_CONFIDENCE, source="default"))
     return out
+
+
+def default_man_down_rule() -> Rule:
+    """
+    Built in: anyone lying still anywhere in view, for the whole camera. A person down is an emergency whether or
+    not anyone thought to add the rule. An organisation's own MAN_DOWN rule (on or off) replaces it.
+    """
+    return Rule(type="MAN_DOWN", zone_id=None, params={"min_seconds_down": 5.0, "lying_allowed_zone_ids": []},
+                name="Person lying still", zone_name="", severity="CRITICAL",
+                min_evidence_confidence=DEFAULT_MIN_EVIDENCE_CONFIDENCE, source="default")
 
 
 def parse_rules(rows: Iterable[dict], zones_config) -> Tuple[List[Rule], List[str]]:

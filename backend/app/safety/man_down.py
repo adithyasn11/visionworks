@@ -276,7 +276,8 @@ class ManDownDetector:
     # ── the decisions ───────────────────────────────────────────────────────
 
     def _where(self, ep: _Episode) -> str:
-        if ep.zone_id is None:
+        # Outside every drawn zone the pipeline says TRANSIT_ZONE: that is not a place a person should read.
+        if ep.zone_id is None or ep.zone_id == "TRANSIT_ZONE":
             return ""
         name = self.zone_names.get(ep.zone_id) or self.rule.zone_name or ep.zone_id
         return f" in {name}"

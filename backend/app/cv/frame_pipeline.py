@@ -32,6 +32,8 @@ silently disable the privacy blur on every endpoint at once.
 import logging
 
 from app.cv.spatial_engine import SpatialEngine
+from app.safety.man_down import torso_angle
+LYING_ANGLE_DEG = 60.0     # as SafetyConfig.man_down_angle_deg
 
 _log = logging.getLogger(__name__)
 
@@ -134,6 +136,11 @@ def process_detections(
         }
         if ppe_by_track is not None and track_id in ppe_by_track:
             entity["ppe"] = ppe_by_track[track_id]
+        # What the overlay writes on the person: the posture, or LYING when the torso is closer to flat than
+        # upright (the same test man-down uses). The classifier itself has no LYING (it reads a person lying
+        # flat as SITTING), and `posture` stays its value because the activity records only take those.
+        angle = torso_angle(det.get("keypoints"))
+        entity["body"] = "LYING" if angle is not None and angle >= LYING_ANGLE_DEG else posture
         tracked_entities.append(entity)
 
     return tracked_entities, zone_summary

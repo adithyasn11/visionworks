@@ -122,7 +122,10 @@ export function drawHUD(ctx, canvas, entities, zones, enableBlur) {
     // Sized to be read at the size the canvas is shown, not at its pixel size.
     ctx.font = '600 14px Inter, sans-serif';
     // "Worker 8", the same name the panels use (not "ID #8"): nobody is named, but one word for one person.
-    const tag = `Worker ${entity.track_id}${flagged ? '  FLAGGED' : ''}`;
+    // The posture beside the name: Standing / Walking / Sitting, or Lying (torso flat, from the backend's `body`).
+    const BODY = { STANDING: 'Standing', WALKING: 'Walking', SITTING: 'Sitting', LYING: 'Lying' };
+    const body = BODY[String(entity.body || entity.posture || '').toUpperCase()];
+    const tag = `Worker ${entity.track_id}${body ? ` · ${body}` : ''}${flagged ? '  FLAGGED' : ''}`;
     const bannerW = Math.max(ctx.measureText(tag).width + 14, w);
     ctx.fillStyle = 'rgba(11,10,12,0.88)';
     ctx.fillRect(x1, y1 - 30, bannerW, 26);

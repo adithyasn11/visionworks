@@ -66,10 +66,12 @@ export default function DecisionFeed({ decisions, zones = [] }) {
                     {meta.label}
                   </span>
                   <span className="text-ink font-medium">{workerLabel(d.worker_key)}</span>
-                  <span className="inline-flex items-center gap-1.5 rounded-md border border-line px-1.5 py-0.5 text-[0.6875rem] font-mono text-ink-muted max-w-[40%]">
-                    <span aria-hidden="true" className="w-2 h-2 rounded-full shrink-0 border border-line" style={{ background: type.color }} />
-                    <span className="truncate">{(zone && (zone.zone_name || zone.zone_id)) || d.zone_id || 'Zone'}</span>
-                  </span>
+                  {(zone || (d.zone_id && d.zone_id !== 'TRANSIT_ZONE')) && (
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-line px-1.5 py-0.5 text-[0.6875rem] font-mono text-ink-muted max-w-[40%]">
+                      <span aria-hidden="true" className="w-2 h-2 rounded-full shrink-0 border border-line" style={{ background: type.color }} />
+                      <span className="truncate">{(zone && (zone.zone_name || zone.zone_id)) || d.zone_id}</span>
+                    </span>
+                  )}
                   {sure && <span className="text-ink-faint">{sure}</span>}
                 </div>
                 <p className={`pl-14 leading-relaxed ${d.status === 'UNVERIFIABLE' ? 'text-ink-faint' : 'text-ink-muted'}`}>{d.reason}</p>
