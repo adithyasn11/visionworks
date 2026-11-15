@@ -88,15 +88,14 @@ const money = (n) => {
   })}`;
 };
 
-export function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay, carriedLabel = null }) {
+export function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay }) {
   const busy = busyPlan === plan.id;
   const anyBusy = busyPlan !== null;
   const featured = Boolean(plan.featured);
 
   // "Continue checkout" resumes an abandoned attempt. Without it the pending
   // choice is invisible and the user starts the flow over.
-  // The tier whose paid time is still running (kept from a deleted organisation) says so instead of selling it again.
-  const label = carriedLabel || (isPending ? 'Continue checkout' : plan.cta);
+  const label = isPending ? 'Continue checkout' : plan.cta;
 
   // The featured card is the dark one, mirroring the landing page's bento —
   // where the tall "Privacy first." panel is `card-dark` against light
@@ -224,6 +223,60 @@ export function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay, c
 
 /* ── Screen ──────────────────────────────────────────────────────────────── */
 
+/**
+ * The plan still running from a deleted organisation (032_carry_paid_term.sql), shown in place of the price list:
+ * there is nothing to buy, only an organisation to create.
+ */
+function OngoingPlan({ carried }) {
+  const plan = PLANS.find((p) => p.id === carried.plan);
+  return (
+    <div className="max-w-3xl mx-auto">
+      <div className="flex flex-col items-center text-center gap-3 mb-10">
+        <span className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-ink-faint">Your plan</span>
+        <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-ink leading-[1.1]">Already paid for.</h2>
+      </div>
+      <div className="bg-surface border-2 border-[color:var(--accent)] rounded-3xl p-7 sm:p-9 shadow-xl shadow-black/5 flex flex-col gap-7">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div>
+            <span className="inline-flex items-center gap-1.5 bg-accent-soft text-accent px-2.5 py-1 rounded-full text-[0.6875rem] font-black uppercase tracking-[0.12em]">
+              <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-accent" /> Ongoing
+            </span>
+            <h3 className="mt-3 text-3xl font-black tracking-tight text-ink">{carried.name}</h3>
+            <p className="mt-1 text-[0.875rem] text-ink-muted font-medium">Billed {carried.period}</p>
+          </div>
+          <div className="sm:text-right">
+            <p className="text-[0.6875rem] font-black uppercase tracking-[0.14em] text-ink-faint">Paid until</p>
+            <p className="mt-1 text-xl font-black text-ink">{termDate(carried.renewsAt)}</p>
+            <p className="mt-1 text-[0.875rem] font-bold text-accent">{daysText(carried.daysLeft)} left</p>
+          </div>
+        </div>
+        {plan && (
+          <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-3 border-t border-line-soft pt-6">
+            {plan.features.filter((f) => f.included).map((f) => (
+              <li key={f.text} className="flex items-center gap-2.5 text-[0.875rem] font-bold text-ink-muted">
+                <CheckCircle2 className="w-[18px] h-[18px] text-accent shrink-0" aria-hidden="true" />
+                {f.text}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-line-soft pt-6">
+          <p className="text-[0.875rem] text-ink-muted leading-relaxed max-w-md">
+            Kept from the organisation you deleted. Your new organisation continues it; nothing is charged again.
+          </p>
+          <Link
+            href="/onboarding"
+            className="shrink-0 inline-flex items-center justify-center gap-2 bg-accent text-white px-6 py-3.5 rounded-2xl font-bold text-[0.9375rem] hover:brightness-110 hover:-translate-y-0.5 transition-all"
+          >
+            Create organisation
+            <ArrowRight className="w-5 h-5" aria-hidden="true" />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod, suspendedOrg = false, carried = null }) {
   const router = useRouter();
   const [period, setPeriod] = useState('monthly');
@@ -249,8 +302,6 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
   const choose = (planId) => {
     setBusyPlan(planId);
     try {
-      // The plan they already have time on: straight to naming the new organisation, nothing to confirm or pay.
-      if (carried && planId === carried.plan && period === carried.period) { router.push('/onboarding'); return; }
       // The PERIOD travels with the tier. It used to be client-only state:
       // choosing yearly changed the displayed price and was never sent
       // anywhere, so a yearly customer's organisation was created MONTHLY.
@@ -285,26 +336,6 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
             returned null.) */}
         <InvitationsPanel />
 
-        {carried && !suspendedOrg && (
-          <div role="status" className="mb-8 rounded-2xl border border-[color:var(--accent)] bg-accent-soft px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-            <div className="min-w-0">
-              <p className="text-[0.9375rem] font-bold text-ink">
-                Your {carried.name} plan is still paid until {termDate(carried.renewsAt)}
-              </p>
-              <p className="mt-1 text-[0.84375rem] text-ink-muted leading-relaxed">
-                {daysText(carried.daysLeft)} left from the organisation you deleted. Create a new one and it carries on, with nothing to pay again.
-              </p>
-            </div>
-            <Link
-              href="/onboarding"
-              className="shrink-0 inline-flex items-center justify-center gap-2 bg-accent text-white px-5 py-3 rounded-xl font-bold text-[0.875rem] hover:brightness-110 transition-all"
-            >
-              Create organisation
-              <ArrowRight className="w-4 h-4" aria-hidden="true" />
-            </Link>
-          </div>
-        )}
-
         {suspendedOrg && (
           <div role="status" className="mb-8 rounded-2xl border border-[color:var(--accent)] bg-accent-soft px-5 py-4">
             <p className="text-[0.875rem] font-bold text-ink">Your organisation is suspended</p>
@@ -338,29 +369,39 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-ink mb-6 leading-[1.15] pb-1 relative z-10 group-hover:translate-x-2 transition-transform duration-500">
-              Let’s set up<br />
+              {carried ? <>Pick up where<br /></> : <>Let’s set up<br /></>}
               <span className="text-accent relative inline-block">
-                your site.
+                {carried ? 'you left off.' : 'your site.'}
                 <span aria-hidden="true" className="absolute bottom-1 left-0 w-full h-2 bg-accent/20 -z-10 group-hover:h-full transition-all duration-300" />
               </span>
             </h1>
 
             <p className="text-lg text-ink-muted mb-8 max-w-md font-medium leading-relaxed relative z-10">
-              Check that safety procedures are followed — PPE before entry, time limits,
-              workers down — without keeping the footage or naming anyone in it. Choose a
-              plan to get started.
+              {carried ? (
+                <>
+                  Your {carried.name} plan is still paid until {termDate(carried.renewsAt)}. Create your new
+                  organisation and it carries on, with nothing to pay again.
+                </>
+              ) : (
+                <>
+                  Check that safety procedures are followed — PPE before entry, time limits,
+                  workers down — without keeping the footage or naming anyone in it. Choose a
+                  plan to get started.
+                </>
+              )}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 relative z-10 mb-8">
+              {/* With paid time still running there is nothing to choose: straight to naming the organisation. */}
               <a
-                href="#pricing"
+                href={carried ? '/onboarding' : '#pricing'}
                 className="bg-inverse text-inverse px-8 py-4 rounded-2xl font-bold text-base hover:bg-accent hover:shadow-xl hover:shadow-red-600/30 hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-3 group/btn"
               >
-                Choose a plan
+                {carried ? `Continue with ${carried.name}` : 'Choose a plan'}
                 <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" aria-hidden="true" />
               </a>
 
-              {pendingPlan && (
+              {pendingPlan && !carried && (
                 <Link
                   href={`/home/checkout?plan=${encodeURIComponent(pendingPlan)}&period=${encodeURIComponent(pendingPeriod ?? 'monthly')}`}
                   className="bg-surface text-ink border-2 border-line px-8 py-4 rounded-2xl font-bold text-base hover:border-[color:var(--accent)] hover:bg-surface-alt hover:-translate-y-1 hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-3"
@@ -430,7 +471,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
                   Live in minutes
                 </h3>
                 <p className="text-ink-muted font-medium text-[0.875rem]">
-                  Pick a plan, name your organisation, and point it at a site.
+                  {carried ? 'Name your organisation and point it at a site.' : 'Pick a plan, name your organisation, and point it at a site.'}
                 </p>
               </div>
               <Activity className="w-16 h-16 text-ink-muted/30 group-hover:text-accent group-hover:scale-110 transition-all duration-500 hidden sm:block" aria-hidden="true" />
@@ -497,6 +538,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
             scroll-mt-20 clears the 4rem sticky header, or the anchor lands
             with the heading hidden behind the navbar. */}
         <section id="pricing" className="scroll-mt-20 py-12">
+          {carried ? <OngoingPlan carried={carried} /> : (<>
           <div className="flex flex-col items-center text-center gap-4 mb-12">
             <span className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-ink-faint">
               Plans
@@ -548,13 +590,13 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
                 plan={plan}
                 period={period}
                 isPending={pendingPlan === plan.id}
-                carriedLabel={carried && carried.plan === plan.id && carried.period === period ? 'Use your paid time' : null}
                 onChoose={choose}
                 busyPlan={busyPlan}
                 delay={`${900 + i * 100}ms`}
               />
             ))}
           </div>
+          </>)}
 
           {/* Closing reassurance, in the page's own bento language. Replaces
               what used to be a billing disclosure panel; the shape is kept
