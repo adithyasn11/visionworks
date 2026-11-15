@@ -7,11 +7,11 @@
 // behind them. Anyone in the organisation can read it; the CSV export is audited on the server.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Download, ListFilter, Loader2 } from 'lucide-react';
+import { ChevronRight, Download, ListFilter, Loader2 } from 'lucide-react';
 import { downloadExport, listDecisions, listEvents } from '../../lib/safetyApi';
 import { listSafetyZones } from '../../lib/safety/management';
 import { describeZoneEvent, workerLabel } from '../../lib/zoneEvents';
-import DecisionDetail from './DecisionDetail';
+import DecisionModal from './DecisionModal';
 import { BTN_QUIET, INPUT, Notice, Panel, ReviewChip, SeverityChip, StatusChip, confidenceText, fmtTime, Skeleton } from './common';
 
 const PAGE = 25;
@@ -124,13 +124,12 @@ export default function EventsScreen({ role }) {
 
       {tab === 'decisions' ? (
         <ul className="flex flex-col divide-y divide-line-soft" aria-label="Decisions, newest first">
-          {data.rows.map((d) => {
-            const isOpen = open === d.id;
+          {data.rows.map((d, i) => {
             return (
               <li key={d.id} className="py-4 first:pt-1 last:pb-1">
-                <button type="button" onClick={() => setOpen(isOpen ? null : d.id)} aria-expanded={isOpen}
+                <button type="button" onClick={() => setOpen(i)} aria-haspopup="dialog"
                   className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 text-left text-[0.8125rem] rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]">
-                  {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" /> : <ChevronRight className="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" />}
+                  <ChevronRight className="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" />
                   <span className="font-mono text-ink-faint tabular-nums w-32">{fmtTime(d.observedAt)}</span>
                   <StatusChip status={d.status} />
                   {d.status !== 'COMPLIANT' && <ReviewChip state={d.reviewState} />}
@@ -140,7 +139,7 @@ export default function EventsScreen({ role }) {
                   {confidenceText(d) && <span className="text-ink-faint">{confidenceText(d)}</span>}
                   <span className="basis-full pl-6 pt-0.5 text-ink leading-relaxed">{d.reason}</span>
                 </button>
-                {isOpen && <div className="mt-4 sm:pl-6"><DecisionDetail decisionId={d.id} role={role} onChanged={load} /></div>}
+                
               </li>
             );
           })}
@@ -159,6 +158,10 @@ export default function EventsScreen({ role }) {
             );
           })}
         </ul>
+      )}
+
+      {tab === 'decisions' && open !== null && data.rows[open] && (
+        <DecisionModal items={data.rows} index={open} onIndex={setOpen} onClose={() => setOpen(null)} role={role} onChanged={() => load()} />
       )}
 
       {(offset > 0 || data.next != null) && (

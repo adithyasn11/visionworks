@@ -7,12 +7,13 @@
 // review function (audited, role-checked there), so a view-only member sees the queue but no controls.
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, ClipboardCheck, Loader2 } from 'lucide-react';
+import { ArrowRight, ClipboardCheck, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { listDecisions } from '../../lib/safetyApi';
 import { can } from '../../lib/permissions';
 import { workerLabel } from '../../lib/zoneEvents';
-import DecisionDetail from './DecisionDetail';
-import { BTN_QUIET, Notice, Panel, SeverityChip, confidenceText, fmtTime, Skeleton } from './common';
+import DecisionModal from './DecisionModal';
+import { ruleTypeMeta } from '../../lib/safety/ruleTypes';
+import { BTN_QUIET, Notice, Panel, SeverityChip, fmtTime, Skeleton } from './common';
 
 const PAGE = 20;
 
@@ -38,11 +39,14 @@ export default function ReviewQueue({ role, onCountChange }) {
     setState((s) => ({ ...s, items: [...s.items, ...r.data.decisions.filter((d) => !s.items.some((x) => x.id === d.id))], next: r.data.next_offset, error: null }));
   }
 
-  // A reviewed flag leaves the queue; the badge and the overview follow.
+  // A reviewed flag leaves the queue; the window moves on to the next one (or closes when none is left).
   function reviewed(id) {
     // The server's pending list shrinks by one too, so the next page starts one place earlier.
-    setState((s) => ({ ...s, items: s.items.filter((d) => d.id !== id), total: Math.max(0, s.total - 1), next: s.next == null ? s.next : Math.max(0, s.next - 1) }));
-    setOpen(null);
+    setState((s) => {
+      const items = s.items.filter((d) => d.id !== id);
+      setOpen((i) => (i === null || items.length === 0 ? null : Math.min(i, items.length - 1)));
+      return { ...s, items, total: Math.max(0, s.total - 1), next: s.next == null ? s.next : Math.max(0, s.next - 1) };
+    });
     if (onCountChange) onCountChange();
   }
 
@@ -56,34 +60,40 @@ export default function ReviewQueue({ role, onCountChange }) {
       {!state.loading && !state.error && state.items.length === 0 && (
         <p className="text-[0.8125rem] text-ink-muted leading-relaxed">Nothing to review. New flags will appear here.</p>
       )}
-      <ul className="flex flex-col divide-y divide-line-soft" aria-label="Flags waiting for review, oldest first">
-        {state.items.map((d) => {
-          const isOpen = open === d.id;
+      {/* One card per flag; a card opens the flag in a window with its picture and everything about it. */}
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Flags waiting for review, oldest first">
+        {state.items.map((d, i) => {
+          const kind = (ruleTypeMeta(d.ruleType) || {}).label || 'Safety check';
+          const where = [d.camera && d.camera.name, d.zone && d.zone.name].filter(Boolean).join(' · ');
           return (
-            <li key={d.id} className="py-4 first:pt-1 last:pb-1">
+            <li key={d.id}>
               <button
                 type="button"
-                onClick={() => setOpen(isOpen ? null : d.id)}
-                aria-expanded={isOpen}
-                className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 text-left text-[0.8125rem] rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
+                onClick={() => setOpen(i)}
+                className="w-full h-full text-left rounded-2xl border border-line bg-surface p-4 flex flex-col gap-2.5 hover:border-[color:var(--accent)] hover:-translate-y-0.5 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]"
               >
-                {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" /> : <ChevronRight className="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" />}
-                <SeverityChip severity={d.severity} />
-                <span className="text-ink font-medium">{workerLabel(d.workerKey)}</span>
-                <span className="text-ink-muted">{[d.camera && d.camera.name, d.zone && d.zone.name].filter(Boolean).join(' · ') || 'Unknown location'}</span>
-                {confidenceText(d) && <span className="text-ink-faint">{confidenceText(d)}</span>}
-                <span className="ml-auto font-mono text-xs text-ink-faint tabular-nums">{fmtTime(d.observedAt)}</span>
-                <span className="basis-full pl-6 pt-0.5 text-ink leading-relaxed">{d.reason}</span>
+                <span className="flex items-center justify-between gap-2">
+                  <SeverityChip severity={d.severity} />
+                  <span className="font-mono text-xs text-ink-faint tabular-nums">{fmtTime(d.observedAt)}</span>
+                </span>
+                <span className="text-[0.9375rem] font-black text-ink">{kind}</span>
+                <span className="text-[0.8125rem] text-ink-muted">{workerLabel(d.workerKey)}{where ? ` · ${where}` : ''}</span>
+                <span className="text-[0.8125rem] text-ink-muted leading-snug line-clamp-2">{d.reason}</span>
+                <span className="mt-auto pt-1 flex items-center justify-between text-[0.8125rem]">
+                  <span className="inline-flex items-center gap-1.5 text-ink-faint">
+                    {d.has_picture && <><ImageIcon className="w-3.5 h-3.5" aria-hidden="true" /> Picture</>}
+                  </span>
+                  <span className="inline-flex items-center gap-1 font-bold text-accent">Open <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" /></span>
+                </span>
               </button>
-              {isOpen && (
-                <div className="mt-4 pl-0 sm:pl-6">
-                  <DecisionDetail decisionId={d.id} role={role} onChanged={() => reviewed(d.id)} />
-                </div>
-              )}
             </li>
           );
         })}
       </ul>
+      {open !== null && state.items[open] && (
+        <DecisionModal items={state.items} index={open} onIndex={setOpen} onClose={() => setOpen(null)} role={role}
+          onChanged={(id, updated) => { if (updated && updated.reviewState && updated.reviewState !== 'PENDING') reviewed(id); }} />
+      )}
       {state.next !== null && state.next !== undefined && (
         <button type="button" onClick={more} disabled={loadingMore} className={`${BTN_QUIET} mt-3`}>
           {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />} Show the next {PAGE}

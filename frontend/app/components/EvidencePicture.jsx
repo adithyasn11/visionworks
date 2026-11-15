@@ -10,7 +10,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Image as ImageIcon, X } from 'lucide-react';
 import { loadEvidence } from '../lib/evidence';
 
-export default function EvidencePicture({ decisionId }) {
+export default function EvidencePicture({ decisionId, fill = false }) {
   const [state, setState] = useState({ open: false, loading: false, url: null, error: null });
   // Which request is current. A reply that arrives after the picture was closed (or the row
   // went away) is dropped, and its object URL released, rather than reopening the picture.
@@ -40,9 +40,29 @@ export default function EvidencePicture({ decisionId }) {
     setState({ open: true, loading: false, url: result.url || null, error: result.error || null });
   }
 
+  // In the review window the picture is the point of opening it: load it straight away (one audited view).
+  useEffect(() => { if (fill) open(); }, [fill, decisionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function close() {
     request.current += 1;
     setState({ open: false, loading: false, url: null, error: null });
+  }
+
+  if (fill) {
+    return (
+      <div className="w-full h-full flex items-center justify-center" aria-live="polite">
+        {state.loading && <div role="status" aria-busy="true" className="skeleton w-3/4 aspect-video rounded-lg"><span className="sr-only">Loading the picture…</span></div>}
+        {state.error && <p className="px-6 text-center text-[0.875rem] text-white/70">{state.error}</p>}
+        {state.url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={state.url}
+            alt="The frame the system flagged, with faces blurred and the person, zone and detected helmet and vest outlined"
+            className="w-full h-full object-contain"
+          />
+        )}
+      </div>
+    );
   }
 
   if (!state.open) {

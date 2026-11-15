@@ -309,7 +309,7 @@ function ActionForm({ decision, onCreated }) {
   );
 }
 
-export default function DecisionDetail({ decisionId, role, onChanged }) {
+export default function DecisionDetail({ decisionId, role, onChanged, split = false }) {
   const [state, setState] = useState({ loading: true, decision: null, error: null });
   const [events, setEvents] = useState(null);
   const [actions, setActions] = useState([]);
@@ -355,20 +355,22 @@ export default function DecisionDetail({ decisionId, role, onChanged }) {
   if (state.error) return <Notice tone="error">{state.error}</Notice>;
 
   const flag = decision.status !== 'COMPLIANT';
-  return (
-    <div className="flex flex-col gap-5 rounded-xl border border-line bg-surface-alt/40 p-4 sm:p-5">
+  const picture = decision.has_picture
+    ? (canEvidence
+      ? <EvidencePicture decisionId={decision.id} fill={split} />
+      : <p className={`text-xs ${split ? 'text-white/70 px-6 text-center' : 'text-ink-faint'}`}>A picture was kept. Only an administrator or manager can open it.</p>)
+    : (split ? <p className="text-[0.875rem] text-white/60">No picture was kept for this one.</p> : null);
+  const column = (
+    <div className={split ? 'flex flex-col gap-5 p-5 min-h-0 overflow-y-auto' : 'flex flex-col gap-5 rounded-xl border border-line bg-surface-alt/40 p-4 sm:p-5'}>
       {/* The row this opens under already says who, where, when and why; here it is only the state, which a review changes. */}
       <div className="flex flex-wrap items-center gap-2">
         <StatusChip status={decision.status} />
         <ReviewChip state={decision.reviewState} />
         {decision.status === 'POTENTIAL_VIOLATION' && <SeverityChip severity={decision.severity} />}
       </div>
-      <p className="text-xs text-ink-faint">
-        A flag is a prompt for a person to look at the evidence, never a final verdict. {decision.status === 'UNVERIFIABLE' && 'The system could not tell, and did not guess.'}
-      </p>
+      {decision.status === 'UNVERIFIABLE' && <p className="text-xs text-ink-faint">The system could not tell, and did not guess.</p>}
 
-      {decision.has_picture && canEvidence && <EvidencePicture decisionId={decision.id} />}
-      {decision.has_picture && !canEvidence && <p className="text-xs text-ink-faint">A picture was kept. Only an administrator or manager can open it.</p>}
+      {!split && picture}
 
       <Section title="What was measured" icon={ListChecks}><Evidence evidence={decision.evidence} ruleType={decision.ruleType} /></Section>
       {decision.thresholds && <MoreInfo summary="The limits it was judged by"><Thresholds thresholds={decision.thresholds} /></MoreInfo>}
@@ -415,6 +417,13 @@ export default function DecisionDetail({ decisionId, role, onChanged }) {
           {decision.reviewState === 'CONFIRMED' && canActions && <ActionForm decision={decision} onCreated={loadActions} />}
         </Section>
       )}
+    </div>
+  );
+  if (!split) return column;
+  return (
+    <div className="grid h-full min-h-0 grid-rows-[minmax(12rem,40%)_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(22rem,1fr)]">
+      <div className="bg-black flex items-center justify-center min-h-0 p-2">{picture}</div>
+      {column}
     </div>
   );
 }
