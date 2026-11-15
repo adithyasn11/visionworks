@@ -317,7 +317,7 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
               )}
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-[0.625rem] font-black uppercase tracking-[0.12em] opacity-45">
                   Started
@@ -486,7 +486,7 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
           )}
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {PLANS.map((p) => {
             const active = p.id === plan;
             const confirming = pending === p.id;

@@ -273,7 +273,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
           </ul>
         )}
         {canEditSites && (
-          <form onSubmit={submitSite} className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] items-end">
+          <form onSubmit={submitSite} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] items-end">
             <label className="grid gap-1 text-[0.78125rem] font-semibold text-ink-muted">
               New site
               <input

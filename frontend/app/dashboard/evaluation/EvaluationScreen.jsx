@@ -323,7 +323,7 @@ export default function EvaluationScreen() {
       )}
 
       <Panel title="How to read this page" icon={FlaskConical} aside={updated}>
-        <dl className="grid gap-3 sm:grid-cols-3 text-[0.8125rem] leading-relaxed">
+        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-[0.8125rem] leading-relaxed">
           <div><dt className="font-bold text-ink">False accusation</dt><dd className="text-ink-muted">Flagging someone who was wearing the item. The error that matters most.</dd></div>
           <div><dt className="font-bold text-ink">Abstaining</dt><dd className="text-ink-muted">Saying it could not tell. Not an error: the system refuses to guess.</dd></div>
           <div><dt className="font-bold text-ink">Coverage</dt><dd className="text-ink-muted">How often the system gave a verdict. A zero is shown with its 95 % upper bound.</dd></div>

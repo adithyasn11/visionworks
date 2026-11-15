@@ -285,7 +285,7 @@ export default async function PlatformOperatorsPage() {
         <h2 className="text-[0.9375rem] font-bold tracking-tight text-ink mb-3">
           What platform access allows
         </h2>
-        <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
           <div>
             <p className="font-mono text-[0.65625rem] uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400 mb-1.5">
               can see

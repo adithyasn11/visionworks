@@ -120,7 +120,7 @@ export default function CheckoutScreen({
           Back to plans
         </Link>
 
-        <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-5 items-start">
 
           {/* ── ORDER SUMMARY ───────────────────────────────────────────── */}
           <div
@@ -210,7 +210,7 @@ export default function CheckoutScreen({
 
               <div className="flex flex-col gap-4">
                 <span className="text-[0.8125rem] font-black text-ink">What’s included</span>
-                <ul className="grid sm:grid-cols-2 gap-3">
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {included.map((f) => (
                     <li key={f.text} className="flex items-start gap-3">
                       <CheckCircle2 className="w-[18px] h-[18px] text-accent shrink-0 mt-0.5" aria-hidden="true" />

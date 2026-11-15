@@ -58,7 +58,7 @@ export default function PlansPage() {
               ))}
             </div>
           </div>
-          <div className="grid lg:grid-cols-3 gap-5 lg:items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:items-start">
             {PLANS.map((plan, i) => (
               <PlanCard key={plan.id} plan={plan} period={period} isPending={false} onChoose={choose} busyPlan={busyPlan}
                 delay={`${150 + i * 100}ms`} />

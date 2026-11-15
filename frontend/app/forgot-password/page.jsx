@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="themed auth-screen bg-ground text-ink font-sans">
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] h-full">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] h-full">
         <AuthAside {...ASIDE} />
         <main className="auth-pane flex flex-col">
           <div className="flex items-center justify-between">

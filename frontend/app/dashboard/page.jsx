@@ -421,6 +421,8 @@ function DashboardInner() {
             cameraId={cameraId}
             activeZones={activeZones}
             planUsage={planUsage}
+            role={role}
+            onAlertsChanged={refreshOverview}
             onNavigate={(v) => {
               // Members lives on its own page; everything else is a section of this one.
               if (v === 'members') { window.location.assign('/settings/members'); return; }

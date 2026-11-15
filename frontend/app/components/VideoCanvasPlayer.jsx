@@ -676,7 +676,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     : <Video className="w-3.5 h-3.5 text-ink-muted" />;
 
   return (
-    <div ref={containerRef} className="glass-panel p-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem] lg:h-[calc(100dvh-10.5rem)] lg:min-h-[30rem] relative group min-w-0">
+    <div ref={containerRef} className="glass-panel p-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_17rem] lg:h-[calc(100dvh-10.5rem)] lg:min-h-[30rem] relative group min-w-0">
       {/* Hidden HTML5 Video element for webcam capture */}
       <video ref={hiddenVideoRef} className="hidden" playsInline muted />
       <div className="flex flex-col gap-3 min-w-0 min-h-0">

@@ -9,11 +9,11 @@ export default function Loading() {
     <SkeletonPage>
       <SkeletonHeader withAction />
       <SkeletonTiles count={6} />
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
         <SkeletonCard tall headerWidth="w-52" />
         <SkeletonCard rows={3} headerWidth="w-36" />
       </div>
-      <div className="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
         <SkeletonCard rows={5} headerWidth="w-32" />
         <SkeletonCard rows={3} headerWidth="w-24" />
       </div>

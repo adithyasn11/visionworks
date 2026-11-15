@@ -102,7 +102,7 @@ export default function EvidencePicture({ decisionId, fill = false }) {
         <img
           src={state.url}
           alt="The frame the system flagged, with faces blurred and the person, zone and detected helmet and vest outlined"
-          className="w-full rounded-md border border-line"
+          className="max-w-full max-h-[60vh] w-auto mx-auto rounded-md border border-line"
         />
       )}
     </figure>

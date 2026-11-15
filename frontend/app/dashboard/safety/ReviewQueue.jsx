@@ -61,7 +61,7 @@ export default function ReviewQueue({ role, onCountChange }) {
         <p className="text-[0.8125rem] text-ink-muted leading-relaxed">Nothing to review. New flags will appear here.</p>
       )}
       {/* One card per flag; a card opens the flag in a window with its picture and everything about it. */}
-      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Flags waiting for review, oldest first">
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Flags waiting for review, oldest first">
         {state.items.map((d, i) => {
           const kind = (ruleTypeMeta(d.ruleType) || {}).label || 'Safety check';
           const where = [d.camera && d.camera.name, d.zone && d.zone.name].filter(Boolean).join(' · ');

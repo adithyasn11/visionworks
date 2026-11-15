@@ -102,7 +102,7 @@ function SetupSteps({ steps, onNavigate }) {
   return (
     <div className={`${CARD} p-7 sm:p-8`}>
       <CardHead icon={Sparkles} title="Get your first check running" aside={`${steps.filter((s) => s.done).length} of ${steps.length} done`} />
-      <ol className="grid md:grid-cols-3 gap-4">
+      <ol className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {steps.map((s, i) => (
           <li key={s.title}>
             <button
@@ -131,6 +131,7 @@ function SetupSteps({ steps, onNavigate }) {
 
 export default function OverviewScreen({
   user, orgName, days, rangeLabel, actions, refreshKey, alerts, cameras, activeZones, cameraId, planUsage, onNavigate,
+  role = null, onAlertsChanged,
 }) {
   const [state, setState] = useState({ loading: true, data: null, error: null });
 
@@ -299,7 +300,7 @@ export default function OverviewScreen({
                   {zones.map((z) => (
                     <li key={z.zone_id || z.zone}>
                       <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-[0.9375rem] font-bold text-ink truncate">{z.zone}</span>
+                        <span className="text-[0.9375rem] font-bold text-ink truncate">{z.zone === 'No zone' ? 'Anywhere in view' : z.zone}</span>
                         <span className="text-[0.8125rem] text-ink-muted tabular-nums shrink-0">
                           <span className={z.potential_violations ? 'text-accent font-bold' : ''}>{z.potential_violations}</span> of {z.decisions} flagged
                         </span>
@@ -332,7 +333,7 @@ export default function OverviewScreen({
 
       {/* What is waiting, newest first (unchanged list, so a flag reads the same everywhere). */}
       {(waiting > 0 || alerts.status === 'error') && (
-        <SafetyAlertsPanel status={alerts.status} count={alerts.count} alerts={alerts.alerts.slice(0, 3)} error={alerts.error} onReview={() => onNavigate('review')} />
+        <SafetyAlertsPanel status={alerts.status} count={alerts.count} alerts={alerts.alerts.slice(0, 3)} error={alerts.error} onReview={() => onNavigate('review')} role={role} onChanged={onAlertsChanged} />
       )}
     </div>
   );

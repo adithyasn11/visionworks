@@ -22,7 +22,7 @@ export default function Loading() {
       aria-busy="true"
     >
       <span className="sr-only">Loading setup…</span>
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] min-h-screen">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] min-h-screen">
         {/* Left panel is permanently dark in both themes, like AuthAside. */}
         <div className="hidden lg:block card-dark" />
 

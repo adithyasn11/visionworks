@@ -8,10 +8,10 @@
 
 import React from 'react';
 import { Skeleton } from './safety/common';
-import { ShieldAlert, ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, AlertCircle, ArrowRight, Image as ImageIcon } from 'lucide-react';
 import { severityMeta } from '../lib/alerts';
 import { workerLabel } from '../lib/zoneEvents';
-import EvidencePicture from '../components/EvidencePicture';
+import DecisionModal from './safety/DecisionModal';
 
 const BADGE = {
   critical: 'bg-accent text-white border-[color:var(--accent)]',
@@ -25,8 +25,12 @@ function when(iso) {
   return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function SafetyAlertsPanel({ status, count, alerts, error, onReview }) {
+export default function SafetyAlertsPanel({ status, count, alerts, error, onReview, role, onChanged }) {
   const open = count > 0;
+  const [shown, setShown] = React.useState(null);
+  // The rows in the shape the review window reads (the same flags the Review queue lists).
+  const items = alerts.map((a) => ({ id: a.id, severity: a.severity, status: 'POTENTIAL_VIOLATION', reason: a.reason, confidence: a.confidence,
+    observedAt: a.observedAt, workerKey: a.workerKey, camera: a.camera ? { name: a.camera } : null, zone: a.zone ? { name: a.zone } : null }));
   return (
     <section
       className={`glass-panel px-5 sm:px-6 py-5 themed ${open ? 'border-[color:var(--accent)]' : ''}`}
@@ -74,7 +78,9 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
           {alerts.map((a) => {
             const meta = severityMeta(a.severity);
             return (
-              <li key={a.id} className="flex flex-col gap-2 py-4 first:pt-1 text-[0.8125rem]">
+              <li key={a.id} className="first:pt-0">
+                <button type="button" onClick={() => setShown(alerts.indexOf(a))}
+                  className="w-full text-left flex flex-col gap-1.5 py-3 text-[0.8125rem] rounded-lg hover:bg-surface-alt/60 px-2 -mx-2 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className={`px-2 py-0.5 rounded-md border text-[0.6875rem] font-bold uppercase tracking-wide ${BADGE[meta.tone]}`}>
                     {meta.label}
@@ -86,8 +92,12 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
                   <span className="text-ink-faint font-mono tabular-nums">{when(a.observedAt)}</span>
                   {Number(a.confidence) > 0 && <span className="text-ink-faint">{Math.round(a.confidence * 100)}% sure</span>}
                 </div>
-                <p className="text-ink leading-relaxed">{a.reason}</p>
-                {a.hasPicture && <div className="flex flex-col"><EvidencePicture decisionId={a.id} /></div>}
+                <p className="text-ink leading-relaxed line-clamp-2">{a.reason}</p>
+                <span className="flex items-center justify-between text-ink-faint">
+                  <span className="inline-flex items-center gap-1.5">{a.hasPicture && <><ImageIcon className="w-3.5 h-3.5" aria-hidden="true" /> Picture</>}</span>
+                  <span className="inline-flex items-center gap-1 font-bold text-accent">Open <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" /></span>
+                </span>
+                </button>
               </li>
             );
           })}
@@ -98,6 +108,10 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
           They stay listed until someone reviews them.{onReview ? ' ' : ''}
           {onReview && <button type="button" onClick={onReview} className="underline text-ink hover:text-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)] rounded">Open the Review queue</button>}
         </p>
+      )}
+      {shown !== null && items[shown] && (
+        <DecisionModal items={items} index={shown} onIndex={setShown} onClose={() => setShown(null)} role={role}
+          onChanged={(id, updated) => { if (updated && updated.reviewState && updated.reviewState !== 'PENDING' && onChanged) { setShown(null); onChanged(); } }} />
       )}
       {status === 'ready' && count > alerts.length && (
         <p className="mt-2 text-xs text-ink-faint">Showing the newest {alerts.length} of {count}.</p>

@@ -188,7 +188,7 @@ function SignupForm() {
 
   return (
     <div className="themed auth-screen bg-ground text-ink font-sans selection:bg-red-600 selection:text-white">
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] h-full">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] h-full">
 
         {/* LEFT — editorial panel */}
         <AuthAside {...ASIDE} />

@@ -251,7 +251,7 @@ function OngoingPlan({ carried }) {
           </div>
         </div>
         {plan && (
-          <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-3 border-t border-line-soft pt-6">
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 border-t border-line-soft pt-6">
             {plan.features.filter((f) => f.included).map((f) => (
               <li key={f.text} className="flex items-center gap-2.5 text-[0.875rem] font-bold text-ink-muted">
                 <CheckCircle2 className="w-[18px] h-[18px] text-accent shrink-0" aria-hidden="true" />
@@ -583,7 +583,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
 
           {/* items-start so the featured card's -translate-y does not stretch
               its neighbours to match. */}
-          <div className="grid lg:grid-cols-3 gap-5 lg:items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:items-start">
             {PLANS.map((plan, i) => (
               <PlanCard
                 key={plan.id}

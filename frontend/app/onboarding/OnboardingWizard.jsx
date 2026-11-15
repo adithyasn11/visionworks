@@ -373,7 +373,7 @@ export default function OnboardingWizard({ firstName, email, pendingPlan = null,
 
   return (
     <div className="themed min-h-screen bg-ground text-ink font-sans selection:bg-red-600 selection:text-white">
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] min-h-screen">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] min-h-screen">
 
         {/* LEFT — the same editorial panel as sign-up, so this reads as the
             final screen of registration rather than a separate product. */}

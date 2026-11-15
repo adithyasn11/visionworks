@@ -121,13 +121,13 @@ export default async function PlatformOverviewPage() {
       </section>
 
       {/* ── Chart + attention, side by side on wide screens ── */}
-      <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
         <SignupsChart data={signups ?? []} />
         <AttentionList items={attention} />
       </div>
 
       {/* ── Recent signups + live activity ── */}
-      <div className="grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
         <RecentSignups orgs={orgs} />
 
         <div className="space-y-3">

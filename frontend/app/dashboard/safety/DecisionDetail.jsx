@@ -421,7 +421,7 @@ export default function DecisionDetail({ decisionId, role, onChanged, split = fa
   );
   if (!split) return column;
   return (
-    <div className="grid h-full min-h-0 grid-rows-[minmax(12rem,40%)_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(22rem,1fr)]">
+    <div className="grid grid-cols-1 h-full min-h-0 grid-rows-[minmax(12rem,40%)_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(22rem,1fr)]">
       <div className="bg-black flex items-center justify-center min-h-0 p-2">{picture}</div>
       {column}
     </div>
