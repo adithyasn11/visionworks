@@ -108,3 +108,10 @@ backend/evidence/
 
 # Ultralytics Construction-PPE export (signed, expiring image links); the images live in ppe_training/datasets/ (ignored)
 construction-ppe.ndjson
+
+# The trained helmet/vest detector IS committed (about 52 MB): it cannot be downloaded from anywhere,
+# and the safety checks do not work without it. Everything else above stays ignored.
+!backend/models/ppe_yolov8m_ft1.pt
+
+# The keys file you send privately to someone setting VisionWorks up (see SETUP.md). Never committed.
+visionworks-keys.env

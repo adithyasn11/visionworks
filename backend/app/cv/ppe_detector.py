@@ -22,7 +22,10 @@ _BASE_WEIGHTS = os.path.join(_RUNS, "ppe_yolov8m_v1", "weights", "best.pt")
 # images it wrongly reads a worn helmet/vest as absent about 6x less often.
 # Used when present; otherwise the original model. PPE_MODEL_PATH overrides both.
 _TUNED_WEIGHTS = os.path.join(_RUNS, "ppe_yolov8m_ft1", "weights", "best.pt")
-DEFAULT_WEIGHTS = _TUNED_WEIGHTS if os.path.isfile(_TUNED_WEIGHTS) else _BASE_WEIGHTS
+# The same fine-tuned weights, committed to git (backend/models/), so a fresh clone works without the training runs.
+_SHIPPED_WEIGHTS = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), "..", "..", "models", "ppe_yolov8m_ft1.pt"))
+DEFAULT_WEIGHTS = next((w for w in (_TUNED_WEIGHTS, _SHIPPED_WEIGHTS) if os.path.isfile(w)), _BASE_WEIGHTS)
 
 # Low floor on purpose: the evidence layer needs to see weak (0.20-0.45)
 # detections to tell "ambiguous" from "nothing there".
