@@ -37,8 +37,7 @@ export default function ZoneActivity({ events, zones = [] }) {
 
       {events.length === 0 ? (
         <p className="text-[0.8125rem] text-ink-muted leading-relaxed">
-          Nothing yet. Entries and exits appear here for Restricted, PPE checkpoint, Approach and Exit
-          zones. General zones are not tracked.
+          Nothing yet.
         </p>
       ) : (
         <ul

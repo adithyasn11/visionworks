@@ -77,6 +77,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   const [recordedAt, setRecordedAt] = useState('');
   // The phone panel opens from the source buttons; it pairs and controls the phone, its picture lands here.
   const [phoneOpen, setPhoneOpen] = useState(false);
+  const [phoneLive, setPhoneLive] = useState(false);
   const [sessionId, setSessionId] = useState('');
   const [progress, setProgress] = useState(0);
   const [currentTimeSec, setCurrentTimeSec] = useState(0);
@@ -675,10 +676,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     : <Video className="w-3.5 h-3.5 text-ink-muted" />;
 
   return (
-    <div ref={containerRef} className="glass-panel p-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem] items-start relative group min-w-0">
+    <div ref={containerRef} className="glass-panel p-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem] lg:h-[calc(100dvh-10.5rem)] lg:min-h-[30rem] relative group min-w-0">
       {/* Hidden HTML5 Video element for webcam capture */}
       <video ref={hiddenVideoRef} className="hidden" playsInline muted />
-      <div className="flex flex-col gap-3 min-w-0">
+      <div className="flex flex-col gap-3 min-w-0 min-h-0">
 
       {/* ── Header: what this is, and what it is doing right now ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -717,10 +718,10 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
             </span>
           )}
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.6875rem] font-black uppercase tracking-[0.1em] ${
-            isWebcamActive ? 'bg-accent text-white' : phase === 'processing' ? 'bg-accent-soft text-accent' : 'bg-surface-alt text-ink-faint border border-line'
+            (isWebcamActive || phoneLive) ? 'bg-accent text-white' : phase === 'processing' ? 'bg-accent-soft text-accent' : 'bg-surface-alt text-ink-faint border border-line'
           }`}>
-            {(isWebcamActive || phase === 'processing') && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
-            {isWebcamActive ? 'Live' : phase === 'processing' ? `Analysing ${Math.round(progress)}%` : phase === 'uploading' ? 'Uploading' : phase === 'done' ? 'Finished' : 'Idle'}
+            {(isWebcamActive || phoneLive || phase === 'processing') && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
+            {(isWebcamActive || phoneLive) ? 'Live' : phase === 'processing' ? `Analysing ${Math.round(progress)}%` : phase === 'uploading' ? 'Uploading' : phase === 'done' ? 'Finished' : 'Idle'}
           </span>
           <button
             onClick={handleReset}
@@ -742,7 +743,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       />
 
       {/* ── Where the picture comes from: three equal choices ── */}
-      {!readOnly && (
+      {!readOnly && !phoneLive && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {isWebcamActive ? (
             <button
@@ -811,13 +812,14 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           activeZones={activeZones}
           onFrame={handleFrame}
           open={phoneOpen}
-          onClose={() => setPhoneOpen(false)}
+          onClose={() => { setPhoneOpen(false); setPhoneLive(false); }}
+          onLiveChange={setPhoneLive}
         />
       )}
 
       {/* Status Bar */}
-      {(fileName || statusMsg || isWebcamActive) && (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-alt/80 border border-line-soft text-xs text-ink-muted font-mono">
+      {(phase === 'error' || /error|could not|stopped|not sending|failed|refused/i.test(String(statusMsg || ''))) && (
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent-soft border border-[color:var(--accent)] text-[0.8125rem] text-ink">
           {PhaseIcon}
           <span className="truncate">
             {isWebcamActive ? `🔴 ${isNetworkCamera ? 'NETWORK CAMERA' : 'LIVE WEBCAM FEED'} — ${statusMsg}` : (statusMsg || fileName)}
@@ -831,39 +833,19 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       {/* Main Canvas Player Display */}
       <div
         ref={stageRef}
-        className={`relative overflow-hidden bg-ground group/canvas ${
+        className={`relative overflow-hidden group/canvas ${
           isFullscreen
-            ? 'flex items-center justify-center w-screen h-screen'
-            : 'rounded-xl border border-line shadow-2xl'
+            ? 'w-screen h-screen bg-black'
+            // Fills whatever height is left in the card (wide screens); a 16:9 box on a phone.
+            : 'bg-ground rounded-xl border border-line aspect-video lg:aspect-auto lg:flex-1 lg:min-h-0'
         }`}
       >
-        {/*
-          CAP THE HEIGHT, NOT JUST THE WIDTH.
-
-          `w-full h-auto` alone is fine for 16:9 laptop video, but a phone held
-          upright sends a PORTRAIT frame — the canvas takes its intrinsic size
-          from whatever arrives, so at full width that renders taller than the
-          screen and pushes every control below the fold.
-
-          object-contain keeps the whole frame visible and letterboxes the
-          remainder, rather than cropping people out of the edges of a feed
-          whose whole purpose is watching them.
-        */}
         <canvas
           ref={canvasRef}
           width={960}
           height={540}
-          className={
-            isFullscreen
-              // The cap exists to stop a tall frame overflowing the PAGE. In
-              // fullscreen there is no page to overflow, and keeping it would
-              // pin the video to 70% of the screen — the one place the user
-              // explicitly asked for all of it.
-              ? 'max-w-full max-h-full w-auto h-auto object-contain block'
-              : 'w-full h-auto object-contain block mx-auto'
-          }
-          // Sized to the window, so the picture AND the play controls under it fit on a 768-pixel laptop screen.
-          style={isFullscreen ? undefined : { maxHeight: `max(12rem, calc(100vh - ${phoneOpen ? 34 : 24}rem))` }}
+          // Fitted inside the box, upright or sideways, never cropped; in full screen the box is the screen.
+          className="absolute inset-0 w-full h-full object-contain block"
         />
 
         {/*
@@ -996,22 +978,22 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
       </div>
 
       {/* Side column: what is in view now, what was decided, and where people were seen. */}
-      <aside className="flex flex-col gap-3 min-w-0 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pr-1">
+      <aside className="flex flex-col gap-3 min-w-0 min-h-0 lg:overflow-y-auto lg:pr-1">
         <div className="grid grid-cols-2 gap-2">
           {[
             { label: 'In view', value: stats.detected, accent: false },
             { label: 'Flagged', value: stats.flagged, accent: stats.flagged > 0 },
           ].map(({ label, value, accent }) => (
             <div key={label} className="rounded-xl border border-line bg-surface px-3 py-2.5">
-              <p className={`text-2xl font-black tabular-nums leading-none ${accent ? 'text-accent' : 'text-ink'}`}>{(phase === 'processing' || isWebcamActive) ? value : 0}</p>
+              <p className={`text-2xl font-black tabular-nums leading-none ${accent ? 'text-accent' : 'text-ink'}`}>{(phase === 'processing' || isWebcamActive || phoneLive) ? value : 0}</p>
               <p className="mt-1 text-[0.75rem] font-bold text-ink-muted">{label}</p>
             </div>
           ))}
         </div>
-        {safetyOn && (phase === 'processing' || isWebcamActive) && (
+        {safetyOn && (phase === 'processing' || isWebcamActive || phoneLive) && (
           <PpeStatus entities={ppeEntities} unavailable={ppeUnavailable} />
         )}
-        {safetyOn && (phase === 'processing' || phase === 'done' || isWebcamActive) && (
+        {safetyOn && (phase === 'processing' || phase === 'done' || isWebcamActive || phoneLive) && (
           <>
             <DecisionFeed decisions={decisions} zones={activeZones} />
             <ZoneActivity events={zoneEvents} zones={activeZones} />

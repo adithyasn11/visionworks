@@ -130,31 +130,22 @@ export default function CameraClient({ code }) {
     // it is the track that decides what the detector sees.
     setIsPortrait(video.videoHeight > video.videoWidth);
 
-    // SEND A LANDSCAPE FRAME EVEN WHEN THE PHONE IS HELD UPRIGHT.
-    //
-    // A portrait phone reports 720x1280, so scaling by width alone sent a
-    // 640x1138 frame: taller than the laptop screen, and the wrong shape for
-    // a pipeline built around a wide CCTV view — a tall frame spends most of
-    // its pixels on ceiling and floor.
-    //
-    // So the frame is fitted into a 16:9 box: the whole camera view is kept
-    // (letterboxed, never cropped — cropping would cut people out at the
-    // edges) and every frame arrives the same size regardless of how the
-    // phone happens to be held. That also keeps zone polygons meaningful,
-    // since they are stored in this pixel space and would otherwise shift
-    // the moment the phone rotated.
-    const SEND_HEIGHT = Math.round(SEND_WIDTH * 9 / 16);
-    canvas.width = SEND_WIDTH;
+    // The frame keeps the phone's own shape: upright phone, upright picture (360x640); sideways, 640x360.
+    // The long side stays 640 either way, so the detector's work per frame is the same.
+    const portrait = video.videoHeight > video.videoWidth;
+    const SEND_W = portrait ? Math.round(SEND_WIDTH * 9 / 16) : SEND_WIDTH;
+    const SEND_HEIGHT = portrait ? SEND_WIDTH : Math.round(SEND_WIDTH * 9 / 16);
+    canvas.width = SEND_W;
     canvas.height = SEND_HEIGHT;
     const ctx = canvas.getContext('2d');
 
-    const fit = Math.min(SEND_WIDTH / video.videoWidth,
+    const fit = Math.min(SEND_W / video.videoWidth,
                          SEND_HEIGHT / video.videoHeight);
     const dw = video.videoWidth * fit;
     const dh = video.videoHeight * fit;
     ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, SEND_WIDTH, SEND_HEIGHT);
-    ctx.drawImage(video, (SEND_WIDTH - dw) / 2, (SEND_HEIGHT - dh) / 2, dw, dh);
+    ctx.fillRect(0, 0, SEND_W, SEND_HEIGHT);
+    ctx.drawImage(video, (SEND_W - dw) / 2, (SEND_HEIGHT - dh) / 2, dw, dh);
 
     try {
       ws.send(JSON.stringify({

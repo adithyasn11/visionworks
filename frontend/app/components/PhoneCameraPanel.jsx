@@ -72,7 +72,7 @@ function phoneUrlFor(code, lanHost, phoneBase) {
   return `${window.location.protocol}//${host}${port}/camera/${code}`;
 }
 
-export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, activeZones = [], open: wanted = false, onClose }) {
+export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, activeZones = [], open: wanted = false, onClose, onLiveChange }) {
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState(null);
   const [lanHost, setLanHost] = useState(null);
@@ -338,6 +338,9 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
     teardown(true);      // keep the room, so one click restarts it
   }, [teardown]);
 
+  // The player shows the phone's picture, so it needs to know when the phone is live (counters, status).
+  useEffect(() => { if (onLiveChange) onLiveChange(streaming); }, [streaming, onLiveChange]);
+
   const startedRef = useRef(false);
   useEffect(() => {
     if (wanted && !startedRef.current) { startedRef.current = true; startPairing(); }
@@ -356,7 +359,7 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
   const BTN = 'inline-flex items-center gap-2 px-3.5 py-2 rounded-lg font-bold text-[0.8125rem] transition-colors';
 
   return (
-    <div className="rounded-2xl border border-line bg-surface-alt/50 px-4 py-3 flex flex-col gap-2">
+    <div className={`rounded-2xl border border-line bg-surface-alt/50 px-4 flex flex-col gap-2 ${paired ? 'py-2' : 'py-3'}`}>
     <div className="flex items-center gap-4">
       {noEntrance ? (
         <p className="flex-1 flex items-center gap-2 text-[0.875rem] text-ink">

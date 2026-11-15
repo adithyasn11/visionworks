@@ -44,8 +44,7 @@ export default function DecisionFeed({ decisions, zones = [] }) {
 
       {decisions.length === 0 ? (
         <p className="text-[0.8125rem] text-ink-muted leading-relaxed">
-          Nothing yet. Each time someone enters a Restricted zone, the safety rule for that zone is judged here.
-          A flag is a potential violation for a person to review, never a final verdict.
+          Nothing yet.
         </p>
       ) : (
         <ul
