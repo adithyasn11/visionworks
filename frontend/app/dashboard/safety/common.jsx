@@ -11,7 +11,7 @@ import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
 import { decisionStatus } from '../../lib/decisions';
 import { severityMeta } from '../../lib/alerts';
 
-const CHIP = 'inline-flex items-center px-2 py-0.5 rounded-md border text-[0.625rem] font-bold uppercase tracking-wide whitespace-nowrap';
+const CHIP = 'inline-flex items-center px-2 py-0.5 rounded-md border text-[0.6875rem] font-bold uppercase tracking-wide whitespace-nowrap';
 const TONE = {
   ok: 'border-line text-ink bg-surface-alt',
   alert: 'border-[color:var(--accent)] text-white bg-accent',
@@ -83,17 +83,17 @@ export function Notice({ tone = 'info', children, className = '' }) {
   const Icon = tone === 'error' ? AlertCircle : tone === 'ok' ? CheckCircle2 : Info;
   const box = tone === 'error' ? 'border-[color:var(--accent)] bg-accent-soft' : 'border-line bg-surface-alt';
   return (
-    <div role={tone === 'error' ? 'alert' : 'status'} className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs leading-relaxed text-ink-muted ${box} ${className}`}>
+    <div role={tone === 'error' ? 'alert' : 'status'} className={`flex items-start gap-2 rounded-lg border px-3.5 py-2.5 text-[0.8125rem] leading-relaxed text-ink-muted ${box} ${className}`}>
       <Icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${tone === 'error' ? 'text-accent' : 'text-ink-faint'}`} aria-hidden="true" />
       <div className="min-w-0">{children}</div>
     </div>
   );
 }
 
-export const BTN = 'inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]';
+export const BTN = 'inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg border text-[0.8125rem] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]';
 export const BTN_PRIMARY = `${BTN} bg-accent text-white border-[color:var(--accent)] hover:brightness-110`;
 export const BTN_QUIET = `${BTN} bg-surface-alt text-ink-muted border-line hover:text-ink hover:border-field`;
-export const INPUT = 'rounded-lg bg-ground border border-line px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:outline-none focus:border-[color:var(--accent)] transition-colors';
+export const INPUT = 'rounded-lg bg-ground border border-line px-3 py-2 text-[0.8125rem] text-ink placeholder:text-ink-faint focus:outline-none focus:border-[color:var(--accent)] transition-colors';
 
 /**
  * Placeholder while a panel's data loads: grey bars in the shape of what is coming, with a soft shimmer
@@ -118,11 +118,11 @@ export function Skeleton({ rows = 3, label = 'Loading', className = '' }) {
 export function MoreInfo({ summary = 'More detail', children, className = '' }) {
   return (
     <details className={`group rounded-lg border border-line-soft ${className}`}>
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-semibold text-ink-muted hover:text-ink select-none [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-[0.8125rem] font-semibold text-ink-muted hover:text-ink select-none [&::-webkit-details-marker]:hidden">
         <span className="inline-block transition-transform duration-200 group-open:rotate-90" aria-hidden="true">›</span>
         {summary}
       </summary>
-      <div className="px-3 pb-3 pt-0.5 text-xs text-ink-muted leading-relaxed space-y-2">{children}</div>
+      <div className="px-3.5 pb-3.5 pt-0.5 text-[0.8125rem] text-ink-muted leading-relaxed space-y-2">{children}</div>
     </details>
   );
 }
@@ -130,10 +130,10 @@ export function MoreInfo({ summary = 'More detail', children, className = '' }) 
 /** One headline number: big value, short label, optional one-line note. */
 export function Stat({ value, label, note, tone }) {
   return (
-    <div className="glass-panel px-4 py-4 flex flex-col gap-1 min-w-0">
-      <span className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-ink-faint">{label}</span>
+    <div className="glass-panel px-5 py-5 flex flex-col gap-2 min-w-0">
+      <span className="font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-ink-faint">{label}</span>
       <span className={`text-[1.625rem] font-black tracking-tight leading-none tabular-nums ${tone === 'accent' ? 'text-accent' : 'text-ink'}`}>{value}</span>
-      {note && <span className="text-[0.71875rem] text-ink-muted leading-snug">{note}</span>}
+      {note && <span className="text-[0.78125rem] text-ink-muted leading-snug">{note}</span>}
     </div>
   );
 }
@@ -141,14 +141,14 @@ export function Stat({ value, label, note, tone }) {
 /** A page-section card with a heading. */
 export function Panel({ title, icon: Icon, aside, children, className = '' }) {
   return (
-    <section className={`glass-panel px-4 sm:px-5 py-4 themed ${className}`}>
+    <section className={`glass-panel px-5 sm:px-6 py-5 themed ${className}`}>
       {(title || aside) && (
-        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3">
+        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-4">
           <div className="flex items-center gap-2">
             {Icon && <Icon className="w-4 h-4 text-accent" strokeWidth={2.2} aria-hidden="true" />}
-            <h3 className="text-[0.84375rem] font-bold tracking-tight text-ink">{title}</h3>
+            <h3 className="text-[0.9375rem] font-bold tracking-tight text-ink">{title}</h3>
           </div>
-          {aside && <div className="text-[0.625rem] font-mono uppercase tracking-[0.14em] text-ink-faint">{aside}</div>}
+          {aside && <div className="text-[0.6875rem] font-mono uppercase tracking-[0.14em] text-ink-faint">{aside}</div>}
         </header>
       )}
       {children}

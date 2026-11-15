@@ -25,23 +25,23 @@ export default function PpeStatus({ entities, unavailable }) {
           <HardHat className="w-4 h-4 text-accent" />
           <h3 className="font-semibold">PPE check</h3>
         </div>
-        <span className="text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint">
+        <span className="text-[0.6875rem] font-mono uppercase tracking-[0.12em] text-ink-faint">
           Judged over several frames
         </span>
       </header>
 
       {unavailable ? (
-        <p className="text-xs text-ink-muted leading-relaxed">
+        <p className="text-[0.8125rem] text-ink-muted leading-relaxed">
           {unavailable}. Nobody can be checked for helmet or vest, so every person stays unverified.
         </p>
       ) : rows.length === 0 ? (
-        <p className="text-xs text-ink-muted leading-relaxed">No one in view.</p>
+        <p className="text-[0.8125rem] text-ink-muted leading-relaxed">No one in view.</p>
       ) : (
         <ul className="flex flex-col divide-y divide-line-soft">
           {rows.map((e) => {
             const { label, tone, detail } = describePpe(e.ppe);
             return (
-              <li key={e.track_id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-1.5 text-xs">
+              <li key={e.track_id} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-1.5 text-[0.8125rem]">
                 <span className="w-20 shrink-0 text-ink font-medium">{workerLabel(`trk-${e.track_id}`)}</span>
                 <span
                   className={
@@ -56,7 +56,7 @@ export default function PpeStatus({ entities, unavailable }) {
               </li>
             );
           })}
-          {hidden > 0 && <li className="py-1.5 text-xs text-ink-faint">and {hidden} more</li>}
+          {hidden > 0 && <li className="py-1.5 text-[0.8125rem] text-ink-faint">and {hidden} more</li>}
         </ul>
       )}
     </section>

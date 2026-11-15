@@ -29,25 +29,25 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
   const open = count > 0;
   return (
     <section
-      className={`glass-panel px-4 sm:px-5 py-4 themed ${open ? 'border-[color:var(--accent)]' : ''}`}
+      className={`glass-panel px-5 sm:px-6 py-5 themed ${open ? 'border-[color:var(--accent)]' : ''}`}
       aria-label="Open safety alerts"
     >
-      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-3">
+      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-4">
         <div className="flex items-center gap-2">
           {open
             ? <ShieldAlert className="w-4 h-4 text-accent" strokeWidth={2.2} />
             : <ShieldCheck className="w-4 h-4 text-ink-faint" strokeWidth={2.2} />}
-          <h3 className="text-[0.84375rem] font-bold tracking-tight text-ink">Open alerts</h3>
+          <h3 className="text-[0.9375rem] font-bold tracking-tight text-ink">Open alerts</h3>
           {(status === 'ready' || (status === 'error' && count > 0)) && (
             <span
-              className={`px-2 py-0.5 rounded-md text-[0.6875rem] font-bold tabular-nums ${open ? 'bg-accent text-white' : 'bg-surface-alt text-ink-muted'}`}
+              className={`px-2 py-0.5 rounded-md text-xs font-bold tabular-nums ${open ? 'bg-accent text-white' : 'bg-surface-alt text-ink-muted'}`}
               aria-label={`${count} open`}
             >
               {count}
             </span>
           )}
         </div>
-        <span className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-ink-faint">
+        <span className="font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-ink-faint">
           potential violations waiting for review
         </span>
       </header>
@@ -57,14 +57,14 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
       )}
 
       {status === 'error' && (
-        <p role="alert" className="flex items-start gap-2 text-xs text-ink-muted">
+        <p role="alert" className="flex items-start gap-2 text-[0.8125rem] text-ink-muted">
           <AlertCircle className="w-3.5 h-3.5 mt-0.5 text-accent shrink-0" /> Could not load alerts. {error}
           {count > 0 ? ` The count above is the last one received (${count}).` : ''}
         </p>
       )}
 
       {status === 'ready' && !open && (
-        <p className="text-xs text-ink-muted leading-relaxed">
+        <p className="text-[0.8125rem] text-ink-muted leading-relaxed">
           No open alerts. New flags appear here within a minute.
         </p>
       )}
@@ -74,9 +74,9 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
           {alerts.map((a) => {
             const meta = severityMeta(a.severity);
             return (
-              <li key={a.id} className="flex flex-col gap-1 py-2.5 text-xs">
+              <li key={a.id} className="flex flex-col gap-2 py-4 first:pt-1 text-[0.8125rem]">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className={`px-2 py-0.5 rounded-md border text-[0.625rem] font-bold uppercase tracking-wide ${BADGE[meta.tone]}`}>
+                  <span className={`px-2 py-0.5 rounded-md border text-[0.6875rem] font-bold uppercase tracking-wide ${BADGE[meta.tone]}`}>
                     {meta.label}
                   </span>
                   <span className="text-ink font-medium">{workerLabel(a.workerKey)}</span>
@@ -86,7 +86,7 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
                   <span className="text-ink-faint font-mono tabular-nums">{when(a.observedAt)}</span>
                   {Number(a.confidence) > 0 && <span className="text-ink-faint">{Math.round(a.confidence * 100)}% sure</span>}
                 </div>
-                <p className="text-ink-muted leading-relaxed">{a.reason}</p>
+                <p className="text-ink leading-relaxed">{a.reason}</p>
                 {a.hasPicture && <div className="flex flex-col"><EvidencePicture decisionId={a.id} /></div>}
               </li>
             );
@@ -94,13 +94,13 @@ export default function SafetyAlertsPanel({ status, count, alerts, error, onRevi
         </ul>
       )}
       {status === 'ready' && open && (
-        <p className="mt-2 text-[0.6875rem] text-ink-faint">
+        <p className="mt-3 pt-3 border-t border-line-soft text-xs text-ink-faint">
           They stay listed until someone reviews them.{onReview ? ' ' : ''}
           {onReview && <button type="button" onClick={onReview} className="underline text-ink hover:text-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)] rounded">Open the Review queue</button>}
         </p>
       )}
       {status === 'ready' && count > alerts.length && (
-        <p className="mt-2 text-[0.6875rem] text-ink-faint">Showing the newest {alerts.length} of {count}.</p>
+        <p className="mt-2 text-xs text-ink-faint">Showing the newest {alerts.length} of {count}.</p>
       )}
     </section>
   );

@@ -46,7 +46,7 @@ function ActionCard({ action, people, canEdit, onChanged }) {
 
   return (
     <li className={`py-3 flex flex-col gap-1.5 ${overdue ? 'border-l-2 border-[color:var(--accent)] pl-3' : ''}`}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem]">
         <span className="text-ink font-semibold">{action.title}</span>
         <SeverityChip severity={action.priority} />
         <span className="text-ink-muted">{STATUS_WORDS[action.status] || action.status}</span>
@@ -57,26 +57,26 @@ function ActionCard({ action, people, canEdit, onChanged }) {
         )}
         <span className="text-ink-faint">{assignee ? `Assigned to ${assignee.name}` : 'Not assigned'}</span>
       </div>
-      {action.description && <p className="text-xs text-ink-muted leading-relaxed">{action.description}</p>}
-      <p className="text-[0.6875rem] text-ink-faint">
+      {action.description && <p className="text-[0.8125rem] text-ink-muted leading-relaxed">{action.description}</p>}
+      <p className="text-xs text-ink-faint">
         About {action.workerKey ? workerLabel(action.workerKey) : 'a worker'}{action.zone ? ` in ${action.zone}` : ''}{action.observedAt ? `, ${fmtTime(action.observedAt)}` : ''}: {action.reason}
       </p>
       {action.status === 'CLOSED' && (
-        <p className="text-xs text-ink-muted">Closed{action.closedAt ? ` on ${fmtTime(action.closedAt)}` : ''}{action.closingNote ? `: ${action.closingNote}` : ''}</p>
+        <p className="text-[0.8125rem] text-ink-muted">Closed{action.closedAt ? ` on ${fmtTime(action.closedAt)}` : ''}{action.closingNote ? `: ${action.closingNote}` : ''}</p>
       )}
-      {action.status === 'CANCELLED' && <p className="text-xs text-ink-faint">Cancelled{action.closingNote ? `: ${action.closingNote}` : ''}</p>}
+      {action.status === 'CANCELLED' && <p className="text-[0.8125rem] text-ink-faint">Cancelled{action.closingNote ? `: ${action.closingNote}` : ''}</p>}
 
       {canEdit && (
         <div className="flex flex-wrap items-end gap-2">
           {active && (
             <>
-              <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">Assigned to
+              <label className="flex flex-col gap-1 text-xs text-ink-faint">Assigned to
                 <select value={action.assignedToId || ''} disabled={busy} onChange={(e) => run({ assignedToId: e.target.value || null })} className={INPUT}>
                   <option value="">Nobody</option>
                   {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               </label>
-              <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">Due
+              <label className="flex flex-col gap-1 text-xs text-ink-faint">Due
                 <input type="date" value={action.dueDate ? String(action.dueDate).slice(0, 10) : ''} disabled={busy} onChange={(e) => run({ dueDate: e.target.value || null })} className={INPUT} />
               </label>
             </>
@@ -91,7 +91,7 @@ function ActionCard({ action, people, canEdit, onChanged }) {
       )}
       {closing && (
         <div className="flex flex-col gap-2">
-          <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">{closing === 'cancel' ? 'Why is it being cancelled?' : 'What was done'}
+          <label className="flex flex-col gap-1 text-xs text-ink-faint">{closing === 'cancel' ? 'Why is it being cancelled?' : 'What was done'}
             <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} rows={2} className={`${INPUT} resize-y`} autoFocus />
           </label>
           <div className="flex gap-2">
@@ -106,7 +106,7 @@ function ActionCard({ action, people, canEdit, onChanged }) {
             <button type="button" onClick={() => { setClosing(false); setNote(''); }} className={BTN_QUIET}>{closing === 'cancel' ? 'Keep it' : 'Not yet'}</button>
           </div>
           {!note.trim() && (
-            <p className="text-[0.6875rem] text-ink-faint">
+            <p className="text-xs text-ink-faint">
               {closing === 'cancel' ? 'Say why, then cancel it.' : 'Say what was done, then close it.'}
             </p>
           )}
@@ -152,15 +152,15 @@ export default function ActionsScreen({ role, onCountChange }) {
       <div role="tablist" aria-label="Which actions" className="flex flex-wrap gap-1 mb-3">
         {TABS.map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id} type="button" onClick={() => setTab(id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${tab === id ? 'border-[color:var(--accent)] text-ink bg-surface-alt' : 'border-line text-ink-muted'}`}>{label}</button>
+            className={`px-3 py-1.5 rounded-lg text-[0.8125rem] font-semibold border ${tab === id ? 'border-[color:var(--accent)] text-ink bg-surface-alt' : 'border-line text-ink-muted'}`}>{label}</button>
         ))}
       </div>
       {state.loading && <Skeleton rows={3} label="Loading" />}
       {state.error && <Notice tone="error">{state.error}</Notice>}
       {!state.loading && !state.error && state.actions.length === 0 && (
-        <p className="text-xs text-ink-muted leading-relaxed">{tab === 'OVERDUE' ? 'Nothing is overdue.' : tab === 'ACTIVE' ? 'No actions are waiting to be done.' : 'No actions here.'}</p>
+        <p className="text-[0.8125rem] text-ink-muted leading-relaxed">{tab === 'OVERDUE' ? 'Nothing is overdue.' : tab === 'ACTIVE' ? 'No actions are waiting to be done.' : 'No actions here.'}</p>
       )}
-      {tab === 'ACTIVE' && overdueCount > 0 && <p className="mb-2 text-xs text-accent font-semibold">{overdueCount} overdue</p>}
+      {tab === 'ACTIVE' && overdueCount > 0 && <p className="mb-2 text-[0.8125rem] text-accent font-semibold">{overdueCount} overdue</p>}
       <ul className="flex flex-col divide-y divide-line-soft" aria-label="Corrective actions">
         {state.actions.map((a) => <ActionCard key={a.id} action={a} people={people} canEdit={canEdit} onChanged={changed} />)}
       </ul>

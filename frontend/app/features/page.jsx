@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, BarChart, Maximize, Activity, Zap, Layers } from 'lucide-react';
+import { ArrowRight, BarChart, Maximize, Activity, Layers } from 'lucide-react';
 import LandingNavbar from '../components/LandingNavbar';
 import LandingFooter from '../components/LandingFooter';
 import { StatsBand, HowItWorks, FAQ } from '../components/LandingSections';
@@ -173,8 +173,6 @@ export default function FeaturesPage() {
           </div>
 
           <div className="flex-1 bg-surface-alt border border-line rounded-3xl p-8 sm:p-10 flex flex-col justify-center items-center text-center animate-fade-in-up group overflow-hidden relative" style={{ animationDelay: '600ms' }}>
-             {/* Decorative only: centred behind the text, never intercepts clicks. */}
-             <Zap className="w-20 h-20 text-accent opacity-10 group-hover:scale-150 transition-all duration-700 absolute inset-0 m-auto pointer-events-none" aria-hidden="true" />
              <div className="relative z-10">
                <h3 className="text-4xl sm:text-5xl font-black text-ink tracking-tight leading-[1.15] pb-1 mb-2 tabular-nums">95%</h3>
                <p className="font-bold text-ink-faint uppercase tracking-[0.12em] text-[0.6875rem] mb-3">Helmet recall</p>

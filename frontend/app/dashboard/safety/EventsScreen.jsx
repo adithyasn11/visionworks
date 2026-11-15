@@ -79,30 +79,30 @@ export default function EventsScreen({ role }) {
       <div role="tablist" aria-label="What to list" className="flex gap-1 mb-3">
         {[['decisions', 'Decisions'], ['activity', 'Zone activity']].map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id} type="button" onClick={() => { setTab(id); setOffset(0); setOpen(null); setData({ loading: true, rows: [], total: null, next: null, error: null }); }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${tab === id ? 'border-[color:var(--accent)] text-ink bg-surface-alt' : 'border-line text-ink-muted'}`}>{label}</button>
+            className={`px-3 py-1.5 rounded-lg text-[0.8125rem] font-semibold border ${tab === id ? 'border-[color:var(--accent)] text-ink bg-surface-alt' : 'border-line text-ink-muted'}`}>{label}</button>
         ))}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 items-end gap-2 mb-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 items-end gap-3 mb-5">
         {tab === 'decisions' ? (
           <>
-            <label className="flex flex-col gap-1 min-w-0 text-[0.6875rem] text-ink-faint">Result
+            <label className="flex flex-col gap-1 min-w-0 text-xs text-ink-faint">Result
               <select value={filters.status} onChange={(e) => set({ status: e.target.value })} className={`${INPUT} w-full`}>{STATUS_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-            <label className="flex flex-col gap-1 min-w-0 text-[0.6875rem] text-ink-faint">Review
+            <label className="flex flex-col gap-1 min-w-0 text-xs text-ink-faint">Review
               <select value={filters.reviewState} onChange={(e) => set({ reviewState: e.target.value })} className={`${INPUT} w-full`}>{REVIEW_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
           </>
         ) : (
-          <label className="flex flex-col gap-1 min-w-0 text-[0.6875rem] text-ink-faint">Activity
+          <label className="flex flex-col gap-1 min-w-0 text-xs text-ink-faint">Activity
             <select value={filters.eventType} onChange={(e) => set({ eventType: e.target.value })} className={`${INPUT} w-full`}>{EVENT_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
         )}
-        <label className="flex flex-col gap-1 min-w-0 text-[0.6875rem] text-ink-faint">Zone
+        <label className="flex flex-col gap-1 min-w-0 text-xs text-ink-faint">Zone
           <select value={filters.zoneId} onChange={(e) => set({ zoneId: e.target.value })} className={`${INPUT} w-full`}>
             <option value="">Any zone</option>
             {zones.map((z) => <option key={z.id} value={z.id}>{z.name}{z.camera ? ` (${z.camera})` : ''}</option>)}
           </select></label>
-        <label className="flex flex-col gap-1 min-w-0 text-[0.6875rem] text-ink-faint">From
+        <label className="flex flex-col gap-1 min-w-0 text-xs text-ink-faint">From
           <input type="date" value={filters.from} max={filters.to || undefined} onChange={(e) => set({ from: e.target.value })} className={`${INPUT} w-full`} /></label>
-        <label className="flex flex-col gap-1 min-w-0 text-[0.6875rem] text-ink-faint">To
+        <label className="flex flex-col gap-1 min-w-0 text-xs text-ink-faint">To
           <input type="date" value={filters.to} min={filters.from || undefined} onChange={(e) => set({ to: e.target.value })} className={`${INPUT} w-full`} /></label>
         {tab === 'decisions' && (
           <button type="button" onClick={exportCsv} disabled={exporting && exporting.busy} className={`${BTN_QUIET} col-span-2 md:col-span-1 xl:col-start-6 xl:justify-self-end`}>
@@ -120,16 +120,16 @@ export default function EventsScreen({ role }) {
 
       {data.error && <Notice tone="error" className="mb-3">{data.error}</Notice>}
       {data.loading && data.rows.length === 0 && <Skeleton rows={3} label="Loading" />}
-      {!data.loading && !data.error && data.rows.length === 0 && <p className="text-xs text-ink-muted leading-relaxed">Nothing matches these filters.</p>}
+      {!data.loading && !data.error && data.rows.length === 0 && <p className="text-[0.8125rem] text-ink-muted leading-relaxed">Nothing matches these filters.</p>}
 
       {tab === 'decisions' ? (
         <ul className="flex flex-col divide-y divide-line-soft" aria-label="Decisions, newest first">
           {data.rows.map((d) => {
             const isOpen = open === d.id;
             return (
-              <li key={d.id} className="py-2.5">
+              <li key={d.id} className="py-4 first:pt-1 last:pb-1">
                 <button type="button" onClick={() => setOpen(isOpen ? null : d.id)} aria-expanded={isOpen}
-                  className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 text-left text-xs rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]">
+                  className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 text-left text-[0.8125rem] rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]">
                   {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" /> : <ChevronRight className="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" />}
                   <span className="font-mono text-ink-faint tabular-nums w-32">{fmtTime(d.observedAt)}</span>
                   <StatusChip status={d.status} />
@@ -138,20 +138,20 @@ export default function EventsScreen({ role }) {
                   <span className="text-ink font-medium">{workerLabel(d.workerKey)}</span>
                   <span className="text-ink-muted">{[d.camera && d.camera.name, d.zone && d.zone.name].filter(Boolean).join(' · ')}</span>
                   {confidenceText(d) && <span className="text-ink-faint">{confidenceText(d)}</span>}
-                  <span className="basis-full pl-6 text-ink-muted leading-relaxed">{d.reason}</span>
+                  <span className="basis-full pl-6 pt-0.5 text-ink leading-relaxed">{d.reason}</span>
                 </button>
-                {isOpen && <div className="mt-3 sm:pl-6"><DecisionDetail decisionId={d.id} role={role} onChanged={load} /></div>}
+                {isOpen && <div className="mt-4 sm:pl-6"><DecisionDetail decisionId={d.id} role={role} onChanged={load} /></div>}
               </li>
             );
           })}
         </ul>
       ) : (
-        <ul className="flex flex-col divide-y divide-line-soft text-xs" aria-label="Zone activity, newest first">
+        <ul className="flex flex-col divide-y divide-line-soft text-[0.8125rem]" aria-label="Zone activity, newest first">
           {data.rows.map((e) => {
             const d = describeZoneEvent({ event_type: e.eventType, worker_key: e.workerKey, details: e.details });
             const zone = zones.find((z) => z.id === e.zoneId);
             return (
-              <li key={e.id} className="flex flex-wrap gap-x-3 gap-y-0.5 py-1.5">
+              <li key={e.id} className="flex flex-wrap gap-x-3 gap-y-0.5 py-2.5">
                 <span className="font-mono text-ink-faint tabular-nums w-32">{fmtTime(e.observedAt)}</span>
                 <span className="text-ink-faint w-32 truncate">{zone ? zone.name : 'No zone'}</span>
                 <span className={d.tone === 'unconfirmed' ? 'text-ink-faint' : 'text-ink-muted'}>{d.text}</span>
@@ -162,7 +162,7 @@ export default function EventsScreen({ role }) {
       )}
 
       {(offset > 0 || data.next != null) && (
-        <nav aria-label="Pages" className="mt-3 flex items-center gap-3 text-xs text-ink-muted">
+        <nav aria-label="Pages" className="mt-3 flex items-center gap-3 text-[0.8125rem] text-ink-muted">
           <button type="button" disabled={offset === 0 || data.loading} onClick={() => { setOffset(Math.max(0, offset - PAGE)); setOpen(null); }} className={BTN_QUIET}>Previous</button>
           <span className="tabular-nums">{from}-{offset + data.rows.length}{data.total != null ? ` of ${data.total}` : ''}</span>
           <button type="button" disabled={data.next == null || data.loading} onClick={() => { setOffset(data.next); setOpen(null); }} className={BTN_QUIET}>Next</button>

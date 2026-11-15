@@ -54,29 +54,29 @@ export default function ReviewQueue({ role, onCountChange }) {
       {state.loading && <Skeleton rows={3} label="Loading the queue" />}
       {state.error && <Notice tone="error" className="mb-3">{state.error}</Notice>}
       {!state.loading && !state.error && state.items.length === 0 && (
-        <p className="text-xs text-ink-muted leading-relaxed">Nothing to review. New flags will appear here.</p>
+        <p className="text-[0.8125rem] text-ink-muted leading-relaxed">Nothing to review. New flags will appear here.</p>
       )}
       <ul className="flex flex-col divide-y divide-line-soft" aria-label="Flags waiting for review, oldest first">
         {state.items.map((d) => {
           const isOpen = open === d.id;
           return (
-            <li key={d.id} className="py-2.5">
+            <li key={d.id} className="py-4 first:pt-1 last:pb-1">
               <button
                 type="button"
                 onClick={() => setOpen(isOpen ? null : d.id)}
                 aria-expanded={isOpen}
-                className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 text-left text-xs rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
+                className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 text-left text-[0.8125rem] rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]"
               >
                 {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" /> : <ChevronRight className="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" />}
                 <SeverityChip severity={d.severity} />
                 <span className="text-ink font-medium">{workerLabel(d.workerKey)}</span>
                 <span className="text-ink-muted">{[d.camera && d.camera.name, d.zone && d.zone.name].filter(Boolean).join(' · ') || 'Unknown location'}</span>
-                <span className="font-mono text-ink-faint tabular-nums">{fmtTime(d.observedAt)}</span>
                 {confidenceText(d) && <span className="text-ink-faint">{confidenceText(d)}</span>}
-                <span className="basis-full pl-6 text-ink-muted leading-relaxed">{d.reason}</span>
+                <span className="ml-auto font-mono text-xs text-ink-faint tabular-nums">{fmtTime(d.observedAt)}</span>
+                <span className="basis-full pl-6 pt-0.5 text-ink leading-relaxed">{d.reason}</span>
               </button>
               {isOpen && (
-                <div className="mt-3 pl-0 sm:pl-6">
+                <div className="mt-4 pl-0 sm:pl-6">
                   <DecisionDetail decisionId={d.id} role={role} onChanged={() => reviewed(d.id)} />
                 </div>
               )}

@@ -45,10 +45,10 @@ function ParamField({ field, form, setParams, zones }) {
     const list = Array.isArray(value) ? value : [];
     return (
       <fieldset className="flex flex-col gap-1.5">
-        <legend className="text-[0.6875rem] text-ink-faint mb-1">{field.label}</legend>
+        <legend className="text-xs text-ink-faint mb-1">{field.label}</legend>
         <div className="flex flex-wrap gap-2">
           {PPE_ITEMS.map((item) => (
-            <label key={item.value} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-line text-xs text-ink-muted cursor-pointer">
+            <label key={item.value} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-line text-[0.8125rem] text-ink-muted cursor-pointer">
               <input type="checkbox" checked={list.includes(item.value)} className="accent-[color:var(--accent)]"
                 onChange={(e) => setParams({ [field.key]: e.target.checked ? [...list, item.value] : list.filter((x) => x !== item.value) })} />
               {item.label}
@@ -60,7 +60,7 @@ function ParamField({ field, form, setParams, zones }) {
   }
   if (field.kind === 'select') {
     return (
-      <label htmlFor={id} className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">{field.label}
+      <label htmlFor={id} className="flex flex-col gap-1 text-xs text-ink-faint">{field.label}
         <select id={id} value={value ?? ''} onChange={(e) => setParams({ [field.key]: e.target.value })} className={INPUT}>
           {field.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
@@ -71,7 +71,7 @@ function ParamField({ field, form, setParams, zones }) {
     const camera = (zones.find((z) => z.id === form.zoneId) || {}).cameraId;
     const options = zones.filter((z) => field.zoneTypes.includes(z.safetyType) && (!camera || z.cameraId === camera));
     return (
-      <label htmlFor={id} className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">{field.label}
+      <label htmlFor={id} className="flex flex-col gap-1 text-xs text-ink-faint">{field.label}
         <select id={id} value={value ?? ''} onChange={(e) => setParams({ [field.key]: e.target.value })} className={INPUT}>
           <option value="">{options.length ? 'Choose a zone' : `No ${field.zoneTypes.map((t) => ZONE_TYPE_LABELS[t].toLowerCase()).join(' / ')} zone on this camera`}</option>
           {options.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
@@ -80,7 +80,7 @@ function ParamField({ field, form, setParams, zones }) {
     );
   }
   return (
-    <label htmlFor={id} className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">{field.label}
+    <label htmlFor={id} className="flex flex-col gap-1 text-xs text-ink-faint">{field.label}
       <input id={id} type="number" inputMode="decimal" min={field.min} max={field.max} step={field.step} value={value ?? ''}
         onChange={(e) => setParams({ [field.key]: e.target.value })} className={`${INPUT} w-40`} />
     </label>
@@ -150,30 +150,30 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone }) {
   return (
     <form ref={formRef} onSubmit={save} className="flex flex-col gap-3 rounded-lg border border-line bg-surface-alt/40 p-3 sm:p-4" aria-label={editing ? 'Edit rule' : 'New rule'}>
       <div className="flex flex-wrap gap-3">
-        <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint flex-1 min-w-[200px]">Name
+        <label className="flex flex-col gap-1 text-xs text-ink-faint flex-1 min-w-[200px]">Name
           <input value={form.name} maxLength={160} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="For example: Hard hat and vest at the press" className={INPUT} required />
         </label>
-        <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">What to check
+        <label className="flex flex-col gap-1 text-xs text-ink-faint">What to check
           <select value={form.type} disabled={editing} onChange={(e) => changeType(e.target.value)} className={INPUT}>
             {RULE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         </label>
       </div>
-      <p className="text-[0.6875rem] text-ink-faint">{meta.blurb}{editing ? ' The kind of rule cannot be changed; make a new rule instead.' : ''}</p>
+      <p className="text-xs text-ink-faint">{meta.blurb}{editing ? ' The kind of rule cannot be changed; make a new rule instead.' : ''}</p>
 
       <div className="flex flex-wrap gap-3">
-        <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">Where{meta.zoneOptional ? ' (optional)' : ''}
+        <label className="flex flex-col gap-1 text-xs text-ink-faint">Where{meta.zoneOptional ? ' (optional)' : ''}
           <select value={form.zoneId} onChange={(e) => setForm({ ...form, zoneId: e.target.value, params: { ...form.params, ...(form.params.checkpoint_zone_id !== undefined ? { checkpoint_zone_id: '' } : {}), ...(form.params.exit_zone_id !== undefined ? { exit_zone_id: '' } : {}) } })} className={INPUT}>
             <option value="">{meta.zoneOptional ? 'Everywhere (every camera)' : 'Choose a zone'}</option>
             {zoneChoices.map((z) => <option key={z.id} value={z.id}>{z.name}{z.camera ? ` (${z.camera})` : ''} · {ZONE_TYPE_LABELS[z.safetyType]}</option>)}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">How serious
+        <label className="flex flex-col gap-1 text-xs text-ink-faint">How serious
           <select value={form.severity} onChange={(e) => setForm({ ...form, severity: e.target.value })} className={INPUT}>
             {SEVERITIES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-[0.6875rem] text-ink-faint">Least evidence to make a claim
+        <label className="flex flex-col gap-1 text-xs text-ink-faint">Least evidence to make a claim
           <div className="flex items-center gap-2">
             <input type="range" min="0" max="1" step="0.05" value={form.minEvidenceConfidence} onChange={(e) => setForm({ ...form, minEvidenceConfidence: Number(e.target.value) })} aria-label="Least evidence to make a claim" className="accent-[color:var(--accent)]" />
             <span className="w-10 tabular-nums text-ink">{Math.round(form.minEvidenceConfidence * 100)}%</span>
@@ -188,13 +188,13 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone }) {
         {meta.fields.map((f) => <ParamField key={f.key} field={f} form={form} setParams={setParams} zones={zones} />)}
       </div>
 
-      <label className="inline-flex items-center gap-2 text-xs text-ink-muted self-start cursor-pointer">
+      <label className="inline-flex items-center gap-2 text-[0.8125rem] text-ink-muted self-start cursor-pointer">
         <input type="checkbox" checked={form.isEnabled} onChange={(e) => setForm({ ...form, isEnabled: e.target.checked })} className="accent-[color:var(--accent)]" />
         This rule is on
       </label>
 
       <div aria-live="polite" className="min-h-[1.25rem]">
-        {check.state === 'checking' && <p className="flex items-center gap-2 text-xs text-ink-faint"><Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> Checking…</p>}
+        {check.state === 'checking' && <p className="flex items-center gap-2 text-[0.8125rem] text-ink-faint"><Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> Checking…</p>}
         {check.state === 'valid' && (
           <Notice tone="ok">
             This rule is valid. {check.enforced ? 'The safety engine acts on it from the next run of a camera.' : 'It will be saved, but the safety engine does not act on this kind of rule yet.'}
@@ -264,24 +264,24 @@ export default function RulesScreen({ role }) {
         {message && <Notice tone={message.tone} className="mb-3">{message.text}</Notice>}
         {state.loading && <Skeleton rows={3} label="Loading the rules" />}
         {state.error && <Notice tone="error">{state.error}</Notice>}
-        {!state.loading && !state.error && state.rules.length === 0 && <p className="text-xs text-ink-muted leading-relaxed">No rules of your own yet, so the built-in helmet-and-vest check applies to every Restricted zone.</p>}
+        {!state.loading && !state.error && state.rules.length === 0 && <p className="text-[0.8125rem] text-ink-muted leading-relaxed">No rules of your own yet, so the built-in helmet-and-vest check applies to every Restricted zone.</p>}
 
         <ul className="flex flex-col divide-y divide-line-soft" aria-label="Rules">
           {state.rules.map((rule) => {
             const meta = ruleTypeMeta(rule.type);
             return (
-              <li key={rule.id} className="py-3 flex flex-col gap-1.5">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                  <span className="text-ink font-semibold">{rule.name}</span>
+              <li key={rule.id} className="py-4 first:pt-1 flex flex-col gap-2.5">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.8125rem]">
+                  <span className="text-sm text-ink font-bold">{rule.name}</span>
                   <SeverityChip severity={rule.severity} />
-                  <span className={rule.isEnabled ? 'text-ink' : 'text-ink-faint'}>{rule.isEnabled ? 'On' : 'Off'}</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[0.6875rem] font-bold uppercase tracking-wide ${rule.isEnabled ? 'border-line text-ink bg-surface-alt' : 'border-line text-ink-faint'}`}>{rule.isEnabled ? 'On' : 'Off'}</span>
                   <span className="text-ink-muted">{meta ? meta.label : rule.type}</span>
                   <span className="text-ink-faint">{[rule.camera && rule.camera.name, rule.zone && rule.zone.name].filter(Boolean).join(' · ') || 'Every camera'}</span>
                 </div>
                 {rule.evaluated_by_engine && ruleSummary(rule.type, rule.params, (id) => (zones.find((z) => z.id === id) || {}).name) && (
-                  <p className="text-[0.6875rem] text-ink-muted">{ruleSummary(rule.type, rule.params, (id) => (zones.find((z) => z.id === id) || {}).name)}</p>
+                  <p className="text-[0.8125rem] text-ink-muted leading-relaxed">{ruleSummary(rule.type, rule.params, (id) => (zones.find((z) => z.id === id) || {}).name)}</p>
                 )}
-                {!rule.evaluated_by_engine && <p className="text-[0.6875rem] text-ink-faint">Saved, but the safety engine does not act on this kind of rule yet.</p>}
+                {!rule.evaluated_by_engine && <p className="text-xs text-ink-faint">Saved, but the safety engine does not act on this kind of rule yet.</p>}
                 {/* A zone this rule names in its settings (the exit, or the checkpoint) was deleted. Deleting a zone removes
                     the rules ON it, but not this reference, and the engine then skips the rule: say so, here. */}
                 {zonesReady && missingZoneRef(rule, zones) && (
@@ -293,7 +293,7 @@ export default function RulesScreen({ role }) {
                     <button type="button" onClick={() => { setEditing(formFromRule(rule)); setMessage(null); }} className={BTN_QUIET}><Pencil className="w-3.5 h-3.5" aria-hidden="true" /> Edit</button>
                     {confirmDelete === rule.id ? (
                       <>
-                        <span className="self-center text-xs text-ink-muted">Delete this rule?</span>
+                        <span className="self-center text-[0.8125rem] text-ink-muted">Delete this rule?</span>
                         <button type="button" onClick={() => remove(rule)} className={BTN_PRIMARY}>Yes, delete</button>
                         <button type="button" onClick={() => setConfirmDelete(null)} className={BTN_QUIET}>Keep it</button>
                       </>

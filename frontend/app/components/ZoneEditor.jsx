@@ -435,13 +435,13 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
   return (
     <div className="glass-panel p-5 flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 text-ink font-bold text-[0.84375rem] tracking-tight">
+        <div className="flex items-center gap-2 text-ink font-bold text-[0.9375rem] tracking-tight">
           <Shapes className="w-4 h-4 text-accent" />
           <span>Zone Mapping</span>
         </div>
 
         {readOnly ? (
-          <span className="inline-flex items-center gap-1.5 text-[0.6875rem] font-bold text-ink-faint">
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-ink-faint">
             <Eye className="w-3.5 h-3.5" />
             View only
           </span>
@@ -449,7 +449,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
           <button
             type="button"
             onClick={startDrawing}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent hover:brightness-110 text-white text-xs font-bold transition-[filter]"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent hover:brightness-110 text-white text-[0.8125rem] font-bold transition-[filter]"
           >
             <Plus className="w-3.5 h-3.5" />
             Draw zone
@@ -460,7 +460,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
               type="button"
               onClick={() => setDraft((p) => p.slice(0, -1))}
               disabled={draft.length === 0}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-alt hover:bg-surface border border-line hover:border-field text-ink-muted text-xs font-semibold transition-colors disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-alt hover:bg-surface border border-line hover:border-field text-ink-muted text-[0.8125rem] font-semibold transition-colors disabled:opacity-40"
             >
               <Undo2 className="w-3.5 h-3.5" />
               Undo
@@ -469,7 +469,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
               type="button"
               onClick={saveZone}
               disabled={!canSave}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent hover:brightness-110 text-white text-xs font-bold transition-[filter] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent hover:brightness-110 text-white text-[0.8125rem] font-bold transition-[filter] disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               Save
@@ -477,7 +477,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
             <button
               type="button"
               onClick={cancelDrawing}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-alt hover:bg-surface border border-line hover:border-field text-ink-muted text-xs font-semibold transition-colors"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-alt hover:bg-surface border border-line hover:border-field text-ink-muted text-[0.8125rem] font-semibold transition-colors"
             >
               <X className="w-3.5 h-3.5" />
               Cancel
@@ -495,20 +495,20 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
             placeholder={`Zone ${zones.length + 1}`}
             aria-label="Zone name"
             maxLength={80}
-            className="flex-1 min-w-[140px] rounded-lg bg-ground border border-line px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:outline-none focus:border-[color:var(--accent)] transition-colors"
+            className="flex-1 min-w-[140px] rounded-lg bg-ground border border-line px-3 py-1.5 text-[0.8125rem] text-ink placeholder:text-ink-faint focus:outline-none focus:border-[color:var(--accent)] transition-colors"
           />
           <select
             value={newType}
             onChange={(e) => setNewType(e.target.value)}
             title={ZONE_TYPES.find((t) => t.value === newType)?.hint}
             aria-label="Zone type"
-            className="rounded-lg bg-ground border border-line px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors"
+            className="rounded-lg bg-ground border border-line px-2.5 py-1.5 text-[0.8125rem] text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors"
           >
             {ZONE_TYPES.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
           </select>
-          <span className="text-[0.6875rem] text-ink-muted font-mono whitespace-nowrap">
+          <span className="text-xs text-ink-muted font-mono whitespace-nowrap">
             {draft.length} pt{draft.length === 1 ? '' : 's'}
             {draft.length < MIN_POINTS && ` · click at least ${MIN_POINTS} points to outline an area`}
           </span>
@@ -523,14 +523,14 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
           already recorded — and silently showing black taught them nothing. */}
       {!readOnly && (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[0.6875rem] font-mono uppercase tracking-[0.12em] text-ink-faint">
+          <span className="text-xs font-mono uppercase tracking-[0.12em] text-ink-faint">
             backdrop
           </span>
           <select
             value={snapSource}
             disabled={backdropIsLive}
             onChange={(e) => { setSnapSource(e.target.value); grabSnapshot(e.target.value); }}
-            className="max-w-full min-w-0 rounded-lg bg-ground border border-line px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="max-w-full min-w-0 rounded-lg bg-ground border border-line px-2.5 py-1.5 text-[0.8125rem] text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <option value="webcam">Live webcam</option>
             {snapVideos.map((v) => (
@@ -541,7 +541,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
             type="button"
             onClick={() => grabSnapshot(snapSource)}
             disabled={snapState === 'loading'}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-alt hover:bg-surface border border-line hover:border-field text-ink-muted text-xs font-semibold transition-colors disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-alt hover:bg-surface border border-line hover:border-field text-ink-muted text-[0.8125rem] font-semibold transition-colors disabled:opacity-60"
           >
             {snapState === 'loading'
               ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -549,7 +549,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
             Refresh
           </button>
           {snapState === 'error' && (
-            <span className="text-[0.6875rem] text-accent font-medium">{snapError}</span>
+            <span className="text-xs text-accent font-medium">{snapError}</span>
           )}
         </div>
       )}
@@ -591,7 +591,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
         {status === 'ready' && !backdrop && snapState !== 'loading' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
             <AlertCircle className="w-6 h-6 text-ink-faint" strokeWidth={1.8} />
-            <p className="text-xs text-ink-muted max-w-sm leading-relaxed">
+            <p className="text-[0.8125rem] text-ink-muted max-w-sm leading-relaxed">
               <span className="text-ink font-semibold">No camera image.</span>{' '}
               Zones are drawn onto the actual view, so there is nothing to aim
               at yet. Connect a webcam, or pick an uploaded video from the
@@ -608,7 +608,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
                 instruction you cannot read is the same as no instruction. */}
             <div className="rounded-xl border border-line bg-surface px-4 py-3 shadow-lg max-w-[19rem]">
               <MousePointerClick className="w-6 h-6 text-accent mx-auto mb-1.5" strokeWidth={1.8} />
-              <p className="text-[0.75rem] text-ink-muted leading-relaxed">
+              <p className="text-[0.8125rem] text-ink-muted leading-relaxed">
                 <span className="text-ink font-bold">Click “Draw zone”</span>, then
                 click each corner of the area, then press Save to close the
                 shape.
@@ -619,7 +619,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 text-[0.71875rem] text-accent leading-relaxed" role="alert">
+        <div className="flex items-start gap-2 text-[0.78125rem] text-accent leading-relaxed" role="alert">
           <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
@@ -652,13 +652,13 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
                       if (e.key === 'Escape') setEditingZone(null);
                     }}
                     maxLength={80}
-                    className="flex-1 min-w-0 rounded bg-ground border border-field px-2 py-1 text-xs text-ink focus:outline-none focus:border-[color:var(--accent)]"
+                    className="flex-1 min-w-0 rounded bg-ground border border-field px-2 py-1 text-[0.8125rem] text-ink focus:outline-none focus:border-[color:var(--accent)]"
                   />
                   <select
                     value={editType}
                     onChange={(e) => setEditType(e.target.value)}
                     title={zoneTypeMeta(editType).hint}
-                    className="rounded bg-ground border border-field px-1.5 py-1 text-[0.6875rem] text-ink focus:outline-none focus:border-[color:var(--accent)]"
+                    className="rounded bg-ground border border-field px-1.5 py-1 text-xs text-ink focus:outline-none focus:border-[color:var(--accent)]"
                   >
                     {ZONE_TYPES.map((t) => (
                       <option key={t.value} value={t.value}>{t.label}</option>
@@ -683,7 +683,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
                 </>
               ) : (
                 <>
-                  <span className="text-xs font-semibold text-ink truncate flex-1">
+                  <span className="text-[0.8125rem] font-semibold text-ink truncate flex-1">
                     {zone.zone_name}
                   </span>
                   {/* The kind is shown, not hidden in an edit form. A zone
@@ -691,7 +691,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
                       with nothing on screen explaining why. */}
                   <span
                     title={zoneTypeMeta(zone.zone_type).hint}
-                    className={`font-mono text-[0.59375rem] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded whitespace-nowrap ${
+                    className={`font-mono text-[0.65625rem] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded whitespace-nowrap ${
                       zoneTypeMeta(zone.zone_type).value === 'RESTRICTED'
                         ? 'bg-accent-soft text-accent'
                         : 'bg-ground text-ink-faint'
@@ -699,7 +699,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
                   >
                     {zoneTypeMeta(zone.zone_type).badge}
                   </span>
-                  <span className="font-mono text-[0.625rem] text-ink-faint whitespace-nowrap">
+                  <span className="font-mono text-[0.6875rem] text-ink-faint whitespace-nowrap">
                     {zone.polygon_coordinates?.length ?? 0} pts
                   </span>
                   {!readOnly && (
@@ -726,7 +726,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                       {confirmDelete === zone.zone_id && (
-                        <span className="basis-full text-[0.6875rem] text-accent">
+                        <span className="basis-full text-xs text-accent">
                           Click the bin again to delete. Rules for this zone are deleted too.
                         </span>
                       )}

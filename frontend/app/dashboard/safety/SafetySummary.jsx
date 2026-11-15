@@ -15,9 +15,9 @@ import { Notice, Panel, Skeleton } from './common';
 function Tile({ label, value, hint, strong }) {
   return (
     <div className="rounded-lg border border-line bg-surface-alt/40 px-3 py-2.5">
-      <div className="text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint">{label}</div>
+      <div className="text-[0.6875rem] font-mono uppercase tracking-[0.12em] text-ink-faint">{label}</div>
       <div className={`mt-1 text-2xl font-extrabold tabular-nums ${strong ? 'text-accent' : 'text-ink'}`}>{value}</div>
-      {hint && <div className="text-[0.6875rem] text-ink-faint">{hint}</div>}
+      {hint && <div className="text-xs text-ink-faint">{hint}</div>}
     </div>
   );
 }
@@ -45,7 +45,7 @@ export default function SafetySummary({ days, refreshKey }) {
     <Panel title="Safety" icon={ShieldCheck} aside={label}>
       {state.loading && !d && <Skeleton rows={3} label="Loading" />}
       {state.error && <Notice tone="error">{state.error}</Notice>}
-      {d && d.total === 0 && <p className="text-xs text-ink-muted leading-relaxed">No safety decisions in {label} yet.</p>}
+      {d && d.total === 0 && <p className="text-[0.8125rem] text-ink-muted leading-relaxed">No safety decisions in {label} yet.</p>}
       {d && d.total > 0 && (
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -54,16 +54,16 @@ export default function SafetySummary({ days, refreshKey }) {
             <Tile label="Could not verify" value={d.abstentions} hint="the system did not guess" />
             <Tile label="Waiting for review" value={d.open_alerts} hint={d.open_alerts ? 'in the Review queue' : 'nothing waiting'} strong={d.open_alerts > 0} />
           </div>
-          <p className="text-xs text-ink-muted">
+          <p className="text-[0.8125rem] text-ink-muted">
             {d.confirmed + d.dismissed === 0
               ? 'No flag has been judged yet in this period.'
               : `${d.confirmed + d.dismissed} judged: ${d.confirmed} confirmed, ${d.dismissed} dismissed${share ? ` (people agreed with ${share} of the flags they judged)` : ''}.`}
           </p>
           {d.by_zone[0] && d.by_zone[0].potential_violations > 0 && (
-            <p className="text-xs text-ink-muted">Most flags: <span className="text-ink font-semibold">{d.by_zone[0].zone}</span> ({d.by_zone[0].potential_violations}).</p>
+            <p className="text-[0.8125rem] text-ink-muted">Most flags: <span className="text-ink font-semibold">{d.by_zone[0].zone}</span> ({d.by_zone[0].potential_violations}).</p>
           )}
           <div>
-            <div className="text-[0.625rem] font-mono uppercase tracking-[0.12em] text-ink-faint mb-1.5">Decisions per day (red: flagged)</div>
+            <div className="text-[0.6875rem] font-mono uppercase tracking-[0.12em] text-ink-faint mb-1.5">Decisions per day (red: flagged)</div>
             <div className="flex items-end gap-1 h-16" role="img" aria-label={`Decisions per day: ${d.by_day.map((x) => `${x.day} ${x.decisions}`).join(', ')}`}>
               {d.by_day.map((x) => (
                 <div key={x.day} className="flex-1 min-w-[6px] flex flex-col justify-end h-full" title={`${x.day}: ${x.decisions} decisions, ${x.potential_violations} flagged`}>
@@ -73,7 +73,7 @@ export default function SafetySummary({ days, refreshKey }) {
                 </div>
               ))}
             </div>
-            <div className="flex justify-between text-[0.625rem] text-ink-faint mt-1 tabular-nums"><span>{d.by_day[0] && d.by_day[0].day}</span><span>{d.by_day[d.by_day.length - 1] && d.by_day[d.by_day.length - 1].day}</span></div>
+            <div className="flex justify-between text-[0.6875rem] text-ink-faint mt-1 tabular-nums"><span>{d.by_day[0] && d.by_day[0].day}</span><span>{d.by_day[d.by_day.length - 1] && d.by_day[d.by_day.length - 1].day}</span></div>
           </div>
         </div>
       )}

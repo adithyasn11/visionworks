@@ -143,12 +143,12 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                     {cam.sourceType === 'UPLOAD'
                       ? <Upload className="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" />
                       : <Video className="w-3.5 h-3.5 text-ink-faint" aria-hidden="true" />}
-                    <span className="text-[0.8125rem] font-bold text-ink break-all">{cam.name}</span>
+                    <span className="text-sm font-bold text-ink break-all">{cam.name}</span>
                     {selected === cam.name && (
-                      <span className="font-mono text-[0.59375rem] uppercase tracking-[0.14em] text-accent">in use</span>
+                      <span className="font-mono text-[0.65625rem] uppercase tracking-[0.14em] text-accent">in use</span>
                     )}
                   </div>
-                  <p className="text-[0.71875rem] text-ink-faint mt-0.5">
+                  <p className="text-[0.78125rem] text-ink-faint mt-0.5">
                     {SOURCE_LABEL[cam.sourceType] || cam.sourceType}{siteNameOf(cam.siteId) ? ` · ${siteNameOf(cam.siteId)}` : ''} · added {fmtTime(cam.createdAt)}
                   </p>
                 </div>
@@ -174,7 +174,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                   )}
                 </div>
                 {confirming === cam.id && (
-                  <p className="basis-full text-[0.71875rem] text-ink-muted">
+                  <p className="basis-full text-[0.78125rem] text-ink-muted">
                     Removing a camera also deletes its zones and every safety decision, zone event and corrective
                     action recorded on it. Click again to confirm.
                   </p>
@@ -188,7 +188,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
       {canEdit ? (
         <Panel title="Add a camera" icon={Plus}>
           <form onSubmit={submit} className={`grid gap-3 items-end ${sites.rows.length > 1 ? 'sm:grid-cols-[minmax(0,1fr)_180px_180px_auto]' : 'sm:grid-cols-[minmax(0,1fr)_200px_auto]'}`}>
-            <label className="grid gap-1 text-[0.71875rem] font-semibold text-ink-muted">
+            <label className="grid gap-1 text-[0.78125rem] font-semibold text-ink-muted">
               Name
               <input
                 className={INPUT}
@@ -199,7 +199,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                 required
               />
             </label>
-            <label className="grid gap-1 text-[0.71875rem] font-semibold text-ink-muted">
+            <label className="grid gap-1 text-[0.78125rem] font-semibold text-ink-muted">
               Video comes from
               <select className={INPUT} value={source} onChange={(e) => setSource(e.target.value)}>
                 <option value="WEBCAM">{SOURCE_LABEL.WEBCAM}</option>
@@ -208,7 +208,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
               </select>
             </label>
             {source === 'RTSP' && (
-              <label className="grid gap-1 text-[0.71875rem] font-semibold text-ink-muted sm:col-span-full">
+              <label className="grid gap-1 text-[0.78125rem] font-semibold text-ink-muted sm:col-span-full">
                 Stream address (kept on the server; it can include the camera's user name and password)
                 <input
                   className={INPUT}
@@ -223,7 +223,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
               </label>
             )}
             {sites.rows.length > 1 && (
-              <label className="grid gap-1 text-[0.71875rem] font-semibold text-ink-muted">
+              <label className="grid gap-1 text-[0.78125rem] font-semibold text-ink-muted">
                 Site
                 <select className={INPUT} value={siteId} onChange={(e) => setSiteId(e.target.value)}>
                   {sites.rows.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
@@ -235,7 +235,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
               Add camera
             </button>
           </form>
-          <p className="mt-3 text-[0.71875rem] text-ink-faint leading-relaxed">
+          <p className="mt-3 text-[0.78125rem] text-ink-faint leading-relaxed">
             The name cannot be changed later. Your plan sets how many cameras you can add.
           </p>
         </Panel>
@@ -251,8 +251,8 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
             {sites.rows.map((site) => (
               <li key={site.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
-                  <span className="text-[0.8125rem] font-bold text-ink break-all">{site.name}</span>
-                  <p className="text-[0.71875rem] text-ink-faint mt-0.5">
+                  <span className="text-sm font-bold text-ink break-all">{site.name}</span>
+                  <p className="text-[0.78125rem] text-ink-faint mt-0.5">
                     {site.cameras} camera{site.cameras === 1 ? '' : 's'}{site.timezone ? ` · ${site.timezone}` : ''}
                   </p>
                 </div>
@@ -274,7 +274,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
         )}
         {canEditSites && (
           <form onSubmit={submitSite} className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] items-end">
-            <label className="grid gap-1 text-[0.71875rem] font-semibold text-ink-muted">
+            <label className="grid gap-1 text-[0.78125rem] font-semibold text-ink-muted">
               New site
               <input
                 className={INPUT}
@@ -290,7 +290,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
             </button>
           </form>
         )}
-        <p className="mt-3 text-[0.71875rem] text-ink-faint leading-relaxed">
+        <p className="mt-3 text-[0.78125rem] text-ink-faint leading-relaxed">
           Your plan sets how many sites you can have. A site with cameras on it, or the only site, cannot be removed.
         </p>
       </Panel>

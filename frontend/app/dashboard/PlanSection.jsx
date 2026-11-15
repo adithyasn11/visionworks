@@ -245,11 +245,6 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
 
       {/* ── HERO: the current subscription ──────────────────────────────── */}
       <section className="card-dark rounded-2xl p-6 sm:p-8 relative overflow-hidden shadow-xl shadow-black/20 group">
-        <div
-          aria-hidden="true"
-          className="absolute -top-16 -right-16 w-64 h-64 border-[24px] border-white/[0.04] rounded-full group-hover:scale-110 transition-transform duration-1000 pointer-events-none"
-        />
-
         <div className="relative z-10">
           <div className="flex flex-wrap items-start justify-between gap-5 mb-7">
             <div>
