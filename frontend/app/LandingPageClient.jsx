@@ -32,7 +32,7 @@ export default function LandingPageClient() {
             style={{ animationDelay: '100ms' }}
           >
             {/* Background animated graphic */}
-            <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.06] group-hover:rotate-45 group-hover:scale-110 transition-all duration-700">
+            <div aria-hidden="true" className="hidden md:block pointer-events-none absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.06] group-hover:rotate-45 group-hover:scale-110 transition-all duration-700">
                <Target className="w-80 h-80 text-ink transform rotate-12 translate-x-12 -translate-y-12" />
             </div>
             
@@ -178,8 +178,6 @@ export default function LandingPageClient() {
                   </li>
                 ))}
               </ul>
-              {/* Decorative circle */}
-              <div className="absolute -bottom-10 -right-10 w-48 h-48 border-[20px] border-white/10 rounded-full group-hover:scale-150 group-hover:border-red-900/30 transition-all duration-700"></div>
             </div>
             
             {/* Feature 3 */}

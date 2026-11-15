@@ -35,7 +35,7 @@ function NavLink({ item, active, onNavigate }) {
       href={item.href}
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
-      className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[0.84375rem] font-semibold transition-colors duration-150 ${
+      className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[0.9375rem] font-semibold transition-colors duration-150 ${
         active
           ? 'bg-accent-soft text-accent'
           : 'text-ink-muted hover:text-ink hover:bg-surface-alt'
@@ -96,7 +96,7 @@ export default function PlatformShell({ children, operator }) {
           </div>
           <div className="leading-none">
             <div className="font-extrabold text-[0.9375rem] tracking-tight text-ink">VisionWorks</div>
-            <div className="font-mono text-[0.59375rem] uppercase tracking-[0.18em] text-accent mt-1">
+            <div className="font-mono text-[0.65625rem] uppercase tracking-[0.18em] text-accent mt-1">
               Platform
             </div>
           </div>
@@ -118,7 +118,7 @@ export default function PlatformShell({ children, operator }) {
           operator is reminded of it on every screen, and so is anyone being
           shown the console. */}
       <div className="mx-3 mb-3 rounded-lg border border-line bg-surface-alt px-3 py-2.5">
-        <p className="text-[0.6875rem] leading-relaxed text-ink-faint">
+        <p className="text-xs leading-relaxed text-ink-faint">
           <span className="font-bold text-ink-muted">Metadata only.</span>{' '}
           Safety data is not accessible to platform operators.
         </p>
@@ -127,14 +127,14 @@ export default function PlatformShell({ children, operator }) {
       {/* Operator identity + controls */}
       <div className="border-t border-line px-3 py-3 space-y-2">
         <div className="flex items-center gap-2.5 px-1">
-          <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center font-bold text-[0.6875rem] shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center font-bold text-xs shrink-0">
             {initials}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[0.78125rem] font-bold text-ink truncate">
+            <div className="text-[0.84375rem] font-bold text-ink truncate">
               {operator?.fullName || 'Operator'}
             </div>
-            <div className="text-[0.6875rem] text-ink-faint truncate">{operator?.email}</div>
+            <div className="text-xs text-ink-faint truncate">{operator?.email}</div>
           </div>
         </div>
 
@@ -142,7 +142,7 @@ export default function PlatformShell({ children, operator }) {
           <ThemeToggle />
           <Link
             href="/"
-            className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl border border-line bg-surface text-[0.75rem] font-semibold text-ink-muted hover:text-ink hover:border-field transition-colors"
+            className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl border border-line bg-surface text-[0.8125rem] font-semibold text-ink-muted hover:text-ink hover:border-field transition-colors"
             title="Open the public site"
           >
             Site <ExternalLink className="w-3 h-3" />
@@ -212,7 +212,7 @@ export default function PlatformShell({ children, operator }) {
             <Menu className="w-5 h-5" />
           </button>
           <span className="font-extrabold text-[0.9375rem] tracking-tight">VisionWorks</span>
-          <span className="font-mono text-[0.5625rem] uppercase tracking-[0.16em] text-accent">
+          <span className="font-mono text-[0.65625rem] uppercase tracking-[0.16em] text-accent">
             Platform
           </span>
         </div>

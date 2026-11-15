@@ -111,14 +111,6 @@ export function PlanCard({ plan, period, isPending, onChoose, busyPlan, delay })
       }`}
       style={{ animationDelay: delay }}
     >
-      {/* Decorative ring, same device as the landing page's privacy panel. */}
-      {dark && (
-        <div
-          aria-hidden="true"
-          className="absolute -bottom-12 -right-12 w-48 h-48 border-[20px] border-white/10 rounded-full group-hover:scale-150 group-hover:border-red-900/30 transition-all duration-700 pointer-events-none"
-        />
-      )}
-
       {featured && (
         <span className="absolute -top-3 left-7 bg-accent text-white text-[0.625rem] font-black uppercase tracking-[0.14em] px-3 py-1 rounded-full shadow-lg shadow-red-600/30 z-20">
           Most popular
@@ -310,7 +302,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
           >
             <div
               aria-hidden="true"
-              className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.06] group-hover:rotate-45 group-hover:scale-110 transition-all duration-700 pointer-events-none"
+              className="hidden md:block absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.06] group-hover:rotate-45 group-hover:scale-110 transition-all duration-700 pointer-events-none"
             >
               <Target className="w-80 h-80 text-ink transform rotate-12 translate-x-12 -translate-y-12" />
             </div>
@@ -448,7 +440,7 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
               What happens next
             </span>
             <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-ink max-w-2xl leading-[1.15]">
-              Three steps from an empty account to a measured room.
+              Three steps from an empty account to a monitored site.
             </h2>
           </div>
 
@@ -556,10 +548,9 @@ export default function HomeScreen({ email, fullName, pendingPlan, pendingPeriod
                 Private by design, on every plan
               </h3>
               <p className="text-[0.875rem] text-ink-muted font-medium leading-relaxed max-w-2xl group-hover:text-ink transition-colors">
-                Frames are discarded the moment inference finishes. What is kept is a count
-                per zone per minute — no faces, no track ids, no coordinates — so the
-                database physically cannot answer what any individual did. That guarantee is
-                structural, and it does not change with your tier.
+                Video is analysed and then discarded. What is kept is the verdict and, for a
+                flag, one blurred snapshot. Workers are anonymous IDs, never names — on
+                every tier.
               </p>
             </div>
           </div>

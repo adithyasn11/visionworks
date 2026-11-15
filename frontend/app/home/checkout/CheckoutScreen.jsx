@@ -28,7 +28,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, ArrowRight, Check, CheckCircle2, Lock, ShieldCheck,
-  Loader2, CreditCard, Target,
+  Loader2, CreditCard,
 } from 'lucide-react';
 
 import AppHeader from '../../components/AppHeader';
@@ -125,13 +125,6 @@ export default function CheckoutScreen({
             className="bg-surface border border-line shadow-xl shadow-black/5 rounded-3xl p-8 sm:p-10 flex flex-col relative overflow-hidden animate-fade-in-up group hover:border-[color:var(--accent)] hover:shadow-2xl transition-all duration-500"
             style={{ animationDelay: '100ms' }}
           >
-            <div
-              aria-hidden="true"
-              className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:opacity-[0.06] group-hover:rotate-45 group-hover:scale-110 transition-all duration-700 pointer-events-none"
-            >
-              <Target className="w-72 h-72 text-ink transform rotate-12 translate-x-12 -translate-y-12" />
-            </div>
-
             <div className="relative z-10 flex flex-col gap-7">
               <div className="flex flex-col gap-3">
                 <span className="text-[0.6875rem] font-black uppercase tracking-[0.16em] text-ink-faint">
@@ -253,11 +246,6 @@ export default function CheckoutScreen({
             className="card-dark rounded-3xl p-7 sm:p-8 flex flex-col gap-6 relative overflow-hidden shadow-xl shadow-black/20 animate-fade-in-up group hover:shadow-2xl hover:shadow-red-900/30 transition-all duration-500 lg:sticky lg:top-24"
             style={{ animationDelay: '200ms' }}
           >
-            <div
-              aria-hidden="true"
-              className="absolute -bottom-12 -right-12 w-48 h-48 border-[20px] border-white/10 rounded-full group-hover:scale-150 group-hover:border-red-900/30 transition-all duration-700 pointer-events-none"
-            />
-
             <div className="relative z-10 flex flex-col gap-6">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 bg-accent text-white rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-red-600/30 group-hover:scale-110 transition-transform duration-300">
