@@ -189,6 +189,23 @@ function RuleForm({ initial, zones, cameras = [], onSaved, onCancel, onGone, onZ
     if (rest.length) out.push({ key: 'other', name: null, label: 'Other zones', zones: rest });
     return out;
   }, [cameras, zones, meta]);
+  // The camera box: picked by hand, or worked out from the rule's zone (when editing, or once the lists arrive).
+  const zoneCamKey = (zoneId) => {
+    const w = wholeCamera(zoneId);
+    if (w) return (cameras.find((c) => c.name === w) || {}).id || '';
+    const z = zones.find((x) => x.id === zoneId);
+    if (!z) return '';
+    return cameras.some((c) => c.id === z.cameraId) ? z.cameraId : 'other';
+  };
+  const [pickedCam, setPickedCam] = useState(null);
+  useEffect(() => {
+    if (pickedCam === null && !form.zoneId && groups.length === 1 && groups[0].name && !meta.zoneOptional) setPickedCam(groups[0].key);
+  }, [groups.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const camKey = pickedCam ?? zoneCamKey(form.zoneId) ?? '';
+  const camGroup = groups.find((g) => g.key === camKey) || null;
+  // A new zone (or camera) clears what the checks' own zone settings (checkpoint, exit) pointed at.
+  const setZone = (zoneId) => setForm((f) => ({ ...f, zoneId, paramsByType: Object.fromEntries(Object.entries(f.paramsByType).map(([t, p]) => [t, { ...p, ...(p.checkpoint_zone_id !== undefined ? { checkpoint_zone_id: '' } : {}), ...(p.exit_zone_id !== undefined ? { exit_zone_id: '' } : {}) }])) }));
+  const chooseCamera = (key) => { setPickedCam(key); setZone(''); };
   const many = form.types.length > 1;
   const labelOf = (t) => (ruleTypeMeta(t) || {}).label || t;
   // One rule per checked kind; with several, each name says which check it is.
@@ -336,19 +353,22 @@ function RuleForm({ initial, zones, cameras = [], onSaved, onCancel, onGone, onZ
       </fieldset>
 
       <div className="flex flex-wrap gap-3">
-        <label className="flex flex-col gap-1 text-xs text-ink-faint">Where{meta.zoneOptional ? ' (optional)' : ''}
-          <select value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value, paramsByType: Object.fromEntries(Object.entries(f.paramsByType).map(([t, p]) => [t, { ...p, ...(p.checkpoint_zone_id !== undefined ? { checkpoint_zone_id: '' } : {}), ...(p.exit_zone_id !== undefined ? { exit_zone_id: '' } : {}) }])) }))} className={INPUT}>
-            <option value="">{meta.zoneOptional ? 'Everywhere (every camera)' : 'Choose a camera or zone'}</option>
-            {groups.map((g) => (
-              <optgroup key={g.key} label={g.label}>
-                {g.zones.map((z) => (
-                  <option key={z.id} value={z.id}>
-                    {z.name} · {z.safetyType === 'GENERAL' && !meta.zoneTypes.includes('GENERAL') ? `General, becomes ${ZONE_TYPE_LABELS[mainTarget(meta)]}` : ZONE_TYPE_LABELS[z.safetyType]}
-                  </option>
-                ))}
-                {g.name && <option value={`${WHOLE}${g.name}`}>Whole view of {g.name}</option>}
-              </optgroup>
+        {/* First the camera, then one of ITS zones (or its whole picture). */}
+        <label className="flex flex-col gap-1 text-xs text-ink-faint">Camera
+          <select value={camKey} onChange={(e) => chooseCamera(e.target.value)} className={INPUT} aria-label="Camera">
+            <option value="">{meta.zoneOptional ? 'Every camera' : 'Choose a camera'}</option>
+            {groups.map((g) => <option key={g.key} value={g.key}>{g.label}</option>)}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-ink-faint">Zone
+          <select value={form.zoneId} disabled={!camGroup} onChange={(e) => setZone(e.target.value)} className={`${INPUT} disabled:opacity-50`} aria-label="Zone">
+            <option value="">{camGroup ? 'Choose a zone' : meta.zoneOptional ? 'Every zone' : 'Choose a camera first'}</option>
+            {camGroup && camGroup.zones.map((z) => (
+              <option key={z.id} value={z.id}>
+                {z.name} · {z.safetyType === 'GENERAL' && !meta.zoneTypes.includes('GENERAL') ? `General, becomes ${ZONE_TYPE_LABELS[mainTarget(meta)]}` : ZONE_TYPE_LABELS[z.safetyType]}
+              </option>
             ))}
+            {camGroup && camGroup.name && <option value={`${WHOLE}${camGroup.name}`}>Whole view (the full picture)</option>}
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-ink-faint">How serious
@@ -395,7 +415,7 @@ function RuleForm({ initial, zones, cameras = [], onSaved, onCancel, onGone, onZ
         {check.state === 'checking' && <p className="flex items-center gap-2 text-[0.8125rem] text-ink-faint"><Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> Checking…</p>}
         {check.state === 'valid' && (
           <Notice tone="ok">
-            {many ? `All ${form.types.length} checks are valid.` : 'This rule is valid.'} {check.enforced ? 'They apply from the next run of a camera.' : 'Saved, but the safety engine does not act on every one of these yet.'}
+            {many ? `All ${form.types.length} checks are valid.` : 'This rule is valid.'} {check.enforced ? `${many ? 'They apply' : 'It applies'} from the next run of a camera.` : 'Saved, but the safety engine does not act on every one of these yet.'}
           </Notice>
         )}
         {check.state === 'invalid' && <Notice tone="error">{check.errors.join(' ')}</Notice>}
