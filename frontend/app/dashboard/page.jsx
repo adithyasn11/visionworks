@@ -500,7 +500,7 @@ function DashboardInner() {
           <PageHeader
             eyebrow="Cameras"
             title="Your cameras"
-            subtitle="Add the cameras you check. Each keeps its own zones and history."
+            subtitle="Your sites, and the cameras in each one."
           />
           <CamerasScreen
             role={role}

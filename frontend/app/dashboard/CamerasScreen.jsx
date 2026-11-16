@@ -140,205 +140,186 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
   };
 
   const LABEL = 'grid gap-1 text-[0.78125rem] font-semibold text-ink-muted';
+
+  // Cameras grouped by the site they belong to; a camera whose site is gone sits under "No site".
+  const groups = sites.rows.map((site) => ({ site, cams: cameras.filter((c) => c.siteId === site.id) }));
+  const loose = cameras.filter((c) => !sites.rows.some((x) => x.id === c.siteId));
+  if (loose.length && sites.status === 'ready') groups.push({ site: null, cams: loose });
+  const addHere = (id) => { if (id) setSiteId(id); nameRef.current?.focus(); };
+
+  const cameraBox = (cam) => {
+    const Icon = cam.sourceType === 'UPLOAD' ? Upload : Video;
+    const inUse = selected === cam.name;
+    const zs = zonesOf(cam);
+    const rc = rulesOf(cam);
+    return (
+      <li key={cam.id} className={`rounded-2xl border bg-surface p-4 flex flex-col gap-3 min-w-0 ${inUse ? 'border-[color:var(--accent)]' : 'border-line'}`}>
+        <div className="flex items-start gap-3 min-w-0">
+          <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${inUse ? 'bg-accent text-white' : 'bg-accent-soft text-accent'}`}>
+            <Icon className="w-4 h-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[0.9375rem] font-black text-ink truncate" title={cam.name}>{cam.name}</span>
+              {inUse && <span className="shrink-0 px-2 py-0.5 rounded-md text-[0.6875rem] font-bold bg-accent-soft text-accent">In use</span>}
+            </div>
+            <p className="text-[0.8125rem] text-ink-muted truncate" title={`Added ${fmtTime(cam.createdAt)}`}>{SOURCE_LABEL[cam.sourceType] || cam.sourceType}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5 min-w-0">
+          {zs.length === 0 ? (
+            <span className="text-[0.75rem] text-ink-faint">No zones yet</span>
+          ) : (
+            <>
+              {zs.slice(0, 3).map((z) => (
+                <span key={z.id} className="max-w-[9rem] truncate px-2 py-0.5 rounded-md border border-line bg-surface-alt text-[0.75rem] font-semibold text-ink-muted">{z.name}</span>
+              ))}
+              {zs.length > 3 && <span className="px-1 py-0.5 text-[0.75rem] text-ink-faint">+{zs.length - 3}</span>}
+            </>
+          )}
+        </div>
+        <p className="text-[0.75rem] text-ink-faint">{zs.length} zone{zs.length === 1 ? '' : 's'} · {rc} rule{rc === 1 ? '' : 's'} checked</p>
+        {confirming === cam.id && <p className="text-[0.78125rem] text-ink-muted">Its zones and history go too. Click again to remove.</p>}
+        <div className="mt-auto flex flex-wrap items-center gap-2">
+          {!inUse && <button type="button" className={BTN_QUIET} onClick={() => onSelect?.(cam.name)}>Use this camera</button>}
+          {canEdit && (
+            <button
+              type="button"
+              className={confirming === cam.id ? BTN_PRIMARY : BTN_QUIET}
+              onClick={() => remove(cam)}
+              disabled={removing === cam.id}
+              onBlur={() => { if (confirming === cam.id && removing !== cam.id) setConfirming(null); }}
+            >
+              {removing === cam.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />}
+              {confirming === cam.id ? 'Sure? Remove' : 'Remove'}
+            </button>
+          )}
+        </div>
+      </li>
+    );
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {message && <Notice tone={message.tone}>{message.text}</Notice>}
 
-      {/* One screen on a laptop: cameras on the left, adding and sites on the right. Long lists scroll inside. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_21rem] xl:grid-cols-[minmax(0,1fr)_24rem] lg:h-[calc(100dvh-15.5rem)] lg:min-h-[32rem]">
-        <Panel title="Cameras" icon={Camera} aside={status === 'ready' ? `${cameras.length} added` : null} className="flex flex-col min-h-0">
-          {status === 'loading' && <Skeleton rows={2} label="Loading cameras" />}
-          {status === 'error' && <Notice tone="error">{error || 'Could not load the cameras.'}</Notice>}
-          {status === 'ready' && cameras.length === 0 && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 py-10">
-              <span className="flex items-center justify-center w-14 h-14 rounded-2xl border border-line bg-surface-alt">
-                <Camera className="w-6 h-6 text-ink-muted" strokeWidth={2} aria-hidden="true" />
+      {/* Adding: a camera and a site, side by side. */}
+      <div className={`grid grid-cols-1 gap-4 ${canEditSites ? 'xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]' : ''}`}>
+        {canEdit ? (
+          <Panel title="Add a camera" icon={Plus}>
+            <form onSubmit={submit} className={`grid grid-cols-1 gap-3 items-end ${sites.rows.length > 1 ? 'sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]' : 'sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]'}`}>
+              <label className={LABEL}>
+                Name
+                <input ref={nameRef} className={INPUT} value={name} onChange={(e) => setName(e.target.value)} maxLength={64} placeholder="e.g. Gate camera" required />
+              </label>
+              <label className={LABEL}>
+                Video comes from
+                <select className={INPUT} value={source} onChange={(e) => setSource(e.target.value)}>
+                  <option value="WEBCAM">{SOURCE_LABEL.WEBCAM}</option>
+                  <option value="UPLOAD">{SOURCE_LABEL.UPLOAD}</option>
+                  <option value="RTSP">{SOURCE_LABEL.RTSP}</option>
+                </select>
+              </label>
+              {sites.rows.length > 1 && (
+                <label className={LABEL}>
+                  Site
+                  <select className={INPUT} value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+                    {sites.rows.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                  </select>
+                </label>
+              )}
+              <button type="submit" className={`${BTN_PRIMARY} justify-center py-2`} disabled={busy || !name.trim() || (source === 'RTSP' && !rtspUrl.trim())}>
+                {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Plus className="w-3.5 h-3.5" aria-hidden="true" />}
+                Add camera
+              </button>
+              {source === 'RTSP' && (
+                <label className={`${LABEL} col-span-full`} title="Kept on the server. It can include the camera's user name and password.">
+                  Stream address
+                  <input
+                    className={INPUT}
+                    value={rtspUrl}
+                    onChange={(e) => setRtspUrl(e.target.value)}
+                    maxLength={1024}
+                    placeholder="rtsp://user:password@192.168.1.50:554/stream1"
+                    autoComplete="off"
+                    spellCheck={false}
+                    required
+                  />
+                </label>
+              )}
+            </form>
+            <p className="mt-2 text-[0.75rem] text-ink-faint" title="Your plan sets how many cameras you can add.">The name can’t be changed later.</p>
+          </Panel>
+        ) : (
+          role && <Notice>You have view-only access here. {denialMessage('cameras.edit')}</Notice>
+        )}
+
+        {canEditSites && (
+          <Panel title="Add a site" icon={MapPin}>
+            <form onSubmit={submitSite} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-end">
+              <label className={LABEL}>
+                Name
+                <input className={INPUT} value={siteName} onChange={(e) => setSiteName(e.target.value)} maxLength={160} placeholder="e.g. Plant 2, Warehouse" />
+              </label>
+              <button type="submit" className={`${BTN_PRIMARY} py-2`} disabled={siteBusy || !siteName.trim()}>
+                {siteBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Plus className="w-3.5 h-3.5" aria-hidden="true" />}
+                Add site
+              </button>
+            </form>
+            <p className="mt-2 text-[0.75rem] text-ink-faint" title="Your plan sets how many sites you can have.">A site groups the cameras in one place.</p>
+          </Panel>
+        )}
+      </div>
+
+      {/* Every site, with its cameras under it. */}
+      {(status === 'loading' || sites.status === 'loading') && <Panel><Skeleton rows={3} label="Loading cameras" /></Panel>}
+      {status === 'error' && <Notice tone="error">{error || 'Could not load the cameras.'}</Notice>}
+      {sites.status === 'error' && <Notice tone="error">{sites.error}</Notice>}
+      {status === 'ready' && sites.status === 'ready' && groups.map(({ site, cams }) => (
+        <section key={site ? site.id : 'none'} className="glass-panel themed px-5 sm:px-6 py-5">
+          <header className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="w-9 h-9 rounded-xl bg-surface-alt border border-line flex items-center justify-center shrink-0">
+                <MapPin className="w-4 h-4 text-accent" aria-hidden="true" />
               </span>
-              <div>
-                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-ink">No cameras yet</h2>
-                <p className="mt-2 text-[0.9375rem] text-ink-muted max-w-sm" title="Until one is added, results stay on this computer and do not reach Review, Events, Reports or the Overview.">
-                  {canEdit ? 'Add one so results are saved to Review, Events and Reports.' : 'Ask an admin or manager to add one.'}
+              <div className="min-w-0">
+                <h3 className="text-[1.0625rem] font-black tracking-tight text-ink truncate">{site ? site.name : 'No site'}</h3>
+                <p className="text-[0.78125rem] text-ink-faint">
+                  {cams.length} camera{cams.length === 1 ? '' : 's'}{site && site.timezone ? ` · ${site.timezone}` : ''}
                 </p>
               </div>
             </div>
-          )}
-          {status === 'ready' && cameras.length > 0 && (
-            <ul className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3 content-start -mx-1 px-1 pb-1">
-              {cameras.map((cam) => {
-                const Icon = cam.sourceType === 'UPLOAD' ? Upload : Video;
-                const inUse = selected === cam.name;
-                return (
-                  <li key={cam.id} className={`rounded-2xl border bg-surface p-4 flex flex-col gap-3 min-w-0 ${inUse ? 'border-[color:var(--accent)]' : 'border-line'}`}>
-                    <div className="flex items-start gap-3 min-w-0">
-                      <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${inUse ? 'bg-accent text-white' : 'bg-accent-soft text-accent'}`}>
-                        <Icon className="w-4 h-4" aria-hidden="true" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[0.9375rem] font-black text-ink truncate" title={cam.name}>{cam.name}</span>
-                          {inUse && <span className="shrink-0 px-2 py-0.5 rounded-md text-[0.6875rem] font-bold bg-accent-soft text-accent">In use</span>}
-                        </div>
-                        <p className="text-[0.8125rem] text-ink-muted truncate" title={`Added ${fmtTime(cam.createdAt)}`}>
-                          {SOURCE_LABEL[cam.sourceType] || cam.sourceType}{siteNameOf(cam.siteId) ? ` · ${siteNameOf(cam.siteId)}` : ''}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 min-w-0">
-                      {zonesOf(cam).length === 0 ? (
-                        <span className="text-[0.75rem] text-ink-faint">No zones yet</span>
-                      ) : (
-                        <>
-                          {zonesOf(cam).slice(0, 3).map((z) => (
-                            <span key={z.id} className="max-w-[9rem] truncate px-2 py-0.5 rounded-md border border-line bg-surface-alt text-[0.75rem] font-semibold text-ink-muted">{z.name}</span>
-                          ))}
-                          {zonesOf(cam).length > 3 && <span className="px-1 py-0.5 text-[0.75rem] text-ink-faint">+{zonesOf(cam).length - 3}</span>}
-                        </>
-                      )}
-                    </div>
-                    <p className="text-[0.75rem] text-ink-faint">
-                      {zonesOf(cam).length} zone{zonesOf(cam).length === 1 ? '' : 's'} · {rulesOf(cam)} rule{rulesOf(cam) === 1 ? '' : 's'} checked
-                    </p>
-                    {confirming === cam.id && (
-                      <p className="text-[0.78125rem] text-ink-muted">Its zones and history go too. Click again to remove.</p>
-                    )}
-                    <div className="mt-auto flex flex-wrap items-center gap-2">
-                      {!inUse && (
-                        <button type="button" className={BTN_QUIET} onClick={() => onSelect?.(cam.name)}>Use this camera</button>
-                      )}
-                      {canEdit && (
-                        <button
-                          type="button"
-                          className={confirming === cam.id ? BTN_PRIMARY : BTN_QUIET}
-                          onClick={() => remove(cam)}
-                          disabled={removing === cam.id}
-                          onBlur={() => { if (confirming === cam.id && removing !== cam.id) setConfirming(null); }}
-                        >
-                          {removing === cam.id
-                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
-                            : <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />}
-                          {confirming === cam.id ? 'Sure? Remove' : 'Remove'}
-                        </button>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-              {canEdit && (
-                <li className="min-w-0">
-                  <button type="button" onClick={() => nameRef.current?.focus()}
-                    className="w-full h-full min-h-[9rem] rounded-2xl border-2 border-dashed border-line text-ink-muted hover:text-accent hover:border-[color:var(--accent)] transition-colors flex flex-col items-center justify-center gap-2">
-                    <Plus className="w-5 h-5" aria-hidden="true" />
-                    <span className="text-[0.875rem] font-bold">Add another</span>
-                  </button>
-                </li>
-              )}
-            </ul>
-          )}
-        </Panel>
-
-        <div className="flex flex-col gap-4 min-h-0">
-          {canEdit ? (
-            <Panel title="Add a camera" icon={Plus} className="shrink-0">
-              <form onSubmit={submit} className="grid gap-3">
-                <label className={LABEL}>
-                  Name
-                  <input ref={nameRef} className={INPUT} value={name} onChange={(e) => setName(e.target.value)} maxLength={64} placeholder="e.g. Gate camera" required />
-                </label>
-                <div className={`grid gap-3 ${sites.rows.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                  <label className={LABEL}>
-                    Video comes from
-                    <select className={INPUT} value={source} onChange={(e) => setSource(e.target.value)}>
-                      <option value="WEBCAM">{SOURCE_LABEL.WEBCAM}</option>
-                      <option value="UPLOAD">{SOURCE_LABEL.UPLOAD}</option>
-                      <option value="RTSP">{SOURCE_LABEL.RTSP}</option>
-                    </select>
-                  </label>
-                  {sites.rows.length > 1 && (
-                    <label className={LABEL}>
-                      Site
-                      <select className={INPUT} value={siteId} onChange={(e) => setSiteId(e.target.value)}>
-                        {sites.rows.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                      </select>
-                    </label>
-                  )}
-                </div>
-                {source === 'RTSP' && (
-                  <label className={LABEL} title="Kept on the server. It can include the camera's user name and password.">
-                    Stream address
-                    <input
-                      className={INPUT}
-                      value={rtspUrl}
-                      onChange={(e) => setRtspUrl(e.target.value)}
-                      maxLength={1024}
-                      placeholder="rtsp://user:password@192.168.1.50:554/stream1"
-                      autoComplete="off"
-                      spellCheck={false}
-                      required
-                    />
-                  </label>
-                )}
-                <button type="submit" className={`${BTN_PRIMARY} justify-center`} disabled={busy || !name.trim() || (source === 'RTSP' && !rtspUrl.trim())}>
-                  {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Plus className="w-3.5 h-3.5" aria-hidden="true" />}
-                  Add camera
+            {site && isAdmin && sites.rows.length > 1 && cams.length === 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className={siteConfirm === site.id ? BTN_PRIMARY : BTN_QUIET}
+                  onClick={() => dropSite(site)}
+                  disabled={siteBusy}
+                  onBlur={() => { if (siteConfirm === site.id && !siteBusy) setSiteConfirm(null); }}
+                >
+                  <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                  {siteConfirm === site.id ? 'Sure? Remove site' : 'Remove site'}
                 </button>
-              </form>
-              <p className="mt-2 text-[0.75rem] text-ink-faint" title="Your plan sets how many cameras you can add.">The name can’t be changed later.</p>
-            </Panel>
-          ) : (
-            role && <Notice>You have view-only access here. {denialMessage('cameras.edit')}</Notice>
-          )}
-
-          <Panel title="Sites" icon={MapPin} aside={sites.status === 'ready' ? `${sites.rows.length} site${sites.rows.length === 1 ? '' : 's'}` : null}
-            className="flex flex-col lg:flex-1 lg:min-h-[13rem] min-h-0">
-            {sites.status === 'loading' && <Skeleton rows={2} label="Loading sites" />}
-            {sites.status === 'error' && <Notice tone="error">{sites.error}</Notice>}
-            {sites.status === 'ready' && sites.rows.length > 0 && (
-              <ul className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
-                {sites.rows.map((site) => (
-                  <li key={site.id} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 shrink-0">
-                    <div className="min-w-0">
-                      <span className="block text-[0.875rem] font-bold text-ink truncate" title={site.name}>{site.name}</span>
-                      <p className="text-[0.75rem] text-ink-faint truncate">
-                        {site.cameras} camera{site.cameras === 1 ? '' : 's'}{site.timezone ? ` · ${site.timezone}` : ''}
-                      </p>
-                    </div>
-                    {isAdmin && sites.rows.length > 1 && (
-                      <button
-                        type="button"
-                        className={siteConfirm === site.id ? BTN_PRIMARY : BTN_QUIET}
-                        onClick={() => dropSite(site)}
-                        disabled={siteBusy}
-                        title="A site with cameras on it cannot be removed."
-                        aria-label={siteConfirm === site.id ? `Click again to remove ${site.name}` : `Remove ${site.name}`}
-                        onBlur={() => { if (siteConfirm === site.id && !siteBusy) setSiteConfirm(null); }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                        {siteConfirm === site.id ? 'Sure?' : ''}
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              </div>
             )}
-            {canEditSites && (
-              <form onSubmit={submitSite} className="mt-3 pt-3 border-t border-line-soft grid grid-cols-[minmax(0,1fr)_auto] gap-2 shrink-0">
-                <input
-                  className={INPUT}
-                  value={siteName}
-                  onChange={(e) => setSiteName(e.target.value)}
-                  maxLength={160}
-                  placeholder="New site, e.g. Plant 2"
-                  aria-label="New site"
-                />
-                <button type="submit" className={BTN_PRIMARY} disabled={siteBusy || !siteName.trim()} title="Your plan sets how many sites you can have.">
-                  {siteBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Plus className="w-3.5 h-3.5" aria-hidden="true" />}
-                  Add
+          </header>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+            {cams.map(cameraBox)}
+            {canEdit && site && (
+              <li className="min-w-0">
+                <button type="button" onClick={() => addHere(site.id)}
+                  className="w-full h-full min-h-[9rem] rounded-2xl border-2 border-dashed border-line text-ink-muted hover:text-accent hover:border-[color:var(--accent)] transition-colors flex flex-col items-center justify-center gap-2 px-4 text-center">
+                  <Plus className="w-5 h-5" aria-hidden="true" />
+                  <span className="text-[0.875rem] font-bold">{cams.length ? 'Add another camera here' : 'Add a camera here'}</span>
+                  {cams.length === 0 && <span className="text-[0.75rem] text-ink-faint">Results are only saved once a camera is added.</span>}
                 </button>
-              </form>
+              </li>
             )}
-          </Panel>
-        </div>
-      </div>
+            {!canEdit && cams.length === 0 && <li className="text-[0.8125rem] text-ink-muted">No cameras here yet.</li>}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }
