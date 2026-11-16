@@ -529,6 +529,7 @@ function DashboardInner() {
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-5 items-start">
             <ZoneEditor
               cameraId={cameraId}
+              cameras={cameras}
               onZonesChanged={setActiveZones}
               readOnly={!can(role, 'zones.edit')}
             />

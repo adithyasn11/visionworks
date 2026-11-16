@@ -539,7 +539,30 @@ def camera_snapshot(
     """
     frame = None
 
-    if source == "webcam":
+    if source.startswith("camera:"):
+        # One of the organisation's saved network (RTSP) cameras, by name. The address is read on the server and
+        # never leaves it. A webcam camera is asked for as "webcam" and a recorded-video camera has no live picture.
+        name = source[len("camera:"):]
+        try:
+            url = _rtsp_url_for(name, org_id)
+        except Exception as e:                    # the database could not be reached
+            logger.warning("Could not read the RTSP address of %s: %s", name, e)
+            url = None
+        if not url:
+            raise HTTPException(status_code=404, detail="This camera has no network address to take a picture from.")
+        cap, why = _open_rtsp(url)
+        if cap is None:
+            raise HTTPException(status_code=503, detail=("Could not connect to this camera." if why == "connect"
+                                                         else "The camera connected but sent no picture."))
+        try:
+            ok, frame = cap.read()
+            if not ok:
+                frame = None
+        finally:
+            cap.release()
+        if frame is None:
+            raise HTTPException(status_code=503, detail="The camera connected but sent no picture.")
+    elif source == "webcam":
         # OpenCV logs a MSMF backend warning to stderr for every failed read,
         # and a camera held by another application fails every read. Measured:
         # 130 warning lines from 58 snapshot calls, which buries anything
@@ -611,6 +634,60 @@ def camera_snapshot(
         # stale still would have somebody drawing around furniture that moved.
         headers={"Cache-Control": "no-store"},
     )
+
+
+@router.post("/snapshot_from_video")
+async def snapshot_from_video(file: UploadFile = File(...), org_id: str = Depends(require_analysis_run)):
+    """
+    One still from a video the browser could not play itself (a codec it lacks), for the zone editor's backdrop.
+    The file is written to a temporary place, one frame a tenth of the way in is read, and the file is deleted
+    straight away: drawing a zone never keeps the video.
+    """
+    import tempfile
+    from fastapi.responses import Response
+    suffix = os.path.splitext(os.path.basename(file.filename or ""))[1][:8] or ".mp4"
+    fd, path = tempfile.mkstemp(suffix=suffix)
+    try:
+        written = 0
+        with os.fdopen(fd, "wb") as out:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > MAX_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="This video is too large.")
+                out.write(chunk)
+
+        def read_frame():
+            cap = cv2.VideoCapture(path)
+            try:
+                total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+                if total > 30:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, min(total // 10, total - 1))
+                ok, frame = cap.read()
+                if not ok:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    ok, frame = cap.read()
+                return frame if ok else None
+            finally:
+                cap.release()
+
+        frame = await asyncio.to_thread(read_frame)
+        if frame is None:
+            raise HTTPException(status_code=422, detail="Could not read a picture from that video.")
+        h, w = frame.shape[:2]
+        if w != 640:
+            frame = cv2.resize(frame, (640, int(h * 640 / w)))
+        ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 82])
+        if not ok:
+            raise HTTPException(status_code=500, detail="Could not encode the frame.")
+        return Response(content=buf.tobytes(), media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
 
 
 @router.get("/status")

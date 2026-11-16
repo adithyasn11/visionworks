@@ -120,7 +120,7 @@ function paint(canvas, zones, draft, hoverPoint) {
  * require manage_org_ids() in Postgres (layer 3, the one that actually holds).
  * A VIEWER still sees the zones, because reading them is permitted.
  */
-export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly = false }) => {
+export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onZonesChanged, readOnly = false }) => {
   const canvasRef = useRef(null);
 
   const [zones, setZones] = useState([]);
@@ -143,8 +143,9 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
   // `snapshot` is an object URL for a JPEG from GET /video/snapshot. It is
   // revoked on replacement so a long editing session does not leak blobs.
   const [snapshot, setSnapshot] = useState(null);
-  const [snapSource, setSnapSource] = useState('webcam');
-  const [snapVideos, setSnapVideos] = useState([]);
+  // The picture behind the canvas: one of the saved cameras (by name), or a video from this computer ('upload').
+  const [snapSource, setSnapSource] = useState(cameraId);
+  const fileRef = useRef(null);
   const [snapState, setSnapState] = useState('idle');  // idle|loading|ready|error
   const [snapError, setSnapError] = useState(null);
 
@@ -183,18 +184,73 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
 
   /* ── the camera frame behind the canvas ────────────────────────────────── */
 
-  /** Which videos could be used as a backdrop, if there is no webcam. */
-  const loadSnapSources = useCallback(async () => {
-    try {
-      const res = await backendFetch('/api/v1/video/samples');
-      if (!res.ok) return;
-      const data = await res.json();
-      setSnapVideos(Array.isArray(data?.sample_videos) ? data.sample_videos : []);
-    } catch {
-      // Not fatal: the webcam option still works, and the picker just has
-      // fewer entries.
-    }
+  /** A still from a video on this computer, taken in the browser: nothing is uploaded to draw a zone. */
+  const grabFromFile = useCallback((file) => {
+    if (!file) return;
+    setSnapState('loading');
+    setSnapError(null);
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    v.muted = true;
+    v.preload = 'auto';
+    v.src = url;
+    const setImage = (blob) => {
+      setSnapshot((prev) => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(blob); });
+      setSnapState('ready');
+    };
+    // The browser cannot play every video (some cameras and tools write codecs it lacks). Then the analysis
+    // server takes the still instead; it reads one frame and deletes the file.
+    let fellBack = false;
+    const fail = async () => {
+      if (fellBack) return;
+      fellBack = true;
+      URL.revokeObjectURL(url);
+      try {
+        const body = new FormData();
+        body.append('file', file);
+        const res = await backendFetch('/api/v1/video/snapshot_from_video', { method: 'POST', body });
+        if (!res.ok) throw new Error(String(res.status));
+        setImage(await res.blob());
+      } catch {
+        setSnapState('error');
+        setSnapError('Could not read a picture from that video.');
+      }
+    };
+    v.onerror = fail;
+    // A video the browser half-understands can stall without an error: give it a few seconds.
+    const stall = setTimeout(fail, 6000);
+    v.onloadedmetadata = () => {
+      // A tenth of the way in, like the server's stills: past any fade-in.
+      v.currentTime = Number.isFinite(v.duration) && v.duration > 1 ? v.duration / 10 : 0;
+    };
+    v.onseeked = () => {
+      // The same 640-wide space the analysis works in, so a drawn zone lands where it is drawn.
+      const c = document.createElement('canvas');
+      c.width = 640;
+      c.height = Math.round((v.videoHeight / Math.max(1, v.videoWidth)) * 640) || 360;
+      if (!v.videoWidth) { fail(); return; }
+      c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+      c.toBlob((blob) => {
+        if (!blob) { fail(); return; }
+        if (fellBack) return;
+        clearTimeout(stall);
+        URL.revokeObjectURL(url);
+        setImage(blob);
+      }, 'image/jpeg', 0.85);
+    };
   }, []);
+
+  /** A saved camera's picture: a network camera's stream, or this computer's webcam. */
+  const grabCamera = useCallback((name) => {
+    const cam = cameras.find((c) => c.name === name);
+    if (cam && cam.sourceType === 'UPLOAD') {
+      setSnapState('error');
+      setSnapError('This camera uses recorded videos. Choose “Upload a video” to draw on one.');
+      return;
+    }
+    // eslint-disable-next-line no-use-before-define
+    grabSnapshot(cam && cam.sourceType === 'RTSP' ? `camera:${name}` : 'webcam');
+  }, [cameras]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const grabSnapshot = useCallback(async (source) => {
     setSnapState('loading');
@@ -271,14 +327,13 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
   // Object URLs are revoked in grabSnapshot when they are REPLACED, which is
   // where the old one actually becomes garbage. What leaks here is at most one
   // URL per editor instance, released when the tab closes.
+  // The camera chosen at the top of the page is the backdrop to start with (and again when it changes).
+  // Only grabbed if nothing is already streaming: when the live feed owns the webcam, asking the backend to open
+  // it too fails, and the live frames are a better backdrop than a still anyway.
   useEffect(() => {
-    loadSnapSources();
-    // Only grab a still if nothing is already streaming. When the live feed
-    // owns the webcam, asking the backend to open it too fails with a 503 —
-    // and would be pointless anyway, since the live frames are a better
-    // backdrop than a still.
-    if (!getLatestFrame()) grabSnapshot('webcam');
-  }, [loadSnapSources, grabSnapshot]);
+    setSnapSource(cameraId);
+    if (!getLatestFrame() && cameras.length) grabCamera(cameraId);
+  }, [cameraId, cameras.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── canvas ────────────────────────────────────────────────────────────── */
 
@@ -526,20 +581,34 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', onZonesChanged, readOnly 
           <span className="text-xs font-mono uppercase tracking-[0.12em] text-ink-faint">
             backdrop
           </span>
+          <input ref={fileRef} type="file" accept="video/*" className="hidden"
+            onChange={(e) => { grabFromFile(e.target.files && e.target.files[0]); e.target.value = ''; }} />
           <select
             value={snapSource}
             disabled={backdropIsLive}
-            onChange={(e) => { setSnapSource(e.target.value); grabSnapshot(e.target.value); }}
+            aria-label="Backdrop"
+            onChange={(e) => {
+              const v = e.target.value;
+              setSnapSource(v);
+              if (v === 'upload') fileRef.current?.click(); else grabCamera(v);
+            }}
             className="max-w-full min-w-0 rounded-lg bg-ground border border-line px-2.5 py-1.5 text-[0.8125rem] text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <option value="webcam">Live webcam</option>
-            {snapVideos.map((v) => (
-              <option key={v} value={v}>{v}</option>
-            ))}
+            {cameras.length > 0 && (
+              <optgroup label="Saved cameras">
+                {cameras.map((c) => (
+                  <option key={c.id} value={c.name}>
+                    {c.name} · {c.sourceType === 'RTSP' ? 'network camera' : c.sourceType === 'UPLOAD' ? 'recorded videos' : 'webcam'}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {cameras.length === 0 && <option value={cameraId}>Webcam</option>}
+            <option value="upload">Upload a video…</option>
           </select>
           <button
             type="button"
-            onClick={() => grabSnapshot(snapSource)}
+            onClick={() => (snapSource === 'upload' ? fileRef.current?.click() : grabCamera(snapSource))}
             disabled={snapState === 'loading'}
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-alt hover:bg-surface border border-line hover:border-field text-ink-muted text-[0.8125rem] font-semibold transition-colors disabled:opacity-60"
           >
