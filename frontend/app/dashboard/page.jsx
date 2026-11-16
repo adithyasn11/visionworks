@@ -466,7 +466,7 @@ function DashboardInner() {
       {view === 'review' && (
         <div className="space-y-6 animate-view-in">
           <PageHeader eyebrow="Review" title="Flags waiting for a person" subtitle="Look at the evidence, then confirm or dismiss each flag." />
-          <ReviewQueue role={role} onCountChange={loadAlerts} />
+          <ReviewQueue role={role} onCountChange={loadAlerts} onNavigate={setView} />
         </div>
       )}
 

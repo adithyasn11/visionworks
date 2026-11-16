@@ -7,8 +7,8 @@
 // review function (audited, role-checked there), so a view-only member sees the queue but no controls.
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { ArrowRight, ClipboardCheck, Image as ImageIcon, Loader2 } from 'lucide-react';
-import { listDecisions } from '../../lib/safetyApi';
+import { CheckCircle2, ClipboardCheck, History, Image as ImageIcon, Loader2, PlayCircle } from 'lucide-react';
+import { listDecisions, getSummary } from '../../lib/safetyApi';
 import { can } from '../../lib/permissions';
 import { workerLabel } from '../../lib/zoneEvents';
 import DecisionModal from './DecisionModal';
@@ -17,7 +17,70 @@ import { BTN_QUIET, Notice, Panel, SeverityChip, fmtTime, Skeleton } from './com
 
 const PAGE = 20;
 
-export default function ReviewQueue({ role, onCountChange }) {
+/** How long a flag has waited: "5 min", "3 h", "2 days". */
+function waited(iso) {
+  const t = Date.parse(iso);
+  if (!t) return '';
+  const m = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} h`;
+  const d = Math.round(h / 24);
+  return `${d} day${d === 1 ? '' : 's'}`;
+}
+
+/** Nothing waiting: a calm, centred "all caught up" with the week's reviews and where to go next. */
+function CaughtUp({ onNavigate }) {
+  const [week, setWeek] = useState(null);
+  useEffect(() => {
+    let live = true;
+    const tz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch { return 'UTC'; } })();
+    getSummary(7, tz).then((r) => { if (live && r.ok) setWeek(r.data); });
+    return () => { live = false; };
+  }, []);
+  const stats = [
+    ['Checked', week ? week.total : '—'],
+    ['Confirmed', week ? week.confirmed : '—'],
+    ['Dismissed', week ? week.dismissed : '—'],
+  ];
+  return (
+    <div className="flex flex-col items-center justify-center text-center gap-6 py-12 lg:min-h-[calc(100dvh-20rem)]">
+      <span className="relative flex items-center justify-center w-24 h-24">
+        <span className="absolute inset-0 rounded-full bg-accent-soft" aria-hidden="true" />
+        <span className="absolute inset-3 rounded-full border-2 border-[color:var(--accent)] opacity-30" aria-hidden="true" />
+        <CheckCircle2 className="relative w-10 h-10 text-accent" strokeWidth={2.2} aria-hidden="true" />
+      </span>
+      <div>
+        <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-ink">All caught up</h2>
+        <p className="mt-2 text-[0.9375rem] text-ink-muted">No flags waiting. New ones show up here.</p>
+      </div>
+      <dl className="grid grid-cols-3 w-full max-w-md rounded-2xl border border-line divide-x divide-line overflow-hidden">
+        {stats.map(([label, value]) => (
+          <div key={label} className="px-3 py-4">
+            <dd className="text-2xl font-black text-ink tabular-nums leading-none">{value}</dd>
+            <dt className="mt-1.5 text-[0.75rem] font-bold text-ink-muted">{label}</dt>
+          </div>
+        ))}
+      </dl>
+      <p className="-mt-3 text-[0.75rem] text-ink-faint">Last 7 days</p>
+      {onNavigate && (
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button type="button" onClick={() => onNavigate('live')}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-inverse text-inverse font-bold text-[0.875rem] hover:bg-accent transition-colors">
+            <PlayCircle className="w-4 h-4" aria-hidden="true" /> Live feed
+          </button>
+          <button type="button" onClick={() => onNavigate('events')}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl border-2 border-line text-ink font-bold text-[0.875rem] hover:border-[color:var(--accent)] transition-colors">
+            <History className="w-4 h-4" aria-hidden="true" /> Past decisions
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ReviewQueue({ role, onCountChange, onNavigate }) {
   const [state, setState] = useState({ loading: true, items: [], total: 0, next: null, error: null });
   const [open, setOpen] = useState(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -51,14 +114,14 @@ export default function ReviewQueue({ role, onCountChange }) {
   }
 
   return (
-    <Panel title="Review queue" icon={ClipboardCheck} aside={state.loading ? '' : `${state.total} waiting · oldest first`}>
+    <Panel title="Review queue" icon={ClipboardCheck} aside={state.loading || !state.total ? '' : `${state.total} waiting · oldest first`}>
       {!canReview && !state.loading && (
         <Notice className="mb-3">You have view-only access: you can see what is waiting, and an administrator or manager reviews it.</Notice>
       )}
       {state.loading && <Skeleton rows={3} label="Loading the queue" />}
       {state.error && <Notice tone="error" className="mb-3">{state.error}</Notice>}
       {!state.loading && !state.error && state.items.length === 0 && (
-        <p className="text-[0.8125rem] text-ink-muted leading-relaxed">Nothing to review. New flags will appear here.</p>
+        <CaughtUp onNavigate={onNavigate} />
       )}
       {/* One card per flag; a card opens the flag in a window with its picture and everything about it. */}
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Flags waiting for review, oldest first">
@@ -70,20 +133,17 @@ export default function ReviewQueue({ role, onCountChange }) {
               <button
                 type="button"
                 onClick={() => setOpen(i)}
-                className="w-full h-full text-left rounded-2xl border border-line bg-surface p-4 flex flex-col gap-2.5 hover:border-[color:var(--accent)] hover:-translate-y-0.5 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]"
+                title={d.reason}
+                className="w-full h-full text-left rounded-2xl border border-line bg-surface p-4 flex flex-col gap-2 hover:border-[color:var(--accent)] hover:-translate-y-0.5 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]"
               >
                 <span className="flex items-center justify-between gap-2">
                   <SeverityChip severity={d.severity} />
-                  <span className="font-mono text-xs text-ink-faint tabular-nums">{fmtTime(d.observedAt)}</span>
+                  <span className="text-xs text-ink-faint tabular-nums" title={fmtTime(d.observedAt)}>{waited(d.observedAt)}</span>
                 </span>
-                <span className="text-[0.9375rem] font-black text-ink">{kind}</span>
-                <span className="text-[0.8125rem] text-ink-muted">{workerLabel(d.workerKey)}{where ? ` · ${where}` : ''}</span>
-                <span className="text-[0.8125rem] text-ink-muted leading-snug line-clamp-2">{d.reason}</span>
-                <span className="mt-auto pt-1 flex items-center justify-between text-[0.8125rem]">
-                  <span className="inline-flex items-center gap-1.5 text-ink-faint">
-                    {d.has_picture && <><ImageIcon className="w-3.5 h-3.5" aria-hidden="true" /> Picture</>}
-                  </span>
-                  <span className="inline-flex items-center gap-1 font-bold text-accent">Open <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" /></span>
+                <span className="text-[0.9375rem] font-black text-ink truncate">{kind}</span>
+                <span className="flex items-center justify-between gap-2 text-[0.8125rem] text-ink-muted min-w-0">
+                  <span className="truncate">{[workerLabel(d.workerKey), where].filter(Boolean).join(' · ')}</span>
+                  {d.has_picture && <ImageIcon className="w-3.5 h-3.5 shrink-0 text-ink-faint" aria-label="Has a picture" />}
                 </span>
               </button>
             </li>
