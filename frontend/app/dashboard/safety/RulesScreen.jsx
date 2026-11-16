@@ -54,7 +54,6 @@ const ZONE_TYPE_ERROR = /must be anchored to a RESTRICTED zone|needs a real zone
 const WHOLE = 'whole:';
 const wholeCamera = (zoneId) => (typeof zoneId === 'string' && zoneId.startsWith(WHOLE) ? zoneId.slice(WHOLE.length) : null);
 const FULL_FRAME = [[0, 0], [640, 0], [640, 360], [0, 360]];
-const SOURCE_LABELS = { UPLOAD: 'recorded videos', WEBCAM: 'webcam or phone', RTSP: 'network camera' };
 
 /** The General zones the checks refer to, each with the type it gets when they are saved. */
 function zoneChanges(form, zones) {
@@ -184,7 +183,7 @@ function RuleForm({ initial, zones, cameras = [], onSaved, onCancel, onGone, onZ
   // Every saved camera, with its zones under it; zones whose camera is not in the list (none, or removed) last.
   const groups = useMemo(() => {
     const fits = (z) => meta.zoneTypes.includes(z.safetyType) || z.safetyType === 'GENERAL';
-    const out = cameras.map((c) => ({ key: c.id, name: c.name, label: `${c.name} · ${SOURCE_LABELS[c.sourceType] || 'camera'}`, zones: zones.filter((z) => z.cameraId === c.id && fits(z)) }));
+    const out = cameras.map((c) => ({ key: c.id, name: c.name, label: c.sourceType === 'UPLOAD' ? `${c.name} · uploaded videos` : c.name, zones: zones.filter((z) => z.cameraId === c.id && fits(z)) }));
     const rest = zones.filter((z) => !cameras.some((c) => c.id === z.cameraId) && fits(z));
     if (rest.length) out.push({ key: 'other', name: null, label: 'Other zones', zones: rest });
     return out;

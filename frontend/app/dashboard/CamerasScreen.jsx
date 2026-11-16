@@ -13,7 +13,7 @@ import { addCamera, removeCamera, listSites, addSite, removeSite } from '../lib/
 import { can, denialMessage } from '../lib/permissions';
 import { Panel, Notice, Skeleton, BTN_PRIMARY, BTN_QUIET, INPUT, fmtTime } from './safety/common';
 
-const SOURCE_LABEL = { WEBCAM: 'Webcam or phone', UPLOAD: 'Recorded videos', RTSP: 'Network camera (RTSP)' };
+const SOURCE_LABEL = { WEBCAM: 'Camera', UPLOAD: 'Uploaded videos', RTSP: 'Network camera (RTSP)' };
 
 export default function CamerasScreen({ role, cameras, status, error, selected, onSelect, onChanged }) {
   const canEdit = can(role, 'cameras.edit');

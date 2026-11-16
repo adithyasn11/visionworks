@@ -22,7 +22,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { backendFetch } from '../lib/backend';
 import { subscribeToFrames, getLatestFrame } from '../lib/liveFrame';
-import PhoneCameraPanel from './PhoneCameraPanel';
 import { ZONE_TYPES, zoneTypeMeta, zoneTypeColor, zoneCanvasLabel } from '../lib/zoneTypes';
 import {
   Shapes, Plus, Trash2, Check, X, Undo2, Loader2, AlertCircle, MousePointerClick, Eye,
@@ -254,7 +253,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
     if (cam && cam.sourceType === 'UPLOAD') {
       setSnapshot((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });   // not another camera's picture
       setSnapState('error');
-      setSnapError('This camera uses recorded videos. Choose “Upload a video” to draw on one.');
+      setSnapError('This camera uses uploaded videos. Choose “Upload a video” to draw on one.');
       return;
     }
     // eslint-disable-next-line no-use-before-define
@@ -343,8 +342,6 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
   const uploadingRef = useRef(false);
   useEffect(() => {
     if (uploadingRef.current) { uploadingRef.current = false; return; }
-    // The phone panel only makes sense on a webcam-or-phone camera; on another camera, step back to its picture.
-    if (snapSource === 'phone' && (cameras.find((c) => c.name === cameraId) || {}).sourceType === 'WEBCAM') return;
     setSnapSource(cameraId);
     if (!getLatestFrame() && cameras.length) grabCamera(cameraId);
   }, [cameraId, cameras.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -354,18 +351,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
   // camera's zones and an uploaded video's zones stay apart.
   const uploadCamera = cameras.find((c) => c.name === cameraId && c.sourceType === 'UPLOAD')
     || cameras.find((c) => c.sourceType === 'UPLOAD') || null;
-  // "Phone camera" pairs a phone right here (a QR code); its live picture becomes the backdrop. A phone is a
-  // "Webcam or phone" camera, so the zones go to one of those.
-  const phoneCamera = cameras.find((c) => c.name === cameraId && c.sourceType === 'WEBCAM')
-    || cameras.find((c) => c.sourceType === 'WEBCAM') || null;
   const chooseBackdrop = (v) => {
-    if (v === 'phone') {
-      setSnapSource('phone');
-      setSnapState('idle');
-      setSnapError(null);
-      if (phoneCamera && phoneCamera.name !== cameraId && onCameraChange) { uploadingRef.current = true; onCameraChange(phoneCamera.name); }
-      return;
-    }
     if (v === 'upload') {
       setSnapSource('upload');
       if (uploadCamera && uploadCamera.name !== cameraId && onCameraChange) { uploadingRef.current = true; onCameraChange(uploadCamera.name); }
@@ -636,22 +622,21 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
             className="max-w-full min-w-0 rounded-lg bg-ground border border-line px-2.5 py-1.5 text-[0.8125rem] text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {cameras.length > 0 && (
-              <optgroup label="Saved cameras">
+              <optgroup label="Cameras">
                 {cameras.map((c) => (
                   <option key={c.id} value={c.name}>
-                    {c.name} · {c.sourceType === 'RTSP' ? 'network camera' : c.sourceType === 'UPLOAD' ? 'recorded videos' : 'webcam'}
+                    {c.name}{c.sourceType === 'UPLOAD' ? ' · uploaded videos' : ''}
                   </option>
                 ))}
               </optgroup>
             )}
-            {cameras.length === 0 && <option value={cameraId}>Webcam</option>}
-            <option value="phone">Phone camera (scan a QR code)</option>
+            {cameras.length === 0 && <option value={cameraId}>Camera</option>}
             <option value="upload">Upload a video…</option>
           </select>
           <button
             type="button"
             onClick={() => (snapSource === 'upload' ? fileRef.current?.click() : grabCamera(snapSource))}
-            disabled={snapState === 'loading' || snapSource === 'phone'}
+            disabled={snapState === 'loading'}
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-alt hover:bg-surface border border-line hover:border-field text-ink-muted text-[0.8125rem] font-semibold transition-colors disabled:opacity-60"
           >
             {snapState === 'loading'
@@ -663,17 +648,11 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
             <span className="text-xs text-accent font-medium">{snapError}</span>
           )}
           {snapSource === 'upload' && !uploadCamera && (
-            <span className="text-xs text-ink-faint">Zones are saved to {cameraId}. Add a “Recorded videos” camera to keep upload zones apart.</span>
-          )}
-          {snapSource === 'phone' && !phoneCamera && (
-            <span className="text-xs text-ink-faint">Zones are saved to {cameraId}. Add a “Webcam or phone” camera to keep phone zones apart.</span>
+            <span className="text-xs text-ink-faint">Zones are saved to {cameraId}. Add an “Uploaded videos” camera to keep upload zones apart.</span>
           )}
         </div>
       )}
-      {!readOnly && snapSource === 'phone' && (
-        // Hold the phone sideways: zones are drawn on a landscape picture.
-        <PhoneCameraPanel cameraId={cameraId} open onClose={() => chooseBackdrop(cameraId)} />
-      )}
+
 
       <div className="relative w-full rounded-xl bg-ground border border-line overflow-hidden">
         {/* The frame sits UNDER the canvas, at the same aspect ratio, so a

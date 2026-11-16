@@ -76,6 +76,8 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
   const [recordedAt, setRecordedAt] = useState('');
   // The phone panel opens from the source buttons; it pairs and controls the phone, its picture lands here.
   const [phoneOpen, setPhoneOpen] = useState(false);
+  // "Turn on camera" asks which: this computer's webcam or the phone.
+  const [camChoice, setCamChoice] = useState(false);
   const [phoneLive, setPhoneLive] = useState(false);
   const [sessionId, setSessionId] = useState('');
   const [progress, setProgress] = useState(0);
@@ -742,60 +744,64 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         onChange={handleFileChange}
       />
 
-      {/* ── Where the picture comes from: three equal choices ── */}
+      {/* ── Where the picture comes from: the camera, or an uploaded video ── */}
       {!readOnly && !phoneLive && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {isWebcamActive ? (
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {isWebcamActive ? (
+              <button
+                onClick={stopWebcamStream}
+                className="flex items-center gap-3 rounded-xl border-2 border-[color:var(--accent)] bg-accent-soft px-4 py-3 text-left transition-colors"
+              >
+                <span className="w-9 h-9 rounded-lg bg-accent text-white flex items-center justify-center shrink-0"><CameraOff className="w-4 h-4" /></span>
+                <span className="min-w-0">
+                  <span className="block text-[0.875rem] font-black text-ink">Stop camera</span>
+                  <span className="block text-[0.75rem] text-ink-muted truncate">The camera is live</span>
+                </span>
+              </button>
+            ) : (
+              <button
+                onClick={() => (isNetworkCamera ? startNetworkCamera() : (phoneOpen ? null : setCamChoice((o) => !o)))}
+                disabled={phase === 'uploading' || phoneOpen}
+                aria-expanded={isNetworkCamera ? undefined : camChoice}
+                className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0 ${
+                  camChoice || phoneOpen ? 'border-2 border-[color:var(--accent)] bg-accent-soft' : 'border border-line bg-surface hover:border-[color:var(--accent)] hover:-translate-y-0.5'
+                }`}
+              >
+                <span className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0"><Camera className="w-4 h-4" /></span>
+                <span className="min-w-0">
+                  <span className="block text-[0.875rem] font-black text-ink">{isNetworkCamera ? 'Connect camera' : 'Turn on camera'}</span>
+                  <span className="block text-[0.75rem] text-ink-muted truncate">{isNetworkCamera ? 'The network camera' : 'This computer or your phone'}</span>
+                </span>
+              </button>
+            )}
             <button
-              onClick={stopWebcamStream}
-              className="flex items-center gap-3 rounded-xl border-2 border-[color:var(--accent)] bg-accent-soft px-4 py-3 text-left transition-colors"
-            >
-              <span className="w-9 h-9 rounded-lg bg-accent text-white flex items-center justify-center shrink-0"><CameraOff className="w-4 h-4" /></span>
-              <span className="min-w-0">
-                <span className="block text-[0.875rem] font-black text-ink">Stop camera</span>
-                <span className="block text-[0.75rem] text-ink-muted truncate">{isNetworkCamera ? 'Network camera is live' : 'Webcam is live'}</span>
-              </span>
-            </button>
-          ) : (
-            <button
-              onClick={isNetworkCamera ? startNetworkCamera : startLiveWebcam}
-              disabled={phase === 'uploading' || phoneOpen}
+              onClick={() => { setCamChoice(false); fileInputRef.current?.click(); }}
+              disabled={phase === 'uploading' || isWebcamActive || phoneOpen}
               className="flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-left hover:border-[color:var(--accent)] hover:-translate-y-0.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0"
             >
-              <span className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0"><Camera className="w-4 h-4" /></span>
+              <span className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0">
+                {phase === 'uploading' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              </span>
               <span className="min-w-0">
-                <span className="block text-[0.875rem] font-black text-ink">{isNetworkCamera ? 'Connect camera' : 'Turn on camera'}</span>
-                <span className="block text-[0.75rem] text-ink-muted truncate">{isNetworkCamera ? 'The network (RTSP) camera' : 'This computer’s webcam'}</span>
+                <span className="block text-[0.875rem] font-black text-ink">{phase === 'uploading' ? 'Uploading…' : 'Upload a video'}</span>
+                <span className="block text-[0.75rem] text-ink-muted truncate">MP4, AVI, MOV · 2 GB</span>
               </span>
             </button>
+          </div>
+          {/* Which camera: this computer's webcam, or a phone (paired with a QR code). */}
+          {camChoice && !isWebcamActive && !phoneOpen && !isNetworkCamera && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => { setCamChoice(false); startLiveWebcam(); }}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-line bg-surface text-[0.8125rem] font-bold text-ink hover:border-[color:var(--accent)] transition-colors">
+                <Camera className="w-4 h-4 text-accent" /> This computer
+              </button>
+              <button type="button" onClick={() => { setCamChoice(false); setPhoneOpen(true); }}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-line bg-surface text-[0.8125rem] font-bold text-ink hover:border-[color:var(--accent)] transition-colors">
+                <Smartphone className="w-4 h-4 text-accent" /> My phone
+              </button>
+            </div>
           )}
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={phase === 'uploading' || isWebcamActive || phoneOpen}
-            className="flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-left hover:border-[color:var(--accent)] hover:-translate-y-0.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0"
-          >
-            <span className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0">
-              {phase === 'uploading' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[0.875rem] font-black text-ink">{phase === 'uploading' ? 'Uploading…' : 'Upload a video'}</span>
-              <span className="block text-[0.75rem] text-ink-muted truncate">MP4, AVI, MOV · 2 GB</span>
-            </span>
-          </button>
-          <button
-            onClick={() => setPhoneOpen((o) => !o)}
-            disabled={isWebcamActive || phase === 'uploading'}
-            className={`flex items-center gap-3 rounded-xl px-4 py-3 text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-              phoneOpen ? 'border-2 border-[color:var(--accent)] bg-accent-soft' : 'border border-line bg-surface hover:border-[color:var(--accent)] hover:-translate-y-0.5'
-            }`}
-            aria-expanded={phoneOpen}
-          >
-            <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${phoneOpen ? 'bg-accent text-white' : 'bg-accent-soft text-accent'}`}><Smartphone className="w-4 h-4" /></span>
-            <span className="min-w-0">
-              <span className="block text-[0.875rem] font-black text-ink">Use my phone</span>
-              <span className="block text-[0.75rem] text-ink-muted truncate">{phoneOpen ? 'Pairing panel open' : 'Pair it with a QR code'}</span>
-            </span>
-          </button>
         </div>
       )}
 
@@ -822,7 +828,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-accent-soft border border-[color:var(--accent)] text-[0.8125rem] text-ink">
           {PhaseIcon}
           <span className="truncate">
-            {isWebcamActive ? `🔴 ${isNetworkCamera ? 'NETWORK CAMERA' : 'LIVE WEBCAM FEED'} — ${statusMsg}` : (statusMsg || fileName)}
+            {isWebcamActive ? `Camera — ${statusMsg}` : (statusMsg || fileName)}
           </span>
           {phase === 'processing' && !isWebcamActive && (
             <span className="ml-auto text-accent shrink-0 font-bold">{progress.toFixed(1)}%</span>
@@ -873,7 +879,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         {isWebcamActive && (
           <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-accent/90 text-white font-bold text-xs font-mono flex items-center gap-1.5 shadow-lg backdrop-blur-sm animate-pulse">
             <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-            <span>LIVE WEBCAM AI</span>
+            <span>LIVE CAMERA</span>
           </div>
         )}
 
