@@ -120,6 +120,9 @@ function paint(canvas, zones, draft, hoverPoint) {
  * require manage_org_ids() in Postgres (layer 3, the one that actually holds).
  * A VIEWER still sees the zones, because reading them is permitted.
  */
+/** Frame pixels from the edge within which a clicked corner is put on the edge itself. */
+const EDGE_SNAP = 20;
+
 export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraChange, onZonesChanged, readOnly = false }) => {
   const canvasRef = useRef(null);
 
@@ -378,9 +381,13 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
     const rect = canvas.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
     const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+    // A corner clicked close to the picture's edge goes ON the edge. A person counts as in a zone by where their
+    // feet are, and someone standing at the bottom of the picture was missed by a zone that stopped a few pixels short
+    // (nobody can click exactly on the border).
+    const snap = (v, max) => (v < EDGE_SNAP ? 0 : v > max - EDGE_SNAP ? max : v);
     return [
-      Math.round(Math.max(0, Math.min(canvas.width, x))),
-      Math.round(Math.max(0, Math.min(canvas.height, y))),
+      Math.round(snap(Math.max(0, Math.min(canvas.width, x)), canvas.width)),
+      Math.round(snap(Math.max(0, Math.min(canvas.height, y)), canvas.height)),
     ];
   };
 

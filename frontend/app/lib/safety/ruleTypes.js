@@ -25,13 +25,13 @@ export const SEVERITIES = [
 export const RULE_TYPES = [
   {
     value: 'PPE_ENTRY',
-    label: 'Helmet and vest on entry',
+    label: 'Safety gear on entry',
     blurb: 'Checks the required items when someone enters the zone, or accepts a check at a PPE checkpoint shortly before. Someone not seen at the checkpoint is checked at the entry instead; skipping it is not flagged on its own.',
     zoneTypes: ['RESTRICTED'],
     enforced: () => true,
     defaults: { required_ppe: ['helmet', 'safety_vest'], mode: 'AT_ENTRY' },
     fields: [
-      { key: 'required_ppe', kind: 'ppe', label: 'Required items' },
+      { key: 'required_ppe', kind: 'ppe', label: 'Items to look for' },
       { key: 'mode', kind: 'select', label: 'When it is checked', options: [
         { value: 'AT_ENTRY', label: 'At the moment of entry' },
         { value: 'VIA_CHECKPOINT', label: 'At a PPE checkpoint beforehand' },
@@ -54,13 +54,13 @@ export const RULE_TYPES = [
   },
   {
     value: 'PPE_CONTINUOUS',
-    label: 'Keep helmet and vest on while inside',
+    label: 'Safety gear kept on inside',
     blurb: 'Raises a flag for review when a required item is clearly not seen, without a break, for longer than the grace period while someone is in the zone. If the picture is unclear, nothing is flagged.',
     zoneTypes: ['RESTRICTED'],
     enforced: () => true,
     defaults: { required_ppe: ['helmet', 'safety_vest'], grace_seconds: 3 },
     fields: [
-      { key: 'required_ppe', kind: 'ppe', label: 'Required items' },
+      { key: 'required_ppe', kind: 'ppe', label: 'Items to look for' },
       { key: 'grace_seconds', kind: 'number', label: 'Grace period (seconds)', min: 1, max: 30, step: 1 },
     ],
   },

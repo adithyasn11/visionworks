@@ -19,33 +19,50 @@ import { RULE_TYPES, SEVERITIES, PPE_ITEMS, defaultParams, friendlyRuleError, is
 import { can } from '../../lib/permissions';
 import { BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel, SeverityChip, Skeleton } from './common';
 
-const BLANK = { id: null, name: '', type: 'PPE_ENTRY', zoneId: '', severity: 'WARNING', isEnabled: true, minEvidenceConfidence: 0.6, params: defaultParams('PPE_ENTRY') };
 const ZONE_TYPE_LABELS = { PPE_CHECKPOINT: 'PPE checkpoint', APPROACH: 'Approach', RESTRICTED: 'Restricted', EXIT: 'Exit', GENERAL: 'General' };
+
+// One form can add several checks for the same place (say, safety gear on entry AND a time limit): each checked kind
+// is saved as its own rule, with its own settings, sharing the name, place and seriousness.
+const newForm = () => ({ id: null, name: '', types: ['PPE_ENTRY'], paramsByType: { PPE_ENTRY: defaultParams('PPE_ENTRY') }, zoneId: '',
+  severity: 'WARNING', isEnabled: true, minEvidenceConfidence: 0.6 });
 
 function formFromRule(rule) {
   return {
-    id: rule.id, name: rule.name, type: rule.type, zoneId: rule.zoneId || '', severity: rule.severity, isEnabled: rule.isEnabled,
-    minEvidenceConfidence: rule.minEvidenceConfidence, params: { ...defaultParams(rule.type), ...(rule.params || {}) },
+    id: rule.id, name: rule.name, types: [rule.type], paramsByType: { [rule.type]: { ...defaultParams(rule.type), ...(rule.params || {}) } },
+    zoneId: rule.zoneId || '', severity: rule.severity, isEnabled: rule.isEnabled, minEvidenceConfidence: rule.minEvidenceConfidence,
+  };
+}
+
+/** What the place must be for every checked kind: the zone types they all accept, and whether "everywhere" is allowed. */
+function combinedMeta(types) {
+  const metas = types.map(ruleTypeMeta).filter(Boolean);
+  if (!metas.length) return { zoneTypes: [], zoneOptional: false };
+  return {
+    zoneTypes: metas[0].zoneTypes.filter((t) => metas.every((m) => m.zoneTypes.includes(t))),
+    zoneOptional: metas.every((m) => m.zoneOptional),
   };
 }
 
 // A zone drawn on the Zones page starts as General, which no rule attaches to. Such a zone is still offered here
-// (marked), and saving the rule gives it the type the rule needs. Only General zones are offered this way, so
-// saving a rule never turns a zone that already has a safety meaning into something else.
-// A helmet-and-vest or exit rule needs a Restricted zone; any other rule gets an Approach zone, which has no built-in helmet check.
-const mainTarget = (meta) => (meta.zoneTypes.length === 1 ? meta.zoneTypes[0] : 'APPROACH');
+// (marked), and saving gives it the type the checks need. Only General zones are offered this way, so saving never
+// turns a zone that already has a safety meaning into something else. Safety-gear and exit checks need a Restricted
+// zone; any other mix gets an Approach zone, which has no built-in safety-gear check.
+const mainTarget = (meta) => (meta.zoneTypes.length === 1 ? meta.zoneTypes[0] : meta.zoneTypes.includes('APPROACH') ? 'APPROACH' : meta.zoneTypes[0]);
 const ZONE_TYPE_ERROR = /must be anchored to a RESTRICTED zone|needs a real zone|checkpoint_zone_id must be|exit_zone_id must be/i;
 
-/** The General zones a rule refers to, each with the type it gets when the rule is saved. */
-function zoneChanges(form, meta, zones) {
+/** The General zones the checks refer to, each with the type it gets when they are saved. */
+function zoneChanges(form, zones) {
   const out = [];
   const add = (id, to) => {
     const z = zones.find((x) => x.id === id);
     if (z && z.safetyType === 'GENERAL' && !out.some((c) => c.zone.id === z.id)) out.push({ zone: z, to });
   };
-  if (form.zoneId) add(form.zoneId, mainTarget(meta));
-  meta.fields.forEach((f) => {
-    if (f.kind === 'zone' && (!f.when || f.when(form.params)) && form.params[f.key]) add(form.params[f.key], f.zoneTypes[0]);
+  if (form.zoneId) add(form.zoneId, mainTarget(combinedMeta(form.types)));
+  form.types.forEach((t) => {
+    const params = form.paramsByType[t] || {};
+    (ruleTypeMeta(t)?.fields || []).forEach((f) => {
+      if (f.kind === 'zone' && (!f.when || f.when(params)) && params[f.key]) add(params[f.key], f.zoneTypes[0]);
+    });
   });
   return out;
 }
@@ -141,7 +158,7 @@ function ParamField({ field, form, setParams, zones }) {
   );
 }
 
-function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged }) {
+function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged, onListChanged }) {
   const [form, setForm] = useState(initial);
   const [check, setCheck] = useState({ state: 'idle' });
   const [saving, setSaving] = useState(false);
@@ -150,47 +167,63 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged })
   // The form opens below the list: bring it into view (and focus its first field) so the click visibly did something.
   useEffect(() => { const el = formRef.current; if (el) { el.scrollIntoView({ block: "nearest", behavior: "smooth" }); const f = el.querySelector("input, select"); if (f) f.focus({ preventScroll: true }); } }, []);
   const [error, setError] = useState(null);
-  const meta = ruleTypeMeta(form.type);
   const editing = Boolean(form.id);
-  const setParams = (patch) => setForm((f) => ({ ...f, params: { ...f.params, ...patch } }));
+  const meta = useMemo(() => combinedMeta(form.types), [form.types]);
   const zoneChoices = useMemo(() => zones.filter((z) => meta.zoneTypes.includes(z.safetyType)), [zones, meta]);
   const generalZones = useMemo(() => zones.filter((z) => z.safetyType === 'GENERAL'), [zones]);
-  const changes = useMemo(() => zoneChanges(form, meta, zones), [form, meta, zones]);
-  const body = useMemo(() => ruleBody(form), [form]);
+  const changes = useMemo(() => zoneChanges(form, zones), [form, zones]);
+  const many = form.types.length > 1;
+  const labelOf = (t) => (ruleTypeMeta(t) || {}).label || t;
+  // One rule per checked kind; with several, each name says which check it is.
+  const bodies = useMemo(() => form.types.map((t) => ruleBody({
+    ...form, type: t, params: form.paramsByType[t] || {}, name: many && form.name.trim() ? `${form.name.trim().slice(0, 157 - labelOf(t).length)} · ${labelOf(t)}` : form.name,
+  })), [form, many]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Ask the server whether this rule is acceptable, shortly after the last change, so a mistake is named
+  const setParamsFor = (t) => (patch) => setForm((f) => ({ ...f, paramsByType: { ...f.paramsByType, [t]: { ...f.paramsByType[t], ...patch } } }));
+  function toggleType(t, on) {
+    setForm((f) => {
+      const types = on ? RULE_TYPES.map((x) => x.value).filter((v) => v === t || f.types.includes(v)) : f.types.filter((x) => x !== t);
+      const paramsByType = { ...f.paramsByType };
+      if (on && !paramsByType[t]) paramsByType[t] = defaultParams(t);
+      return { ...f, types, paramsByType };
+    });
+  }
+
+  // Ask the server whether these rules are acceptable, shortly after the last change, so a mistake is named
   // while it is being made and not after Save.
   const token = useRef(0);
   useEffect(() => {
-    if (!body.name) { setCheck({ state: 'idle' }); return undefined; }
+    if (!form.name.trim() || !bodies.length) { setCheck({ state: 'idle' }); return undefined; }
     setCheck({ state: 'checking' });
     const mine = ++token.current;
     const timer = setTimeout(async () => {
-      const r = await validateRule(body);
+      const results = await Promise.all(bodies.map((body) => validateRule(body)));
       if (mine !== token.current) return;
-      if (!r.ok) setCheck({ state: 'error', message: friendlyRuleError(r.message) });
-      else if (r.data.valid) setCheck({ state: 'valid', enforced: r.data.evaluated_by_engine });
-      else if (changes.length && r.data.errors.every((x) => ZONE_TYPE_ERROR.test(x))) setCheck({ state: 'valid', enforced: true });
-      else setCheck({ state: 'invalid', errors: r.data.errors });
+      const failed = results.find((r) => !r.ok);
+      if (failed) { setCheck({ state: 'error', message: friendlyRuleError(failed.message) }); return; }
+      const errors = [];
+      results.forEach((r, i) => {
+        if (r.data.valid) return;
+        const own = r.data.errors.filter((x) => !(changes.length && ZONE_TYPE_ERROR.test(x)));
+        own.forEach((x) => errors.push(many ? `${labelOf(form.types[i])}: ${friendlyRuleError(x)}` : friendlyRuleError(x)));
+      });
+      if (errors.length) setCheck({ state: 'invalid', errors });
+      else setCheck({ state: 'valid', enforced: results.every((r) => r.data.valid ? r.data.evaluated_by_engine : true) });
     }, 450);
     return () => clearTimeout(timer);
-  }, [body, changes.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function changeType(type) {
-    setForm((f) => ({ ...f, type, zoneId: '', params: defaultParams(type) }));
-  }
+  }, [bodies, changes.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save(e) {
     e.preventDefault();
-    // The button stays clickable while the live check runs (a click right after typing used to do nothing at
-    // all); a missing name or a known problem is named here, and the server validates the rule again on save.
-    if (!body.name) { setError('Give the rule a name.'); return; }
-    if (check.state === 'invalid') { setError(check.errors.map(friendlyRuleError).join(' ')); return; }
+    if (!form.name.trim()) { setError('Give the rule a name.'); return; }
+    if (!form.types.length) { setError('Choose at least one check.'); return; }
+    if (check.state === 'invalid') { setError(check.errors.join(' ')); return; }
     // A ref, not the `saving` state: a double click sends the second click before React has re-rendered the
     // button as disabled, and that used to create the rule twice.
     if (inFlight.current) return;
     inFlight.current = true;
     setSaving(true); setError(null);
+    const stop = (msg) => { inFlight.current = false; setSaving(false); setError(msg); };
     for (const c of changes) {
       try {
         const res = await backendFetch(`/api/v1/zones/${encodeURIComponent(c.zone.slug)}`, {
@@ -198,45 +231,77 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged })
         });
         if (!res.ok) throw new Error(String(res.status));
       } catch {
-        inFlight.current = false; setSaving(false);
-        setError(`Could not make "${c.zone.name}" a ${ZONE_TYPE_LABELS[c.to]} zone. Change its type on the Zones page, then try again.`);
+        stop(`Could not make "${c.zone.name}" ${/^[AEIOU]/.test(ZONE_TYPE_LABELS[c.to]) ? 'an' : 'a'} ${ZONE_TYPE_LABELS[c.to]} zone. Change its type on the Zones page, then try again.`);
         return;
       }
     }
     if (changes.length && onZonesChanged) await onZonesChanged();
-    // An update may not carry `type` (a rule's kind cannot change, and the API refuses unknown fields), so it is left
-    // out of the PATCH; validation above still sends it, because the validator needs to know the kind.
-    const { type: _kind, ...patch } = body;
-    const r = editing ? await updateRule(form.id, patch) : await createRule(body);
-    inFlight.current = false;
-    setSaving(false);
-    // Deleted meanwhile (in another window, or by someone else): close the form and refresh the list, rather than
-    // leave "Rule not found." under a form for a rule that is still listed.
-    if (!r.ok && editing && r.status === 404 && onGone) { onGone(); return; }
-    if (!r.ok) { setError(friendlyRuleError(r.message)); return; }
-    onSaved(r.data);
+
+    if (editing) {
+      // An update may not carry `type` (a rule's kind cannot change, and the API refuses unknown fields).
+      const { type: _kind, ...patch } = bodies[0];
+      const r = await updateRule(form.id, patch);
+      inFlight.current = false; setSaving(false);
+      // Deleted meanwhile (in another window, or by someone else): close the form and refresh the list.
+      if (!r.ok && r.status === 404 && onGone) { onGone(); return; }
+      if (!r.ok) { setError(friendlyRuleError(r.message)); return; }
+      onSaved(1);
+      return;
+    }
+
+    // One rule per check, in order. If one is refused, the ones already saved stay saved and leave the form, so
+    // pressing Create again does not add them twice.
+    const saved = [];
+    for (let i = 0; i < bodies.length; i += 1) {
+      const r = await createRule(bodies[i]);
+      if (!r.ok) {
+        const t = form.types[i];
+        if (saved.length) {
+          setForm((f) => ({ ...f, types: f.types.filter((x) => !saved.includes(x)) }));
+          if (onListChanged) onListChanged();
+        }
+        stop(`${saved.length ? `Saved: ${saved.map(labelOf).join(', ')}. ` : ''}${many ? `${labelOf(t)}: ` : ''}${friendlyRuleError(r.message)}`);
+        return;
+      }
+      saved.push(form.types[i]);
+    }
+    inFlight.current = false; setSaving(false);
+    onSaved(saved.length);
   }
 
   return (
     <form ref={formRef} onSubmit={save} className="flex flex-col gap-3 rounded-lg border border-line bg-surface-alt/40 p-3 sm:p-4" aria-label={editing ? 'Edit rule' : 'New rule'}>
-      <div className="flex flex-wrap gap-3">
-        <label className="flex flex-col gap-1 text-xs text-ink-faint flex-1 min-w-[200px]">Name
-          <input value={form.name} maxLength={160} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="For example: Hard hat and vest at the press" className={INPUT} required />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-ink-faint">What to check
-          <select value={form.type} disabled={editing} onChange={(e) => changeType(e.target.value)} className={INPUT}>
-            {RULE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-        </label>
-      </div>
-      <p className="text-xs text-ink-faint">{meta.blurb}{editing ? ' The kind of rule cannot be changed; make a new rule instead.' : ''}</p>
+      <label className="flex flex-col gap-1 text-xs text-ink-faint">Name
+        <input value={form.name} maxLength={140} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="For example: Press area" className={INPUT} required />
+      </label>
+
+      {/* What to check: one or more. Each checked kind has its own settings below. */}
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="text-xs text-ink-faint mb-1">What to check{editing ? '' : ' (choose one or more)'}</legend>
+        {editing ? (
+          <p className="text-[0.875rem] font-bold text-ink">{labelOf(form.types[0])}</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+            {RULE_TYPES.filter((t) => t.enforced({})).map((t) => {
+              const on = form.types.includes(t.value);
+              return (
+                <label key={t.value} title={t.blurb}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[0.8125rem] cursor-pointer transition-colors ${on ? 'border-[color:var(--accent)] bg-accent-soft text-ink font-bold' : 'border-line text-ink-muted hover:border-field'}`}>
+                  <input type="checkbox" checked={on} onChange={(e) => toggleType(t.value, e.target.checked)} className="accent-[color:var(--accent)]" />
+                  {t.label}
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </fieldset>
 
       <div className="flex flex-wrap gap-3">
         <label className="flex flex-col gap-1 text-xs text-ink-faint">Where{meta.zoneOptional ? ' (optional)' : ''}
-          <select value={form.zoneId} onChange={(e) => setForm({ ...form, zoneId: e.target.value, params: { ...form.params, ...(form.params.checkpoint_zone_id !== undefined ? { checkpoint_zone_id: '' } : {}), ...(form.params.exit_zone_id !== undefined ? { exit_zone_id: '' } : {}) } })} className={INPUT}>
+          <select value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value, paramsByType: Object.fromEntries(Object.entries(f.paramsByType).map(([t, p]) => [t, { ...p, ...(p.checkpoint_zone_id !== undefined ? { checkpoint_zone_id: '' } : {}), ...(p.exit_zone_id !== undefined ? { exit_zone_id: '' } : {}) }])) }))} className={INPUT}>
             <option value="">{meta.zoneOptional ? 'Everywhere (every camera)' : 'Choose a zone'}</option>
             {zoneChoices.map((z) => <option key={z.id} value={z.id}>{z.name}{z.camera ? ` (${z.camera})` : ''} · {ZONE_TYPE_LABELS[z.safetyType]}</option>)}
-            {generalZones.length > 0 && (
+            {generalZones.length > 0 && meta.zoneTypes.length > 0 && (
               <optgroup label={`General zones (become ${ZONE_TYPE_LABELS[mainTarget(meta)]})`}>
                 {generalZones.map((z) => <option key={z.id} value={z.id}>{z.name}{z.camera ? ` (${z.camera})` : ''}</option>)}
               </optgroup>
@@ -256,36 +321,47 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged })
         </label>
       </div>
       {changes.length > 0 && (
-        <Notice>{changes.map((c) => `"${c.zone.name}" becomes ${/^[AEIOU]/.test(ZONE_TYPE_LABELS[c.to]) ? "an" : "a"} ${ZONE_TYPE_LABELS[c.to]} zone`).join('; ')} when you save.</Notice>
+        <Notice>{changes.map((c) => `"${c.zone.name}" becomes ${/^[AEIOU]/.test(ZONE_TYPE_LABELS[c.to]) ? 'an' : 'a'} ${ZONE_TYPE_LABELS[c.to]} zone`).join('; ')} when you save.</Notice>
       )}
-      {zoneChoices.length === 0 && generalZones.length === 0 && !meta.zoneOptional && (
-        <Notice>There is no {meta.zoneTypes.map((t) => ZONE_TYPE_LABELS[t].toLowerCase()).join(' or ')} zone yet. Draw one in Zones and set its type, then come back.</Notice>
+      {form.types.length > 0 && zoneChoices.length === 0 && generalZones.length === 0 && !meta.zoneOptional && (
+        <Notice>There is no {meta.zoneTypes.map((t) => ZONE_TYPE_LABELS[t].toLowerCase()).join(' or ')} zone yet. Draw one in Zones, then come back.</Notice>
       )}
 
-      <div className="flex flex-wrap gap-3">
-        {meta.fields.map((f) => <ParamField key={f.key} field={f} form={form} setParams={setParams} zones={zones} />)}
-      </div>
+      {/* Each checked kind's own settings. */}
+      {form.types.map((t) => {
+        const m = ruleTypeMeta(t);
+        if (!m || !m.fields.length) return null;
+        const pf = { ...form, params: form.paramsByType[t] || {} };
+        return (
+          <div key={t} className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3">
+            <p className="text-[0.8125rem] font-bold text-ink">{m.label}</p>
+            <div className="flex flex-wrap gap-3">
+              {m.fields.map((f) => <ParamField key={f.key} field={f} form={pf} setParams={setParamsFor(t)} zones={zones} />)}
+            </div>
+          </div>
+        );
+      })}
 
       <label className="inline-flex items-center gap-2 text-[0.8125rem] text-ink-muted self-start cursor-pointer">
         <input type="checkbox" checked={form.isEnabled} onChange={(e) => setForm({ ...form, isEnabled: e.target.checked })} className="accent-[color:var(--accent)]" />
-        This rule is on
+        {many ? 'These rules are on' : 'This rule is on'}
       </label>
 
       <div aria-live="polite" className="min-h-[1.25rem]">
         {check.state === 'checking' && <p className="flex items-center gap-2 text-[0.8125rem] text-ink-faint"><Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> Checking…</p>}
         {check.state === 'valid' && (
           <Notice tone="ok">
-            This rule is valid. {check.enforced ? 'The safety engine acts on it from the next run of a camera.' : 'It will be saved, but the safety engine does not act on this kind of rule yet.'}
+            {many ? `All ${form.types.length} checks are valid.` : 'This rule is valid.'} {check.enforced ? 'They apply from the next run of a camera.' : 'Saved, but the safety engine does not act on every one of these yet.'}
           </Notice>
         )}
-        {check.state === 'invalid' && <Notice tone="error">{check.errors.map(friendlyRuleError).join(' ')}</Notice>}
+        {check.state === 'invalid' && <Notice tone="error">{check.errors.join(' ')}</Notice>}
         {check.state === 'error' && <Notice tone="error">{check.message}</Notice>}
       </div>
       {/* Not twice: a save refused for the reason the live check above already shows. */}
-      {error && !(check.state === 'invalid' && error === check.errors.map(friendlyRuleError).join(' ')) && <Notice tone="error">{error}</Notice>}
+      {error && !(check.state === 'invalid' && error === check.errors.join(' ')) && <Notice tone="error">{error}</Notice>}
       <div className="flex gap-2">
         <button type="submit" disabled={saving} className={BTN_PRIMARY}>
-          {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />} {editing ? 'Save changes' : 'Create rule'}
+          {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />} {editing ? 'Save changes' : many ? `Create ${form.types.length} rules` : 'Create rule'}
         </button>
         <button type="button" onClick={onCancel} className={BTN_QUIET}>Cancel</button>
       </div>
@@ -389,7 +465,7 @@ export default function RulesScreen({ role }) {
         </ul>
 
         {canEdit && !editing && (
-          <button type="button" onClick={() => { setEditing({ ...BLANK, params: defaultParams('PPE_ENTRY') }); setMessage(null); }} className={`${BTN_PRIMARY} mt-3`}>
+          <button type="button" onClick={() => { setEditing(newForm()); setMessage(null); }} className={`${BTN_PRIMARY} mt-3`}>
             <Plus className="w-3.5 h-3.5" aria-hidden="true" /> New rule
           </button>
         )}
@@ -397,7 +473,8 @@ export default function RulesScreen({ role }) {
 
       {canEdit && editing && (
         <RuleForm key={editing.id || 'new'} initial={editing} zones={zones} onZonesChanged={loadZones}
-          onSaved={() => { setEditing(null); setMessage({ tone: 'ok', text: 'The rule was saved. It applies from the next run of a camera.' }); load(); }}
+          onListChanged={load}
+          onSaved={(n) => { setEditing(null); setMessage({ tone: 'ok', text: `${n > 1 ? `${n} rules were saved` : 'The rule was saved'}. ${n > 1 ? 'They apply' : 'It applies'} from the next run of a camera.` }); load(); }}
           onCancel={() => setEditing(null)} onGone={gone} />
       )}
     </div>
