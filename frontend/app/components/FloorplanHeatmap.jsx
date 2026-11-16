@@ -138,11 +138,19 @@ export const FloorplanHeatmap = ({ compact = false }) => {
         blur: 0.8,
         gradient: GRADIENT,
       });
+      // heatmap.js sets its box to position: relative, which collapsed this absolutely-placed box to zero height:
+      // put it back, so the box (and the canvas sized from it) fills the panel.
+      container.style.position = 'absolute';
     }
 
     const paint = () => {
       const { width, height } = container.getBoundingClientRect();
       if (!width || !height) return;
+      // heatmap.js sizes its canvas once, when it is created; a box that later narrows (a scrollbar appearing,
+      // a panel opening) left the canvas a few pixels wider than the box. Keep the canvas the box's size.
+      const renderer = heatmapRef.current._renderer;
+      const w = Math.floor(width), h = Math.floor(height);
+      if (renderer && renderer.setDimensions && (renderer._width !== w || renderer._height !== h)) renderer.setDimensions(w, h);
 
       heatmapRef.current.setData({
         max: state.data?.max || 1,

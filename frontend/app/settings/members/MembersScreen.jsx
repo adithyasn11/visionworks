@@ -220,7 +220,7 @@ function MemberRow({ member, canManage, isLastActiveAdmin, busyId, onAction }) {
             <span className="text-[0.625rem] font-black uppercase tracking-wider text-ink-faint">You</span>
           )}
         </div>
-        <div className="text-[0.75rem] text-ink-muted truncate">
+        <div className="text-[0.75rem] text-ink-muted break-words">
           {member.fullName ? member.email : null}
           {member.status === 'ACTIVE' && member.joinedAt && (
             <span className="text-ink-faint">

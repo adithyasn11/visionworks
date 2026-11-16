@@ -13,6 +13,7 @@ import {
   TrendingUp, Users,
 } from 'lucide-react';
 import { getSummary } from '../lib/safetyApi';
+import { listSafetyZones } from '../lib/safety/management';
 import { Notice, Skeleton } from './safety/common';
 import SafetyAlertsPanel from './SafetyAlertsPanel';
 
@@ -146,6 +147,15 @@ export default function OverviewScreen({
     return () => { live = false; };
   }, [days, refreshKey]);
 
+  // Zones across every camera (the Live feed's camera picker only holds the selected camera's).
+  const [zoneCount, setZoneCount] = useState(null);
+  useEffect(() => {
+    let live = true;
+    listSafetyZones().then((r) => { if (live && !r.error) setZoneCount((r.zones || []).length); });
+    return () => { live = false; };
+  }, [refreshKey, activeZones.length]);
+  const zonesTotal = zoneCount ?? activeZones.length;
+
   const d = state.data;
   const firstName = (user?.fullName || '').trim().split(/\s+/)[0] || null;
   const waiting = alerts.status === 'ready' || alerts.count > 0 ? alerts.count : (d ? d.open_alerts : 0);
@@ -166,7 +176,7 @@ export default function OverviewScreen({
 
   const steps = [
     { title: 'Add a camera', text: 'Register the camera or recording the checks will use.', view: 'cameras', cta: 'Add a camera', done: cameras.length > 0 },
-    { title: 'Draw your zones', text: 'Mark the PPE checkpoint and the restricted area on its view.', view: 'zones', cta: 'Draw zones', done: activeZones.length > 0 },
+    { title: 'Draw your zones', text: 'Mark the PPE checkpoint and the restricted area on its view.', view: 'zones', cta: 'Draw zones', done: zonesTotal > 0 },
     { title: 'Run a check', text: 'Upload a video or turn the camera on. Verdicts appear here.', view: 'live', cta: 'Open live feed', done: Boolean(d && d.total > 0) },
   ];
 
@@ -247,7 +257,7 @@ export default function OverviewScreen({
             <div className="grid grid-cols-3 gap-3">
               {[
                 { icon: Camera, label: 'Cameras', value: planUsage?.cameras?.used ?? cameras.length, max: planUsage?.cameras?.max, view: 'cameras' },
-                { icon: MapPin, label: 'Zones', title: cameraId && cameras.length ? `Zones on ${cameraId}` : 'Zones', value: activeZones.length, view: 'zones' },
+                { icon: MapPin, label: 'Zones', title: 'Zones on all cameras', value: zonesTotal, view: 'zones' },
                 { icon: Users, label: 'Members', value: planUsage?.seats?.used ?? '—', max: planUsage?.seats?.max, view: 'members' },
               ].map(({ icon: Icon, label, title, value, max, view }) => (
                 <button key={label} type="button" title={title || label} onClick={() => onNavigate(view)} className="text-left rounded-2xl border border-line px-4 py-3.5 hover:border-[color:var(--accent)] transition-colors min-w-0">
