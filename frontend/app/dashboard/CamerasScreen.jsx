@@ -139,13 +139,13 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
     }
   };
 
-  const LABEL = 'grid gap-1 text-[0.78125rem] font-semibold text-ink-muted';
+  const LABEL = 'grid grid-cols-[minmax(0,1fr)] gap-1 min-w-0 text-[0.78125rem] font-semibold text-ink-muted';
+  const FIELD = `${INPUT} w-full min-w-0`;
 
   // Cameras grouped by the site they belong to; a camera whose site is gone sits under "No site".
   const groups = sites.rows.map((site) => ({ site, cams: cameras.filter((c) => c.siteId === site.id) }));
   const loose = cameras.filter((c) => !sites.rows.some((x) => x.id === c.siteId));
   if (loose.length && sites.status === 'ready') groups.push({ site: null, cams: loose });
-  const addHere = (id) => { if (id) setSiteId(id); nameRef.current?.focus(); };
 
   const cameraBox = (cam) => {
     const Icon = cam.sourceType === 'UPLOAD' ? Upload : Video;
@@ -178,7 +178,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
             </>
           )}
         </div>
-        <p className="text-[0.75rem] text-ink-faint">{zs.length} zone{zs.length === 1 ? '' : 's'} · {rc} rule{rc === 1 ? '' : 's'} checked</p>
+        <p className="text-[0.75rem] text-ink-faint">{rc} rule{rc === 1 ? '' : 's'} checked</p>
         {confirming === cam.id && <p className="text-[0.78125rem] text-ink-muted">Its zones and history go too. Click again to remove.</p>}
         <div className="mt-auto flex flex-wrap items-center gap-2">
           {!inUse && <button type="button" className={BTN_QUIET} onClick={() => onSelect?.(cam.name)}>Use this camera</button>}
@@ -206,15 +206,15 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
       {/* Adding: a camera and a site, side by side. */}
       <div className={`grid grid-cols-1 gap-4 ${canEditSites ? 'xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]' : ''}`}>
         {canEdit ? (
-          <Panel title="Add a camera" icon={Plus}>
+          <Panel title="New camera" icon={Camera}>
             <form onSubmit={submit} className={`grid grid-cols-1 gap-3 items-end ${sites.rows.length > 1 ? 'sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]' : 'sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]'}`}>
               <label className={LABEL}>
                 Name
-                <input ref={nameRef} className={INPUT} value={name} onChange={(e) => setName(e.target.value)} maxLength={64} placeholder="e.g. Gate camera" required />
+                <input ref={nameRef} className={FIELD} value={name} onChange={(e) => setName(e.target.value)} maxLength={64} placeholder="e.g. Gate camera" required />
               </label>
               <label className={LABEL}>
                 Video comes from
-                <select className={INPUT} value={source} onChange={(e) => setSource(e.target.value)}>
+                <select className={FIELD} value={source} onChange={(e) => setSource(e.target.value)}>
                   <option value="WEBCAM">{SOURCE_LABEL.WEBCAM}</option>
                   <option value="UPLOAD">{SOURCE_LABEL.UPLOAD}</option>
                   <option value="RTSP">{SOURCE_LABEL.RTSP}</option>
@@ -223,7 +223,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
               {sites.rows.length > 1 && (
                 <label className={LABEL}>
                   Site
-                  <select className={INPUT} value={siteId} onChange={(e) => setSiteId(e.target.value)}>
+                  <select className={FIELD} value={siteId} onChange={(e) => setSiteId(e.target.value)}>
                     {sites.rows.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
                   </select>
                 </label>
@@ -236,7 +236,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                 <label className={`${LABEL} col-span-full`} title="Kept on the server. It can include the camera's user name and password.">
                   Stream address
                   <input
-                    className={INPUT}
+                    className={FIELD}
                     value={rtspUrl}
                     onChange={(e) => setRtspUrl(e.target.value)}
                     maxLength={1024}
@@ -255,11 +255,11 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
         )}
 
         {canEditSites && (
-          <Panel title="Add a site" icon={MapPin}>
+          <Panel title="New site" icon={MapPin}>
             <form onSubmit={submitSite} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-end">
               <label className={LABEL}>
                 Name
-                <input className={INPUT} value={siteName} onChange={(e) => setSiteName(e.target.value)} maxLength={160} placeholder="e.g. Plant 2, Warehouse" />
+                <input className={FIELD} value={siteName} onChange={(e) => setSiteName(e.target.value)} maxLength={160} placeholder="e.g. Plant 2, Warehouse" />
               </label>
               <button type="submit" className={`${BTN_PRIMARY} py-2`} disabled={siteBusy || !siteName.trim()}>
                 {siteBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Plus className="w-3.5 h-3.5" aria-hidden="true" />}
@@ -306,17 +306,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
           </header>
           <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
             {cams.map(cameraBox)}
-            {canEdit && site && (
-              <li className="min-w-0">
-                <button type="button" onClick={() => addHere(site.id)}
-                  className="w-full h-full min-h-[9rem] rounded-2xl border-2 border-dashed border-line text-ink-muted hover:text-accent hover:border-[color:var(--accent)] transition-colors flex flex-col items-center justify-center gap-2 px-4 text-center">
-                  <Plus className="w-5 h-5" aria-hidden="true" />
-                  <span className="text-[0.875rem] font-bold">{cams.length ? 'Add another camera here' : 'Add a camera here'}</span>
-                  {cams.length === 0 && <span className="text-[0.75rem] text-ink-faint">Results are only saved once a camera is added.</span>}
-                </button>
-              </li>
-            )}
-            {!canEdit && cams.length === 0 && <li className="text-[0.8125rem] text-ink-muted">No cameras here yet.</li>}
+            {cams.length === 0 && <li className="col-span-full text-[0.8125rem] text-ink-muted">No cameras here yet. Add one above and pick this site.</li>}
           </ul>
         </section>
       ))}
