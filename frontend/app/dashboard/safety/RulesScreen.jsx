@@ -14,6 +14,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, Pencil, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { createRule, deleteRule, listRules, updateRule, validateRule } from '../../lib/safetyApi';
 import { listSafetyZones } from '../../lib/safety/management';
+import { listCameras } from '../../lib/platform/cameras';
 import { backendFetch } from '../../lib/backend';
 import { RULE_TYPES, SEVERITIES, PPE_ITEMS, defaultParams, friendlyRuleError, isEnforced, ruleBody, ruleSummary, ruleTypeMeta } from '../../lib/safety/ruleTypes';
 import { can } from '../../lib/permissions';
@@ -49,6 +50,11 @@ function combinedMeta(types) {
 // zone; any other mix gets an Approach zone, which has no built-in safety-gear check.
 const mainTarget = (meta) => (meta.zoneTypes.length === 1 ? meta.zoneTypes[0] : meta.zoneTypes.includes('APPROACH') ? 'APPROACH' : meta.zoneTypes[0]);
 const ZONE_TYPE_ERROR = /must be anchored to a RESTRICTED zone|needs a real zone|checkpoint_zone_id must be|exit_zone_id must be/i;
+// "whole:<camera name>": the camera's full picture. Saving makes a zone covering it (640 x 360, the space zones are in).
+const WHOLE = 'whole:';
+const wholeCamera = (zoneId) => (typeof zoneId === 'string' && zoneId.startsWith(WHOLE) ? zoneId.slice(WHOLE.length) : null);
+const FULL_FRAME = [[0, 0], [640, 0], [640, 360], [0, 360]];
+const SOURCE_LABELS = { UPLOAD: 'recorded videos', WEBCAM: 'webcam or phone', RTSP: 'network camera' };
 
 /** The General zones the checks refer to, each with the type it gets when they are saved. */
 function zoneChanges(form, zones) {
@@ -98,7 +104,7 @@ function DurationField({ field, value, onChange }) {
   );
 }
 
-function ParamField({ field, form, setParams, zones }) {
+function ParamField({ field, form, setParams, zones, cameras = [] }) {
   const value = form.params[field.key];
   if (field.when && !field.when(form.params)) return null;
   const id = `rule-${field.key}`;
@@ -132,7 +138,9 @@ function ParamField({ field, form, setParams, zones }) {
     );
   }
   if (field.kind === 'zone') {
-    const camera = (zones.find((z) => z.id === form.zoneId) || {}).cameraId;
+    const camera = wholeCamera(form.zoneId)
+      ? (cameras.find((c) => c.name === wholeCamera(form.zoneId)) || {}).id
+      : (zones.find((z) => z.id === form.zoneId) || {}).cameraId;
     const sameCamera = (z) => !camera || z.cameraId === camera;
     const options = zones.filter((z) => field.zoneTypes.includes(z.safetyType) && sameCamera(z));
     const general = zones.filter((z) => z.safetyType === 'GENERAL' && z.id !== form.zoneId && sameCamera(z));
@@ -158,7 +166,7 @@ function ParamField({ field, form, setParams, zones }) {
   );
 }
 
-function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged, onListChanged }) {
+function RuleForm({ initial, zones, cameras = [], onSaved, onCancel, onGone, onZonesChanged, onListChanged }) {
   const [form, setForm] = useState(initial);
   const [check, setCheck] = useState({ state: 'idle' });
   const [saving, setSaving] = useState(false);
@@ -172,11 +180,20 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged, o
   const zoneChoices = useMemo(() => zones.filter((z) => meta.zoneTypes.includes(z.safetyType)), [zones, meta]);
   const generalZones = useMemo(() => zones.filter((z) => z.safetyType === 'GENERAL'), [zones]);
   const changes = useMemo(() => zoneChanges(form, zones), [form, zones]);
+  const whole = wholeCamera(form.zoneId);
+  // Every saved camera, with its zones under it; zones whose camera is not in the list (none, or removed) last.
+  const groups = useMemo(() => {
+    const fits = (z) => meta.zoneTypes.includes(z.safetyType) || z.safetyType === 'GENERAL';
+    const out = cameras.map((c) => ({ key: c.id, name: c.name, label: `${c.name} · ${SOURCE_LABELS[c.sourceType] || 'camera'}`, zones: zones.filter((z) => z.cameraId === c.id && fits(z)) }));
+    const rest = zones.filter((z) => !cameras.some((c) => c.id === z.cameraId) && fits(z));
+    if (rest.length) out.push({ key: 'other', name: null, label: 'Other zones', zones: rest });
+    return out;
+  }, [cameras, zones, meta]);
   const many = form.types.length > 1;
   const labelOf = (t) => (ruleTypeMeta(t) || {}).label || t;
   // One rule per checked kind; with several, each name says which check it is.
   const bodies = useMemo(() => form.types.map((t) => ruleBody({
-    ...form, type: t, params: form.paramsByType[t] || {}, name: many && form.name.trim() ? `${form.name.trim().slice(0, 157 - labelOf(t).length)} · ${labelOf(t)}` : form.name,
+    ...form, zoneId: wholeCamera(form.zoneId) ? '' : form.zoneId, type: t, params: form.paramsByType[t] || {}, name: many && form.name.trim() ? `${form.name.trim().slice(0, 157 - labelOf(t).length)} · ${labelOf(t)}` : form.name,
   })), [form, many]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setParamsFor = (t) => (patch) => setForm((f) => ({ ...f, paramsByType: { ...f.paramsByType, [t]: { ...f.paramsByType[t], ...patch } } }));
@@ -204,14 +221,15 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged, o
       const errors = [];
       results.forEach((r, i) => {
         if (r.data.valid) return;
-        const own = r.data.errors.filter((x) => !(changes.length && ZONE_TYPE_ERROR.test(x)));
+        const own = r.data.errors.filter((x) => !(changes.length && ZONE_TYPE_ERROR.test(x))
+          && !(whole && (ZONE_TYPE_ERROR.test(x) || /must be anchored to a zone/i.test(x))));
         own.forEach((x) => errors.push(many ? `${labelOf(form.types[i])}: ${friendlyRuleError(x)}` : friendlyRuleError(x)));
       });
       if (errors.length) setCheck({ state: 'invalid', errors });
       else setCheck({ state: 'valid', enforced: results.every((r) => r.data.valid ? r.data.evaluated_by_engine : true) });
     }, 450);
     return () => clearTimeout(timer);
-  }, [bodies, changes.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bodies, changes.length, whole]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save(e) {
     e.preventDefault();
@@ -237,9 +255,30 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged, o
     }
     if (changes.length && onZonesChanged) await onZonesChanged();
 
+    let finalBodies = bodies;
+    if (whole) {
+      const taken = new Set(zones.filter((z) => z.camera === whole).map((z) => z.name.toLowerCase()));
+      let zname = 'Whole view';
+      for (let i = 2; taken.has(zname.toLowerCase()); i += 1) zname = `Whole view ${i}`;
+      const slug = `zone_${Date.now().toString(36)}`;
+      let fresh = null;
+      try {
+        const res = await backendFetch('/api/v1/zones/', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ zone_id: slug, camera_id: whole, zone_name: zname, zone_type: mainTarget(meta), polygon_coordinates: FULL_FRAME }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const list = onZonesChanged ? await onZonesChanged() : [];
+        fresh = (list || []).find((z) => z.slug === slug) || null;
+      } catch { /* reported below */ }
+      if (!fresh) { stop(`Could not add a whole-picture zone to "${whole}". Draw one on the Zones page, then try again.`); return; }
+      setForm((f) => ({ ...f, zoneId: fresh.id }));       // a retry after a refused rule reuses it
+      finalBodies = bodies.map((b) => ({ ...b, zone_id: fresh.id }));
+    }
+
     if (editing) {
       // An update may not carry `type` (a rule's kind cannot change, and the API refuses unknown fields).
-      const { type: _kind, ...patch } = bodies[0];
+      const { type: _kind, ...patch } = finalBodies[0];
       const r = await updateRule(form.id, patch);
       inFlight.current = false; setSaving(false);
       // Deleted meanwhile (in another window, or by someone else): close the form and refresh the list.
@@ -252,8 +291,8 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged, o
     // One rule per check, in order. If one is refused, the ones already saved stay saved and leave the form, so
     // pressing Create again does not add them twice.
     const saved = [];
-    for (let i = 0; i < bodies.length; i += 1) {
-      const r = await createRule(bodies[i]);
+    for (let i = 0; i < finalBodies.length; i += 1) {
+      const r = await createRule(finalBodies[i]);
       if (!r.ok) {
         const t = form.types[i];
         if (saved.length) {
@@ -299,13 +338,17 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged, o
       <div className="flex flex-wrap gap-3">
         <label className="flex flex-col gap-1 text-xs text-ink-faint">Where{meta.zoneOptional ? ' (optional)' : ''}
           <select value={form.zoneId} onChange={(e) => setForm((f) => ({ ...f, zoneId: e.target.value, paramsByType: Object.fromEntries(Object.entries(f.paramsByType).map(([t, p]) => [t, { ...p, ...(p.checkpoint_zone_id !== undefined ? { checkpoint_zone_id: '' } : {}), ...(p.exit_zone_id !== undefined ? { exit_zone_id: '' } : {}) }])) }))} className={INPUT}>
-            <option value="">{meta.zoneOptional ? 'Everywhere (every camera)' : 'Choose a zone'}</option>
-            {zoneChoices.map((z) => <option key={z.id} value={z.id}>{z.name}{z.camera ? ` (${z.camera})` : ''} · {ZONE_TYPE_LABELS[z.safetyType]}</option>)}
-            {generalZones.length > 0 && meta.zoneTypes.length > 0 && (
-              <optgroup label={`General zones (become ${ZONE_TYPE_LABELS[mainTarget(meta)]})`}>
-                {generalZones.map((z) => <option key={z.id} value={z.id}>{z.name}{z.camera ? ` (${z.camera})` : ''}</option>)}
+            <option value="">{meta.zoneOptional ? 'Everywhere (every camera)' : 'Choose a camera or zone'}</option>
+            {groups.map((g) => (
+              <optgroup key={g.key} label={g.label}>
+                {g.zones.map((z) => (
+                  <option key={z.id} value={z.id}>
+                    {z.name} · {z.safetyType === 'GENERAL' && !meta.zoneTypes.includes('GENERAL') ? `General, becomes ${ZONE_TYPE_LABELS[mainTarget(meta)]}` : ZONE_TYPE_LABELS[z.safetyType]}
+                  </option>
+                ))}
+                {g.name && <option value={`${WHOLE}${g.name}`}>Whole view of {g.name}</option>}
               </optgroup>
-            )}
+            ))}
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-ink-faint">How serious
@@ -323,7 +366,8 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged, o
       {changes.length > 0 && (
         <Notice>{changes.map((c) => `"${c.zone.name}" becomes ${/^[AEIOU]/.test(ZONE_TYPE_LABELS[c.to]) ? 'an' : 'a'} ${ZONE_TYPE_LABELS[c.to]} zone`).join('; ')} when you save.</Notice>
       )}
-      {form.types.length > 0 && zoneChoices.length === 0 && generalZones.length === 0 && !meta.zoneOptional && (
+      {whole && <Notice>A zone covering the whole picture of "{whole}" is added when you save.</Notice>}
+      {form.types.length > 0 && cameras.length === 0 && zoneChoices.length === 0 && generalZones.length === 0 && !meta.zoneOptional && (
         <Notice>There is no {meta.zoneTypes.map((t) => ZONE_TYPE_LABELS[t].toLowerCase()).join(' or ')} zone yet. Draw one in Zones, then come back.</Notice>
       )}
 
@@ -336,7 +380,7 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged, o
           <div key={t} className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3">
             <p className="text-[0.8125rem] font-bold text-ink">{m.label}</p>
             <div className="flex flex-wrap gap-3">
-              {m.fields.map((f) => <ParamField key={f.key} field={f} form={pf} setParams={setParamsFor(t)} zones={zones} />)}
+              {m.fields.map((f) => <ParamField key={f.key} field={f} form={pf} setParams={setParamsFor(t)} zones={zones} cameras={cameras} />)}
             </div>
           </div>
         );
@@ -385,10 +429,12 @@ export default function RulesScreen({ role }) {
 
   // zonesReady: a rule is only called broken once the zone list has actually arrived.
   const [zonesReady, setZonesReady] = useState(false);
-  const loadZones = useCallback(() => listSafetyZones().then((r) => { setZones(r.zones || []); setZonesReady(!r.error); }), []);
-  useEffect(() => { load(); loadZones(); }, [load, loadZones]);
+  const loadZones = useCallback(() => listSafetyZones().then((r) => { setZones(r.zones || []); setZonesReady(!r.error); return r.zones || []; }), []);
+  const [cameras, setCameras] = useState([]);
+  const loadCameras = useCallback(() => listCameras().then((r) => setCameras(r.cameras || [])), []);
+  useEffect(() => { load(); loadZones(); loadCameras(); }, [load, loadZones, loadCameras]);
   // A zone drawn a moment ago on the Zones page is in the list as soon as the form opens.
-  useEffect(() => { if (editing) loadZones(); }, [Boolean(editing)]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (editing) { loadZones(); loadCameras(); } }, [Boolean(editing)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A rule deleted elsewhere since this list was loaded.
   const gone = () => { setEditing(null); setMessage({ tone: 'error', text: 'That rule has been deleted, perhaps in another window. The list is up to date now.' }); load(); };
@@ -433,7 +479,7 @@ export default function RulesScreen({ role }) {
                   <SeverityChip severity={rule.severity} />
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[0.6875rem] font-bold uppercase tracking-wide ${rule.isEnabled ? 'border-line text-ink bg-surface-alt' : 'border-line text-ink-faint'}`}>{rule.isEnabled ? 'On' : 'Off'}</span>
                   <span className="text-ink-muted">{meta ? meta.label : rule.type}</span>
-                  <span className="text-ink-faint">{[rule.camera && rule.camera.name, rule.zone && rule.zone.name].filter(Boolean).join(' · ') || 'Every camera'}</span>
+                  <span className="text-ink-faint">{[(rule.camera && rule.camera.name) || (zones.find((z) => z.id === rule.zoneId) || {}).camera, rule.zone && rule.zone.name].filter(Boolean).join(' · ') || 'Every camera'}</span>
                 </div>
                 {rule.evaluated_by_engine && ruleSummary(rule.type, rule.params, (id) => (zones.find((z) => z.id === id) || {}).name) && (
                   <p className="text-[0.8125rem] text-ink-muted leading-relaxed">{ruleSummary(rule.type, rule.params, (id) => (zones.find((z) => z.id === id) || {}).name)}</p>
@@ -472,7 +518,7 @@ export default function RulesScreen({ role }) {
       </Panel>
 
       {canEdit && editing && (
-        <RuleForm key={editing.id || 'new'} initial={editing} zones={zones} onZonesChanged={loadZones}
+        <RuleForm key={editing.id || 'new'} initial={editing} zones={zones} cameras={cameras} onZonesChanged={loadZones}
           onListChanged={load}
           onSaved={(n) => { setEditing(null); setMessage({ tone: 'ok', text: `${n > 1 ? `${n} rules were saved` : 'The rule was saved'}. ${n > 1 ? 'They apply' : 'It applies'} from the next run of a camera.` }); load(); }}
           onCancel={() => setEditing(null)} onGone={gone} />
