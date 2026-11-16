@@ -120,7 +120,7 @@ function paint(canvas, zones, draft, hoverPoint) {
  * require manage_org_ids() in Postgres (layer 3, the one that actually holds).
  * A VIEWER still sees the zones, because reading them is permitted.
  */
-export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onZonesChanged, readOnly = false }) => {
+export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraChange, onZonesChanged, readOnly = false }) => {
   const canvasRef = useRef(null);
 
   const [zones, setZones] = useState([]);
@@ -161,11 +161,14 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onZonesChan
 
   /* ── data ──────────────────────────────────────────────────────────────── */
 
+  const camRef = useRef(cameraId);
+  camRef.current = cameraId;
   const loadZones = useCallback(async () => {
     try {
       const res = await backendFetch(`/api/v1/zones/${encodeURIComponent(cameraId)}`);
       if (!res.ok) throw new Error(`Zones API returned ${res.status}`);
       const data = await res.json();
+      if (camRef.current !== cameraId) return;          // the camera changed while this was loading
       setZones(Array.isArray(data) ? data : []);
       setStatus('ready');
       setError(null);
@@ -180,7 +183,8 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onZonesChan
     }
   }, [cameraId, onZonesChanged]);
 
-  useEffect(() => { loadZones(); }, [loadZones]);
+  // Zones belong to one camera: another camera's zones are never shown while this one's load.
+  useEffect(() => { setZones([]); setEditingZone(null); loadZones(); }, [loadZones]);
 
   /* ── the camera frame behind the canvas ────────────────────────────────── */
 
@@ -244,6 +248,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onZonesChan
   const grabCamera = useCallback((name) => {
     const cam = cameras.find((c) => c.name === name);
     if (cam && cam.sourceType === 'UPLOAD') {
+      setSnapshot((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });   // not another camera's picture
       setSnapState('error');
       setSnapError('This camera uses recorded videos. Choose “Upload a video” to draw on one.');
       return;
@@ -330,10 +335,29 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onZonesChan
   // The camera chosen at the top of the page is the backdrop to start with (and again when it changes).
   // Only grabbed if nothing is already streaming: when the live feed owns the webcam, asking the backend to open
   // it too fails, and the live frames are a better backdrop than a still anyway.
+  // Switching to a recorded-videos camera in order to upload one must not then replace the upload's picture.
+  const uploadingRef = useRef(false);
   useEffect(() => {
+    if (uploadingRef.current) { uploadingRef.current = false; return; }
     setSnapSource(cameraId);
     if (!getLatestFrame() && cameras.length) grabCamera(cameraId);
   }, [cameraId, cameras.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The backdrop list IS the camera choice: zones are drawn for, and saved to, the camera whose picture is shown.
+  // "Upload a video" draws for a recorded-videos camera (the one the Live feed's uploads run under), so a live
+  // camera's zones and an uploaded video's zones stay apart.
+  const uploadCamera = cameras.find((c) => c.name === cameraId && c.sourceType === 'UPLOAD')
+    || cameras.find((c) => c.sourceType === 'UPLOAD') || null;
+  const chooseBackdrop = (v) => {
+    if (v === 'upload') {
+      setSnapSource('upload');
+      if (uploadCamera && uploadCamera.name !== cameraId && onCameraChange) { uploadingRef.current = true; onCameraChange(uploadCamera.name); }
+      fileRef.current?.click();
+      return;
+    }
+    setSnapSource(v);
+    if (v !== cameraId && onCameraChange) onCameraChange(v); else grabCamera(v);
+  };
 
   /* ── canvas ────────────────────────────────────────────────────────────── */
 
@@ -587,11 +611,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onZonesChan
             value={snapSource}
             disabled={backdropIsLive}
             aria-label="Backdrop"
-            onChange={(e) => {
-              const v = e.target.value;
-              setSnapSource(v);
-              if (v === 'upload') fileRef.current?.click(); else grabCamera(v);
-            }}
+            onChange={(e) => chooseBackdrop(e.target.value)}
             className="max-w-full min-w-0 rounded-lg bg-ground border border-line px-2.5 py-1.5 text-[0.8125rem] text-ink focus:outline-none focus:border-[color:var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {cameras.length > 0 && (
@@ -619,6 +639,9 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onZonesChan
           </button>
           {snapState === 'error' && (
             <span className="text-xs text-accent font-medium">{snapError}</span>
+          )}
+          {snapSource === 'upload' && !uploadCamera && (
+            <span className="text-xs text-ink-faint">Zones are saved to {cameraId}. Add a “Recorded videos” camera to keep upload zones apart.</span>
           )}
         </div>
       )}

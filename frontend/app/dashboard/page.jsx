@@ -530,6 +530,7 @@ function DashboardInner() {
             <ZoneEditor
               cameraId={cameraId}
               cameras={cameras}
+              onCameraChange={setCameraId}
               onZonesChanged={setActiveZones}
               readOnly={!can(role, 'zones.edit')}
             />
