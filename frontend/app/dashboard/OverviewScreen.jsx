@@ -9,11 +9,12 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  ArrowRight, Camera, CheckCircle2, Circle, ClipboardCheck, MapPin, PlayCircle, ShieldCheck, Sparkles,
-  TrendingUp, Users,
+  ArrowRight, Camera, CheckCircle2, Circle, ClipboardCheck, ListChecks, MapPin, PlayCircle, ShieldCheck, Sparkles,
+  TrendingUp, Users, Wrench,
 } from 'lucide-react';
-import { getSummary } from '../lib/safetyApi';
-import { listSafetyZones } from '../lib/safety/management';
+import { getSummary, listRules } from '../lib/safetyApi';
+import { listSafetyZones, listCorrectiveActions } from '../lib/safety/management';
+import { ruleTypeMeta } from '../lib/safety/ruleTypes';
 import { Notice, Skeleton } from './safety/common';
 import SafetyAlertsPanel from './SafetyAlertsPanel';
 
@@ -98,35 +99,23 @@ function DayChart({ days }) {
   );
 }
 
-/** First-run checklist, for an organisation with no checks yet. */
-function SetupSteps({ steps, onNavigate }) {
+/** The setup steps, one short row each, inside the greeting card. */
+function SetupList({ steps, onNavigate }) {
   return (
-    <div className={`${CARD} p-7 sm:p-8`}>
-      <CardHead icon={Sparkles} title="Get your first check running" aside={`${steps.filter((s) => s.done).length} of ${steps.length} done`} />
-      <ol className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {steps.map((s, i) => (
-          <li key={s.title}>
-            <button
-              type="button"
-              onClick={() => onNavigate(s.view)}
-              className={`w-full h-full text-left rounded-2xl border p-5 flex flex-col gap-2 transition-all hover:-translate-y-0.5 hover:border-[color:var(--accent)] ${s.done ? 'border-line bg-surface-alt/60' : 'border-line bg-surface'}`}
-            >
-              <span className="flex items-center gap-2">
-                {s.done
-                  ? <CheckCircle2 className="w-5 h-5 text-accent" aria-hidden="true" />
-                  : <Circle className="w-5 h-5 text-ink-faint" aria-hidden="true" />}
-                <span className="font-mono text-[0.75rem] text-ink-faint">0{i + 1}</span>
-              </span>
-              <span className="text-[0.9375rem] font-black text-ink">{s.title}</span>
-              <span className="text-[0.84375rem] text-ink-muted leading-relaxed">{s.text}</span>
-              <span className="mt-auto pt-2 inline-flex items-center gap-1.5 text-[0.8125rem] font-bold text-accent">
-                {s.done ? 'Done' : s.cta} {!s.done && <ArrowRight className="w-4 h-4" aria-hidden="true" />}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ol>
-    </div>
+    <ol className="flex flex-col divide-y divide-line-soft border-t border-line-soft">
+      {steps.map((st) => (
+        <li key={st.title}>
+          <button type="button" onClick={() => onNavigate(st.view)}
+            className="w-full flex items-center gap-3 py-3 text-left group">
+            {st.done
+              ? <CheckCircle2 className="w-5 h-5 text-accent shrink-0" aria-hidden="true" />
+              : <Circle className="w-5 h-5 text-ink-faint shrink-0" aria-hidden="true" />}
+            <span className={`flex-1 min-w-0 truncate text-[0.9375rem] font-bold ${st.done ? 'text-ink-muted line-through decoration-1' : 'text-ink'}`}>{st.title}</span>
+            {!st.done && <ArrowRight className="w-4 h-4 text-accent shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
+          </button>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -148,13 +137,27 @@ export default function OverviewScreen({
   }, [days, refreshKey]);
 
   // Zones across every camera (the Live feed's camera picker only holds the selected camera's).
-  const [zoneCount, setZoneCount] = useState(null);
+  const [zoneList, setZoneList] = useState(null);
+  const zoneCount = zoneList ? zoneList.length : null;
   useEffect(() => {
     let live = true;
-    listSafetyZones().then((r) => { if (live && !r.error) setZoneCount((r.zones || []).length); });
+    listSafetyZones().then((r) => { if (live && !r.error) setZoneList(r.zones || []); });
     return () => { live = false; };
   }, [refreshKey, activeZones.length]);
   const zonesTotal = zoneCount ?? activeZones.length;
+
+  // The rules, and the follow-up work still open.
+  const [rules, setRules] = useState(null);
+  const [acts, setActs] = useState(null);
+  useEffect(() => {
+    let live = true;
+    listRules().then((r) => { if (live && r.ok) setRules(r.data.rules || []); });
+    const day = new Date().toLocaleDateString('en-CA');
+    Promise.all([listCorrectiveActions({ status: 'ACTIVE' }), listCorrectiveActions({ overdue: true, today: day })])
+      .then(([all, late]) => { if (live && !all.error) setActs({ count: all.count, overdue: late.error ? 0 : late.count, list: all.actions.slice(0, 2) }); });
+    return () => { live = false; };
+  }, [refreshKey]);
+  const rulesOn = rules ? rules.filter((r) => r.isEnabled !== false).length : null;
 
   const d = state.data;
   const firstName = (user?.fullName || '').trim().split(/\s+/)[0] || null;
@@ -175,16 +178,20 @@ export default function OverviewScreen({
       : { top: 'All clear.', bottom: 'Nothing waiting.' };
 
   const steps = [
-    { title: 'Add a camera', text: 'Register the camera or recording the checks will use.', view: 'cameras', cta: 'Add a camera', done: cameras.length > 0 },
-    { title: 'Draw your zones', text: 'Mark the PPE checkpoint and the restricted area on its view.', view: 'zones', cta: 'Draw zones', done: zonesTotal > 0 },
-    { title: 'Run a check', text: 'Upload a video or turn the camera on. Verdicts appear here.', view: 'live', cta: 'Open live feed', done: Boolean(d && d.total > 0) },
+    { title: 'Add a camera', view: 'cameras', done: cameras.length > 0 },
+    { title: 'Draw your zones', view: 'zones', done: zonesTotal > 0 },
+    { title: 'Set your rules', view: 'rules', done: Boolean(rulesOn) },
+    { title: 'Run a check', view: 'live', done: Boolean(d && d.total > 0) },
   ];
+  const setupDone = steps.every((st) => st.done);
+  const todayRow = d && d.by_day.length ? d.by_day[d.by_day.length - 1] : null;
 
   return (
     <div className="flex flex-col gap-6">
       {/* ── HERO: greeting beside three bold tiles ─────────────────────── */}
-      <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-5">
-        <div className={`${CARD} p-7 sm:p-9 flex flex-col justify-between gap-8 relative overflow-hidden`}>
+      {/* On a laptop or larger it fills the first screen exactly, so no box is cut by the bottom edge. */}
+      <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-5 lg:h-[calc(100dvh-4rem)] lg:min-h-[38rem]">
+        <div className={`${CARD} p-7 sm:p-9 flex flex-col justify-between gap-6 relative overflow-hidden min-h-0`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="inline-flex items-center gap-2 bg-accent-soft text-accent px-3 py-1.5 rounded-full">
               <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
@@ -193,14 +200,14 @@ export default function OverviewScreen({
             <span className="text-[0.8125rem] font-semibold text-ink-faint">{today}</span>
           </div>
           <div>
-            <h1 className="text-[2.25rem] sm:text-5xl font-black tracking-tight leading-[1.08] text-ink">
+            <h1 className="text-[2.25rem] sm:text-5xl xl:text-6xl font-black tracking-tight leading-[1.08] text-ink">
               {headline.top}<br />
               <span className="text-accent">{headline.bottom}</span>
             </h1>
             <p className="mt-4 text-[0.9375rem] sm:text-base text-ink-muted leading-relaxed max-w-md">
               {orgName ? <><span className="font-bold text-ink">{orgName}</span> · </> : null}
               {noChecksYet
-                ? 'No checks yet. Three short steps below get the first one running.'
+                ? 'No checks yet. Finish the steps below to run the first one.'
                 : waiting > 0
                   ? 'Each one needs a person to look at the evidence and confirm or dismiss it.'
                   : `Every flag from the ${rangeLabel} has been looked at.`}
@@ -224,10 +231,29 @@ export default function OverviewScreen({
               {waiting > 0 || noChecksYet ? 'Live feed' : 'Safety report'}
             </button>
           </div>
+          {!setupDone ? (
+            <div>
+              <p className={`${EYEBROW} text-ink-faint mb-1`}>Setup · {steps.filter((st) => st.done).length} of {steps.length}</p>
+              <SetupList steps={steps} onNavigate={onNavigate} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 border-t border-line-soft pt-4">
+              {[
+                ['Checked today', todayRow ? todayRow.decisions : 0],
+                ['Flagged today', todayRow ? todayRow.potential_violations : 0],
+                ['Rules on', rulesOn ?? '—'],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <p className="text-2xl font-black text-ink tabular-nums leading-none">{value}</p>
+                  <p className="mt-1.5 text-[0.75rem] font-bold text-ink-muted">{label}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 gap-5">
-          <div className="rounded-3xl border border-line bg-accent-soft p-6 flex flex-col justify-between gap-6 min-h-[11rem]">
+        <div className="grid grid-cols-2 gap-5 lg:grid-rows-[1fr_auto_1fr] min-h-0">
+          <div className="rounded-3xl border border-line bg-accent-soft p-6 flex flex-col justify-between gap-6 min-h-[10rem]">
             <ShieldCheck className="w-7 h-7 text-accent" strokeWidth={2} aria-hidden="true" />
             <div>
               <p className="text-4xl font-black tracking-tight text-ink tabular-nums leading-none">{compliance == null ? '—' : `${compliance}%`}</p>
@@ -239,7 +265,7 @@ export default function OverviewScreen({
           <button
             type="button"
             onClick={() => onNavigate('review')}
-            className="text-left rounded-3xl bg-accent text-white p-6 flex flex-col justify-between gap-6 min-h-[11rem] shadow-xl shadow-red-600/20 hover:-translate-y-1 transition-transform"
+            className="text-left rounded-3xl bg-accent text-white p-6 flex flex-col justify-between gap-6 min-h-[10rem] shadow-xl shadow-red-600/20 hover:-translate-y-1 transition-transform"
           >
             <ClipboardCheck className="w-7 h-7" strokeWidth={2} aria-hidden="true" />
             <div>
@@ -254,10 +280,11 @@ export default function OverviewScreen({
               <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" aria-hidden="true" />
               <span className={`${EYEBROW} text-ink-muted`}>Your setup</span>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
                 { icon: Camera, label: 'Cameras', value: planUsage?.cameras?.used ?? cameras.length, max: planUsage?.cameras?.max, view: 'cameras' },
                 { icon: MapPin, label: 'Zones', title: 'Zones on all cameras', value: zonesTotal, view: 'zones' },
+                { icon: ListChecks, label: 'Rules', title: 'Rules switched on', value: rulesOn ?? '—', view: 'rules' },
                 { icon: Users, label: 'Members', value: planUsage?.seats?.used ?? '—', max: planUsage?.seats?.max, view: 'members' },
               ].map(({ icon: Icon, label, title, value, max, view }) => (
                 <button key={label} type="button" title={title || label} onClick={() => onNavigate(view)} className="text-left rounded-2xl border border-line px-4 py-3.5 hover:border-[color:var(--accent)] transition-colors min-w-0">
@@ -270,6 +297,37 @@ export default function OverviewScreen({
               ))}
             </div>
           </div>
+
+          {/* Follow-up work on confirmed flags. */}
+          <button type="button" onClick={() => onNavigate('actions')}
+            className={`col-span-2 ${CARD} p-6 flex flex-col justify-between gap-4 text-left hover:border-[color:var(--accent)] transition-colors min-h-[10rem] min-w-0 overflow-hidden`}>
+            <span className="flex items-center justify-between gap-3 w-full">
+              <span className="flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-accent" aria-hidden="true" />
+                <span className={`${EYEBROW} text-ink-muted`}>Actions</span>
+              </span>
+              <ArrowRight className="w-4 h-4 text-ink-faint" aria-hidden="true" />
+            </span>
+            <span className="flex items-end gap-8">
+              <span>
+                <span className="block text-4xl font-black text-ink tabular-nums leading-none">{acts ? acts.count : '—'}</span>
+                <span className="block mt-1.5 text-[0.75rem] font-bold text-ink-muted">Open</span>
+              </span>
+              <span>
+                <span className={`block text-4xl font-black tabular-nums leading-none ${acts && acts.overdue ? 'text-accent' : 'text-ink'}`}>{acts ? acts.overdue : '—'}</span>
+                <span className="block mt-1.5 text-[0.75rem] font-bold text-ink-muted">Overdue</span>
+              </span>
+            </span>
+            {acts && acts.list.length > 0 ? (
+              <span className="flex flex-col gap-1 w-full min-w-0">
+                {acts.list.map((x) => (
+                  <span key={x.id} className="block truncate text-[0.8125rem] text-ink-muted">· {x.title}</span>
+                ))}
+              </span>
+            ) : (
+              <span className="text-[0.8125rem] text-ink-faint">{acts ? 'Nothing to follow up.' : ''}</span>
+            )}
+          </button>
         </div>
       </section>
 
@@ -285,9 +343,7 @@ export default function OverviewScreen({
       {state.error && <Notice tone="error">{state.error}</Notice>}
       {state.loading && !d && <div className={`${CARD} p-7`}><Skeleton rows={4} label="Loading the numbers" /></div>}
 
-      {noChecksYet && <SetupSteps steps={steps} onNavigate={onNavigate} />}
-
-      {d && d.total > 0 && (
+      {d && (
         <>
           <div className={`${CARD} grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-line overflow-hidden`}>
             <Kpi label="Checked" value={d.total} note="safety decisions made" />
@@ -304,7 +360,7 @@ export default function OverviewScreen({
             <div className={`${CARD} p-7 flex flex-col`}>
               <CardHead icon={MapPin} title="Where flags come from" />
               {zones.length === 0 ? (
-                <p className="text-[0.875rem] text-ink-muted">No zone has a decision in this period.</p>
+                <p className="text-[0.875rem] text-ink-muted">No checks in this period.</p>
               ) : (
                 <ul className="flex flex-col gap-4">
                   {zones.map((z) => (
@@ -339,6 +395,42 @@ export default function OverviewScreen({
             </div>
           </section>
         </>
+      )}
+
+      {/* The rules being checked. */}
+      {rules && (
+        <div className={`${CARD} p-7`}>
+          <CardHead icon={ListChecks} title="Rules being checked" aside={`${rulesOn} on`} />
+          {rules.length === 0 ? (
+            <button type="button" onClick={() => onNavigate('rules')} className="inline-flex items-center gap-1.5 text-[0.875rem] font-bold text-accent">
+              Add your first rule <ArrowRight className="w-4 h-4" aria-hidden="true" />
+            </button>
+          ) : (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {rules.slice(0, 6).map((r) => (
+                <li key={r.id} className="min-w-0">
+                  <button type="button" onClick={() => onNavigate('rules')}
+                    className={`w-full text-left rounded-2xl border border-line px-4 py-3 hover:border-[color:var(--accent)] transition-colors min-w-0 ${r.isEnabled === false ? 'opacity-50' : ''}`}>
+                    <span className="flex items-center justify-between gap-2 min-w-0">
+                      <span className="text-[0.875rem] font-bold text-ink truncate">{(ruleTypeMeta(r.type) || {}).label || r.name}</span>
+                      {r.isEnabled === false
+                        ? <span className="text-[0.6875rem] font-bold text-ink-faint shrink-0">Off</span>
+                        : r.severity === 'CRITICAL' && <span className="text-[0.6875rem] font-bold text-accent shrink-0">Critical</span>}
+                    </span>
+                    <span className="block mt-1 text-[0.75rem] text-ink-faint truncate">
+                      {[(r.camera && r.camera.name) || ((zoneList || []).find((z) => z.id === r.zoneId) || {}).camera, r.zone && r.zone.name].filter(Boolean).join(' · ') || 'Every camera'}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {rules.length > 6 && (
+            <button type="button" onClick={() => onNavigate('rules')} className="mt-4 inline-flex items-center gap-1.5 text-[0.8125rem] font-bold text-accent">
+              All {rules.length} rules <ArrowRight className="w-4 h-4" aria-hidden="true" />
+            </button>
+          )}
+        </div>
       )}
 
       {/* What is waiting, newest first (unchanged list, so a flag reads the same everywhere). */}
