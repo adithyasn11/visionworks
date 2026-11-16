@@ -7,7 +7,7 @@
 // review function (audited, role-checked there), so a view-only member sees the queue but no controls.
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, ClipboardCheck, History, Image as ImageIcon, Loader2, PlayCircle } from 'lucide-react';
+import { ClipboardCheck, History, Image as ImageIcon, Loader2, PlayCircle } from 'lucide-react';
 import { listDecisions, getSummary } from '../../lib/safetyApi';
 import { can } from '../../lib/permissions';
 import { workerLabel } from '../../lib/zoneEvents';
@@ -45,14 +45,12 @@ function CaughtUp({ onNavigate }) {
     ['Dismissed', week ? week.dismissed : '—'],
   ];
   return (
-    <div className="flex flex-col items-center justify-center text-center gap-6 py-12 lg:min-h-[calc(100dvh-20rem)]">
-      <span className="relative flex items-center justify-center w-24 h-24">
-        <span className="absolute inset-0 rounded-full bg-accent-soft" aria-hidden="true" />
-        <span className="absolute inset-3 rounded-full border-2 border-[color:var(--accent)] opacity-30" aria-hidden="true" />
-        <CheckCircle2 className="relative w-10 h-10 text-accent" strokeWidth={2.2} aria-hidden="true" />
+    <div className="flex flex-col items-center justify-center text-center gap-5 py-8 lg:min-h-[calc(100dvh-19.5rem)]">
+      <span className="flex items-center justify-center w-14 h-14 rounded-2xl border border-line bg-surface-alt">
+        <ClipboardCheck className="w-6 h-6 text-ink-muted" strokeWidth={2} aria-hidden="true" />
       </span>
       <div>
-        <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-ink">All caught up</h2>
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight text-ink">All caught up</h2>
         <p className="mt-2 text-[0.9375rem] text-ink-muted">No flags waiting. New ones show up here.</p>
       </div>
       <dl className="grid grid-cols-3 w-full max-w-md rounded-2xl border border-line divide-x divide-line overflow-hidden">
