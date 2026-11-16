@@ -48,7 +48,7 @@ export const RULE_TYPES = [
     enforced: () => true,
     defaults: { max_seconds: 60, warn_fraction: 0.8 },
     fields: [
-      { key: 'max_seconds', kind: 'number', label: 'Alert after (seconds)', min: 10, max: 86400, step: 5, required: true },
+      { key: 'max_seconds', kind: 'duration', label: 'Alert after', min: 10, max: 86400, required: true },
       { key: 'warn_fraction', kind: 'number', label: 'Early warning at (share of the time)', min: 0.1, max: 1, step: 0.05 },
     ],
   },
@@ -138,7 +138,7 @@ export function cleanParams(type, params) {
     if (f.when && !f.when(params)) return;
     const v = params[f.key];
     if (v === undefined || v === null || v === '') return;
-    out[f.key] = f.kind === 'number' ? Number(v) : v;
+    out[f.key] = f.kind === 'number' || f.kind === 'duration' ? Number(v) : v;
   });
   return out;
 }
@@ -168,7 +168,8 @@ const FRIENDLY = [
   [/exit_zone_id must be/i, 'The exit must be an Exit zone on the same camera.'],
   [/give min_people, max_people or both/i, 'Give a smallest number of people, a largest number, or both.'],
   [/min_people cannot be more than max_people/i, 'The smallest number cannot be larger than the largest.'],
-  [/max_seconds is required/i, 'Say after how many seconds to alert.'],
+  [/max_seconds is required/i, 'Set the time after which to alert.'],
+  [/max_seconds must be between/i, 'The time must be between 10 seconds and 24 hours.'],
 ];
 
 /** A server validation sentence in words a site manager would use (anything unrecognised is shown as it came). */

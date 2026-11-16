@@ -59,6 +59,28 @@ function missingZoneRef(rule, zones) {
   return null;
 }
 
+// A length of time the manager types in the unit they think in (seconds, minutes or hours); stored as seconds.
+const UNITS = [{ value: 1, label: 'seconds' }, { value: 60, label: 'minutes' }, { value: 3600, label: 'hours' }];
+function DurationField({ field, value, onChange }) {
+  const secs = Number(value);
+  const [unit, setUnit] = useState(() => (secs >= 3600 && secs % 3600 === 0 ? 3600 : secs >= 60 && secs % 60 === 0 ? 60 : 1));
+  const [text, setText] = useState(() => (Number.isFinite(secs) && value !== '' && value != null ? String(secs / unit) : ''));
+  const send = (t, u) => onChange(t === '' || !Number.isFinite(Number(t)) ? '' : Math.round(Number(t) * u));
+  const id = `rule-${field.key}`;
+  return (
+    <div className="flex flex-col gap-1 text-xs text-ink-faint">
+      <label htmlFor={id}>{field.label}</label>
+      <div className="flex items-center gap-2">
+        <input id={id} type="number" inputMode="decimal" min="0" step="any" value={text} required={field.required}
+          onChange={(e) => { setText(e.target.value); send(e.target.value, unit); }} className={`${INPUT} w-24`} />
+        <select aria-label={`${field.label}: unit`} value={unit} onChange={(e) => { const u = Number(e.target.value); setUnit(u); send(text, u); }} className={INPUT}>
+          {UNITS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 function ParamField({ field, form, setParams, zones }) {
   const value = form.params[field.key];
   if (field.when && !field.when(form.params)) return null;
@@ -79,6 +101,9 @@ function ParamField({ field, form, setParams, zones }) {
         </div>
       </fieldset>
     );
+  }
+  if (field.kind === 'duration') {
+    return <DurationField field={field} value={value} onChange={(v) => setParams({ [field.key]: v })} />;
   }
   if (field.kind === 'select') {
     return (
