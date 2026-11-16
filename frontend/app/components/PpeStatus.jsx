@@ -23,16 +23,13 @@ export default function PpeStatus({ entities, unavailable }) {
       <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="flex items-center gap-2 text-ink text-sm font-semibold">
           <HardHat className="w-4 h-4 text-accent" />
-          <h3 className="font-semibold">PPE check</h3>
+          <h3 className="font-semibold">Safety gear</h3>
         </div>
-        <span className="text-[0.6875rem] font-mono uppercase tracking-[0.12em] text-ink-faint">
-          Judged over several frames
-        </span>
       </header>
 
       {unavailable ? (
         <p className="text-[0.8125rem] text-ink-muted leading-relaxed">
-          {unavailable}. Nobody can be checked for helmet or vest, so every person stays unverified.
+          Safety gear can't be checked right now.
         </p>
       ) : rows.length === 0 ? (
         <p className="text-[0.8125rem] text-ink-muted leading-relaxed">No one in view.</p>
@@ -52,7 +49,7 @@ export default function PpeStatus({ entities, unavailable }) {
                 >
                   {label}
                 </span>
-                <span className="text-ink-faint">{detail}</span>
+                <span className="text-ink-faint truncate" title={detail}>{detail}</span>
               </li>
             );
           })}

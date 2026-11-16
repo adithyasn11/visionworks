@@ -45,7 +45,7 @@ export function describeZoneEvent(event) {
     case 'ENTERED_ZONE':
       return {
         text: details.first_sighting
-          ? `${worker} was already inside when first seen`
+          ? `${worker} inside`
           : `${worker} entered`,
         tone: 'normal',
       };

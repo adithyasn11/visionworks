@@ -901,7 +901,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         <AlertBanners
           banners={banners}
           zones={activeZones}
-          flaggedCount={openCount}
+          inside={isFullscreen}
           onDismiss={(id) => setBanners((list) => list.filter((b) => b.id !== id))}
           onHold={(held) => {
             bannersHeldRef.current = held;
@@ -913,6 +913,12 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
 
       {/* Controls: one row */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-surface px-3 py-2">
+        {(isWebcamActive || phoneLive) ? (
+          <span className="mr-auto inline-flex items-center gap-1.5 text-[0.8125rem] font-bold text-accent">
+            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" aria-hidden="true" /> Live
+          </span>
+        ) : (
+        <>
         <button
           onClick={() => handleSkip(-5)}
           disabled={isWebcamActive || phase !== 'processing'}
@@ -954,6 +960,8 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
           className="flex-1 min-w-[6rem] h-1.5 bg-[color:var(--line)] rounded-lg appearance-none cursor-pointer accent-[color:var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
         />
         <span className="text-[0.75rem] font-mono text-ink-muted tabular-nums">{isWebcamActive ? 'LIVE' : formatTime(durationSec)}</span>
+        </>
+        )}
         <label
           className={`flex items-center gap-1.5 select-none text-[0.8125rem] text-ink-muted ${enableBlur === null ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           title="Blur faces before frames are shown"

@@ -458,8 +458,8 @@ function DashboardInner() {
             readOnly={!can(role, 'analysis.run')}
             cameraId={cameraId}
             cameraSource={(cameras.find((c) => c.name === cameraId) || {}).sourceType || null}
-            aside={<FloorplanHeatmap compact />}
           />
+          <FloorplanHeatmap />
         </div>
       </div>
 

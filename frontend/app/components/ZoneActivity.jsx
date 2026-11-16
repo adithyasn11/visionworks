@@ -30,9 +30,6 @@ export default function ZoneActivity({ events, zones = [] }) {
           <MapPin className="w-4 h-4 text-accent" />
           <h3 className="font-semibold">Zone activity</h3>
         </div>
-        <span className="text-[0.6875rem] font-mono uppercase tracking-[0.12em] text-ink-faint">
-          Times are from the video
-        </span>
       </header>
 
       {events.length === 0 ? (
@@ -51,23 +48,19 @@ export default function ZoneActivity({ events, zones = [] }) {
             const meta = zoneTypeMeta(zone && zone.zone_type);
             const { text, tone } = describeZoneEvent(ev);
             return (
-              <li key={ev.id} className="flex items-center gap-3 py-1.5 text-[0.8125rem]">
-                <span className="w-11 shrink-0 font-mono text-ink-faint tabular-nums">{clock(ev.video_time_s)}</span>
-                <span
-                  className="inline-flex items-center gap-1.5 shrink-0 max-w-[40%] rounded-md border border-line px-1.5 py-0.5 text-[0.6875rem] font-mono text-ink-muted"
-                  title={`${meta.label} zone`}
-                >
+              <li key={ev.id} className="flex flex-col gap-0.5 py-1.5 text-[0.8125rem]">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[0.75rem] text-ink-faint tabular-nums">{clock(ev.video_time_s)}</span>
+                  <span
+                    title={text}
+                    className={`truncate ${tone === 'attention' ? 'text-accent font-semibold' : tone === 'unconfirmed' ? 'text-ink-faint' : 'text-ink'}`}
+                  >
+                    {text}
+                  </span>
+                </div>
+                <span className="inline-flex items-center gap-1.5 text-[0.75rem] text-ink-faint" title={`${meta.label} zone`}>
                   <span aria-hidden="true" className="w-2 h-2 rounded-full shrink-0 border border-line" style={{ background: meta.color }} />
                   <span className="truncate">{(zone && (zone.zone_name || zone.zone_id)) || ev.zone_id || 'Zone'}</span>
-                </span>
-                <span
-                  className={
-                    tone === 'attention' ? 'text-accent font-semibold'
-                      : tone === 'unconfirmed' ? 'text-ink-faint'
-                      : 'text-ink'
-                  }
-                >
-                  {text}
                 </span>
               </li>
             );
