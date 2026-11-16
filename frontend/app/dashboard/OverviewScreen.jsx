@@ -10,9 +10,9 @@
 import React, { useEffect, useState } from 'react';
 import {
   ArrowRight, Camera, CheckCircle2, Circle, ClipboardCheck, ListChecks, MapPin, PlayCircle, ShieldCheck, Sparkles,
-  TrendingUp, Users, Wrench,
+  TrendingUp, Users, Wrench, Clock,
 } from 'lucide-react';
-import { getSummary, listRules } from '../lib/safetyApi';
+import { getSummary, listRules, listDecisions } from '../lib/safetyApi';
 import { listSafetyZones, listCorrectiveActions } from '../lib/safety/management';
 import { ruleTypeMeta } from '../lib/safety/ruleTypes';
 import { Notice, Skeleton } from './safety/common';
@@ -33,6 +33,19 @@ const shortDay = (iso) => {
 };
 
 const pct = (n, d) => (d > 0 ? Math.round((n / d) * 100) : null);
+
+/** "just now", "12 min ago", "3 h ago", "2 days ago". */
+function ago(iso) {
+  const t = Date.parse(iso);
+  if (!t) return '—';
+  const m = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} h ago`;
+  const dd = Math.round(h / 24);
+  return `${dd} day${dd === 1 ? '' : 's'} ago`;
+}
 
 /** One of the four numbers under the hero. */
 function Kpi({ label, value, note, accent }) {
@@ -102,7 +115,7 @@ function DayChart({ days }) {
 /** The setup steps, one short row each, inside the greeting card. */
 function SetupList({ steps, onNavigate }) {
   return (
-    <ol className="flex flex-col divide-y divide-line-soft border-t border-line-soft">
+    <ol className="flex flex-col divide-y divide-line-soft">
       {steps.map((st) => (
         <li key={st.title}>
           <button type="button" onClick={() => onNavigate(st.view)}
@@ -149,9 +162,11 @@ export default function OverviewScreen({
   // The rules, and the follow-up work still open.
   const [rules, setRules] = useState(null);
   const [acts, setActs] = useState(null);
+  const [last, setLast] = useState(null);
   useEffect(() => {
     let live = true;
     listRules().then((r) => { if (live && r.ok) setRules(r.data.rules || []); });
+    listDecisions({ limit: 1 }).then((r) => { if (live && r.ok) setLast((r.data.decisions || [])[0] || false); });
     const day = new Date().toLocaleDateString('en-CA');
     Promise.all([listCorrectiveActions({ status: 'ACTIVE' }), listCorrectiveActions({ overdue: true, today: day })])
       .then(([all, late]) => { if (live && !all.error) setActs({ count: all.count, overdue: late.error ? 0 : late.count, list: all.actions.slice(0, 2) }); });
@@ -191,7 +206,8 @@ export default function OverviewScreen({
       {/* ── HERO: greeting beside three bold tiles ─────────────────────── */}
       {/* On a laptop or larger it fills the first screen exactly, so no box is cut by the bottom edge. */}
       <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-5 lg:h-[calc(100dvh-4rem)] lg:min-h-[38rem]">
-        <div className={`${CARD} p-7 sm:p-9 flex flex-col justify-between gap-6 relative overflow-hidden min-h-0`}>
+        <div className="flex flex-col gap-5 min-h-0">
+        <div className={`${CARD} p-7 xl:p-8 flex flex-col justify-between gap-4 relative overflow-hidden lg:flex-[1.25] min-h-0`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="inline-flex items-center gap-2 bg-accent-soft text-accent px-3 py-1.5 rounded-full">
               <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
@@ -200,11 +216,11 @@ export default function OverviewScreen({
             <span className="text-[0.8125rem] font-semibold text-ink-faint">{today}</span>
           </div>
           <div>
-            <h1 className="text-[2.25rem] sm:text-5xl xl:text-6xl font-black tracking-tight leading-[1.08] text-ink">
+            <h1 className="text-[2.25rem] sm:text-5xl lg:text-4xl xl:text-5xl font-black tracking-tight leading-[1.08] text-ink">
               {headline.top}<br />
               <span className="text-accent">{headline.bottom}</span>
             </h1>
-            <p className="mt-4 text-[0.9375rem] sm:text-base text-ink-muted leading-relaxed max-w-md">
+            <p className="mt-3 text-[0.9375rem] text-ink-muted leading-relaxed max-w-md">
               {orgName ? <><span className="font-bold text-ink">{orgName}</span> · </> : null}
               {noChecksYet
                 ? 'No checks yet. Finish the steps below to run the first one.'
@@ -231,25 +247,35 @@ export default function OverviewScreen({
               {waiting > 0 || noChecksYet ? 'Live feed' : 'Safety report'}
             </button>
           </div>
+        </div>
+
+        {/* Setup while it is unfinished; after that, today's numbers. */}
+        <div className={`${CARD} p-7 sm:p-8 flex flex-col lg:flex-1 min-h-0`}>
           {!setupDone ? (
-            <div>
-              <p className={`${EYEBROW} text-ink-faint mb-1`}>Setup · {steps.filter((st) => st.done).length} of {steps.length}</p>
-              <SetupList steps={steps} onNavigate={onNavigate} />
-            </div>
+            <>
+              <CardHead icon={Sparkles} title="Get set up" aside={`${steps.filter((st) => st.done).length} of ${steps.length} done`} />
+              <div className="flex-1 flex flex-col justify-center">
+                <SetupList steps={steps} onNavigate={onNavigate} />
+              </div>
+            </>
           ) : (
-            <div className="grid grid-cols-3 border-t border-line-soft pt-4">
-              {[
-                ['Checked today', todayRow ? todayRow.decisions : 0],
-                ['Flagged today', todayRow ? todayRow.potential_violations : 0],
-                ['Rules on', rulesOn ?? '—'],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <p className="text-2xl font-black text-ink tabular-nums leading-none">{value}</p>
-                  <p className="mt-1.5 text-[0.75rem] font-bold text-ink-muted">{label}</p>
-                </div>
-              ))}
-            </div>
+            <>
+              <CardHead icon={TrendingUp} title="Today" />
+              <div className="flex-1 grid grid-cols-3 items-center">
+                {[
+                  ['Checked', todayRow ? todayRow.decisions : 0, false],
+                  ['Flagged', todayRow ? todayRow.potential_violations : 0, true],
+                  ['Compliant', todayRow ? Math.max(0, todayRow.decisions - todayRow.potential_violations) : 0, false],
+                ].map(([label, value, red]) => (
+                  <div key={label}>
+                    <p className={`text-4xl font-black tabular-nums leading-none ${red && value ? 'text-accent' : 'text-ink'}`}>{value}</p>
+                    <p className="mt-2 text-[0.8125rem] font-bold text-ink-muted">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
+        </div>
         </div>
 
         <div className="grid grid-cols-2 gap-5 lg:grid-rows-[1fr_auto_1fr] min-h-0">
@@ -280,7 +306,7 @@ export default function OverviewScreen({
               <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" aria-hidden="true" />
               <span className={`${EYEBROW} text-ink-muted`}>Your setup</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-3">
               {[
                 { icon: Camera, label: 'Cameras', value: planUsage?.cameras?.used ?? cameras.length, max: planUsage?.cameras?.max, view: 'cameras' },
                 { icon: MapPin, label: 'Zones', title: 'Zones on all cameras', value: zonesTotal, view: 'zones' },
@@ -300,33 +326,28 @@ export default function OverviewScreen({
 
           {/* Follow-up work on confirmed flags. */}
           <button type="button" onClick={() => onNavigate('actions')}
-            className={`col-span-2 ${CARD} p-6 flex flex-col justify-between gap-4 text-left hover:border-[color:var(--accent)] transition-colors min-h-[10rem] min-w-0 overflow-hidden`}>
-            <span className="flex items-center justify-between gap-3 w-full">
-              <span className="flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-accent" aria-hidden="true" />
-                <span className={`${EYEBROW} text-ink-muted`}>Actions</span>
-              </span>
-              <ArrowRight className="w-4 h-4 text-ink-faint" aria-hidden="true" />
-            </span>
-            <span className="flex items-end gap-8">
-              <span>
-                <span className="block text-4xl font-black text-ink tabular-nums leading-none">{acts ? acts.count : '—'}</span>
-                <span className="block mt-1.5 text-[0.75rem] font-bold text-ink-muted">Open</span>
-              </span>
-              <span>
-                <span className={`block text-4xl font-black tabular-nums leading-none ${acts && acts.overdue ? 'text-accent' : 'text-ink'}`}>{acts ? acts.overdue : '—'}</span>
-                <span className="block mt-1.5 text-[0.75rem] font-bold text-ink-muted">Overdue</span>
+            className={`${CARD} p-6 flex flex-col justify-between gap-6 text-left hover:border-[color:var(--accent)] transition-colors min-h-[10rem] min-w-0`}>
+            <Wrench className="w-7 h-7 text-accent" strokeWidth={2} aria-hidden="true" />
+            <span className="block">
+              <span className="block text-4xl font-black tracking-tight text-ink tabular-nums leading-none">{acts ? acts.count : '—'}</span>
+              <span className="block mt-2 text-[0.9375rem] font-black text-ink">Open actions</span>
+              <span className={`block ${EYEBROW} mt-1 ${acts && acts.overdue ? 'text-accent' : 'text-ink-faint'}`}>
+                {acts ? (acts.overdue ? `${acts.overdue} overdue` : 'none overdue') : '\u00a0'}
               </span>
             </span>
-            {acts && acts.list.length > 0 ? (
-              <span className="flex flex-col gap-1 w-full min-w-0">
-                {acts.list.map((x) => (
-                  <span key={x.id} className="block truncate text-[0.8125rem] text-ink-muted">· {x.title}</span>
-                ))}
+          </button>
+
+          {/* When the system last checked someone. */}
+          <button type="button" onClick={() => onNavigate(last ? 'events' : 'live')}
+            className={`${CARD} p-6 flex flex-col justify-between gap-6 text-left hover:border-[color:var(--accent)] transition-colors min-h-[10rem] min-w-0`}>
+            <Clock className="w-7 h-7 text-accent" strokeWidth={2} aria-hidden="true" />
+            <span className="block min-w-0">
+              <span className="block text-[1.75rem] font-black tracking-tight text-ink leading-none truncate">{last ? ago(last.observedAt) : '—'}</span>
+              <span className="block mt-2 text-[0.9375rem] font-black text-ink">Last check</span>
+              <span className={`block ${EYEBROW} text-ink-faint mt-1 truncate`}>
+                {last ? ((last.camera && last.camera.name) || 'camera') : last === false ? 'none yet' : '\u00a0'}
               </span>
-            ) : (
-              <span className="text-[0.8125rem] text-ink-faint">{acts ? 'Nothing to follow up.' : ''}</span>
-            )}
+            </span>
           </button>
         </div>
       </section>
