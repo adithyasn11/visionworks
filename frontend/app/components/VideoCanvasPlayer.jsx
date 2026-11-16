@@ -20,6 +20,7 @@ import DecisionFeed from './DecisionFeed';
 import { addDecisions } from '../lib/decisions';
 import { addBanners, expireBanners } from '../lib/alerts';
 import AlertBanners from './AlertBanners';
+import CameraChecks from './CameraChecks';
 import { addZoneEvents } from '../lib/zoneEvents';
 
 /** mm:ss for the scrubber. */
@@ -45,7 +46,7 @@ function localNowValue() {
  * processing WebSockets refuse a VIEWER server-side (layer 2), and any rows
  * that did reach the database are still org-scoped by RLS (layer 3).
  */
-export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = false, cameraId = 'live_webcam', cameraSource = null, aside = null }) => {
+export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = false, cameraId = 'live_webcam', cameraSource = null, aside = null, withNotice = false }) => {
   // A network (RTSP) camera is opened by the server at its stored address; the browser's webcam is not involved.
   const isNetworkCamera = cameraSource === 'RTSP';
   const canvasRef   = useRef(null);
@@ -678,7 +679,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
     : <Video className="w-3.5 h-3.5 text-ink-muted" />;
 
   return (
-    <div ref={containerRef} className="glass-panel p-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_17rem] lg:h-[calc(100dvh-10.5rem)] lg:min-h-[30rem] relative group min-w-0">
+    <div ref={containerRef} className={`glass-panel p-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_17rem] ${withNotice ? 'lg:h-[calc(100dvh-14.75rem)]' : 'lg:h-[calc(100dvh-10.5rem)]'} lg:min-h-[30rem] relative group min-w-0`}>
       {/* Hidden HTML5 Video element for webcam capture */}
       <video ref={hiddenVideoRef} className="hidden" playsInline muted />
       <div className="flex flex-col gap-3 min-w-0 min-h-0">
@@ -1016,6 +1017,8 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
             <ZoneActivity events={zoneEvents} zones={activeZones} />
           </>
         )}
+        {/* Before a run: what this camera is checked for. */}
+        {phase !== 'processing' && phase !== 'done' && !isWebcamActive && !phoneLive && cameraId && <CameraChecks cameraId={cameraId} />}
         {aside}
       </aside>
     </div>

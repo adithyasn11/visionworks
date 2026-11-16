@@ -18,7 +18,7 @@
 
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { RefreshCw, Loader2, Eye } from 'lucide-react';
+import { RefreshCw, Loader2, Eye, AlertTriangle } from 'lucide-react';
 
 import DashboardShell, { VIEWS } from './DashboardShell';
 import OverviewScreen from './OverviewScreen';
@@ -349,15 +349,18 @@ function DashboardInner() {
   // Shown on Live feed and Zones while the organisation has no camera: runs
   // still work, but nothing they decide can reach the dashboard.
   const noCameraNotice = camerasStatus.status === 'ready' && cameras.length === 0 ? (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[color:var(--accent)] bg-accent-soft px-4 py-3">
-      <p className="text-[0.84375rem] text-ink-muted font-medium leading-relaxed max-w-2xl">
-        <strong className="text-ink">No camera is registered.</strong> Detection still runs, but its decisions stay on
-        this computer and never reach Review, Events, Reports or the Overview.
+    <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface pl-3 pr-2 py-2">
+      <span className="w-9 h-9 rounded-xl bg-accent-soft text-accent flex items-center justify-center shrink-0">
+        <AlertTriangle className="w-4 h-4" aria-hidden="true" />
+      </span>
+      <p className="flex-1 min-w-0 text-[0.875rem] text-ink-muted leading-snug"
+        title="Detection still runs, but its decisions stay on this computer and do not reach Review, Events, Reports or the Overview.">
+        <strong className="text-ink">No camera added.</strong> <span className="hidden sm:inline">Results won’t be saved until you add one.</span>
       </p>
       <button
         type="button"
         onClick={() => setView('cameras')}
-        className="rounded-lg bg-accent px-3.5 py-2 text-[0.84375rem] font-bold text-white hover:brightness-110 transition"
+        className="shrink-0 rounded-xl bg-accent px-4 py-2 text-[0.84375rem] font-bold text-white hover:brightness-110 transition"
       >
         {can(role, 'cameras.edit') ? 'Add a camera' : 'See cameras'}
       </button>
@@ -458,6 +461,7 @@ function DashboardInner() {
             readOnly={!can(role, 'analysis.run')}
             cameraId={cameraId}
             cameraSource={(cameras.find((c) => c.name === cameraId) || {}).sourceType || null}
+            withNotice={Boolean(noCameraNotice) || (!can(role, 'analysis.run') && Boolean(role))}
           />
           <FloorplanHeatmap />
         </div>
