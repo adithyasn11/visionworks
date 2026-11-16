@@ -33,7 +33,7 @@ from typing import Any, Dict, List, Optional, Tuple
 RULE_LABELS = {          # the same names the rule screens use
     "PPE_ENTRY": "Helmet and vest on entry",
     "PPE_CONTINUOUS": "Keep helmet and vest on while inside",
-    "MAX_DWELL": "Longest stay",
+    "MAX_DWELL": "Stayed in a zone too long",
     "REQUIRED_EXIT": "Leave through the exit zone",
     "OCCUPANCY": "People in the zone (lone worker, crowding)",
     "MAN_DOWN": "Person lying down",

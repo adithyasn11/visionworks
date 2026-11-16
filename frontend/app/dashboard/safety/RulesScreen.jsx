@@ -32,7 +32,8 @@ function formFromRule(rule) {
 // A zone drawn on the Zones page starts as General, which no rule attaches to. Such a zone is still offered here
 // (marked), and saving the rule gives it the type the rule needs. Only General zones are offered this way, so
 // saving a rule never turns a zone that already has a safety meaning into something else.
-const mainTarget = (meta) => (meta.zoneTypes.includes('RESTRICTED') ? 'RESTRICTED' : meta.zoneTypes[0]);
+// A helmet-and-vest or exit rule needs a Restricted zone; any other rule gets an Approach zone, which has no built-in helmet check.
+const mainTarget = (meta) => (meta.zoneTypes.length === 1 ? meta.zoneTypes[0] : 'APPROACH');
 const ZONE_TYPE_ERROR = /must be anchored to a RESTRICTED zone|needs a real zone|checkpoint_zone_id must be|exit_zone_id must be/i;
 
 /** The General zones a rule refers to, each with the type it gets when the rule is saved. */
@@ -230,7 +231,7 @@ function RuleForm({ initial, zones, onSaved, onCancel, onGone, onZonesChanged })
         </label>
       </div>
       {changes.length > 0 && (
-        <Notice>{changes.map((c) => `"${c.zone.name}" becomes a ${ZONE_TYPE_LABELS[c.to]} zone`).join('; ')} when you save.</Notice>
+        <Notice>{changes.map((c) => `"${c.zone.name}" becomes ${/^[AEIOU]/.test(ZONE_TYPE_LABELS[c.to]) ? "an" : "a"} ${ZONE_TYPE_LABELS[c.to]} zone`).join('; ')} when you save.</Notice>
       )}
       {zoneChoices.length === 0 && generalZones.length === 0 && !meta.zoneOptional && (
         <Notice>There is no {meta.zoneTypes.map((t) => ZONE_TYPE_LABELS[t].toLowerCase()).join(' or ')} zone yet. Draw one in Zones and set its type, then come back.</Notice>

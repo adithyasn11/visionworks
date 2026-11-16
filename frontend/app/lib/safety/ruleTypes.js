@@ -41,6 +41,18 @@ export const RULE_TYPES = [
     ],
   },
   {
+    value: 'MAX_DWELL',
+    label: 'Stays in a zone too long',
+    blurb: 'Alerts when someone stays in the zone longer than the time you set.',
+    zoneTypes: ['PPE_CHECKPOINT', 'APPROACH', 'RESTRICTED', 'EXIT'],
+    enforced: () => true,
+    defaults: { max_seconds: 60, warn_fraction: 0.8 },
+    fields: [
+      { key: 'max_seconds', kind: 'number', label: 'Alert after (seconds)', min: 10, max: 86400, step: 5, required: true },
+      { key: 'warn_fraction', kind: 'number', label: 'Early warning at (share of the time)', min: 0.1, max: 1, step: 0.05 },
+    ],
+  },
+  {
     value: 'PPE_CONTINUOUS',
     label: 'Keep helmet and vest on while inside',
     blurb: 'Raises a flag for review when a required item is clearly not seen, without a break, for longer than the grace period while someone is in the zone. If the picture is unclear, nothing is flagged.',
@@ -50,18 +62,6 @@ export const RULE_TYPES = [
     fields: [
       { key: 'required_ppe', kind: 'ppe', label: 'Required items' },
       { key: 'grace_seconds', kind: 'number', label: 'Grace period (seconds)', min: 1, max: 30, step: 1 },
-    ],
-  },
-  {
-    value: 'MAX_DWELL',
-    label: 'Longest stay',
-    blurb: 'Raises a flag for review when someone stays in the zone longer than allowed. A warning is recorded earlier, at the chosen share of the limit (below 100%), but nothing is flagged until the limit is reached.',
-    zoneTypes: ['PPE_CHECKPOINT', 'APPROACH', 'RESTRICTED', 'EXIT'],
-    enforced: () => true,
-    defaults: { max_seconds: 300, warn_fraction: 0.8 },
-    fields: [
-      { key: 'max_seconds', kind: 'number', label: 'Longest stay (seconds)', min: 10, max: 86400, step: 10, required: true },
-      { key: 'warn_fraction', kind: 'number', label: 'Warn at this share of the limit', min: 0.1, max: 1, step: 0.05 },
     ],
   },
   {
@@ -168,7 +168,7 @@ const FRIENDLY = [
   [/exit_zone_id must be/i, 'The exit must be an Exit zone on the same camera.'],
   [/give min_people, max_people or both/i, 'Give a smallest number of people, a largest number, or both.'],
   [/min_people cannot be more than max_people/i, 'The smallest number cannot be larger than the largest.'],
-  [/max_seconds is required/i, 'Say how long a stay may last.'],
+  [/max_seconds is required/i, 'Say after how many seconds to alert.'],
 ];
 
 /** A server validation sentence in words a site manager would use (anything unrecognised is shown as it came). */
@@ -215,8 +215,8 @@ export function ruleSummary(type, params, zoneName = () => null) {
       return `${items || 'Required items'} checked all the time someone is inside; flagged after ${durationText(p.grace_seconds)} without a break`;
     case 'MAX_DWELL':
       return (p.warn_fraction ?? 0.8) < 1
-        ? `Longest stay ${durationText(p.max_seconds)}; a warning is recorded at ${Math.round((p.warn_fraction ?? 0.8) * 100)}% of it`
-        : `Longest stay ${durationText(p.max_seconds)}; no earlier warning`;
+        ? `Alert when someone stays over ${durationText(p.max_seconds)}; early warning at ${Math.round((p.warn_fraction ?? 0.8) * 100)}%`
+        : `Alert when someone stays over ${durationText(p.max_seconds)}`;
     case 'OCCUPANCY': {
       const lo = p.min_people != null && p.min_people !== '' ? Number(p.min_people) : null;
       const hi = p.max_people != null && p.max_people !== '' ? Number(p.max_people) : null;
