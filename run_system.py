@@ -306,12 +306,12 @@ def main():
 
     # A normal (http) start also opens a secure entrance for PHONES (scripts/phone_gateway.py): a phone only
     # opens its camera on https, while this computer keeps using plain http://localhost:3000.
-    phone_base = None
-    if not args.https and ip and ensure_cert(verbose=False):
-        phone_base = f"https://{ip}:{PHONE_PORT}"
-        if not ip:
-            print(f"{YELLOW}[SYSTEM]{RESET} No LAN address found — is this "
-                  "laptop on Wi-Fi? A phone will not be able to reach it.")
+    # Started whether or not this computer is on Wi-Fi RIGHT NOW: the backend looks up the Wi-Fi address each
+    # time a phone is paired, so joining (or changing) a network after start-up still works.
+    phone_gateway = bool(not args.https and ensure_cert(verbose=False))
+    phone_base = f"https://{ip}:{PHONE_PORT}" if (phone_gateway and ip) else None
+    if phone_gateway and not ip:
+        print(f"{YELLOW}[SYSTEM]{RESET} Not on Wi-Fi yet. Phones can pair once this computer joins a network.")
 
     # ── 1. Free ports ──────────────────────────────────────────────────────
     print(f"{YELLOW}[SYSTEM]{RESET} Freeing ports 8001 and 3000 ...")
@@ -337,7 +337,8 @@ def main():
         stderr=subprocess.STDOUT,
         text=True, bufsize=1,
         # The address the pairing QR sends a phone to (the gateway below), when there is one.
-        env={**os.environ, "PYTHONUNBUFFERED": "1", **({"VISIONWORKS_PHONE_BASE": phone_base} if phone_base else {})},
+        # The port of the phones' entrance (the gateway below); the backend adds the current Wi-Fi address.
+        env={**os.environ, "PYTHONUNBUFFERED": "1", **({"VISIONWORKS_PHONE_PORT": str(PHONE_PORT)} if phone_gateway else {})},
         creationflags=win_flags,
     )
     threading.Thread(target=stream, args=(backend_proc, "BACKEND ", BLUE), daemon=True).start()
@@ -398,7 +399,7 @@ def main():
     print(f"{YELLOW}[SYSTEM]{RESET} Frontend is UP ✓")
 
     gateway_proc = None
-    if phone_base:
+    if phone_gateway:
         gateway_proc = subprocess.Popen(
             [VENV_PYTHON, os.path.join(ROOT_DIR, "scripts", "phone_gateway.py"), CERT_FILE, KEY_FILE, str(PHONE_PORT)],
             cwd=ROOT_DIR, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,

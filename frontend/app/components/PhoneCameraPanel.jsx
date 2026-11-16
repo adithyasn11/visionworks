@@ -362,10 +362,15 @@ export default function PhoneCameraPanel({ cameraId, onFrame, disabled = false, 
     <div className={`rounded-2xl border border-line bg-surface-alt/50 px-4 flex flex-col gap-2 ${paired ? 'py-2' : 'py-3'}`}>
     <div className="flex items-center gap-4">
       {noEntrance ? (
-        <p className="flex-1 flex items-center gap-2 text-[0.875rem] text-ink">
-          <AlertCircle className="w-4 h-4 text-accent shrink-0" />
-          This computer is not on Wi-Fi, so a phone cannot reach it.
-        </p>
+        <div className="flex-1 flex flex-wrap items-center gap-3">
+          <p className="flex items-center gap-2 text-[0.875rem] text-ink">
+            <AlertCircle className="w-4 h-4 text-accent shrink-0" />
+            No Wi-Fi network found on this computer. Connect to Wi-Fi, then try again.
+          </p>
+          <button type="button" onClick={startPairing} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line text-[0.8125rem] font-bold text-ink hover:border-[color:var(--accent)] transition-colors">
+            <RefreshCw className="w-3.5 h-3.5" /> Try again
+          </button>
+        </div>
       ) : !paired ? (
         <>
           {qrSvg ? (

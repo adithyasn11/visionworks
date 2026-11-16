@@ -150,15 +150,45 @@ def lan_host() -> Optional[str]:
     Only the server knows that address. Found by asking the routing table
     which interface would carry a packet to the internet; no packet is sent.
     """
+    def usable(ip):
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            return False
+        # Private (192.168/10/172.16) or a carrier/hotspot shared range (100.64/10); never loopback or link-local.
+        return (addr.is_private or addr in ipaddress.ip_network("100.64.0.0/10")) and not addr.is_loopback and not addr.is_link_local
+
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        s.connect(("8.8.8.8", 80))
+        s.connect(("8.8.8.8", 80))          # no packet is sent; this only asks the routing table
         ip = s.getsockname()[0]
-        return ip if ipaddress.ip_address(ip).is_private else None
+        if usable(ip):
+            return ip
     except Exception:
-        return None
+        pass                                 # no route to the internet: a Wi-Fi without internet still works
     finally:
         s.close()
+    try:
+        for ip in socket.gethostbyname_ex(socket.gethostname())[2]:
+            if usable(ip):
+                return ip
+    except Exception:
+        pass
+    return None
+
+
+def _phone_base():
+    """
+    The phones' secure entrance, e.g. https://192.168.1.20:3443, with the Wi-Fi address as it is NOW (asked on
+    every pairing, so joining or changing a network after start-up is fine). None when there is no entrance (phone
+    mode serves https itself) or no network.
+    """
+    port = os.environ.get("VISIONWORKS_PHONE_PORT")
+    if not port:
+        legacy = os.environ.get("VISIONWORKS_PHONE_BASE")   # an older launcher
+        return legacy or None
+    host = lan_host()
+    return f"https://{host}:{port}" if host else None
 
 
 # ── HTTP: the laptop asks for a code ──────────────────────────────────────
@@ -187,7 +217,7 @@ async def create_pairing_session(org_id: str = Depends(require_analysis_run)):
         "lan_host": lan_host(),
         # The phones' secure entrance started by run_system.py on a normal start (scripts/phone_gateway.py),
         # e.g. https://192.168.1.20:3443. None when there is none (phone mode serves https itself).
-        "phone_base": os.environ.get("VISIONWORKS_PHONE_BASE") or None,
+        "phone_base": _phone_base(),
     }
 
 
