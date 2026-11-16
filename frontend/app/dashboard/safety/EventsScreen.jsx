@@ -7,7 +7,7 @@
 // behind them. Anyone in the organisation can read it; the CSV export is audited on the server.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, Download, History, ListFilter, Loader2, PlayCircle, X } from 'lucide-react';
+import { Download, Eye, EyeOff, History, Image as ImageIcon, ListFilter, Loader2, LogIn, LogOut, PlayCircle, Timer, X } from 'lucide-react';
 import { downloadExport, listDecisions, listEvents } from '../../lib/safetyApi';
 import { listSafetyZones } from '../../lib/safety/management';
 import { describeZoneEvent, workerLabel } from '../../lib/zoneEvents';
@@ -33,6 +33,9 @@ const TAG = {
   CONFIRMED: { label: 'Confirmed', cls: 'border-[color:var(--accent)] text-accent bg-accent-soft' },
   DISMISSED: { label: 'Dismissed', cls: 'border-line text-ink-muted bg-surface-alt line-through decoration-1' },
 };
+// What happened in a zone, as an icon.
+const EVENT_ICON = { ENTERED_ZONE: LogIn, EXITED_ZONE: LogOut, LOST_IN_ZONE: EyeOff, REAPPEARED: Eye, DWELL_WARNING: Timer, DWELL_EXCEEDED: Timer };
+const CARD = 'w-full h-full text-left rounded-2xl border border-line bg-surface p-4 flex flex-col gap-2';
 const tagOf = (d) => (d.status === 'POTENTIAL_VIOLATION' ? TAG[d.reviewState] || TAG.PENDING : TAG[d.status] || TAG.UNVERIFIABLE);
 
 /** Nothing to list: plain and centred. With filters on, the way out is to clear them. */
@@ -161,42 +164,48 @@ export default function EventsScreen({ role, onNavigate }) {
       {data.loading && data.rows.length === 0 && <div className="pt-4"><Skeleton rows={3} label="Loading" /></div>}
       {!data.loading && !data.error && data.rows.length === 0 && <Empty filtered={filtered} onClear={clear} onNavigate={onNavigate} tab={tab} />}
 
+      {/* Small boxes, like the Review queue: one per decision or zone visit, newest first. */}
       {tab === 'decisions' ? (
-        <ul className="flex flex-col divide-y divide-line-soft" aria-label="Decisions, newest first">
+        <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pt-4" aria-label="Decisions, newest first">
           {data.rows.map((d, i) => {
             const tag = tagOf(d);
             const what = (ruleTypeMeta(d.ruleType) || {}).label || 'Safety check';
             const where = [workerLabel(d.workerKey), d.camera && d.camera.name, d.zone && d.zone.name].filter(Boolean).join(' · ');
             return (
-              <li key={d.id}>
+              <li key={d.id} className="min-w-0">
                 <button type="button" onClick={() => setOpen(i)} aria-haspopup="dialog" title={d.reason}
-                  className="w-full grid grid-cols-[auto_minmax(0,1fr)_auto] sm:grid-cols-[8.75rem_6rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 px-2 -mx-2 rounded-lg text-left text-[0.8125rem] hover:bg-surface-alt transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--accent)]">
-                  <span className="hidden sm:block text-ink-faint tabular-nums whitespace-nowrap">{fmtTime(d.observedAt)}</span>
-                  <span className={`justify-self-start px-2 py-0.5 rounded-md border text-[0.6875rem] font-bold ${tag.cls}`}>{tag.label}</span>
-                  <span className="min-w-0 flex flex-col sm:flex-row sm:items-baseline sm:gap-3">
-                    <span className="text-ink font-bold truncate">{what}</span>
-                    <span className="text-ink-faint truncate">{where}</span>
-                    <span className="sm:hidden text-ink-faint tabular-nums">{fmtTime(d.observedAt)}</span>
+                  className={`${CARD} hover:border-[color:var(--accent)] hover:-translate-y-0.5 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--accent)]`}>
+                  <span className="flex items-center justify-between gap-2">
+                    <span className={`px-2 py-0.5 rounded-md border text-[0.6875rem] font-bold ${tag.cls}`}>{tag.label}</span>
+                    <span className="text-xs text-ink-faint tabular-nums whitespace-nowrap">{fmtTime(d.observedAt)}</span>
                   </span>
-                  <ChevronRight className="w-4 h-4 text-ink-faint" aria-hidden="true" />
+                  <span className="text-[0.9375rem] font-black text-ink truncate">{what}</span>
+                  <span className="flex items-center justify-between gap-2 text-[0.8125rem] text-ink-muted min-w-0">
+                    <span className="truncate">{where}</span>
+                    {d.has_picture && <ImageIcon className="w-3.5 h-3.5 shrink-0 text-ink-faint" aria-label="Has a picture" />}
+                  </span>
                 </button>
               </li>
             );
           })}
         </ul>
       ) : (
-        <ul className="flex flex-col divide-y divide-line-soft text-[0.8125rem]" aria-label="Zone activity, newest first">
+        <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pt-4" aria-label="Zone activity, newest first">
           {data.rows.map((e) => {
             const d = describeZoneEvent({ event_type: e.eventType, worker_key: e.workerKey, details: e.details });
             const zone = zones.find((z) => z.id === e.zoneId);
+            const Icon = EVENT_ICON[e.eventType] || History;
+            const warn = e.eventType === 'DWELL_EXCEEDED';
             return (
-              <li key={e.id} className="grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[8.75rem_minmax(0,1fr)_auto] items-center gap-x-3 py-3">
-                <span className="hidden sm:block text-ink-faint tabular-nums whitespace-nowrap">{fmtTime(e.observedAt)}</span>
-                <span className="min-w-0 flex flex-col">
-                  <span className={`truncate ${d.tone === 'unconfirmed' ? 'text-ink-muted' : 'text-ink font-medium'}`}>{d.text}</span>
-                  <span className="sm:hidden text-ink-faint tabular-nums">{fmtTime(e.observedAt)}</span>
+              <li key={e.id} className={`${CARD} min-w-0`}>
+                <span className="flex items-center justify-between gap-2">
+                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${warn ? 'bg-accent text-white' : 'bg-accent-soft text-accent'}`}>
+                    <Icon className="w-3.5 h-3.5" aria-hidden="true" />
+                  </span>
+                  <span className="text-xs text-ink-faint tabular-nums whitespace-nowrap">{fmtTime(e.observedAt)}</span>
                 </span>
-                <span className="text-ink-faint truncate max-w-[10rem] text-right">{zone ? zone.name : '—'}</span>
+                <span className={`text-[0.9375rem] font-black truncate ${d.tone === 'unconfirmed' ? 'text-ink-muted' : 'text-ink'}`} title={d.text}>{d.text}</span>
+                <span className="text-[0.8125rem] text-ink-muted truncate">{zone ? [zone.camera, zone.name].filter(Boolean).join(' · ') : 'No zone'}</span>
               </li>
             );
           })}
