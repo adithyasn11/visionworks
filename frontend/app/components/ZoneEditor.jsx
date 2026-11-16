@@ -22,6 +22,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { backendFetch } from '../lib/backend';
 import { subscribeToFrames, getLatestFrame } from '../lib/liveFrame';
+import PhoneCameraPanel from './PhoneCameraPanel';
 import { ZONE_TYPES, zoneTypeMeta, zoneTypeColor, zoneCanvasLabel } from '../lib/zoneTypes';
 import {
   Shapes, Plus, Trash2, Check, X, Undo2, Loader2, AlertCircle, MousePointerClick, Eye,
@@ -342,6 +343,8 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
   const uploadingRef = useRef(false);
   useEffect(() => {
     if (uploadingRef.current) { uploadingRef.current = false; return; }
+    // The phone panel only makes sense on a webcam-or-phone camera; on another camera, step back to its picture.
+    if (snapSource === 'phone' && (cameras.find((c) => c.name === cameraId) || {}).sourceType === 'WEBCAM') return;
     setSnapSource(cameraId);
     if (!getLatestFrame() && cameras.length) grabCamera(cameraId);
   }, [cameraId, cameras.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -351,7 +354,18 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
   // camera's zones and an uploaded video's zones stay apart.
   const uploadCamera = cameras.find((c) => c.name === cameraId && c.sourceType === 'UPLOAD')
     || cameras.find((c) => c.sourceType === 'UPLOAD') || null;
+  // "Phone camera" pairs a phone right here (a QR code); its live picture becomes the backdrop. A phone is a
+  // "Webcam or phone" camera, so the zones go to one of those.
+  const phoneCamera = cameras.find((c) => c.name === cameraId && c.sourceType === 'WEBCAM')
+    || cameras.find((c) => c.sourceType === 'WEBCAM') || null;
   const chooseBackdrop = (v) => {
+    if (v === 'phone') {
+      setSnapSource('phone');
+      setSnapState('idle');
+      setSnapError(null);
+      if (phoneCamera && phoneCamera.name !== cameraId && onCameraChange) { uploadingRef.current = true; onCameraChange(phoneCamera.name); }
+      return;
+    }
     if (v === 'upload') {
       setSnapSource('upload');
       if (uploadCamera && uploadCamera.name !== cameraId && onCameraChange) { uploadingRef.current = true; onCameraChange(uploadCamera.name); }
@@ -631,12 +645,13 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
               </optgroup>
             )}
             {cameras.length === 0 && <option value={cameraId}>Webcam</option>}
+            <option value="phone">Phone camera (scan a QR code)</option>
             <option value="upload">Upload a video…</option>
           </select>
           <button
             type="button"
             onClick={() => (snapSource === 'upload' ? fileRef.current?.click() : grabCamera(snapSource))}
-            disabled={snapState === 'loading'}
+            disabled={snapState === 'loading' || snapSource === 'phone'}
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-alt hover:bg-surface border border-line hover:border-field text-ink-muted text-[0.8125rem] font-semibold transition-colors disabled:opacity-60"
           >
             {snapState === 'loading'
@@ -650,7 +665,14 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
           {snapSource === 'upload' && !uploadCamera && (
             <span className="text-xs text-ink-faint">Zones are saved to {cameraId}. Add a “Recorded videos” camera to keep upload zones apart.</span>
           )}
+          {snapSource === 'phone' && !phoneCamera && (
+            <span className="text-xs text-ink-faint">Zones are saved to {cameraId}. Add a “Webcam or phone” camera to keep phone zones apart.</span>
+          )}
         </div>
+      )}
+      {!readOnly && snapSource === 'phone' && (
+        // Hold the phone sideways: zones are drawn on a landscape picture.
+        <PhoneCameraPanel cameraId={cameraId} open onClose={() => chooseBackdrop(cameraId)} />
       )}
 
       <div className="relative w-full rounded-xl bg-ground border border-line overflow-hidden">
