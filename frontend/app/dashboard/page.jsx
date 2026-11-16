@@ -476,8 +476,8 @@ function DashboardInner() {
 
       {view === 'events' && (
         <div className="space-y-6 animate-view-in">
-          <PageHeader eyebrow="Events" title="What the safety layer decided and saw" subtitle="Every decision and zone visit, with filters." />
-          <EventsScreen role={role} />
+          <PageHeader eyebrow="Events" title="Everything that was checked" subtitle="Each decision and zone visit, newest first." />
+          <EventsScreen role={role} onNavigate={setView} />
         </div>
       )}
 
