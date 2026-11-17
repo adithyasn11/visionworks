@@ -152,50 +152,44 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
     const inUse = selected === cam.name;
     const zs = zonesOf(cam);
     const rc = rulesOf(cam);
-    const facts = [
-      SOURCE_LABEL[cam.sourceType] || cam.sourceType,
-      zs.length ? `${zs.length} zone${zs.length === 1 ? '' : 's'}` : 'No zones yet',
-      `${rc} rule${rc === 1 ? '' : 's'}`,
-    ].join(' · ');
     return (
-      <li key={cam.id} className={`rounded-xl border bg-surface p-3 min-w-0 ${inUse ? 'border-[color:var(--accent)]' : 'border-line'}`}>
-        <div className="flex items-center gap-3 min-w-0">
+      <li key={cam.id} className={`rounded-2xl border bg-surface p-4 flex flex-col gap-3 min-w-0 ${inUse ? 'border-[color:var(--accent)]' : 'border-line'}`}>
+        <div className="flex items-start gap-3 min-w-0">
           <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${inUse ? 'bg-accent text-white' : 'bg-accent-soft text-accent'}`}>
             <Icon className="w-4 h-4" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-[0.9375rem] font-black text-ink truncate" title={cam.name}>{cam.name}</span>
               {inUse && <span className="shrink-0 px-2 py-0.5 rounded-md text-[0.6875rem] font-bold bg-accent-soft text-accent">In use</span>}
             </div>
-            <p className="text-[0.78125rem] text-ink-muted truncate"
-              title={`${zs.map((z) => z.name).join(', ') || 'No zones yet'} · added ${fmtTime(cam.createdAt)}`}>{facts}</p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {!inUse && <button type="button" className={BTN_QUIET} onClick={() => onSelect?.(cam.name)}>Use</button>}
-            {canEdit && (
-              <button
-                type="button"
-                className={confirming === cam.id ? BTN_PRIMARY : BTN_QUIET}
-                onClick={() => remove(cam)}
-                disabled={removing === cam.id}
-                aria-label={confirming === cam.id ? `Click again to remove ${cam.name}` : `Remove ${cam.name}`}
-                title="Remove"
-                onBlur={() => { if (confirming === cam.id && removing !== cam.id) setConfirming(null); }}
-              >
-                {removing === cam.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />}
-                {confirming === cam.id ? 'Sure?' : ''}
-              </button>
-            )}
+            <p className="text-[0.8125rem] text-ink-muted truncate" title={`${zs.map((z) => z.name).join(', ') || 'No zones yet'} · added ${fmtTime(cam.createdAt)}`}>
+              {SOURCE_LABEL[cam.sourceType] || cam.sourceType} · {zs.length ? `${zs.length} zone${zs.length === 1 ? '' : 's'}` : 'No zones yet'} · {rc} rule{rc === 1 ? '' : 's'}
+            </p>
           </div>
         </div>
-        {confirming === cam.id && <p className="mt-2 text-[0.75rem] text-ink-muted">Its zones and history go too. Click again to remove.</p>}
+        {confirming === cam.id && <p className="text-[0.78125rem] text-ink-muted">Its zones and history go too. Click again to remove.</p>}
+        <div className="mt-auto flex flex-wrap items-center gap-2">
+          {!inUse && <button type="button" className={BTN_QUIET} onClick={() => onSelect?.(cam.name)}>Use this camera</button>}
+          {canEdit && (
+            <button
+              type="button"
+              className={confirming === cam.id ? BTN_PRIMARY : BTN_QUIET}
+              onClick={() => remove(cam)}
+              disabled={removing === cam.id}
+              onBlur={() => { if (confirming === cam.id && removing !== cam.id) setConfirming(null); }}
+            >
+              {removing === cam.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />}
+              {confirming === cam.id ? 'Sure? Remove' : 'Remove'}
+            </button>
+          )}
+        </div>
       </li>
     );
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {message && <Notice tone={message.tone}>{message.text}</Notice>}
 
       {/* Adding: a camera and a site, side by side. */}
@@ -205,7 +199,7 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
             <form onSubmit={submit} className={`grid grid-cols-1 gap-3 items-end ${sites.rows.length > 1 ? 'sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto]' : 'sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto]'}`}>
               <label className={LABEL}>
                 Name
-                <input ref={nameRef} className={FIELD} value={name} onChange={(e) => setName(e.target.value)} maxLength={64} placeholder="e.g. Gate camera" required />
+                <input ref={nameRef} className={FIELD} value={name} onChange={(e) => setName(e.target.value)} maxLength={64} placeholder="e.g. Gate camera" title="The name can't be changed later." required />
               </label>
               <label className={LABEL}>
                 Video comes from
@@ -243,7 +237,6 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                 </label>
               )}
             </form>
-            <p className="mt-2 text-[0.75rem] text-ink-faint" title="Your plan sets how many cameras you can add.">The name can’t be changed later.</p>
           </Panel>
         ) : (
           role && <Notice>You have view-only access here. {denialMessage('cameras.edit')}</Notice>
@@ -261,7 +254,6 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                 Add site
               </button>
             </form>
-            <p className="mt-2 text-[0.75rem] text-ink-faint" title="Your plan sets how many sites you can have.">A site groups the cameras in one place.</p>
           </Panel>
         )}
       </div>
@@ -270,11 +262,9 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
       {(status === 'loading' || sites.status === 'loading') && <Panel><Skeleton rows={3} label="Loading cameras" /></Panel>}
       {status === 'error' && <Notice tone="error">{error || 'Could not load the cameras.'}</Notice>}
       {sites.status === 'error' && <Notice tone="error">{sites.error}</Notice>}
-      {status === 'ready' && sites.status === 'ready' && (
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-      {groups.map(({ site, cams }) => (
-        <section key={site ? site.id : 'none'} className="glass-panel themed px-5 py-5 min-w-0">
-          <header className="flex items-center justify-between gap-3 mb-3">
+      {status === 'ready' && sites.status === 'ready' && groups.map(({ site, cams }) => (
+        <section key={site ? site.id : 'none'} className="glass-panel themed px-5 sm:px-6 py-4">
+          <header className={`flex flex-wrap items-center justify-between gap-3 ${cams.length ? 'mb-3' : ''}`}>
             <div className="flex items-center gap-3 min-w-0">
               <span className="w-9 h-9 rounded-xl bg-surface-alt border border-line flex items-center justify-center shrink-0">
                 <MapPin className="w-4 h-4 text-accent" aria-hidden="true" />
@@ -286,8 +276,10 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                 </p>
               </div>
             </div>
-            {site && isAdmin && sites.rows.length > 1 && cams.length === 0 && (
-              <div className="flex items-center gap-2">
+            {cams.length === 0 && (
+              <div className="flex items-center gap-3">
+                <span className="text-[0.8125rem] text-ink-muted">No cameras yet</span>
+                {site && isAdmin && sites.rows.length > 1 && (
                 <button
                   type="button"
                   className={siteConfirm === site.id ? BTN_PRIMARY : BTN_QUIET}
@@ -296,19 +288,19 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                   onBlur={() => { if (siteConfirm === site.id && !siteBusy) setSiteConfirm(null); }}
                 >
                   <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                  {siteConfirm === site.id ? 'Sure?' : 'Remove'}
+                  {siteConfirm === site.id ? 'Sure? Remove site' : 'Remove site'}
                 </button>
+                )}
               </div>
             )}
           </header>
-          <ul className="flex flex-col gap-2">
-            {cams.map(cameraBox)}
-            {cams.length === 0 && <li className="rounded-xl border border-line bg-surface-alt px-3 py-3 text-[0.8125rem] text-ink-muted">No cameras here yet. Add one above and pick this site.</li>}
-          </ul>
+          {cams.length > 0 && (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+              {cams.map(cameraBox)}
+            </ul>
+          )}
         </section>
       ))}
-      </div>
-      )}
     </div>
   );
 }
