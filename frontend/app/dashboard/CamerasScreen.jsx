@@ -152,49 +152,44 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
     const inUse = selected === cam.name;
     const zs = zonesOf(cam);
     const rc = rulesOf(cam);
+    const facts = [
+      SOURCE_LABEL[cam.sourceType] || cam.sourceType,
+      zs.length ? `${zs.length} zone${zs.length === 1 ? '' : 's'}` : 'No zones yet',
+      `${rc} rule${rc === 1 ? '' : 's'}`,
+    ].join(' · ');
     return (
-      <li key={cam.id} className={`rounded-2xl border bg-surface p-4 flex flex-col gap-3 min-w-0 ${inUse ? 'border-[color:var(--accent)]' : 'border-line'}`}>
-        <div className="flex items-start gap-3 min-w-0">
+      <li key={cam.id} className={`rounded-xl border bg-surface p-3 min-w-0 ${inUse ? 'border-[color:var(--accent)]' : 'border-line'}`}>
+        <div className="flex items-center gap-3 min-w-0">
           <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${inUse ? 'bg-accent text-white' : 'bg-accent-soft text-accent'}`}>
             <Icon className="w-4 h-4" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <span className="text-[0.9375rem] font-black text-ink truncate" title={cam.name}>{cam.name}</span>
               {inUse && <span className="shrink-0 px-2 py-0.5 rounded-md text-[0.6875rem] font-bold bg-accent-soft text-accent">In use</span>}
             </div>
-            <p className="text-[0.8125rem] text-ink-muted truncate" title={`Added ${fmtTime(cam.createdAt)}`}>{SOURCE_LABEL[cam.sourceType] || cam.sourceType}</p>
+            <p className="text-[0.78125rem] text-ink-muted truncate"
+              title={`${zs.map((z) => z.name).join(', ') || 'No zones yet'} · added ${fmtTime(cam.createdAt)}`}>{facts}</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {!inUse && <button type="button" className={BTN_QUIET} onClick={() => onSelect?.(cam.name)}>Use</button>}
+            {canEdit && (
+              <button
+                type="button"
+                className={confirming === cam.id ? BTN_PRIMARY : BTN_QUIET}
+                onClick={() => remove(cam)}
+                disabled={removing === cam.id}
+                aria-label={confirming === cam.id ? `Click again to remove ${cam.name}` : `Remove ${cam.name}`}
+                title="Remove"
+                onBlur={() => { if (confirming === cam.id && removing !== cam.id) setConfirming(null); }}
+              >
+                {removing === cam.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />}
+                {confirming === cam.id ? 'Sure?' : ''}
+              </button>
+            )}
           </div>
         </div>
-        <div className="flex flex-wrap gap-1.5 min-w-0">
-          {zs.length === 0 ? (
-            <span className="text-[0.75rem] text-ink-faint">No zones yet</span>
-          ) : (
-            <>
-              {zs.slice(0, 3).map((z) => (
-                <span key={z.id} className="max-w-[9rem] truncate px-2 py-0.5 rounded-md border border-line bg-surface-alt text-[0.75rem] font-semibold text-ink-muted">{z.name}</span>
-              ))}
-              {zs.length > 3 && <span className="px-1 py-0.5 text-[0.75rem] text-ink-faint">+{zs.length - 3}</span>}
-            </>
-          )}
-        </div>
-        <p className="text-[0.75rem] text-ink-faint">{rc} rule{rc === 1 ? '' : 's'} checked</p>
-        {confirming === cam.id && <p className="text-[0.78125rem] text-ink-muted">Its zones and history go too. Click again to remove.</p>}
-        <div className="mt-auto flex flex-wrap items-center gap-2">
-          {!inUse && <button type="button" className={BTN_QUIET} onClick={() => onSelect?.(cam.name)}>Use this camera</button>}
-          {canEdit && (
-            <button
-              type="button"
-              className={confirming === cam.id ? BTN_PRIMARY : BTN_QUIET}
-              onClick={() => remove(cam)}
-              disabled={removing === cam.id}
-              onBlur={() => { if (confirming === cam.id && removing !== cam.id) setConfirming(null); }}
-            >
-              {removing === cam.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />}
-              {confirming === cam.id ? 'Sure? Remove' : 'Remove'}
-            </button>
-          )}
-        </div>
+        {confirming === cam.id && <p className="mt-2 text-[0.75rem] text-ink-muted">Its zones and history go too. Click again to remove.</p>}
       </li>
     );
   };
@@ -275,9 +270,11 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
       {(status === 'loading' || sites.status === 'loading') && <Panel><Skeleton rows={3} label="Loading cameras" /></Panel>}
       {status === 'error' && <Notice tone="error">{error || 'Could not load the cameras.'}</Notice>}
       {sites.status === 'error' && <Notice tone="error">{sites.error}</Notice>}
-      {status === 'ready' && sites.status === 'ready' && groups.map(({ site, cams }) => (
-        <section key={site ? site.id : 'none'} className="glass-panel themed px-5 sm:px-6 py-5">
-          <header className="flex flex-wrap items-center justify-between gap-3 mb-4">
+      {status === 'ready' && sites.status === 'ready' && (
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+      {groups.map(({ site, cams }) => (
+        <section key={site ? site.id : 'none'} className="glass-panel themed px-5 py-5 min-w-0">
+          <header className="flex items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-3 min-w-0">
               <span className="w-9 h-9 rounded-xl bg-surface-alt border border-line flex items-center justify-center shrink-0">
                 <MapPin className="w-4 h-4 text-accent" aria-hidden="true" />
@@ -299,17 +296,19 @@ export default function CamerasScreen({ role, cameras, status, error, selected, 
                   onBlur={() => { if (siteConfirm === site.id && !siteBusy) setSiteConfirm(null); }}
                 >
                   <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                  {siteConfirm === site.id ? 'Sure? Remove site' : 'Remove site'}
+                  {siteConfirm === site.id ? 'Sure?' : 'Remove'}
                 </button>
               </div>
             )}
           </header>
-          <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+          <ul className="flex flex-col gap-2">
             {cams.map(cameraBox)}
-            {cams.length === 0 && <li className="col-span-full text-[0.8125rem] text-ink-muted">No cameras here yet. Add one above and pick this site.</li>}
+            {cams.length === 0 && <li className="rounded-xl border border-line bg-surface-alt px-3 py-3 text-[0.8125rem] text-ink-muted">No cameras here yet. Add one above and pick this site.</li>}
           </ul>
         </section>
       ))}
+      </div>
+      )}
     </div>
   );
 }
