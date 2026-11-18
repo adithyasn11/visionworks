@@ -64,6 +64,7 @@ class SafetyConfig:
     ppe_every_n_frames: int = 2                          # run the PPE model every Nth frame
     ppe_crop_below_px: float = 360.0                     # a person shorter than this (in the PPE frame) is also checked up close; 0 = never
     ppe_hivis_min_fraction: float = 0.10                 # hi-vis coloured share of a torso that stops 'no vest found' being read as 'no vest' (0 = off)
+    ppe_cap_check: bool = True                           # a helmet box that is not white or a vivid colour (a cap) is not counted as a helmet
     ppe_max_crops: int = 10                              # close-up checks per frame, most distant first dropped
     pose_max_width: int = 1280                           # width the people detector sees (the original frame, shrunk only if wider)
     ppe_max_width: int = 1280                            # frame width the PPE model sees (a worker must be >= ppe_min_person_height_px tall in THIS frame)

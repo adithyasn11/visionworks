@@ -186,7 +186,7 @@ class Ppe:
         return self.by.get(key)
 
 
-CFG = SafetyConfig()
+CFG = SafetyConfig(ppe_cap_check=False)   # blank test frames would read as dark caps
 RULE = default_rules(ZONES)[0]
 
 
@@ -509,7 +509,7 @@ print("C. SafetySession end to end (zone tracker + PPE runner + evidence + write
 _n = [0]
 FRAME = np.zeros((480, 640, 3), np.uint8)
 SHAPE = FRAME.shape
-CFG_C = SafetyConfig(ppe_every_n_frames=1, ppe_crop_below_px=0.0, ppe_hivis_min_fraction=0.0)
+CFG_C = SafetyConfig(ppe_cap_check=False, ppe_every_n_frames=1, ppe_crop_below_px=0.0, ppe_hivis_min_fraction=0.0)
 
 
 class Scene:

@@ -63,9 +63,9 @@ from app.safety.session import SafetySession                       # noqa: E402
 RESULTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
 FRAME = np.zeros((480, 640, 3), np.uint8)
 SHAPE = FRAME.shape
-# The scripted detector draws boxes on a blank frame, so the close-up crops and the hi-vis colour cue (which look at the
+# The scripted detector draws boxes on a blank frame, so the close-up crops, the hi-vis colour cue and the cap check (which look at the
 # pixels) are switched off; everything else is the production configuration.
-CFG = SafetyConfig(ppe_crop_below_px=0.0, ppe_hivis_min_fraction=0.0)
+CFG = SafetyConfig(ppe_crop_below_px=0.0, ppe_hivis_min_fraction=0.0, ppe_cap_check=False)
 VARIANTS = 18                                                      # runs per scenario (6 per frame rate)
 
 ZONES = [

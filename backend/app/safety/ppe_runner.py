@@ -54,7 +54,7 @@ from app.cv.ppe_evidence import (
     HELMET, VEST, UNVERIFIABLE, PRESENT_CONF, WEAK_CONF, PpeEvidenceTracker, associate_frame,
 )
 from app.safety.config import SafetyConfig
-from app.safety.ppe_colour import hivis_fraction
+from app.safety.ppe_colour import hivis_fraction, soften_caps
 from app.safety.ppe_crops import needs_crop, person_crop
 
 _log = logging.getLogger(__name__)
@@ -227,6 +227,12 @@ class PpeRunner:
             self._warn(f"PPE detection failed: {type(e).__name__}: {e}")
             return
         detections = list(detections) + self._close_ups(scaled, ppe_frame, small)
+        if self.config.ppe_cap_check:
+            # A cap is "something on the head" to the model too: one that is not hard-hat coloured is not a helmet.
+            try:
+                soften_caps(detections, small, PRESENT_CONF, WEAK_CONF)
+            except Exception as e:
+                self._warn(f"cap check failed: {type(e).__name__}: {e}", key="cap")
         self._failures = 0
         self.detections_run += 1
         self.last_detections = [dict(d) for d in detections]

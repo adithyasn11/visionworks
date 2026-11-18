@@ -1,6 +1,12 @@
 # backend/app/safety/ppe_colour.py
 """
-A second opinion on vests, from colour alone.
+A second opinion on vests, and on helmets, from colour alone.
+
+HELMETS (hardhat_fraction / soften_caps, at the end): the model reads a cap, a beanie
+or a dark hood as a helmet, because to it a helmet is "something on the head". Hard
+hats are white or a vivid colour (yellow, orange, red, blue, green); caps are mostly
+dark, grey, navy or khaki. A helmet box whose shell is almost none of those colours
+is not trusted as a helmet.
 
 The vest detector has no "no vest" class: it says "absent" whenever it finds
 nothing. At a distance, from above, or for a colour it saw little of in training
@@ -70,3 +76,74 @@ def hivis_fraction(frame, bbox: Sequence[float]) -> Optional[float]:
     yg = (hue >= YELLOW_GREEN["h"][0]) & (hue <= YELLOW_GREEN["h"][1]) & (sat >= YELLOW_GREEN["s_min"]) & (val >= YELLOW_GREEN["v_min"])
     og = (hue >= ORANGE["h"][0]) & (hue <= ORANGE["h"][1]) & (sat >= ORANGE["s_min"]) & (val >= ORANGE["v_min"])
     return float((yg | og).mean())
+
+
+# ── helmets ────────────────────────────────────────────────────────────────
+
+# The shell is the top part of the helmet box; the bottom part is often forehead.
+SHELL_TOP = 0.6
+# White hard hats: little colour, bright. Vivid hard hats: saturated and not dark. Skin
+# and brown hair share the orange hue band, so there only a strongly saturated (safety
+# orange) pixel counts.
+WHITE = dict(s_max=60, v_min=165)
+VIVID = dict(s_min=110, v_min=110)
+SKIN_HUE = (3, 22)
+SKIN_HUE_S_MIN = 170
+# Measured on the Construction-PPE labels (1,160 helmets, 615 heads labelled "no
+# helmet"): a shell fraction under 0.06 holds for about 3 % of real helmets and about
+# 40 % of uncovered heads; under 0.15 for about 6 % of helmets. A dark cap in the demo
+# footage scored 0.00, the white helmet beside it 0.71.
+CAP_BELOW = 0.06             # under this: a cap, not a helmet
+UNSURE_BELOW = 0.15          # under this: maybe a dark helmet, maybe a cap: not "seen"
+CAP_KEEP_CONF = 0.90         # a detection this sure is only lowered to "unsure", never dropped
+
+
+def hardhat_fraction(frame, bbox: Sequence[float]) -> Optional[float]:
+    """Share of the top of a helmet box that is hard-hat coloured (white or vivid), or None if it is too small."""
+    import cv2
+
+    fh, fw = frame.shape[:2]
+    x1, y1, x2, y2 = [int(round(v)) for v in bbox]
+    y2 = y1 + max(2, int((y2 - y1) * SHELL_TOP))
+    x1, y1, x2, y2 = max(0, x1), max(0, y1), min(fw, x2), min(fh, y2)
+    if x2 - x1 < 3 or y2 - y1 < 3:
+        return None
+    hsv = cv2.cvtColor(frame[y1:y2, x1:x2], cv2.COLOR_BGR2HSV)
+    hue, sat, val = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    white = (sat < WHITE["s_max"]) & (val >= WHITE["v_min"])
+    skin_band = (hue >= SKIN_HUE[0]) & (hue <= SKIN_HUE[1])
+    vivid = (sat >= VIVID["s_min"]) & (val >= VIVID["v_min"]) & (~skin_band | (sat >= SKIN_HUE_S_MIN))
+    return float((white | vivid).mean())
+
+
+def soften_caps(detections: list, frame, present_conf: float, weak_conf: float) -> int:
+    """
+    Lower the confidence of helmet detections that look like caps (the list's items are replaced, not edited). Returns how many were changed.
+
+      shell fraction < CAP_BELOW     -> below `weak_conf` (no helmet seen), unless the model is very sure,
+                                        then just under `present_conf` (cannot tell)
+      shell fraction < UNSURE_BELOW  -> just under `present_conf` (cannot tell)
+
+    A detection is never raised, and vests are not touched.
+    """
+    changed = 0
+    unsure = present_conf - 0.01
+    for i, d in enumerate(detections):
+        if d.get("cls") != "helmet":
+            continue
+        try:
+            f = hardhat_fraction(frame, d["bbox"])
+        except Exception:
+            continue
+        if f is None or f >= UNSURE_BELOW:
+            continue
+        conf = float(d.get("conf", 0.0))
+        if f < CAP_BELOW and conf < CAP_KEEP_CONF:
+            new = min(conf, weak_conf * 0.5)
+        else:
+            new = min(conf, unsure)
+        if new < conf:
+            # a new dict: the detector's own objects are never edited
+            detections[i] = {**d, "conf": new, "conf_model": conf, "looks_like_cap": True}
+            changed += 1
+    return changed

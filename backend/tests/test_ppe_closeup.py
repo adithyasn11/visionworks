@@ -82,7 +82,7 @@ POSE = (360, 640, 3)
 SMALL = {"track_id": 1, "bbox": [200.0, 100.0, 260.0, 220.0]}
 BIG = {"track_id": 2, "bbox": [400.0, 20.0, 560.0, 340.0]}         # 640 px tall in the PPE frame
 TINY = {"track_id": 3, "bbox": [50.0, 100.0, 60.0, 140.0]}         # 80 px tall in the PPE frame: below the judging floor
-CFG_ON = SafetyConfig(ppe_every_n_frames=1)
+CFG_ON = SafetyConfig(ppe_cap_check=False, ppe_every_n_frames=1)
 
 
 class Eyes:
@@ -134,13 +134,13 @@ r.process([BIG, TINY], ORIG, POSE, 0.0)
 check("a big worker (640 px) and one too small to judge (80 px) get no close-up", len(eyes.calls) == 1 and r.crops_run == 0, str(eyes.calls))
 
 eyes = Eyes()
-r = PpeRunner(eyes, SafetyConfig(ppe_every_n_frames=1, ppe_crop_below_px=0.0))
+r = PpeRunner(eyes, SafetyConfig(ppe_cap_check=False, ppe_every_n_frames=1, ppe_crop_below_px=0.0))
 r.process([SMALL], ORIG, POSE, 0.0)
 check("ppe_crop_below_px = 0 switches close-ups off", len(eyes.calls) == 1)
 
 people = [{"track_id": 10 + i, "bbox": [20.0 + 40 * i, 100.0, 50.0 + 40 * i, 220.0 - 3 * i]} for i in range(8)]
 eyes = Eyes()
-r = PpeRunner(eyes, SafetyConfig(ppe_every_n_frames=1, ppe_max_crops=3))
+r = PpeRunner(eyes, SafetyConfig(ppe_cap_check=False, ppe_every_n_frames=1, ppe_max_crops=3))
 r.process(people, ORIG, POSE, 0.0)
 check("at most ppe_max_crops close-ups per frame", r.crops_run == 3, str(r.crops_run))
 
@@ -183,7 +183,7 @@ class Eyes2:
                                                          (x2 - cr2.x0) * cr2.scale_x, (y2 - cr2.y0) * cr2.scale]}]
 
 
-out = PpeRunner(Eyes2(), SafetyConfig(ppe_every_n_frames=1, ppe_hivis_min_fraction=0.0)).process([P2], ORIG2, POSE2, 0.0)
+out = PpeRunner(Eyes2(), SafetyConfig(ppe_cap_check=False, ppe_every_n_frames=1, ppe_hivis_min_fraction=0.0)).process([P2], ORIG2, POSE2, 0.0)
 check("with different width and height ratios (the case a swapped fx/fy would break) the close-up helmet is still credited", out[1]["helmet"] == 0.8, str(out[1]))
 
 # cap order: the tallest judgeable people are checked first
@@ -193,7 +193,7 @@ real_pc = runner_mod.person_crop
 runner_mod.person_crop = lambda f, b, *a, **k: (seen_boxes.append(b), real_pc(f, b, *a, **k))[1]
 try:
     people2 = [{"track_id": 20 + i, "bbox": [20.0 + 40 * i, 100.0, 50.0 + 40 * i, 100.0 + 60 + 10 * i]} for i in range(6)]   # heights 60..110 (pose px)
-    PpeRunner(Eyes(), SafetyConfig(ppe_every_n_frames=1, ppe_max_crops=2)).process(people2, ORIG, POSE, 0.0)
+    PpeRunner(Eyes(), SafetyConfig(ppe_cap_check=False, ppe_every_n_frames=1, ppe_max_crops=2)).process(people2, ORIG, POSE, 0.0)
 finally:
     runner_mod.person_crop = real_pc
 heights = sorted([b[3] - b[1] for b in seen_boxes], reverse=True)
@@ -213,7 +213,7 @@ check("a crop step that raises is skipped and is not counted as the detector fai
 real_h = runner_mod.hivis_fraction
 runner_mod.hivis_fraction = lambda *a, **k: (_ for _ in ()).throw(ValueError("bad cue"))
 try:
-    r = PpeRunner(Eyes(), SafetyConfig(ppe_every_n_frames=1, ppe_crop_below_px=0.0))
+    r = PpeRunner(Eyes(), SafetyConfig(ppe_cap_check=False, ppe_every_n_frames=1, ppe_crop_below_px=0.0))
     for i in range(10):
         r.process([{"track_id": 1, "bbox": [400.0, 100.0, 520.0, 400.0]}], np.zeros((720, 1280, 3), np.uint8), (720, 1280, 3), i * 0.1)
 finally:
@@ -231,7 +231,7 @@ class Rec:
 
 
 rec = Rec()
-PpeRunner(rec, SafetyConfig(ppe_every_n_frames=1, ppe_crop_below_px=0.0)).process(
+PpeRunner(rec, SafetyConfig(ppe_cap_check=False, ppe_every_n_frames=1, ppe_crop_below_px=0.0)).process(
     [{"track_id": 1, "bbox": [100.0, 100.0, 300.0, 500.0]}], np.zeros((1920, 1080, 3), np.uint8), (640, 360, 3), 0.0)
 check("a portrait 1080x1920 frame reaches the PPE model at 1280 on its long side (not 1920)", rec.shapes[0][0] == (1280, 720) and rec.shapes[0][1] == 1280, str(rec.shapes))
 
@@ -351,7 +351,7 @@ check("no torso to look at gives None, not an error", hivis_fraction(grey, [10, 
 
 POSE_FULL = (720, 1280, 3)
 PERSON_PB = {"track_id": 1, "bbox": PB}
-cfg = SafetyConfig(ppe_every_n_frames=1, ppe_crop_below_px=0.0)
+cfg = SafetyConfig(ppe_cap_check=False, ppe_every_n_frames=1, ppe_crop_below_px=0.0)
 
 
 def verdict_after(frame, detections, cfg=cfg, n=30, person=PERSON_PB):
@@ -383,13 +383,13 @@ v = verdict_after(painted(ORANGE_BGR), [HELMET_ON])
 check("no vest found but an orange torso: 'cannot tell', never 'no vest'", v["vest_state"] == "UNVERIFIABLE" and v["status"] == "UNVERIFIABLE", str(v))
 v = verdict_after(painted((90, 90, 90)), [HELMET_ON])
 check("no vest found and a plain torso: still 'no vest seen' (the cue does not hide real violations)", v["vest_state"] == "ABSENT" and v["status"] == "NON_COMPLIANT", str(v))
-v = verdict_after(painted(ORANGE_BGR), [HELMET_ON], SafetyConfig(ppe_every_n_frames=1, ppe_crop_below_px=0.0, ppe_hivis_min_fraction=0.0))
+v = verdict_after(painted(ORANGE_BGR), [HELMET_ON], SafetyConfig(ppe_cap_check=False, ppe_every_n_frames=1, ppe_crop_below_px=0.0, ppe_hivis_min_fraction=0.0))
 check("with the cue switched off (0) the old behaviour: absent", v["vest_state"] == "ABSENT", str(v))
 # the cue and non-default thresholds: it must never reach 'seen'
-cfg_odd = SafetyConfig(ppe_every_n_frames=1, ppe_crop_below_px=0.0, ppe_weak_conf=0.40, ppe_present_conf=0.60)
+cfg_odd = SafetyConfig(ppe_cap_check=False, ppe_every_n_frames=1, ppe_crop_below_px=0.0, ppe_weak_conf=0.40, ppe_present_conf=0.60)
 v = verdict_after(painted(ORANGE_BGR), [HELMET_ON], cfg_odd)
 check("even with the weak/present settings changed, the colour cue alone can never make a vest PRESENT", v["vest_state"] == "UNVERIFIABLE", str(v))
-cfg_low = SafetyConfig(ppe_every_n_frames=1, ppe_crop_below_px=0.0, ppe_weak_conf=0.10, ppe_present_conf=0.20, ppe_conf_floor=0.05)
+cfg_low = SafetyConfig(ppe_cap_check=False, ppe_every_n_frames=1, ppe_crop_below_px=0.0, ppe_weak_conf=0.10, ppe_present_conf=0.20, ppe_conf_floor=0.05)
 v = verdict_after(painted(ORANGE_BGR), [HELMET_ON], cfg_low)
 check("...and with very low settings it still counts as 'cannot tell', not as nothing", v["vest_state"] == "UNVERIFIABLE", str(v))
 

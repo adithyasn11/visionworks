@@ -51,7 +51,7 @@ def check(name, ok, detail=""):
 
 
 ZONES = [{"zone_id": "press", "zone_name": "Press line", "zone_type": "RESTRICTED"}]
-CFG = SafetyConfig(ppe_every_n_frames=1, ppe_crop_below_px=0.0, ppe_hivis_min_fraction=0.0)
+CFG = SafetyConfig(ppe_cap_check=False, ppe_every_n_frames=1, ppe_crop_below_px=0.0, ppe_hivis_min_fraction=0.0)
 FRAME = np.zeros((480, 640, 3), np.uint8)
 FPS = 10.0
 _n = [0]
