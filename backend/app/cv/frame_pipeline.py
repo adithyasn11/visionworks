@@ -30,12 +30,25 @@ silently disable the privacy blur on every endpoint at once.
 """
 
 import logging
+import time
 
 from app.cv.spatial_engine import SpatialEngine
-from app.safety.man_down import body_state
+from app.safety.man_down import UprightMemory, body_state
 LYING_ANGLE_DEG = 60.0     # as SafetyConfig.man_down_angle_deg
 
 _log = logging.getLogger(__name__)
+
+
+def _upright_memory(owner) -> UprightMemory:
+    """The session's standing references, kept on its per-session activity aggregator."""
+    mem = getattr(owner, "_vw_upright_memory", None)
+    if mem is None:
+        mem = UprightMemory()
+        try:
+            setattr(owner, "_vw_upright_memory", mem)
+        except Exception:
+            pass
+    return mem
 
 
 def process_detections(
@@ -140,7 +153,9 @@ def process_detections(
         # upright (the same test man-down uses). The classifier itself has no LYING (it reads a person lying
         # flat as SITTING), and `posture` stays its value because the activity records only take those.
         # A flat torso with the legs standing under it is someone bending forward, not lying (body_state).
-        entity["body"] = body_state(det.get("keypoints"), bbox, LYING_ANGLE_DEG) or posture
+        # A fall toward the camera keeps the body upright on screen: compare with how this person looked standing.
+        collapsed = _upright_memory(activity_aggregator).observe(str(track_id), det.get("keypoints"), bbox, time.monotonic())
+        entity["body"] = body_state(det.get("keypoints"), bbox, LYING_ANGLE_DEG) or ("LYING" if collapsed else posture)
         tracked_entities.append(entity)
 
     return tracked_entities, zone_summary

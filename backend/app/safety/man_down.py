@@ -140,6 +140,80 @@ def body_state(keypoints, bbox, angle_deg: float = 60.0) -> Optional[str]:
     return "LYING"
 
 
+# A fall toward or away from the camera: the body lies along the line of sight, so on screen it still points up and
+# down and the torso angle stays near vertical. What changes is its length: compared with the same person standing a
+# moment ago, the torso and the legs are foreshortened and the box is much shorter, while the feet stay where they were.
+COLLAPSE_TORSO = 0.50        # torso on screen under this share of its standing length
+COLLAPSE_TORSO_VS_BOX = 0.80 # ... and shrunk clearly more than the box (walking away shrinks everything alike)
+COLLAPSE_LEGS = 0.75         # legs (hip to ankle, up and down) under this share: bending forward keeps the legs
+COLLAPSE_BOX = 0.65          # box height under this share of standing
+COLLAPSE_FEET = 0.25         # the feet within this many standing heights of where they stood (they did not walk off)
+UPRIGHT_KEEP_S = 10.0        # the standing reference is the median of this many seconds of upright frames
+UPRIGHT_MIN_SAMPLES = 5
+
+
+def _body_lengths(keypoints, bbox):
+    """(torso length, leg drop, box height, feet y) on screen, or None when the shoulders, hips or ankles are weak."""
+    sh = _mid(keypoints, _L_SHOULDER, _R_SHOULDER)
+    hip = _mid(keypoints, _L_HIP, _R_HIP)
+    ank = _mid(keypoints, _L_ANKLE, _R_ANKLE)
+    if sh is None or hip is None or ank is None:
+        return None
+    try:
+        h = float(bbox[3]) - float(bbox[1])
+    except (TypeError, IndexError, ValueError):
+        return None
+    if h <= 0:
+        return None
+    return math.hypot(hip[0] - sh[0], hip[1] - sh[1]), ank[1] - hip[1], h, ank[1]
+
+
+class UprightMemory:
+    """
+    How each person looked while standing, to recognise a fall along the camera's line of sight.
+
+    `observe(key, keypoints, bbox, t)` records the frame when the person is upright and not collapsed, and returns
+    True when they are collapsed compared with that reference (see the COLLAPSE_* limits). With no reference yet (a
+    person who came into view already down) it returns False: that case is still the torso-angle test's.
+    """
+
+    def __init__(self):
+        self._samples: Dict[str, Deque[Tuple[float, float, float, float, float]]] = {}
+
+    def reference(self, key: str):
+        q = self._samples.get(key)
+        if not q or len(q) < UPRIGHT_MIN_SAMPLES:
+            return None
+        return tuple(statistics.median(x[i] for x in q) for i in range(1, 5))
+
+    def observe(self, key: str, keypoints, bbox, t: float) -> bool:
+        m = _body_lengths(keypoints, bbox)
+        if m is None:
+            return False
+        torso, legs, h, feet = m
+        ref = self.reference(key)
+        collapsed = False
+        if ref is not None:
+            r_torso, r_legs, r_h, r_feet = ref
+            if r_torso > 0 and r_legs > 0 and r_h > 0:
+                t_ratio, h_ratio = torso / r_torso, h / r_h
+                collapsed = (t_ratio < COLLAPSE_TORSO and t_ratio < COLLAPSE_TORSO_VS_BOX * h_ratio
+                             and legs < COLLAPSE_LEGS * r_legs and h_ratio < COLLAPSE_BOX
+                             and abs(feet - r_feet) < COLLAPSE_FEET * r_h)
+        angle = torso_angle(keypoints)
+        upright = (angle is not None and angle < 30.0 and legs_upright(keypoints) is True
+                   and (ref is None or h >= 0.85 * ref[2]))
+        if upright and not collapsed:
+            q = self._samples.setdefault(key, deque())
+            q.append((t, torso, legs, h, feet))
+            while q and t - q[0][0] > UPRIGHT_KEEP_S:
+                q.popleft()
+        return collapsed
+
+    def forget(self, key: str) -> None:
+        self._samples.pop(key, None)
+
+
 class _Episode:
     def __init__(self, started_at: float, zone_id: Optional[str]):
         self.started_at = started_at
@@ -162,6 +236,7 @@ class _Person:
         self.last_bbox: Optional[List[float]] = None
         self.zone_seen: float = 0.0                                 # last time inside the rule's zone
         self.episode: Optional[_Episode] = None
+        self.upright = UprightMemory()                              # how they looked standing (a fall toward the camera)
 
 
 class ManDownDetector:
@@ -189,7 +264,8 @@ class ManDownDetector:
         moved = max(math.hypot(cx - p[1], cy - p[2]) / max(t - p[0], 1e-6) for p in past)
         return moved / size
 
-    def _classify(self, kp, bbox, posture, frame_w, frame_h, speed, zone_id) -> Tuple[str, Optional[float], str]:
+    def _classify(self, kp, bbox, posture, frame_w, frame_h, speed, zone_id,
+                  collapsed: bool = False) -> Tuple[str, Optional[float], str]:
         c = self.config
         if zone_id is not None and zone_id in self.allowed:
             return UP, None, "lying allowed here"
@@ -200,6 +276,10 @@ class ManDownDetector:
         angle = torso_angle(kp)
         w, h = max(1.0, bbox[2] - bbox[0]), max(1.0, bbox[3] - bbox[1])
         aspect = w / h
+        if collapsed:
+            # Upright on screen, but much shorter than this person standing, feet where they were: lying along the
+            # camera's line of sight (feet or head toward the camera).
+            return DOWN, angle, "lying toward the camera"
         if angle is not None:
             if angle < c.man_down_upright_deg and str(posture).upper() == "SITTING":
                 return UP, angle, "sitting upright"
@@ -253,7 +333,9 @@ class ManDownDetector:
             person.last_bbox = bbox
             size = max(bbox[2] - bbox[0], bbox[3] - bbox[1])
             speed = self._speed(person, t, (bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0, size)
-            state, angle, _why = self._classify(p.get("keypoints"), bbox, p.get("posture"), frame_w, frame_h, speed, zone)
+            collapsed = person.upright.observe("p", p.get("keypoints"), bbox, t)
+            state, angle, _why = self._classify(p.get("keypoints"), bbox, p.get("posture"), frame_w, frame_h, speed, zone,
+                                                collapsed)
             d = self._step(key, person, state, angle, str(p.get("posture") or ""), t, zone, speed)
             if d is not None:
                 out.append(d)
@@ -352,7 +434,10 @@ class ManDownDetector:
 
     def _violation(self, key, ep: _Episode, t: float, fraction: float, speed) -> Decision:
         angle = statistics.median(ep.angles) if ep.angles else None
-        how = f", torso about {angle:.0f} degrees from upright" if angle is not None else ""
+        if angle is not None and angle <= self.config.man_down_angle_deg:
+            how = ", lying toward or away from the camera"        # found by the foreshortened body, not the torso angle
+        else:
+            how = f", torso about {angle:.0f} degrees from upright" if angle is not None else ""
         reason = (f"A person{self._where(ep)} has been lying still for {t - ep.started_at:.0f} s "
                   f"(lying in {ep.down} of {ep.frames} frames{how}). They may need help: please check on them.")
         return Decision(

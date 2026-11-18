@@ -34,7 +34,7 @@ from app.safety.clock import FrameClock                            # noqa: E402
 from app.safety.compliance_engine import ComplianceEngine, is_evaluated   # noqa: E402
 from app.safety.config import SafetyConfig                         # noqa: E402
 from app.safety.engine import SafetyEngine                         # noqa: E402
-from app.safety.man_down import ManDownDetector, ManDownMonitor, body_state, legs_upright, torso_angle   # noqa: E402
+from app.safety.man_down import ManDownDetector, ManDownMonitor, UprightMemory, body_state, legs_upright, torso_angle   # noqa: E402
 from app.safety.rules import parse_rule                            # noqa: E402
 from app.safety.schemas import POTENTIAL_VIOLATION, UNVERIFIABLE   # noqa: E402
 from app.safety.session import SafetySession                       # noqa: E402
@@ -227,6 +227,36 @@ check("a person lying flat with the legs stretched out: LYING (legs sideways are
 r = Run().feed(1, standing()).feed(9, (lk, lb))
 check("... and still for 8 s: the CRITICAL alert", r.kinds() == [(POTENTIAL_VIOLATION, "CRITICAL")], str(r.kinds()))
 check("lying with no legs seen: still LYING; standing: no body label", body_state(*lying()) == "LYING" and body_state(*standing()) is None)
+
+# a fall toward the camera: the body stays upright on screen, but is foreshortened
+def body(cx=240, head=65, sh_y=110, hip_y=185, ank_y=280, top=None):
+    k = kp({0: (cx, head), 5: (cx - 10, sh_y), 6: (cx + 10, sh_y), 11: (cx - 8, hip_y), 12: (cx + 8, hip_y),
+            13: (cx - 8, (hip_y + ank_y) / 2), 14: (cx + 8, (hip_y + ank_y) / 2), 15: (cx - 10, ank_y), 16: (cx + 10, ank_y)})
+    return k, [cx - 40, top if top is not None else head - 5, cx + 40, ank_y + 25]
+stand = body()                                                            # box 240 tall, torso 75, legs 95 (the measured video)
+fallen = body(head=190, sh_y=202, hip_y=225, ank_y=280, top=186)          # box 119, torso 23, legs 55
+squat = body(head=140, sh_y=180, hip_y=255, ank_y=280, top=135)           # torso still 75, legs 25
+bend_to_cam = body(head=165, sh_y=168, hip_y=185, ank_y=280, top=160)      # torso 17, legs still 95
+far = body(cx=240, head=40, sh_y=63, hip_y=101, ank_y=148, top=38)        # walked away: everything half, feet higher up
+def mem_after(pose):
+    m = UprightMemory()
+    for i in range(20):
+        m.observe("w", *stand, i * 0.1)
+    return m.observe("w", *pose, 2.5)
+check("fell toward the camera (torso a third, legs about half, box half, feet in place): collapsed", mem_after(fallen) is True)
+check("squatting (torso full length) is not collapsed", mem_after(squat) is False)
+check("bending toward the camera (legs full length) is not collapsed", mem_after(bend_to_cam) is False)
+check("walking away (everything smaller, feet further up) is not collapsed", mem_after(far) is False)
+check("standing again is not collapsed", mem_after(stand) is False)
+m0 = UprightMemory()
+check("with no standing reference yet (came into view already down): not claimed", m0.observe("w", *fallen, 0.0) is False)
+r = Run().feed(3, stand).feed(9, fallen)
+check("... through the detector: standing 3 s, then down toward the camera and still 8 s: the CRITICAL alert, worded for it",
+      r.kinds() == [(POTENTIAL_VIOLATION, "CRITICAL")] and "toward or away from the camera" in r.out[0].reason, str(r.kinds()))
+r = Run().feed(3, stand).feed(30, squat)
+check("... squatting still for 30 s: nothing", r.out == [], str(r.kinds()))
+r = Run().feed(3, stand).feed(30, bend_to_cam)
+check("... bending toward the camera for 30 s: nothing", r.out == [], str(r.kinds()))
 
 # unclear first, then a clear fall
 r = Run().feed(1, standing()).feed(11, lambda t: (kp({}, 0.0), lying()[1])).feed(25, lying())
