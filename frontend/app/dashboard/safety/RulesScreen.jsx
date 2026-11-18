@@ -13,24 +13,25 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  AlertTriangle, Camera, Check, Footprints, HardHat, ListChecks, Loader2, MapPin, Pencil, PersonStanding, Plus, Power,
+  AlertTriangle, Ban, Camera, Check, Footprints, HardHat, ListChecks, Loader2, MapPin, Pencil, PersonStanding, Plus, Power,
   ShieldCheck, SlidersHorizontal, Timer, Trash2, Users, X,
 } from 'lucide-react';
 import { createRule, deleteRule, listRules, updateRule, validateRule } from '../../lib/safetyApi';
 import { listSafetyZones } from '../../lib/safety/management';
 import { listCameras } from '../../lib/platform/cameras';
 import { backendFetch } from '../../lib/backend';
-import { RULE_TYPES, SEVERITIES, PPE_ITEMS, defaultParams, friendlyRuleError, isEnforced, ruleBody, ruleSummary, ruleTypeMeta } from '../../lib/safety/ruleTypes';
+import { RULE_TYPES, SEVERITIES, PPE_ITEMS, defaultParams, friendlyRuleError, isEnforced, kindOf, ruleBody, ruleSummary, ruleTypeMeta } from '../../lib/safety/ruleTypes';
 import { can } from '../../lib/permissions';
 import { BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel, SeverityChip, Skeleton } from './common';
 
 // An icon and one short line per kind of check, for the picker and the rule boxes.
-const TYPE_ICON = { PPE_ENTRY: HardHat, MAX_DWELL: Timer, PPE_CONTINUOUS: ShieldCheck, OCCUPANCY: Users, MAN_DOWN: PersonStanding, WALK_ONLY: Footprints };
+const TYPE_ICON = { PPE_ENTRY: HardHat, MAX_DWELL: Timer, PPE_CONTINUOUS: ShieldCheck, OCCUPANCY: Users, NO_ENTRY: Ban, MAN_DOWN: PersonStanding, WALK_ONLY: Footprints };
 const TYPE_HINT = {
   PPE_ENTRY: 'Helmet and vest when someone walks in.',
   MAX_DWELL: 'Flag anyone who stays too long.',
   PPE_CONTINUOUS: 'Gear must stay on the whole time.',
   OCCUPANCY: 'Too few or too many people.',
+  NO_ENTRY: 'Flag anyone who goes in.',
   MAN_DOWN: 'Someone lying still on the floor.',
   WALK_ONLY: 'No running in this area.',
 };
@@ -44,7 +45,7 @@ const newForm = () => ({ id: null, name: '', types: ['PPE_ENTRY'], paramsByType:
 
 function formFromRule(rule) {
   return {
-    id: rule.id, name: rule.name, types: [rule.type], paramsByType: { [rule.type]: { ...defaultParams(rule.type), ...(rule.params || {}) } },
+    id: rule.id, name: rule.name, types: [kindOf(rule)], paramsByType: { [kindOf(rule)]: { ...defaultParams(kindOf(rule)), ...(rule.params || {}) } },
     zoneId: rule.zoneId || '', severity: rule.severity, isEnabled: rule.isEnabled, minEvidenceConfidence: rule.minEvidenceConfidence,
   };
 }
@@ -248,7 +249,7 @@ function RuleForm({ initial, zones, cameras = [], rules = [], onSaved, onCancel,
     if (!form.zoneId || whole) return [];
     return rules.filter((r) => r.zoneId === form.zoneId && r.id !== form.id);
   }, [rules, form.zoneId, form.id, whole]);
-  const takenTypes = useMemo(() => new Set(existingHere.map((r) => r.type)), [existingHere]);
+  const takenTypes = useMemo(() => new Set(existingHere.map(kindOf)), [existingHere]);
   const chosenZone = zones.find((z) => z.id === form.zoneId) || null;
   // A zone that already has one of the checked kinds: that kind is unticked, and its tile says it is already set.
   const [dropped, setDropped] = useState([]);
@@ -414,7 +415,7 @@ function RuleForm({ initial, zones, cameras = [], rules = [], onSaved, onCancel,
                   const taken = takenTypes.has(t.value);
                   const on = form.types.includes(t.value);
                   const Icon = TYPE_ICON[t.value] || ShieldCheck;
-                  const already = taken ? existingHere.find((r) => r.type === t.value) : null;
+                  const already = taken ? existingHere.find((r) => kindOf(r) === t.value) : null;
                   return (
                     <label key={t.value} title={taken ? `Already set on this zone: ${already.name}` : t.blurb}
                       className={`relative flex items-start gap-3 rounded-xl border-2 px-3.5 py-3 transition-colors ${taken ? 'border-line bg-surface-alt cursor-not-allowed' : on ? 'border-[color:var(--accent)] bg-accent-soft cursor-pointer' : 'border-line hover:border-field cursor-pointer'}`}>
@@ -465,10 +466,10 @@ function RuleForm({ initial, zones, cameras = [], rules = [], onSaved, onCancel,
                 <p className="text-[0.8125rem] font-black text-ink">Already checked in {chosenZone ? `"${chosenZone.name}"` : 'this zone'}</p>
                 <ul className="flex flex-wrap gap-2">
                   {existingHere.map((r) => {
-                    const Icon = TYPE_ICON[r.type] || ShieldCheck;
+                    const Icon = TYPE_ICON[kindOf(r)] || ShieldCheck;
                     return (
                       <li key={r.id} title={r.name} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-[0.75rem] font-bold text-ink">
-                        <Icon className="w-3.5 h-3.5 text-accent" aria-hidden="true" /> {labelOf(r.type)}
+                        <Icon className="w-3.5 h-3.5 text-accent" aria-hidden="true" /> {labelOf(kindOf(r))}
                         {!r.isEnabled && <span className="text-ink-faint font-semibold">· off</span>}
                       </li>
                     );
@@ -618,7 +619,7 @@ export default function RulesScreen({ role }) {
     const onCam = rules.filter((x) => x.isEnabled && (x.cameraId === c.id || (x.camera && x.camera.name === c.name) || camZones.some((z) => z.id === x.zoneId) || (!x.cameraId && !x.zoneId && !x.camera)));
     return {
       id: c.id, name: c.name, rules: onCam.length,
-      zones: camZones.map((z) => ({ ...z, types: [...new Set(onCam.filter((x) => x.zoneId === z.id).map((x) => x.type))] })),
+      zones: camZones.map((z) => ({ ...z, types: [...new Set(onCam.filter((x) => x.zoneId === z.id).map(kindOf))] })),
     };
   });
 
@@ -683,10 +684,11 @@ export default function RulesScreen({ role }) {
         {rules.length > 0 && (
           <ul className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3 content-start" aria-label="Rules">
             {rules.map((rule) => {
-              const meta = ruleTypeMeta(rule.type);
-              const Icon = TYPE_ICON[rule.type] || ShieldCheck;
+              const kind = kindOf(rule);
+              const meta = ruleTypeMeta(kind);
+              const Icon = TYPE_ICON[kind] || ShieldCheck;
               const where = [(rule.camera && rule.camera.name) || (zones.find((z) => z.id === rule.zoneId) || {}).camera, rule.zone && rule.zone.name].filter(Boolean).join(' · ') || 'Every camera';
-              const summary = rule.evaluated_by_engine ? ruleSummary(rule.type, rule.params, (id) => (zones.find((z) => z.id === id) || {}).name) : 'Saved, not checked yet.';
+              const summary = rule.evaluated_by_engine ? ruleSummary(kind, rule.params, (id) => (zones.find((z) => z.id === id) || {}).name) : 'Saved, not checked yet.';
               const broken = zonesReady && missingZoneRef(rule, zones);
               return (
                 <li key={rule.id} className={`rounded-2xl border bg-surface p-4 flex flex-col gap-3 min-w-0 transition-opacity ${broken ? 'border-[color:var(--accent)]' : 'border-line'} ${rule.isEnabled ? '' : 'opacity-60'}`}>

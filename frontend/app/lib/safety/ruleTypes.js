@@ -80,6 +80,20 @@ export const RULE_TYPES = [
     ],
   },
   {
+    // Saved as a head count with "at most 0": the engine flags anyone seen in the zone for longer than the wait.
+    value: 'NO_ENTRY',
+    saveAs: 'OCCUPANCY',
+    fixed: { max_people: 0 },
+    label: 'Nobody allowed in',
+    blurb: 'Raises a flag for review when anyone is seen inside the zone for longer than the wait below. Use it for a danger area, a closed room or a machine guard where no one may go.',
+    zoneTypes: ['PPE_CHECKPOINT', 'APPROACH', 'RESTRICTED', 'EXIT'],
+    enforced: () => true,
+    defaults: { grace_seconds: 3 },
+    fields: [
+      { key: 'grace_seconds', kind: 'number', label: 'Flag after someone is inside for (seconds)', min: 3, max: 120, step: 1 },
+    ],
+  },
+  {
     value: 'MAN_DOWN',
     label: 'Person lying down',
     blurb: 'Raises a critical flag when someone lies still for longer than the time below, so a person who may have fallen is found quickly. Sitting, crouching and bending over on their feet are not flagged, and if the picture is not clear enough it says it could not tell. Leave the place empty to watch everywhere, on every camera.',
@@ -106,6 +120,20 @@ export const RULE_TYPES = [
 ];
 
 export const ruleTypeMeta = (value) => RULE_TYPES.find((t) => t.value === value) || null;
+
+/** The kind of check a saved rule is, as the picker names it: a head count with "at most 0" is "Nobody allowed in". */
+export function kindOf(rule) {
+  if (!rule) return null;
+  const p = rule.params || {};
+  if (rule.type === 'OCCUPANCY' && p.max_people !== null && p.max_people !== undefined && p.max_people !== '' && Number(p.max_people) === 0 && (p.min_people == null || p.min_people === '')) return 'NO_ENTRY';
+  return rule.type;
+}
+
+/** What a decision checked, in words (a no-entry flag is told apart by its reason). */
+export function decisionLabel(d) {
+  if (d && d.ruleType === 'OCCUPANCY' && /nobody is allowed in this zone/i.test(d.reason || '')) return ruleTypeMeta('NO_ENTRY').label;
+  return (ruleTypeMeta(d && d.ruleType) || {}).label || 'Safety check';
+}
 
 /** The type's default parameters, as a fresh object. */
 export const defaultParams = (type) => JSON.parse(JSON.stringify((ruleTypeMeta(type) || {}).defaults || {}));
@@ -136,11 +164,12 @@ export function cleanParams(type, params) {
 
 /** The body for create / validate / update, from the form's state. */
 export function ruleBody(form) {
+  const meta = ruleTypeMeta(form.type) || {};
   return {
     name: (form.name || '').trim(),
-    type: form.type,
+    type: meta.saveAs || form.type,
     zone_id: form.zoneId || null,
-    params: cleanParams(form.type, form.params || {}),
+    params: { ...cleanParams(form.type, form.params || {}), ...(meta.fixed || {}) },
     severity: form.severity,
     is_enabled: form.isEnabled !== false,
     min_evidence_confidence: Number(form.minEvidenceConfidence),
@@ -219,6 +248,8 @@ export function ruleSummary(type, params, zoneName = () => null) {
       const empty = lo != null && (p.flag_empty != null ? p.flag_empty : true) ? ', empty zone flagged too' : '';
       return `${asks ? `${asks.charAt(0).toUpperCase()}${asks.slice(1)} ${lo === 1 && hi == null ? 'person' : 'people'}` : 'People'} in the zone${empty}; flagged after ${after}`;
     }
+    case 'NO_ENTRY':
+      return `Anyone inside for ${durationText(p.grace_seconds ?? 3)} is flagged`;
     case 'MAN_DOWN':
       return `Critical flag when someone lies still for ${durationText(p.min_seconds_down ?? 5)}`;
     case 'REQUIRED_EXIT': {

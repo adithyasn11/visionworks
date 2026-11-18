@@ -14,7 +14,7 @@ import { listSafetyZones } from '../../lib/safety/management';
 import { can } from '../../lib/permissions';
 import { workerLabel } from '../../lib/zoneEvents';
 import DecisionModal from './DecisionModal';
-import { ruleTypeMeta } from '../../lib/safety/ruleTypes';
+import { decisionLabel } from '../../lib/safety/ruleTypes';
 import { BTN_QUIET, INPUT, Notice, Panel, SeverityChip, fmtTime, Skeleton } from './common';
 
 const PAGE = 20;
@@ -211,7 +211,7 @@ export default function ReviewQueue({ role, onCountChange, onNavigate }) {
       {/* One card per flag; a card opens the flag in a window with its picture and everything about it. */}
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Flags waiting for review, oldest first">
         {state.items.map((d, i) => {
-          const kind = (ruleTypeMeta(d.ruleType) || {}).label || 'Safety check';
+          const kind = decisionLabel(d);
           const where = [d.camera && d.camera.name, d.zone && d.zone.name].filter(Boolean).join(' · ');
           return (
             <li key={d.id}>

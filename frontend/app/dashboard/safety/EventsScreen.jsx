@@ -13,7 +13,7 @@ import { listSafetyZones } from '../../lib/safety/management';
 import { describeZoneEvent, workerLabel } from '../../lib/zoneEvents';
 import DecisionModal from './DecisionModal';
 import { BTN_QUIET, INPUT, Notice, Panel, fmtTime, Skeleton } from './common';
-import { ruleTypeMeta } from '../../lib/safety/ruleTypes';
+import { decisionLabel } from '../../lib/safety/ruleTypes';
 
 const PAGE = 25;
 const STATUS_OPTIONS = [['', 'Any result'], ['POTENTIAL_VIOLATION', 'Potential violation'], ['COMPLIANT', 'Compliant'], ['UNVERIFIABLE', 'Cannot verify']];
@@ -169,7 +169,7 @@ export default function EventsScreen({ role, onNavigate }) {
         <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pt-4" aria-label="Decisions, newest first">
           {data.rows.map((d, i) => {
             const tag = tagOf(d);
-            const what = (ruleTypeMeta(d.ruleType) || {}).label || 'Safety check';
+            const what = decisionLabel(d);
             const where = [workerLabel(d.workerKey), d.camera && d.camera.name, d.zone && d.zone.name].filter(Boolean).join(' · ');
             return (
               <li key={d.id} className="min-w-0">
