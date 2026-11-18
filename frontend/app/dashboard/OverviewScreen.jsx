@@ -59,6 +59,80 @@ function Kpi({ label, value, note, accent }) {
 }
 
 /** A heading for the cards lower down. */
+/** Today at a glance: a ring for the flagged share, and the three counts against yesterday. */
+function TodayCard({ days, onNavigate }) {
+  const row = days.length ? days[days.length - 1] : null;
+  const prev = days.length > 1 ? days[days.length - 2] : null;
+  const checked = row ? row.decisions : 0;
+  const flagged = row ? row.potential_violations : 0;
+  const clear = Math.max(0, checked - flagged);
+  const pChecked = prev ? prev.decisions : null;
+  const pFlagged = prev ? prev.potential_violations : null;
+  const pClear = prev ? Math.max(0, prev.decisions - prev.potential_violations) : null;
+  const share = checked ? flagged / checked : 0;
+  const R = 42;
+  const C = 2 * Math.PI * R;
+
+  const delta = (now, before, badWhenUp) => {
+    if (before == null) return <span className="text-ink-faint">no data yesterday</span>;
+    const diff = now - before;
+    if (diff === 0) return <span className="text-ink-faint">same as yesterday</span>;
+    const up = diff > 0;
+    const bad = badWhenUp ? up : !up;
+    return (
+      <span className={bad ? 'text-accent' : 'text-ink-muted'}>
+        {up ? '▲' : '▼'} {Math.abs(diff)} vs yesterday
+      </span>
+    );
+  };
+
+  const rows = [
+    { label: 'Checked', value: checked, sub: delta(checked, pChecked, false), dot: null, view: 'events' },
+    { label: 'Flagged', value: flagged, sub: delta(flagged, pFlagged, true), dot: 'var(--accent)', red: flagged > 0, view: 'review' },
+    { label: 'Not flagged', value: clear, sub: delta(clear, pClear, false), dot: 'var(--line)', view: 'events' },
+  ];
+
+  return (
+    <>
+      <CardHead icon={TrendingUp} title="Today" aside={new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} />
+      <div className="flex-1 min-h-0 grid grid-cols-[auto_minmax(0,1fr)] gap-5 sm:gap-7 items-center content-center">
+        {/* The ring: the red arc is the share of today's checks that were flagged. */}
+        <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0">
+          <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90" aria-hidden="true">
+            <circle cx="50" cy="50" r={R} fill="none" stroke="var(--line)" strokeWidth="10" />
+            {checked > 0 && (
+              <circle cx="50" cy="50" r={R} fill="none" stroke="var(--accent)" strokeWidth="10" strokeLinecap="round"
+                strokeDasharray={`${Math.max(share > 0 ? 3 : 0, share * C)} ${C}`} />
+            )}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <span className="text-3xl font-black tabular-nums leading-none text-ink">{checked}</span>
+            <span className="mt-1 text-[0.6875rem] font-bold text-ink-muted">{checked === 1 ? 'check' : 'checks'}</span>
+            <span className={`mt-0.5 text-[0.625rem] font-black ${share ? 'text-accent' : 'text-ink-faint'}`}>{checked ? `${Math.round(share * 100)}% flagged` : 'none yet'}</span>
+          </div>
+        </div>
+
+        <ul className="flex flex-col gap-2 min-w-0">
+          {rows.map((r) => (
+            <li key={r.label}>
+              <button type="button" onClick={() => onNavigate(r.view)}
+                className="w-full flex items-center gap-3 rounded-2xl border border-line px-3.5 py-2 text-left hover:border-[color:var(--accent)] transition-colors min-w-0">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={r.dot ? { background: r.dot } : { border: '2px solid var(--ink)' }} aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[0.8125rem] font-black text-ink">{r.label}</span>
+                  <span className="block text-[0.6875rem] font-semibold truncate">{r.sub}</span>
+                </span>
+                <span className={`text-2xl font-black tabular-nums leading-none ${r.red ? 'text-accent' : 'text-ink'}`}>{r.value}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+    </>
+  );
+}
+
 function CardHead({ icon: Icon, title, aside }) {
   return (
     <div className="flex items-center justify-between gap-3 mb-5">
@@ -195,7 +269,6 @@ export default function OverviewScreen({
     { title: 'Run a check', view: 'live', done: Boolean(d && d.total > 0) },
   ];
   const setupDone = steps.every((st) => st.done);
-  const todayRow = d && d.by_day.length ? d.by_day[d.by_day.length - 1] : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -256,19 +329,7 @@ export default function OverviewScreen({
             </>
           ) : (
             <>
-              <CardHead icon={TrendingUp} title="Today" />
-              <div className="flex-1 grid grid-cols-3 items-center">
-                {[
-                  ['Checked', todayRow ? todayRow.decisions : 0, false],
-                  ['Flagged', todayRow ? todayRow.potential_violations : 0, true],
-                  ['Compliant', todayRow ? Math.max(0, todayRow.decisions - todayRow.potential_violations) : 0, false],
-                ].map(([label, value, red]) => (
-                  <div key={label}>
-                    <p className={`text-4xl font-black tabular-nums leading-none ${red && value ? 'text-accent' : 'text-ink'}`}>{value}</p>
-                    <p className="mt-2 text-[0.8125rem] font-bold text-ink-muted">{label}</p>
-                  </div>
-                ))}
-              </div>
+              <TodayCard days={d ? d.by_day : []} onNavigate={onNavigate} />
             </>
           )}
         </div>
