@@ -34,7 +34,7 @@ from app.safety.clock import FrameClock                            # noqa: E402
 from app.safety.compliance_engine import ComplianceEngine, is_evaluated   # noqa: E402
 from app.safety.config import SafetyConfig                         # noqa: E402
 from app.safety.engine import SafetyEngine                         # noqa: E402
-from app.safety.man_down import ManDownDetector, ManDownMonitor, torso_angle   # noqa: E402
+from app.safety.man_down import ManDownDetector, ManDownMonitor, body_state, legs_upright, torso_angle   # noqa: E402
 from app.safety.rules import parse_rule                            # noqa: E402
 from app.safety.schemas import POTENTIAL_VIOLATION, UNVERIFIABLE   # noqa: E402
 from app.safety.session import SafetySession                       # noqa: E402
@@ -204,6 +204,29 @@ sq = lambda t: (leaning(80)[0], [250, 100, 480, 330])                           
 r = Run().feed(1, standing()).feed(12, sq)
 check("a flat torso in a squarish box is not sure enough to alarm: at most a warning, never CRITICAL",
       all(d.status != POTENTIAL_VIOLATION for d in r.out), str(r.kinds()))
+
+# bent forward with the legs seen under the hips (a worker laying blocks): a wide box, but on their feet
+def bent_legs(angle=85, cx=320, top=150):
+    k, _ = leaning(angle, cx, top)
+    hx = cx + 100 * np.sin(np.radians(angle)); hy = top + 40 + 100 * np.cos(np.radians(angle))
+    for i, x in ((13, hx - 25), (14, hx + 5)):
+        k[i] = (x, hy + 70, 0.9)                                                         # knees under the hips
+    for i, x in ((15, hx - 30), (16, hx + 10)):
+        k[i] = (x, hy + 140, 0.9)                                                        # ankles on the ground
+    return k, [cx - 40, top, hx + 60, hy + 150]
+bk, bb = bent_legs()
+check("a worker bent forward with the legs under the hips, box about square: the overlay says BENDING, not LYING",
+      body_state(bk, bb) == "BENDING" and legs_upright(bk) is True, f"{body_state(bk, bb)} {(bb[2]-bb[0])/(bb[3]-bb[1]):.2f}")
+r = Run().feed(1, standing()).feed(30, bent_legs())
+check("... and still like that for 30 s: no man-down, not even a warning", r.out == [], str(r.kinds()))
+lk, lb = lying()
+for i, x in ((13, 380), (14, 380), (15, 440), (16, 440)):
+    lk[i] = (x, 300, 0.9)                                                                # legs out to the side, level with the hips
+check("a person lying flat with the legs stretched out: LYING (legs sideways are not standing)",
+      body_state(lk, lb) == "LYING" and legs_upright(lk) is False, f"{body_state(lk, lb)} {legs_upright(lk)}")
+r = Run().feed(1, standing()).feed(9, (lk, lb))
+check("... and still for 8 s: the CRITICAL alert", r.kinds() == [(POTENTIAL_VIOLATION, "CRITICAL")], str(r.kinds()))
+check("lying with no legs seen: still LYING; standing: no body label", body_state(*lying()) == "LYING" and body_state(*standing()) is None)
 
 # unclear first, then a clear fall
 r = Run().feed(1, standing()).feed(11, lambda t: (kp({}, 0.0), lying()[1])).feed(25, lying())

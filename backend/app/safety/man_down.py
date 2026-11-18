@@ -63,6 +63,9 @@ IOU_CARRY = 0.3              # a new track id that overlaps the box of a person 
 UP, DOWN, UNCLEAR = "UP", "DOWN", "UNCLEAR"
 
 _L_SHOULDER, _R_SHOULDER, _L_HIP, _R_HIP = 5, 6, 11, 12
+_L_KNEE, _R_KNEE, _L_ANKLE, _R_ANKLE = 13, 14, 15, 16
+LEG_UPRIGHT_DEG = 40.0       # hip -> knee/ankle within this of vertical is a leg standing under the body
+LEG_MIN_DROP = 0.5           # ... and it reaches at least this many torso lengths below the hip
 
 
 def _iou(a, b) -> float:
@@ -89,6 +92,52 @@ def torso_angle(keypoints) -> Optional[float]:
     if dx == 0 and dy == 0:
         return None
     return math.degrees(math.atan2(dx, dy))
+
+
+def _mid(keypoints, a: int, b: int) -> Optional[Tuple[float, float]]:
+    """Midpoint of two keypoints, or the one that is seen, or None."""
+    try:
+        seen = [keypoints[i] for i in (a, b) if float(keypoints[i][2]) >= KEYPOINT_CONF]
+    except (TypeError, ValueError, IndexError):
+        return None
+    if not seen:
+        return None
+    return (sum(float(p[0]) for p in seen) / len(seen), sum(float(p[1]) for p in seen) / len(seen))
+
+
+def legs_upright(keypoints) -> Optional[bool]:
+    """True when the legs stand under the hips (a person bent forward on their feet), False when they run sideways
+    like the torso (lying), None when the hips or the legs are not seen well enough to say.
+
+    A bent-over person has a flat torso, exactly like a person lying, so the torso alone cannot tell them apart;
+    the legs can: on their feet, the ankles (or knees) are well below the hips, nearly straight down."""
+    hip = _mid(keypoints, _L_HIP, _R_HIP)
+    shoulder = _mid(keypoints, _L_SHOULDER, _R_SHOULDER)
+    low = _mid(keypoints, _L_ANKLE, _R_ANKLE) or _mid(keypoints, _L_KNEE, _R_KNEE)
+    if hip is None or low is None:
+        return None
+    dx, dy = low[0] - hip[0], low[1] - hip[1]
+    torso = math.hypot(hip[0] - shoulder[0], hip[1] - shoulder[1]) if shoulder else 0.0
+    if dy <= 0:
+        return False                                   # the legs are level with or above the hips
+    angle = math.degrees(math.atan2(abs(dx), dy))
+    return angle <= LEG_UPRIGHT_DEG and (torso <= 0 or dy >= LEG_MIN_DROP * torso)
+
+
+def body_state(keypoints, bbox, angle_deg: float = 60.0) -> Optional[str]:
+    """What the overlay writes for the body: "LYING", "BENDING" or None (use the posture label).
+
+    LYING needs a flat torso AND no legs standing under it AND a box that is not tall and narrow."""
+    angle = torso_angle(keypoints)
+    if angle is None or angle < angle_deg:
+        return None
+    try:
+        w, h = max(1.0, bbox[2] - bbox[0]), max(1.0, bbox[3] - bbox[1])
+    except (TypeError, IndexError):
+        return None
+    if legs_upright(keypoints) or w / h < ASPECT_UPRIGHT:
+        return "BENDING"
+    return "LYING"
 
 
 class _Episode:
@@ -158,7 +207,7 @@ class ManDownDetector:
                 return UP, angle, "upright"
             # The torso is flat. A person bent over a bench or the floor has a flat torso too, but is still tall (the
             # legs): only a box that is as wide as it is tall says the whole body is down.
-            if aspect < ASPECT_UPRIGHT:
+            if aspect < ASPECT_UPRIGHT or legs_upright(kp):
                 return UP, angle, "bent over, on their feet"
             if aspect < ASPECT_LYING:
                 return UNCLEAR, angle, "flat torso, box not wide enough to be sure"
