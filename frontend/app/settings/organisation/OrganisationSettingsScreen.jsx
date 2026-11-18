@@ -207,7 +207,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
       <div className="animate-view-in flex flex-col gap-5">
 
         {/* Same page header as the dashboard screens (eyebrow, title, line of context, rule underneath). */}
-        <header className="flex flex-wrap items-end justify-between gap-4 pb-5 border-b border-line">
+        <header className="flex flex-wrap items-end justify-between gap-4 pb-4 border-b border-line">
           <div className="flex flex-col gap-2">
           <p className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-accent">
             {state.org.name || state.org.slug}
@@ -269,7 +269,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
         </div>
 
         <div className="flex flex-col gap-5">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5 items-stretch">
           {/* ── Identity ── */}
           <Section
             icon={Building2}
@@ -309,7 +309,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
           <Section
             icon={ShieldAlert}
             title="Privacy & retention"
-            description="How long records are kept, and what happens to uploaded video."
+            description="How long records are kept, and uploaded video."
           >
             <div className="flex flex-col gap-4">
               <Field
@@ -322,7 +322,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
                 onChange={(e) => set('dataRetentionDays')(e.target.value)}
                 disabled={!canEdit}
                 error={errors.dataRetentionDays}
-                hint={`Days, 1–${state.historyLimit?.max ?? 730}${state.historyLimit ? ` on the ${planName(state.historyLimit.plan)} plan` : ''}. A nightly job permanently deletes detection records older than this.`}
+                hint={`Days, 1–${state.historyLimit?.max ?? 730}${state.historyLimit ? ` on ${planName(state.historyLimit.plan)}` : ''}. Older records are deleted each night.`}
               />
 
               {retentionWarning && (
@@ -388,10 +388,6 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
             </div>
           </Section>
 
-          </div>
-
-
-
           {/* Plan lives in the dashboard (Plan section), not here.
               Two surfaces showing the same tier is two places to keep honest,
               and the tier is read-only in both — there was nothing to configure
@@ -401,19 +397,19 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
           {canEdit && (
             <Section
               icon={Trash2}
-              title="Delete this organisation"
-              description="Everyone loses access at once. Support can restore it during a short grace period."
+              title="Delete organisation"
+              description="Everyone loses access at once. Support can restore it for a short while."
               danger
             >
-              <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-3 md:items-end">
+              <div className="flex-1 flex flex-col gap-3">
                 {/* Paid time is not lost: it stays with this administrator's account for their next organisation (032). */}
                 {(() => {
                   const end = state.org.plan && state.org.plan !== 'FREE' ? state.org.planRenewsAt : null;
                   const left = end ? Math.ceil((new Date(end).getTime() - Date.now()) / 86400000) : 0;
                   return left > 0 ? (
-                    <p className="md:col-span-2 text-[0.8125rem] text-ink-muted leading-relaxed">
-                      The {daysText(left)} left on your {planName(state.org.plan)} plan (until {termDate(end)}) stay with
-                      your account. The next organisation you create continues them, with nothing to pay again.
+                    <p className="text-[0.78125rem] text-ink-muted leading-relaxed"
+                      title={`The next organisation you create continues them until ${termDate(end)}, with nothing to pay again.`}>
+                      Your {daysText(left)} of {planName(state.org.plan)} stay with your account.
                     </p>
                   ) : null;
                 })()}
@@ -430,7 +426,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
                   onClick={remove}
                   // A confirm dialog is dismissed by reflex; typing the name is not.
                   disabled={deleting || deleteText.trim() !== state.org.name}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-accent px-3.5 py-2.5 text-[0.84375rem] font-bold text-white hover:brightness-110 transition-[filter] disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="mt-auto inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-3.5 py-2.5 text-[0.84375rem] font-bold text-white hover:brightness-110 transition-[filter] disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   Delete organisation
@@ -438,6 +434,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
               </div>
             </Section>
           )}
+          </div>
         </div>
       </div>
     </DashboardShell>

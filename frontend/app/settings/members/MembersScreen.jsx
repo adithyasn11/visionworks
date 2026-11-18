@@ -467,7 +467,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
     <DashboardShell user={viewer} role={state.viewerRole ?? initialRole}>
       <div className="animate-view-in flex flex-col gap-5">
 
-        <header className="flex flex-col gap-2 pb-5 border-b border-line">
+        <header className="flex flex-col gap-1.5 pb-4 border-b border-line">
           <p className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-accent">{orgName}</p>
           <h1 className="text-[1.625rem] sm:text-[1.875rem] font-black tracking-tight text-ink leading-[1.15]">Members</h1>
           <p className="text-[0.84375rem] text-ink-muted">Who can see this organisation’s safety data, and what each person can change.</p>
@@ -496,7 +496,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
 
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_24rem] gap-5 items-stretch">
           {/* The people. */}
-          <section className="rounded-2xl border border-line bg-surface p-5 flex flex-col gap-4 min-w-0 xl:min-h-[calc(100dvh-22rem)]">
+          <section className="rounded-2xl border border-line bg-surface p-5 flex flex-col gap-4 min-w-0 xl:min-h-[calc(100dvh-20.5rem)]">
             <h2 className="flex items-center gap-2 text-[0.9375rem] font-black text-ink"><Users className="w-4 h-4 text-accent" aria-hidden="true" /> People</h2>
             {state.status === 'loading' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3">
@@ -525,9 +525,9 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
           {/* Adding people, and what each role can do. */}
           <aside className="flex flex-col gap-5 min-w-0">
             {canInvite ? (
-              <section className="rounded-2xl border border-line bg-surface p-5 flex flex-col gap-4">
+              <section className="rounded-2xl border border-line bg-surface p-5 flex flex-col gap-4 xl:flex-1">
                 <h2 className="flex items-center gap-2 text-[0.9375rem] font-black text-ink"><UserPlus className="w-4 h-4 text-accent" aria-hidden="true" /> Invite someone</h2>
-                <form onSubmit={submitInvite} noValidate className="flex flex-col gap-3">
+                <form onSubmit={submitInvite} noValidate className="flex flex-col gap-3 flex-1">
                   <input
                     type="email"
                     value={email}
@@ -539,21 +539,27 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
                     className="w-full rounded-xl bg-ground border-2 border-field px-3.5 py-2.5 text-[0.875rem] text-ink placeholder:text-ink-faint focus:outline-none focus:border-[color:var(--accent)]"
                   />
                   {fieldError && <p className="text-[0.75rem] font-semibold text-accent">{fieldError}</p>}
-                  <div role="radiogroup" aria-label="Role" className="grid grid-cols-3 gap-2">
+                  <div role="radiogroup" aria-label="Role" className="flex flex-col gap-2">
                     {ROLE_ORDER.map((id) => {
                       const meta = ROLE_META[id];
                       const on = role === id;
                       const Icon = meta.icon;
+                      const n = members.filter((m) => m.role === id && m.status === 'ACTIVE').length;
                       return (
-                        <button key={id} type="button" role="radio" aria-checked={on} onClick={() => setRole(id)} title={meta.blurb}
-                          className={`flex flex-col items-center gap-1 rounded-xl border-2 py-2.5 text-[0.75rem] font-bold transition-colors ${on ? 'border-[color:var(--accent)] bg-accent-soft text-accent' : 'border-field text-ink-muted hover:border-field-hover'}`}>
-                          <Icon className="w-4 h-4" aria-hidden="true" /> {id === 'ADMIN' ? 'Admin' : meta.label}
+                        <button key={id} type="button" role="radio" aria-checked={on} onClick={() => setRole(id)}
+                          className={`flex items-center gap-3 rounded-xl border-2 px-3 py-2 text-left transition-colors ${on ? 'border-[color:var(--accent)] bg-accent-soft' : 'border-field hover:border-field-hover'}`}>
+                          <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${on ? 'bg-accent text-white' : 'bg-surface-alt text-ink-muted'}`}><Icon className="w-4 h-4" aria-hidden="true" /></span>
+                          <span className="min-w-0 flex-1">
+                            <span className={`block text-[0.8125rem] font-black ${on ? 'text-accent' : 'text-ink'}`}>{meta.label}</span>
+                            <span className="block text-[0.71875rem] text-ink-faint leading-snug">{meta.blurb}</span>
+                          </span>
+                          <span className="text-[0.75rem] font-bold text-ink-faint tabular-nums" title={`${n} now`}>{n}</span>
                         </button>
                       );
                     })}
                   </div>
-                  <p className="text-[0.75rem] text-ink-faint">{ROLE_META[role].blurb}.</p>
                   <button type="submit" disabled={inviting}
+                    style={{ marginTop: 'auto' }}
                     title="No email is sent: you send them the link. They accept by signing up with this address."
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-[0.875rem] font-bold text-white hover:brightness-110 transition disabled:opacity-60">
                     {inviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />} {inviting ? 'Creating…' : 'Create invite link'}
@@ -567,26 +573,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
               </section>
             )}
 
-            <section className="rounded-2xl border border-line bg-surface p-5 flex flex-col gap-3 xl:flex-1">
-              <h2 className="text-[0.9375rem] font-black text-ink">Roles</h2>
-              <ul className="flex flex-col gap-2">
-                {ROLE_ORDER.map((id) => {
-                  const meta = ROLE_META[id];
-                  const Icon = meta.icon;
-                  const n = members.filter((m) => m.role === id && m.status === 'ACTIVE').length;
-                  return (
-                    <li key={id} title={meta.blurb} className="flex items-center gap-3 rounded-xl border border-line bg-surface-alt px-3 py-2">
-                      <span className="w-7 h-7 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0"><Icon className="w-3.5 h-3.5" aria-hidden="true" /></span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[0.8125rem] font-black text-ink">{meta.label}</span>
-                        <span className="block text-[0.6875rem] text-ink-faint truncate">{meta.blurb}</span>
-                      </span>
-                      <span className="text-[0.8125rem] font-black text-ink tabular-nums">{n}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
+
           </aside>
         </div>
       </div>

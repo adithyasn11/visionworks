@@ -16,9 +16,9 @@ import { supabase } from '../../lib/supabase/browser';
 import { getProfile, setAvatar, updateProfile } from './actions';
 
 const ROLE_LABEL = { ADMIN: 'Administrator', MANAGER: 'Manager', VIEWER: 'Viewer' };
-const INPUT = 'w-full rounded-xl bg-ground border-2 border-field px-3.5 py-2.5 text-[0.875rem] text-ink placeholder:text-ink-faint transition-colors focus:outline-none focus:border-[color:var(--accent)] hover:border-field-hover disabled:opacity-60';
+const INPUT = 'w-full rounded-xl bg-ground border-2 border-field px-3.5 py-2 text-[0.875rem] text-ink placeholder:text-ink-faint transition-colors focus:outline-none focus:border-[color:var(--accent)] hover:border-field-hover disabled:opacity-60';
 const LABEL = 'flex flex-col gap-1.5 text-[0.8125rem] font-bold text-ink min-w-0';
-const CARD = 'rounded-2xl border border-line bg-surface p-5 sm:p-6 min-w-0';
+const CARD = 'rounded-2xl border border-line bg-surface p-5 min-w-0';
 const BTN = 'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[0.84375rem] font-bold transition disabled:opacity-50 disabled:cursor-not-allowed';
 const BTN_RED = `${BTN} bg-accent text-white hover:brightness-110`;
 const BTN_LINE = `${BTN} border border-line text-ink-muted hover:text-ink hover:border-field`;
@@ -180,7 +180,7 @@ export default function ProfileScreen({ role, viewer }) {
   return (
     <DashboardShell user={{ ...viewer, fullName: p?.fullName || viewer.fullName, avatarUrl: avatar }} role={role}>
       <div className="animate-view-in flex flex-col gap-5">
-        <header className="flex flex-col gap-2 pb-5 border-b border-line">
+        <header className="flex flex-col gap-1.5 pb-4 border-b border-line">
           <p className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-accent">Profile</p>
           <h1 className="text-[1.625rem] sm:text-[1.875rem] font-black tracking-tight text-ink leading-[1.15]">Your profile</h1>
           <p className="text-[0.84375rem] text-ink-muted">Your picture, your details and how you sign in.</p>
@@ -196,12 +196,12 @@ export default function ProfileScreen({ role, viewer }) {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-[22rem_minmax(0,1fr)] gap-5 items-stretch">
             {/* Who you are. */}
-            <aside className="card-dark rounded-2xl p-6 flex flex-col items-center text-center gap-5 relative overflow-hidden">
+            <aside className="card-dark rounded-2xl p-5 flex flex-col items-center text-center gap-4 relative overflow-hidden">
               <div className="relative">
-                <div className="w-32 h-32 rounded-3xl overflow-hidden bg-white/10 border border-white/15 flex items-center justify-center">
+                <div className="w-24 h-24 rounded-3xl overflow-hidden bg-white/10 border border-white/15 flex items-center justify-center">
                   {avatar
                     ? <img src={avatar} alt="" className="w-full h-full object-cover" />
-                    : <span className="text-4xl font-black text-white">{initialsOf(p.fullName, p.email)}</span>}
+                    : <span className="text-3xl font-black text-white">{initialsOf(p.fullName, p.email)}</span>}
                 </div>
                 <button type="button" onClick={() => fileRef.current?.click()} disabled={photoBusy}
                   className="absolute -bottom-2 -right-2 w-10 h-10 rounded-xl bg-accent text-white flex items-center justify-center shadow-lg hover:brightness-110 transition disabled:opacity-60"
@@ -212,7 +212,7 @@ export default function ProfileScreen({ role, viewer }) {
                   onChange={(e) => { upload(e.target.files && e.target.files[0]); e.target.value = ''; }} />
               </div>
               <div className="min-w-0 w-full">
-                <p className="text-2xl font-black tracking-tight text-white truncate" title={shownName}>{shownName}</p>
+                <p className="text-xl font-black tracking-tight text-white truncate" title={shownName}>{shownName}</p>
                 <p className="mt-1 text-[0.875rem] text-white/60 truncate">{p.jobTitle || 'No job title yet'}</p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
@@ -225,7 +225,7 @@ export default function ProfileScreen({ role, viewer }) {
                   { icon: Calendar, label: 'Joined', value: fmtDate(data.joinedAt || p.createdAt) },
                   { icon: ShieldCheck, label: 'Signs in with', value: p.providers.length ? p.providers.map((x) => (x === 'email' ? 'Email' : x[0].toUpperCase() + x.slice(1))).join(' and ') : 'Email' },
                 ].map(({ icon: Icon, label, value }) => (
-                  <li key={label} className="flex items-center gap-3 rounded-xl bg-white/[0.06] border border-white/10 px-3.5 py-2.5 min-w-0">
+                  <li key={label} className="flex items-center gap-3 rounded-xl bg-white/[0.06] border border-white/10 px-3.5 py-2 min-w-0">
                     <Icon className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
                     <span className="min-w-0">
                       <span className="block text-[0.6875rem] font-bold text-white/50">{label}</span>
@@ -245,8 +245,8 @@ export default function ProfileScreen({ role, viewer }) {
               {/* What you can change. */}
               <Card icon={UserRound} title="Your details"
                 aside={changed ? <span className="text-[0.75rem] font-bold text-accent">Not saved</span> : <span className="text-[0.75rem] text-ink-faint">Saved</span>}>
-                <form onSubmit={save} className="flex flex-col gap-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <form onSubmit={save} className="flex flex-col gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
                     <label className={LABEL}>Name
                       <input className={INPUT} value={form.fullName} maxLength={160} onChange={(e) => setForm({ ...form, fullName: e.target.value })} placeholder="Your name" autoComplete="name" />
                     </label>
@@ -265,7 +265,7 @@ export default function ProfileScreen({ role, viewer }) {
                           const on = form.themePreference === v;
                           return (
                             <button key={v} type="button" role="radio" aria-checked={on} onClick={() => setForm({ ...form, themePreference: v })}
-                              className={`flex items-center justify-center gap-1.5 rounded-xl border-2 py-2.5 text-[0.8125rem] font-bold transition-colors ${on ? 'border-[color:var(--accent)] bg-accent-soft text-accent' : 'border-field text-ink-muted hover:border-field-hover'}`}>
+                              className={`flex items-center justify-center gap-1.5 rounded-xl border-2 py-2 text-[0.8125rem] font-bold transition-colors ${on ? 'border-[color:var(--accent)] bg-accent-soft text-accent' : 'border-field text-ink-muted hover:border-field-hover'}`}>
                               <Icon className="w-4 h-4" aria-hidden="true" /> {label}
                             </button>
                           );
@@ -273,7 +273,7 @@ export default function ProfileScreen({ role, viewer }) {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center justify-end gap-2 pt-1">
+                  <div className="flex items-center justify-end gap-2">
                     {changed && <button type="button" className={BTN_LINE} onClick={() => setForm({ fullName: p.fullName, jobTitle: p.jobTitle, timezone: p.timezone, themePreference: p.themePreference })}>Undo</button>}
                     <button type="submit" className={BTN_RED} disabled={saving || !changed}>
                       {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Save changes
@@ -296,12 +296,12 @@ export default function ProfileScreen({ role, viewer }) {
 
                 <Card icon={LogOut} title="Where you’re signed in">
                   <div className="flex flex-col gap-3 flex-1">
-                    <div className="rounded-xl border border-line bg-surface-alt px-4 py-3">
+                    <div className="rounded-xl border border-line bg-surface-alt px-4 py-2.5">
                       <p className="text-[0.8125rem] font-bold text-ink">This device</p>
                       <p className="text-[0.75rem] text-ink-faint">Last sign-in {fmtDate(p.lastSignInAt)}</p>
                     </div>
                     {data.org && (
-                      <div className="rounded-xl border border-line bg-surface-alt px-4 py-3 flex items-center gap-3 min-w-0">
+                      <div className="rounded-xl border border-line bg-surface-alt px-4 py-2.5 flex items-center gap-3 min-w-0">
                         <Building2 className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
                         <span className="min-w-0">
                           <span className="block text-[0.8125rem] font-bold text-ink truncate">{data.org.name}</span>
