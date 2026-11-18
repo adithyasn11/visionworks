@@ -27,10 +27,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   UserPlus, Loader2, Copy, Check, X, MoreHorizontal,
-  ShieldCheck, Wrench, Eye, Clock, AlertCircle, RotateCw, Trash2, Ban,
+  ShieldCheck, Wrench, Eye, Clock, AlertCircle, RotateCw, Trash2, Ban, UserRound, Users,
 } from 'lucide-react';
 
-import { Field, Banner, SubmitButton } from '../../components/AuthFormBits';
+import { Banner } from '../../components/AuthFormBits';
 import {
   listMembers, inviteMember, resendInvite, revokeInvite,
   changeRole, setMemberStatus, removeMember,
@@ -206,42 +206,22 @@ function MemberRow({ member, canManage, isLastActiveAdmin, busyId, onAction }) {
   const remove = () => (confirmRemove ? act(() => removeMember(member.id)) : setConfirmRemove(true));
 
   return (
-    <li className="flex items-center gap-3 px-4 py-3 border-b border-line-soft last:border-b-0">
-      <div className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center font-bold text-[0.75rem] shrink-0">
-        {initialsOf(member)}
+    <li className={`relative rounded-2xl border bg-surface p-4 flex flex-col gap-3 min-w-0 ${member.isSelf ? 'border-[color:var(--accent)]' : 'border-line'}`}>
+      <div className="flex items-start gap-3 min-w-0">
+      <div className="w-11 h-11 rounded-xl bg-accent-soft text-accent flex items-center justify-center font-black text-[0.8125rem] shrink-0 overflow-hidden">
+        {member.avatarUrl ? <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" /> : initialsOf(member)}
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[0.84375rem] font-bold text-ink truncate">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-[0.9375rem] font-black text-ink truncate" title={member.fullName || member.email}>
             {member.fullName || member.email}
           </span>
-          {member.isSelf && (
-            <span className="text-[0.625rem] font-black uppercase tracking-wider text-ink-faint">You</span>
-          )}
         </div>
-        <div className="text-[0.75rem] text-ink-muted break-words">
-          {member.fullName ? member.email : null}
-          {member.status === 'ACTIVE' && member.joinedAt && (
-            <span className="text-ink-faint">
-              {member.fullName ? ' · ' : ''}Joined {formatDate(member.joinedAt)}
-            </span>
-          )}
-          {member.status === 'INVITED' && (
-            <span className="text-ink-faint">
-              {member.fullName ? ' · ' : ''}
-              {member.expired ? 'Expired ' : 'Expires '}{formatDate(member.expiresAt)}
-            </span>
-          )}
+        <div className="text-[0.78125rem] text-ink-muted truncate" title={member.email}>
+          {member.fullName ? member.email : (member.jobTitle || '\u00a0')}
         </div>
       </div>
-
-      <span className="hidden sm:inline-flex items-center gap-1.5 text-[0.75rem] font-bold text-ink-muted shrink-0">
-        <RoleIcon className="w-3.5 h-3.5" />
-        {ROLE_META[member.role]?.label ?? member.role}
-      </span>
-
-      <StatusPill member={member} />
 
       {canManage ? (
         <div className="relative shrink-0">
@@ -338,9 +318,21 @@ function MemberRow({ member, canManage, isLastActiveAdmin, busyId, onAction }) {
             </>
           )}
         </div>
-      ) : (
-        <span className="w-8 shrink-0" aria-hidden="true" />
-      )}
+      ) : null}
+      </div>
+
+      <div className="mt-auto flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-alt px-2.5 py-1 text-[0.6875rem] font-bold text-ink-muted">
+          <RoleIcon className="w-3 h-3" />
+          {ROLE_META[member.role]?.label ?? member.role}
+        </span>
+        <StatusPill member={member} />
+        {member.isSelf && <span className="px-2 py-1 rounded-full bg-accent-soft text-accent text-[0.6875rem] font-black">You</span>}
+        <span className="ml-auto text-[0.6875rem] text-ink-faint whitespace-nowrap">
+          {member.status === 'ACTIVE' && member.joinedAt ? `Joined ${formatDate(member.joinedAt)}`
+            : member.status === 'INVITED' ? `${member.expired ? 'Expired' : 'Expires'} ${formatDate(member.expiresAt)}` : ''}
+        </span>
+      </div>
     </li>
   );
 }
@@ -464,6 +456,7 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
   };
 
   const activeMembers = state.members.filter((m) => m.status !== 'INVITED');
+  const members = activeMembers.filter((m) => !m.declined);
   const pendingInvites = state.members.filter((m) => m.status === 'INVITED');
 
   return (
@@ -472,169 +465,130 @@ export default function MembersScreen({ orgName, viewer, viewerRole: initialRole
        No `onViewChange` is passed, which puts the shell in routed mode: the
        section nav becomes links back to /dashboard instead of view switches. */
     <DashboardShell user={viewer} role={state.viewerRole ?? initialRole}>
-      <div className="mx-auto max-w-3xl animate-view-in">
+      <div className="animate-view-in flex flex-col gap-5">
 
-        {/* Same page header as the dashboard screens (eyebrow, title, line of context, rule underneath). */}
-        <header className="flex flex-col gap-2 pb-5 mb-7 border-b border-line">
-          <p className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-accent">
-            {orgName}
-          </p>
-          <h1 className="text-[1.625rem] sm:text-[1.875rem] font-black tracking-tight text-ink leading-[1.15]">
-            Members
-          </h1>
-          <p className="text-[0.84375rem] text-ink-muted leading-relaxed max-w-2xl">
-            Everyone who can see this organisation’s safety data, and what each person can change.
-          </p>
+        <header className="flex flex-col gap-2 pb-5 border-b border-line">
+          <p className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-accent">{orgName}</p>
+          <h1 className="text-[1.625rem] sm:text-[1.875rem] font-black tracking-tight text-ink leading-[1.15]">Members</h1>
+          <p className="text-[0.84375rem] text-ink-muted">Who can see this organisation’s safety data, and what each person can change.</p>
         </header>
 
-        {banner && (
-          <div className="mb-5">
-            <Banner kind={banner.kind}>{banner.text}</Banner>
-          </div>
-        )}
+        {banner && <Banner kind={banner.kind}>{banner.text}</Banner>}
+        {invite && <InviteLinkPanel invite={invite} onDismiss={() => setInvite(null)} />}
 
-        {invite && (
-          <div className="mb-5">
-            <InviteLinkPanel invite={invite} onDismiss={() => setInvite(null)} />
-          </div>
-        )}
+        {/* Counts. */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { icon: UserRound, label: 'Members', value: members.length },
+            { icon: ShieldCheck, label: 'Admins', value: members.filter((m) => m.role === 'ADMIN' && m.status === 'ACTIVE').length },
+            { icon: Wrench, label: 'Managers', value: members.filter((m) => m.role === 'MANAGER' && m.status === 'ACTIVE').length },
+            { icon: Clock, label: 'Invites', value: pendingInvites.length, strong: pendingInvites.length > 0 },
+          ].map(({ icon: Icon, label, value, strong }) => (
+            <div key={label} className="rounded-2xl border border-line bg-surface p-5 flex items-center gap-4 min-w-0">
+              <span className="w-11 h-11 rounded-xl bg-accent-soft text-accent flex items-center justify-center shrink-0"><Icon className="w-5 h-5" aria-hidden="true" /></span>
+              <span className="min-w-0">
+                <span className={`block text-3xl font-black tabular-nums leading-none ${strong ? 'text-accent' : 'text-ink'}`}>{state.status === 'loading' ? '—' : value}</span>
+                <span className="block mt-1 text-[0.8125rem] font-bold text-ink-muted leading-tight">{label}</span>
+              </span>
+            </div>
+          ))}
+        </div>
 
-        {/* The invite form is ADMIN-only, matching membership_insert. A manager
-            sees the roster below but no way to change it. */}
-        {canInvite && (
-          <section className="mb-7 rounded-xl border border-line bg-surface p-4 sm:p-5">
-            <h2 className="text-[0.9375rem] font-black tracking-tight text-ink mb-1 flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-accent" />
-              Invite someone
-            </h2>
-            <p className="text-[0.78125rem] text-ink-muted font-medium mb-4 leading-relaxed">
-              They accept by signing up with this address — no token to paste, and it works
-              with Google sign-in too.
-            </p>
-
-            <form onSubmit={submitInvite} noValidate className="flex flex-col gap-4">
-              <Field
-                id="inviteEmail"
-                label="Work email"
-                type="email"
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setFieldError(null); }}
-                placeholder="name@company.com"
-                autoComplete="off"
-                maxLength={320}
-                error={fieldError}
-              />
-
-              <fieldset className="flex flex-col gap-1.5">
-                <legend className="text-[0.8125rem] font-bold text-ink mb-1.5">Role</legend>
-                <div className="flex flex-col gap-1.5">
-                  {ROLE_ORDER.map((id) => {
-                    const meta = ROLE_META[id];
-                    const on = role === id;
-                    const Icon = meta.icon;
-                    return (
-                      <label
-                        key={id}
-                        className={`flex items-start gap-2.5 rounded-lg border-2 px-3 py-2.5 cursor-pointer transition-colors duration-150 ${
-                          on ? 'border-[color:var(--accent)] bg-accent-soft' : 'border-field hover:border-field-hover'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="inviteRole"
-                          value={id}
-                          checked={on}
-                          onChange={() => setRole(id)}
-                          className="mt-0.5 accent-[color:var(--accent)]"
-                        />
-                        <span className="flex flex-col gap-0.5 min-w-0">
-                          <span className={`text-[0.8125rem] font-bold flex items-center gap-1.5 ${on ? 'text-accent' : 'text-ink'}`}>
-                            <Icon className="w-3.5 h-3.5" />
-                            {meta.label}
-                          </span>
-                          <span className="text-[0.75rem] text-ink-faint font-medium leading-snug">
-                            {meta.blurb}
-                          </span>
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </fieldset>
-
-              <SubmitButton busy={inviting}>
-                {inviting ? 'Creating invitation…' : 'Create invitation'}
-              </SubmitButton>
-            </form>
-          </section>
-        )}
-
-        {!canInvite && state.status === 'ready' && (
-          <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-line bg-surface-alt px-4 py-3">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-ink-faint" />
-            <p className="text-[0.78125rem] text-ink-muted font-medium leading-relaxed">
-              Only an administrator can invite people or change roles. You can see who is in{' '}
-              {orgName}.
-            </p>
-          </div>
-        )}
-
-        {state.status === 'loading' ? (
-          <div className="rounded-xl border border-line bg-surface divide-y divide-[color:var(--line-soft)]">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3.5">
-                <div className="w-9 h-9 rounded-lg skeleton" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3.5 w-40 skeleton" />
-                  <div className="h-3 w-56 skeleton" />
-                </div>
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_24rem] gap-5 items-stretch">
+          {/* The people. */}
+          <section className="rounded-2xl border border-line bg-surface p-5 flex flex-col gap-4 min-w-0 xl:min-h-[calc(100dvh-22rem)]">
+            <h2 className="flex items-center gap-2 text-[0.9375rem] font-black text-ink"><Users className="w-4 h-4 text-accent" aria-hidden="true" /> People</h2>
+            {state.status === 'loading' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3">
+                {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-[7.5rem] rounded-2xl skeleton" />)}
               </div>
-            ))}
-          </div>
-        ) : (
-          <>
-            <section className="mb-6">
-              <h2 className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-ink-faint mb-2.5">
-                {/* Someone who declined is listed (so they can be invited again) but is not counted as a member. */}
-                Members · {activeMembers.filter((m) => !m.declined).length}
-              </h2>
-              {/* No overflow-hidden: a row's action menu opens below it, and clipping the list cut off the menu of
-                  the last row (its items could not be reached). The rows have no background, so nothing spills. */}
-              <ul className="rounded-xl border border-line bg-surface">
+            ) : (
+              <ul className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3 content-start">
                 {activeMembers.map((member) => (
-                  <MemberRow
-                    key={member.id}
-                    member={member}
-                    canManage={canManage}
-                    isLastActiveAdmin={isLastActiveAdmin}
-                    busyId={busyId}
-                    onAction={runAction}
-                  />
+                  <MemberRow key={member.id} member={member} canManage={canManage} isLastActiveAdmin={isLastActiveAdmin} busyId={busyId} onAction={runAction} />
                 ))}
               </ul>
-            </section>
+            )}
 
             {pendingInvites.length > 0 && (
-              <section>
-                <h2 className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-ink-faint mb-2.5">
-                  Pending invitations · {pendingInvites.length}
-                </h2>
-                <ul className="rounded-xl border border-line bg-surface">
+              <>
+                <h2 className="mt-2 flex items-center gap-2 text-[0.9375rem] font-black text-ink"><Clock className="w-4 h-4 text-accent" aria-hidden="true" /> Invites waiting</h2>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3 content-start">
                   {pendingInvites.map((member) => (
-                    <MemberRow
-                      key={member.id}
-                      member={member}
-                      canManage={canManage}
-                      isLastActiveAdmin={isLastActiveAdmin}
-                      busyId={busyId}
-                      onAction={runAction}
-                    />
+                    <MemberRow key={member.id} member={member} canManage={canManage} isLastActiveAdmin={isLastActiveAdmin} busyId={busyId} onAction={runAction} />
                   ))}
                 </ul>
+              </>
+            )}
+          </section>
+
+          {/* Adding people, and what each role can do. */}
+          <aside className="flex flex-col gap-5 min-w-0">
+            {canInvite ? (
+              <section className="rounded-2xl border border-line bg-surface p-5 flex flex-col gap-4">
+                <h2 className="flex items-center gap-2 text-[0.9375rem] font-black text-ink"><UserPlus className="w-4 h-4 text-accent" aria-hidden="true" /> Invite someone</h2>
+                <form onSubmit={submitInvite} noValidate className="flex flex-col gap-3">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setFieldError(null); }}
+                    placeholder="name@company.com"
+                    autoComplete="off"
+                    maxLength={320}
+                    aria-label="Work email"
+                    className="w-full rounded-xl bg-ground border-2 border-field px-3.5 py-2.5 text-[0.875rem] text-ink placeholder:text-ink-faint focus:outline-none focus:border-[color:var(--accent)]"
+                  />
+                  {fieldError && <p className="text-[0.75rem] font-semibold text-accent">{fieldError}</p>}
+                  <div role="radiogroup" aria-label="Role" className="grid grid-cols-3 gap-2">
+                    {ROLE_ORDER.map((id) => {
+                      const meta = ROLE_META[id];
+                      const on = role === id;
+                      const Icon = meta.icon;
+                      return (
+                        <button key={id} type="button" role="radio" aria-checked={on} onClick={() => setRole(id)} title={meta.blurb}
+                          className={`flex flex-col items-center gap-1 rounded-xl border-2 py-2.5 text-[0.75rem] font-bold transition-colors ${on ? 'border-[color:var(--accent)] bg-accent-soft text-accent' : 'border-field text-ink-muted hover:border-field-hover'}`}>
+                          <Icon className="w-4 h-4" aria-hidden="true" /> {id === 'ADMIN' ? 'Admin' : meta.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[0.75rem] text-ink-faint">{ROLE_META[role].blurb}.</p>
+                  <button type="submit" disabled={inviting}
+                    title="No email is sent: you send them the link. They accept by signing up with this address."
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-[0.875rem] font-bold text-white hover:brightness-110 transition disabled:opacity-60">
+                    {inviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />} {inviting ? 'Creating…' : 'Create invite link'}
+                  </button>
+                </form>
+              </section>
+            ) : state.status === 'ready' && (
+              <section className="rounded-2xl border border-line bg-surface-alt p-5 flex items-start gap-3">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-ink-faint" />
+                <p className="text-[0.8125rem] text-ink-muted">Only an administrator can invite people or change roles.</p>
               </section>
             )}
-          </>
-        )}
+
+            <section className="rounded-2xl border border-line bg-surface p-5 flex flex-col gap-3 xl:flex-1">
+              <h2 className="text-[0.9375rem] font-black text-ink">Roles</h2>
+              <ul className="flex flex-col gap-2">
+                {ROLE_ORDER.map((id) => {
+                  const meta = ROLE_META[id];
+                  const Icon = meta.icon;
+                  const n = members.filter((m) => m.role === id && m.status === 'ACTIVE').length;
+                  return (
+                    <li key={id} title={meta.blurb} className="flex items-center gap-3 rounded-xl border border-line bg-surface-alt px-3 py-2">
+                      <span className="w-7 h-7 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0"><Icon className="w-3.5 h-3.5" aria-hidden="true" /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[0.8125rem] font-black text-ink">{meta.label}</span>
+                        <span className="block text-[0.6875rem] text-ink-faint truncate">{meta.blurb}</span>
+                      </span>
+                      <span className="text-[0.8125rem] font-black text-ink tabular-nums">{n}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          </aside>
+        </div>
       </div>
     </DashboardShell>
   );

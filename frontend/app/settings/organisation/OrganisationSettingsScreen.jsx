@@ -23,7 +23,7 @@
 import { daysText, planName, termDate } from '../../lib/plans';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Building2, ShieldAlert, Trash2, Loader2, AlertCircle, Info,
+  Building2, ShieldAlert, Trash2, Loader2, AlertCircle, Info, CreditCard, Globe2, Archive, Film, Check,
 } from 'lucide-react';
 
 import { Field, Banner } from '../../components/AuthFormBits';
@@ -36,12 +36,12 @@ import {
 } from './actions';
 
 /** Section wrapper — matches the card treatment on /settings/members. */
-function Section({ icon: Icon, title, description, children, danger = false }) {
+function Section({ icon: Icon, title, description, children, danger = false, className = '' }) {
   return (
     <section
-      className={`rounded-xl border p-4 sm:p-5 ${
+      className={`rounded-2xl border p-5 sm:p-6 flex flex-col min-w-0 ${
         danger ? 'border-[color:var(--accent)] bg-accent-soft' : 'border-line bg-surface'
-      }`}
+      } ${className}`}
     >
       <h2 className={`flex items-center gap-2 text-[0.9375rem] font-black tracking-tight mb-1 ${danger ? 'text-accent' : 'text-ink'}`}>
         <Icon className="w-4 h-4" />
@@ -95,6 +95,10 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
   useEffect(() => { load(); }, [load]);
 
   const canEdit = can(state.role, 'org.settings');
+  const dirty = Boolean(form && state.org && (
+    form.name !== (state.org.name ?? '') || form.timezone !== (state.org.timezone ?? 'UTC')
+    || String(form.dataRetentionDays) !== String(state.org.dataRetentionDays ?? 90)
+    || Boolean(form.purgeVideoAfterProcessing) !== Boolean(state.org.purgeVideoAfterProcessing)));
   const set = (key) => (value) => {
     setForm((f) => ({ ...f, [key]: value }));
     setErrors((e) => ({ ...e, [key]: undefined }));
@@ -184,7 +188,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
   if (state.status === 'loading' || !form) {
     return (
       <DashboardShell user={viewer} role={viewerRole}>
-        <div className="mx-auto max-w-3xl space-y-6">
+        <div className="space-y-6">
           <div className="pb-5 border-b border-line space-y-3" aria-hidden="true">
             <div className="skeleton h-2.5 w-20" /><div className="skeleton h-8 w-56" /><div className="skeleton h-3 w-80 max-w-full" />
           </div>
@@ -200,25 +204,39 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
   return (
     /* Same shell as the dashboard — see MembersScreen for why. */
     <DashboardShell user={viewer} role={viewerRole}>
-      <div className="mx-auto max-w-3xl animate-view-in">
+      <div className="animate-view-in flex flex-col gap-5">
 
         {/* Same page header as the dashboard screens (eyebrow, title, line of context, rule underneath). */}
-        <header className="flex flex-col gap-2 pb-5 mb-7 border-b border-line">
+        <header className="flex flex-wrap items-end justify-between gap-4 pb-5 border-b border-line">
+          <div className="flex flex-col gap-2">
           <p className="font-mono text-[0.625rem] uppercase tracking-[0.16em] text-accent">
             {state.org.name || state.org.slug}
           </p>
           <h1 className="text-[1.625rem] sm:text-[1.875rem] font-black tracking-tight text-ink leading-[1.15]">
             Organisation
           </h1>
-          <p className="text-[0.84375rem] text-ink-muted leading-relaxed max-w-2xl">
-            Identity and data retention.
-          </p>
+          <p className="text-[0.84375rem] text-ink-muted">Its name, its clock, and how long its data is kept.</p>
+          </div>
+          {canEdit && !retentionWarning && (
+          <div className="flex items-center gap-3">
+            <span className={`text-[0.8125rem] font-bold ${dirty ? 'text-accent' : 'text-ink-faint'}`}>{dirty ? 'Not saved yet' : 'All saved'}</span>
+            <button
+              type="button"
+              onClick={() => save(false)}
+              disabled={saving || !dirty}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-white font-bold text-[0.875rem] hover:brightness-110 transition-[filter,opacity] duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              {saving ? 'Saving…' : 'Save settings'}
+            </button>
+          </div>
+        )}
         </header>
 
-        {banner && <div className="mb-5"><Banner kind={banner.kind}>{banner.text}</Banner></div>}
+        {banner && <Banner kind={banner.kind}>{banner.text}</Banner>}
 
         {!canEdit && (
-          <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-line bg-surface-alt px-4 py-3">
+          <div className="flex items-start gap-2.5 rounded-xl border border-line bg-surface-alt px-4 py-3">
             <Info className="w-4 h-4 shrink-0 mt-0.5 text-ink-faint" />
             <p className="text-[0.78125rem] text-ink-muted font-medium leading-relaxed">
               Only an administrator can change these settings. You can see them because they
@@ -227,12 +245,36 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
           </div>
         )}
 
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { icon: CreditCard, label: 'Plan', value: planName(state.org.plan), href: '/dashboard?view=plan' },
+            { icon: Globe2, label: 'Time zone', value: state.org.timezone || 'UTC' },
+            { icon: Archive, label: 'Records kept', value: `${state.org.dataRetentionDays} days` },
+            { icon: Film, label: 'Uploaded video', value: state.org.purgeVideoAfterProcessing ? 'Deleted after use' : 'Kept' },
+          ].map(({ icon: Icon, label, value, href }) => {
+            const body = (
+              <>
+                <span className="w-11 h-11 rounded-xl bg-accent-soft text-accent flex items-center justify-center shrink-0"><Icon className="w-5 h-5" aria-hidden="true" /></span>
+                <span className="min-w-0">
+                  <span className="block text-[1.125rem] font-black text-ink leading-tight break-words" title={value}>{value}</span>
+                  <span className="block mt-0.5 text-[0.8125rem] font-bold text-ink-muted leading-tight">{label}</span>
+                </span>
+              </>
+            );
+            const cls = 'rounded-2xl border border-line bg-surface p-5 flex items-center gap-4 min-w-0';
+            return href
+              ? <a key={label} href={href} className={`${cls} hover:border-[color:var(--accent)] transition-colors`}>{body}</a>
+              : <div key={label} className={cls}>{body}</div>;
+          })}
+        </div>
+
         <div className="flex flex-col gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
           {/* ── Identity ── */}
           <Section
             icon={Building2}
             title="Identity"
-            description="The name shown across the product, and the timezone every report is read in."
+            description="The name everyone sees, and the clock reports use."
           >
             <div className="flex flex-col gap-4">
               <Field
@@ -258,10 +300,7 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
                     : [form.timezone, 'UTC'].filter((v, i, a) => a.indexOf(v) === i)
                   ).map((tz) => <option key={tz} value={tz}>{tz}</option>)}
                 </select>
-                <p className="text-[0.75rem] text-ink-faint font-medium">
-                  Times are stored in UTC and shown in this zone, so the times on alerts and
-                  reports match your site’s clock.
-                </p>
+                <p className="text-[0.75rem] text-ink-faint font-medium">Alerts and reports show times in this zone.</p>
               </div>
             </div>
           </Section>
@@ -349,20 +388,9 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
             </div>
           </Section>
 
-          {canEdit && !retentionWarning && (
-            /* A plain button, not SubmitButton: that component is
-               `type="submit"` and ignores onClick, so using it outside a <form>
-               would render a control that silently does nothing. */
-            <button
-              type="button"
-              onClick={() => save(false)}
-              disabled={saving}
-              className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-lg bg-accent text-white font-bold text-[0.875rem] hover:brightness-110 transition-[filter,opacity] duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {saving ? 'Saving…' : 'Save settings'}
-            </button>
-          )}
+          </div>
+
+
 
           {/* Plan lives in the dashboard (Plan section), not here.
               Two surfaces showing the same tier is two places to keep honest,
@@ -377,13 +405,13 @@ export default function OrganisationSettingsScreen({ role: viewerRole, viewer })
               description="Everyone loses access at once. Support can restore it during a short grace period."
               danger
             >
-              <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-3 md:items-end">
                 {/* Paid time is not lost: it stays with this administrator's account for their next organisation (032). */}
                 {(() => {
                   const end = state.org.plan && state.org.plan !== 'FREE' ? state.org.planRenewsAt : null;
                   const left = end ? Math.ceil((new Date(end).getTime() - Date.now()) / 86400000) : 0;
                   return left > 0 ? (
-                    <p className="text-[0.8125rem] text-ink-muted leading-relaxed">
+                    <p className="md:col-span-2 text-[0.8125rem] text-ink-muted leading-relaxed">
                       The {daysText(left)} left on your {planName(state.org.plan)} plan (until {termDate(end)}) stay with
                       your account. The next organisation you create continues them, with nothing to pay again.
                     </p>

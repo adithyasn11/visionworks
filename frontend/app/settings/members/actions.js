@@ -211,7 +211,7 @@ export async function listMembers() {
 
   const { data, error: dbError } = await supabase
     .from('memberships')
-    .select('id, role, status, invitedEmail, invitedById, acceptedAt, createdAt, inviteExpiresAt, profileId, profiles:profileId (fullName, email, avatarUrl)')
+    .select('id, role, status, invitedEmail, invitedById, acceptedAt, createdAt, inviteExpiresAt, profileId, profiles:profileId (fullName, email, avatarUrl, jobTitle)')
     .eq('orgId', orgId)
     .order('createdAt', { ascending: true });
 
@@ -224,6 +224,8 @@ export async function listMembers() {
     status: row.status,
     email: row.profiles?.email ?? row.invitedEmail,
     fullName: row.profiles?.fullName ?? null,
+    avatarUrl: row.profiles?.avatarUrl ?? null,
+    jobTitle: row.profiles?.jobTitle ?? null,
     joinedAt: row.acceptedAt,
     invitedAt: row.createdAt,
     // An invite past its expiry is still an INVITED row — nothing sweeps it —

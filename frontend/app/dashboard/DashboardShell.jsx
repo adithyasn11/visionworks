@@ -15,7 +15,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Video, Shapes, FileDown, ClipboardCheck, ListFilter, SlidersHorizontal,
-  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard, Camera,
+  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard, Camera, UserRound,
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import { supabase } from '../lib/supabase/browser';
@@ -190,7 +190,25 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
     }
   };
 
-  const initials = (user?.fullName || user?.email || '?')
+  // Your own name and picture, read once and again whenever the profile page saves them.
+  const [me, setMe] = useState(null);
+  useEffect(() => {
+    if (!supabase) return undefined;
+    let live = true;
+    const load = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data?.user || !live) return;
+      const { data: row } = await supabase.from('profiles').select('fullName, avatarUrl, jobTitle').eq('id', data.user.id).maybeSingle();
+      if (live && row) setMe(row);
+    };
+    load();
+    window.addEventListener('vw-profile-changed', load);
+    return () => { live = false; window.removeEventListener('vw-profile-changed', load); };
+  }, []);
+  const shownName = me?.fullName || user?.fullName;
+  const avatarUrl = me ? me.avatarUrl : user?.avatarUrl;
+
+  const initials = (shownName || user?.email || '?')
     .split(/[\s@.]+/)
     .filter(Boolean)
     .slice(0, 2)
@@ -316,17 +334,24 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
       </div>{/* end of the single scroll region */}
 
       <div className="shrink-0 border-t border-line px-3 py-[clamp(0.5rem,1.4vh,0.75rem)] space-y-2">
-        <div className="flex items-center gap-2.5 px-1">
-          <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center font-bold text-[0.6875rem] shrink-0">
-            {initials}
+        {/* You: opens your profile. */}
+        <Link
+          href="/settings/profile"
+          onClick={() => setOpen(false)}
+          title="Your profile"
+          className={`flex items-center gap-2.5 px-1.5 py-1.5 -mx-0.5 rounded-xl transition-colors ${pathname === '/settings/profile' ? 'bg-accent-soft' : 'hover:bg-surface-alt'}`}
+        >
+          <div className="w-8 h-8 rounded-lg bg-accent-soft text-accent flex items-center justify-center font-bold text-[0.6875rem] shrink-0 overflow-hidden">
+            {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : initials}
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-[0.78125rem] font-bold text-ink truncate">
-              {user?.fullName || (user?.email ? user.email.split('@')[0] : 'Account')}
+              {shownName || (user?.email ? user.email.split('@')[0] : 'Account')}
             </div>
-            <div className="text-[0.6875rem] text-ink-faint truncate">{user?.email}</div>
+            <div className="text-[0.6875rem] text-ink-faint truncate">{me?.jobTitle || user?.email}</div>
           </div>
-        </div>
+          <UserRound className={`w-3.5 h-3.5 shrink-0 ${pathname === '/settings/profile' ? 'text-accent' : 'text-ink-faint'}`} aria-hidden="true" />
+        </Link>
 
         <div className="flex items-center gap-2">
           <ThemeToggle />

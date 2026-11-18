@@ -4,5 +4,5 @@ import React from 'react';
 import ShellSkeleton from '../../components/ShellSkeleton';
 
 export default function Loading() {
-  return <ShellSkeleton label="Loading members" narrow panels={2} />;
+  return <ShellSkeleton label="Loading members" panels={2} />;
 }
