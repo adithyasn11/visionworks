@@ -116,9 +116,10 @@ check("MAX_DWELL needs max_seconds (10-86400); warn_fraction 0.1-1; any real zon
 check("REQUIRED_EXIT needs an EXIT zone", raises(lambda: V("REQUIRED_EXIT", "press")) and raises(lambda: V("REQUIRED_EXIT", "press", {"exit_zone_id": "walk"}))
       and V("REQUIRED_EXIT", "press", {"exit_zone_id": "wash"})["max_seconds_to_exit"] == 30.0
       and raises(lambda: V("REQUIRED_EXIT", "walk", {"exit_zone_id": "wash"})))
-check("OCCUPANCY: min or max, min >= 2, max >= 1, min <= max, whole numbers",
-      raises(lambda: V("OCCUPANCY", "walk")) and raises(lambda: V("OCCUPANCY", "walk", {"min_people": 1}))
-      and raises(lambda: V("OCCUPANCY", "walk", {"max_people": 0})) and raises(lambda: V("OCCUPANCY", "walk", {"min_people": 5, "max_people": 3}))
+check("OCCUPANCY: min or max, min >= 1 (empty zone flagged), max >= 0 (no entry), min <= max, whole numbers",
+      raises(lambda: V("OCCUPANCY", "walk")) and raises(lambda: V("OCCUPANCY", "walk", {"min_people": 0}))
+      and V("OCCUPANCY", "walk", {"min_people": 1})["flag_empty"] is True and V("OCCUPANCY", "walk", {"max_people": 0})["max_people"] == 0
+      and raises(lambda: V("OCCUPANCY", "walk", {"max_people": -1})) and raises(lambda: V("OCCUPANCY", "walk", {"min_people": 5, "max_people": 3}))
       and raises(lambda: V("OCCUPANCY", "walk", {"min_people": 2.5})) and V("OCCUPANCY", "walk", {"min_people": 2})["grace_seconds"] == 10.0
       and raises(lambda: V("OCCUPANCY", "walk", {"min_people": 2, "grace_seconds": 2})))
 check("MAN_DOWN: zone optional, seconds 3-60, allowed zones must exist",

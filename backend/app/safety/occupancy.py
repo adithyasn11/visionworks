@@ -22,7 +22,12 @@ THE CONDITIONS
   LONE_WORKER    at least one person seen, and (seen + hidden) is below `min_people`, without a break for
                  `grace_seconds`. An empty zone is nobody being alone: it is not flagged, and a zone whose last
                  person just left is not flagged either.
-  OVER_CAPACITY  more than `max_people` seen, without a break for `grace_seconds`.
+  OVER_CAPACITY  more than `max_people` seen, without a break for `grace_seconds`. `max_people` 0 is a no-entry
+                 zone: anyone seen there for the grace is flagged.
+  EMPTY_ZONE     nobody seen and nobody held as inside, without a break for `grace_seconds`, when the rule asks
+                 for at least one person and `flag_empty` is on (the default for `min_people` 1). Nobody to count
+                 means no crowding doubt, so this is never "could not be trusted"; a camera that stops sending
+                 frames sends no empty frames either, so a dead camera is not read as an empty zone.
 
   Either one lasting the whole grace raises ONE decision for the episode. A break shorter than `RECOVER_S` is
   part of the same episode; a new episode within `realert_after_s` of the last flag of the same kind is the
@@ -88,11 +93,14 @@ class OccupancyDetector:
         p = rule.params
         self.min_people: Optional[int] = None if p.get("min_people") is None else int(p["min_people"])
         self.max_people: Optional[int] = None if p.get("max_people") is None else int(p["max_people"])
+        flag_empty = p.get("flag_empty")
+        self.flag_empty = (bool(flag_empty) if flag_empty is not None else self.min_people == 1) and self.min_people is not None
         self.grace = float(p.get("grace_seconds", self.config.occupancy_grace_s))
         self.window = float(p.get("window_seconds", self.config.occupancy_window_s))
         self._samples: Deque[Tuple[float, int, int, int]] = deque()   # (t, seen, seen + hidden, clear)
         self._lone = _Episode()
         self._over = _Episode()
+        self._empty = _Episode()
         self._last_t: Optional[float] = None
 
     # ── per frame ───────────────────────────────────────────────────────────
@@ -128,6 +136,12 @@ class OccupancyDetector:
                           self.max_people is not None and seen > self.max_people)
         if d:
             out.append(d)
+        if self.flag_empty:
+            empty = med_eff == 0
+            d = self._episode(self._empty, "EMPTY_ZONE", empty, t, seen, clear, hidden, people, med_seen,
+                              seen == 0 and int(hidden) == 0)
+            if d:
+                out.append(d)
         return out
 
     def _episode(self, ep: _Episode, kind: str, cond: bool, t: float, seen: int, clear: int, hidden: int,
@@ -148,11 +162,12 @@ class OccupancyDetector:
         ep.counts.append(seen)
         if kind == "LONE_WORKER" and len(people) == 1:
             ep.key = people[0]["worker_key"]
-        elif kind == "OVER_CAPACITY":
+        elif kind in ("OVER_CAPACITY", "EMPTY_ZONE"):
             ep.key = f"zone-{self.rule.zone_id}"
         if ep.judged or t - ep.since < self.grace or not now_ok:
             return None
-        fraction = ep.sum_clear / ep.sum_n if ep.sum_n else 0.0
+        # An empty zone has nobody to count, so nothing can be miscounted.
+        fraction = 1.0 if kind == "EMPTY_ZONE" else (ep.sum_clear / ep.sum_n if ep.sum_n else 0.0)
         if fraction < self.config.occupancy_min_clear_fraction:
             if ep.warned:
                 ep.judged = True                             # already said it could not be read; nothing more to say
@@ -183,6 +198,13 @@ class OccupancyDetector:
             reason = (f"Only {typical} {'person was' if typical == 1 else 'people were'} seen in {self.zone_name} for {lasted:.0f} s{more}; "
                       f"this rule asks for at least {self.min_people}.")
             outcome = kind
+        elif kind == "EMPTY_ZONE":
+            reason = (f"Nobody was seen in {self.zone_name} for {lasted:.0f} s; this rule asks for at least "
+                      f"{self.min_people} {'person' if self.min_people == 1 else 'people'} there.")
+            outcome = kind
+        elif self.max_people == 0:
+            reason = f"{who(typical).capitalize()} seen in {self.zone_name} for {lasted:.0f} s; nobody is allowed in this zone."
+            outcome = kind
         else:
             reason = f"{who(typical).capitalize()} seen in {self.zone_name} for {lasted:.0f} s; this rule allows at most {self.max_people}."
             outcome = kind
@@ -210,6 +232,7 @@ class OccupancyDetector:
         self._samples.clear()
         self._lone.reset()
         self._over.reset()
+        self._empty.reset()
 
 
 class OccupancyMonitor:

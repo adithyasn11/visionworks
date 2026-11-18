@@ -66,13 +66,16 @@ export const RULE_TYPES = [
   {
     value: 'OCCUPANCY',
     label: 'People in the zone (lone worker, crowding)',
-    blurb: 'Raises a flag for review when too few or too many people are seen in the zone for longer than the grace period. The count is smoothed, so one missed frame changes nothing. A zone nobody is in is never flagged, a second person who is just out of view counts as still there, and if the picture is too crowded to count reliably it says it could not tell.',
+    blurb: 'Raises a flag for review when too few or too many people are seen in the zone for longer than the grace period. At most 0 makes it a no-entry zone; at least 1 means someone must always be there, and an empty zone is flagged. The count is smoothed, so one missed frame changes nothing, a second person who is just out of view counts as still there, and if the picture is too crowded to count reliably it says it could not tell.',
     zoneTypes: ['PPE_CHECKPOINT', 'APPROACH', 'RESTRICTED', 'EXIT'],
     enforced: () => true,
     defaults: { min_people: 2, grace_seconds: 10 },
     fields: [
-      { key: 'min_people', kind: 'number', label: 'At least this many people (optional)', min: 2, max: 100, step: 1 },
-      { key: 'max_people', kind: 'number', label: 'At most this many people (optional)', min: 1, max: 1000, step: 1 },
+      { key: 'min_people', kind: 'number', label: 'At least this many people (optional)', min: 1, max: 100, step: 1 },
+      { key: 'max_people', kind: 'number', label: 'At most this many people (0 = nobody may enter)', min: 0, max: 1000, step: 1 },
+      { key: 'flag_empty', kind: 'toggle', label: 'Also flag when nobody is in the zone',
+        when: (p) => p.min_people != null && p.min_people !== '',
+        auto: (p) => Number(p.min_people) === 1 },
       { key: 'grace_seconds', kind: 'number', label: 'How long before it is flagged (seconds)', min: 3, max: 120, step: 1 },
     ],
   },
@@ -125,6 +128,7 @@ export function cleanParams(type, params) {
     if (f.when && !f.when(params)) return;
     const v = params[f.key];
     if (v === undefined || v === null || v === '') return;
+    if (f.kind === 'toggle') { out[f.key] = Boolean(v); return; }
     out[f.key] = f.kind === 'number' || f.kind === 'duration' ? Number(v) : v;
   });
   return out;
@@ -155,6 +159,7 @@ const FRIENDLY = [
   [/exit_zone_id must be/i, 'The exit must be an Exit zone on the same camera.'],
   [/give min_people, max_people or both/i, 'Give a smallest number of people, a largest number, or both.'],
   [/min_people cannot be more than max_people/i, 'The smallest number cannot be larger than the largest.'],
+  [/flag_empty needs min_people/i, 'Set "at least this many people" to flag an empty zone.'],
   [/max_seconds is required/i, 'Set the time after which to alert.'],
   [/max_seconds must be between/i, 'The time must be between 10 seconds and 24 hours.'],
 ];
@@ -208,8 +213,11 @@ export function ruleSummary(type, params, zoneName = () => null) {
     case 'OCCUPANCY': {
       const lo = p.min_people != null && p.min_people !== '' ? Number(p.min_people) : null;
       const hi = p.max_people != null && p.max_people !== '' ? Number(p.max_people) : null;
+      const after = durationText(p.grace_seconds ?? 10);
+      if (hi === 0) return `Nobody may enter; flagged after ${after}`;
       const asks = [lo != null ? `at least ${lo}` : null, hi != null ? `at most ${hi}` : null].filter(Boolean).join(' and ');
-      return `${asks ? `${asks.charAt(0).toUpperCase()}${asks.slice(1)} people` : 'People'} in the zone; flagged after ${durationText(p.grace_seconds ?? 10)}`;
+      const empty = lo != null && (p.flag_empty != null ? p.flag_empty : lo === 1) ? ', empty zone flagged too' : '';
+      return `${asks ? `${asks.charAt(0).toUpperCase()}${asks.slice(1)} ${lo === 1 && hi == null ? 'person' : 'people'}` : 'People'} in the zone${empty}; flagged after ${after}`;
     }
     case 'MAN_DOWN':
       return `Critical flag when someone lies still for ${durationText(p.min_seconds_down ?? 5)}`;

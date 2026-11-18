@@ -142,6 +142,18 @@ function ParamField({ field, form, setParams, zones, cameras = [] }) {
   if (field.kind === 'duration') {
     return <DurationField field={field} value={value} onChange={(v) => setParams({ [field.key]: v })} />;
   }
+  if (field.kind === 'toggle') {
+    const on = value != null && value !== '' ? Boolean(value) : Boolean(field.auto && field.auto(form.params));
+    return (
+      <label className="flex items-center gap-3 self-end rounded-xl border border-line px-3.5 py-2 cursor-pointer">
+        <input type="checkbox" checked={on} onChange={(e) => setParams({ [field.key]: e.target.checked })} className="sr-only" />
+        <span aria-hidden="true" className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${on ? 'bg-accent' : 'bg-line'}`}>
+          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${on ? 'left-[1.125rem]' : 'left-0.5'}`} />
+        </span>
+        <span className="text-[0.8125rem] font-bold text-ink">{field.label}</span>
+      </label>
+    );
+  }
   if (field.kind === 'select') {
     return (
       <label htmlFor={id} className="flex flex-col gap-1 text-xs text-ink-faint">{field.label}

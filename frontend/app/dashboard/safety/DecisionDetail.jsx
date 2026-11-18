@@ -39,6 +39,7 @@ const OUTCOMES = {
   UNCLEAR: 'Still, and might be lying down, but the picture is not clear enough to say',
   LONE_WORKER: 'Fewer people were seen than the rule asks for',
   OVER_CAPACITY: 'More people were seen than the rule allows',
+  EMPTY_ZONE: 'Nobody was in a zone that must have someone in it',
   CROWDED: 'The head count could not be trusted (people overlapping or partly hidden)',
 };
 

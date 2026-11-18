@@ -17,6 +17,7 @@ import os
 import sqlite3
 import sys
 import tempfile
+import uuid
 import atexit
 import shutil
 
@@ -116,6 +117,42 @@ r = Run().feed(2, folk(2)).feed(3, folk(1)).feed(30, folk(0))
 check("the last person leaves so the zone is empty: nothing (an empty zone is not a lone worker)", r.out == [])
 r = Run().feed(30, folk(0))
 check("an empty zone for 30 s: nothing", r.out == [])
+
+# at least 1: an empty zone is flagged (by default); at most 0: a no-entry zone
+r = Run(rule(min_people=1)).feed(3, folk(1)).feed(12, folk(0))
+check("at least 1, the only person leaves and the zone stays empty for 12 s: ONE potential violation (EMPTY_ZONE)",
+      r.kinds() == [(POTENTIAL_VIOLATION, "EMPTY_ZONE")] and "Nobody was seen in Press hall" in r.out[0].reason
+      and "at least 1 person" in r.out[0].reason and r.out[0].worker_key == "zone-press", str([(d.status, d.reason) for d in r.out]))
+r = Run(rule(min_people=1)).feed(30, folk(1))
+check("at least 1 and one person there for 30 s: nothing (one is enough, they are not 'alone')", r.out == [], str(r.kinds()))
+r = Run(rule(min_people=1)).feed(3, folk(1)).feed(8, folk(0)).feed(10, folk(1))
+check("at least 1, empty for 8 s (grace 10 s) and someone comes back: nothing", r.out == [], str(r.kinds()))
+r = Run(rule(min_people=1)).feed(3, folk(0), hidden=1).feed(12, folk(0), hidden=1)
+check("at least 1, nobody in view but the zone tracker still holds someone inside (behind something): nothing", r.out == [], str(r.kinds()))
+r = Run(rule(min_people=1)).feed(60, folk(0))
+check("at least 1, empty for a minute: flagged once, not every frame", r.kinds() == [(POTENTIAL_VIOLATION, "EMPTY_ZONE")], str(r.kinds()))
+r = Run(rule(min_people=1, flag_empty=False)).feed(30, folk(0))
+check("at least 1 with the empty-zone flag switched off: nothing", r.out == [])
+r = Run(rule(min_people=2)).feed(30, folk(0))
+check("at least 2 (a lone-worker rule): an empty zone is still not flagged by default", r.out == [])
+r = Run(rule(min_people=2, flag_empty=True)).feed(30, folk(0))
+check("... unless the empty-zone flag is switched on", r.kinds() == [(POTENTIAL_VIOLATION, "EMPTY_ZONE")], str(r.kinds()))
+r = Run(rule(max_people=0)).feed(12, folk(1))
+check("at most 0 (no entry): one person inside for 12 s is flagged, worded as a no-entry zone",
+      r.kinds() == [(POTENTIAL_VIOLATION, "OVER_CAPACITY")] and "nobody is allowed in this zone" in r.out[0].reason, str([(d.status, d.reason) for d in r.out]))
+r = Run(rule(max_people=0)).feed(30, folk(0))
+check("at most 0 and nobody there: nothing", r.out == [])
+r = Run(rule(max_people=0)).feed(5, folk(1)).feed(10, folk(0))
+check("at most 0, someone steps in for 5 s (grace 10 s) and leaves: nothing", r.out == [], str(r.kinds()))
+for bad, why in [({"min_people": 0}, "at least 0"), ({"min_people": 1, "max_people": 0}, "at least 1 and at most 0"),
+                 ({"max_people": 3, "flag_empty": True}, "an empty-zone flag with no minimum"), ({"min_people": 1, "flag_empty": "yes"}, "flag_empty not true/false")]:
+    try:
+        rule(**bad)
+        check(f"refused: {why}", False)
+    except RuleError:
+        check(f"refused: {why}", True)
+check("the saved parameters: at least 1 defaults the empty flag on, at least 2 off",
+      rule(min_people=1).params["flag_empty"] is True and rule(min_people=2).params["flag_empty"] is False)
 
 n = {"i": 0}
 def dropout(t):
@@ -274,7 +311,7 @@ atexit.register(lambda: shutil.rmtree(tmp, ignore_errors=True))
 
 
 def session_for(rules, evidence=False):
-    path = os.path.join(tmp, f"t{len(os.listdir(tmp))}.db")
+    path = os.path.join(tmp, f"t{uuid.uuid4().hex}.db")             # unique: the folder also holds -wal/-shm files
     dbe = create_engine(f"sqlite:///{path}")
     configure_sqlite(dbe)
     ensure_safety_tables(dbe)
@@ -338,6 +375,23 @@ s, path = session_for([rule(min_people=2)], evidence=True)
 asyncio.run(play(s, lambda t: [(1, "press"), (2, "press")] if t < 3 else [(1, "press"), (2, None)], 200, hold=True))
 got = rows(path)
 check("session: a lone-worker decision keeps its evidence picture too", len(got) == 1 and got[0]["snapshot_ref"], str(got))
+
+s, path = session_for([rule(min_people=1)])
+asyncio.run(play(s, lambda t: [(1, "press")] if t < 3 else [(1, None)], 200))
+got = rows(path)
+check("session: at least 1, the only worker walks out of the zone at 3 s and nobody comes back: ONE empty-zone row keyed to the zone",
+      len(got) == 1 and got[0]["status"] == "POTENTIAL_VIOLATION" and got[0]["worker_key"] == "zone-press"
+      and "Nobody was seen" in got[0]["reason"], str([(g["status"], g["reason"]) for g in got]))
+s, path = session_for([rule(min_people=1)])
+asyncio.run(play(s, lambda t: [], 200))
+got = rows(path)
+check("session: at least 1 and nobody in the picture at all for 20 s: the empty zone is flagged (frames with no detections still count)",
+      len(got) == 1 and got[0]["status"] == "POTENTIAL_VIOLATION", str(got))
+s, path = session_for([rule(max_people=0, severity="CRITICAL")])
+asyncio.run(play(s, lambda t: [(1, "press")], 200))
+got = rows(path)
+check("session: at most 0 and someone stays inside: ONE critical no-entry row",
+      len(got) == 1 and got[0]["severity"] == "CRITICAL" and "nobody is allowed" in got[0]["reason"], str(got))
 
 s, path = session_for([rule(min_people=2)])
 asyncio.run(play(s, lambda t: [(1, "dock")], 200))

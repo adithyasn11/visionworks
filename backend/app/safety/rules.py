@@ -125,13 +125,22 @@ def validate_params(rule_type: str, zone_id: Optional[str], params: Optional[dic
         out["exit_zone_id"] = str(ez)
         out["max_seconds_to_exit"] = _number(params, "max_seconds_to_exit", 30.0, 3, 600)
     elif rule_type == "OCCUPANCY":
-        lo = _number(params, "min_people", None, 2, 1000, integer=True)
-        hi = _number(params, "max_people", None, 1, 1000, integer=True)
+        # min 1: someone must be there (an empty zone is flagged); max 0: nobody may go in.
+        lo = _number(params, "min_people", None, 1, 1000, integer=True)
+        hi = _number(params, "max_people", None, 0, 1000, integer=True)
         if lo is None and hi is None:
             raise RuleError("give min_people, max_people or both")
         if lo is not None and hi is not None and lo > hi:
             raise RuleError("min_people cannot be more than max_people")
         out["min_people"], out["max_people"] = lo, hi
+        empty = params.get("flag_empty")
+        if empty is not None and not isinstance(empty, bool):
+            raise RuleError(f"flag_empty must be true or false, got {empty!r}")
+        # Default: an empty zone is flagged when the rule asks for at least one person; a lone-worker rule
+        # (at least 2) is about nobody being ALONE, and by default says nothing about an empty zone.
+        out["flag_empty"] = bool(empty) if empty is not None else (lo == 1)
+        if out["flag_empty"] and lo is None:
+            raise RuleError("flag_empty needs min_people")
         out["grace_seconds"] = _number(params, "grace_seconds", 10.0, 3, 120)
         out["window_seconds"] = _number(params, "window_seconds", 2.0, 0.1, 60)
     elif rule_type == "MAN_DOWN":
