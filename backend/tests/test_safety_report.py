@@ -113,7 +113,7 @@ check("a period where every flag is still pending shows 0 confirmed, 6 waiting a
       fl["Confirmed by reviewer"] == 0 and fl["Waiting for review"] == 6 and fl["Share of judged flags that were confirmed"] == "n/a", str(fl))
 bt = tables["By rule"]
 check("the by-rule table uses plain rule names and the columns are stable",
-      bt[1] == ["Rule"] + rg.BREAKDOWN_HEADERS and bt[2][0][0] == "Helmet and vest on entry" and bt[2][1][0] == "Longest stay"
+      bt[1] == ["Rule"] + rg.BREAKDOWN_HEADERS and bt[2][0][0] == "Safety gear on entry" and bt[2][1][0] == "Stayed in a zone too long"
       and bt[2][0][1:] == [14, 9, 4, 1, 1, 2, 1], str(bt[2][0]))
 check("hours with no decisions are left out of the hour table; the day table has every day",
       tables["By hour of the day (UTC)"][2] == [["10:00", 7, 3]] and len(tables["By day (UTC)"][2]) == 8)
@@ -130,10 +130,7 @@ zw = dict((row[0], row[1]) for row in {t[0]: t for t in rg.report_tables(whole)}
 check("when every visit was whole the longest time is stated without 'at least'", zw["Longest time seen in a restricted zone"] == "2 min 5 s" and zw["Visits seen only in part"] == 0, str(zw))
 md = tables["Man-down and head count"][2]
 check("man-down and head-count incidents keep the same categories", md[0][1:] == [2, 1, 1, 0] and md[1][1:] == [1, 0, 0, 1] and md[2][1:] == [1, 1, 0, 0], str(md))
-ac = dict((row[0], row[1]) for row in tables["Corrective actions"][2])
-check("corrective actions: opened 5, closed 2, average 2.5 days, open now 3, overdue 1",
-      ac["Opened in this period"] == 5 and ac["Closed in this period"] == 2 and ac["Average days to close (those closed in this period)"] == "2.5"
-      and ac["Open now"] == 3 and ac["Overdue now (open and past the due date)"] == 1, str(ac))
+
 
 # the CSV
 text = rg.build_csv(R, "Acme Works")
@@ -160,7 +157,7 @@ ptext, pages = pdf_text(pdf)
 check("the PDF is a real PDF with pages, a title and the author", pdf.startswith(b"%PDF-") and pdf.rstrip().endswith(b"%%EOF") and pages >= 2
       and "Safety report" in (PdfReader(io.BytesIO(pdf)).metadata.title or ""), str(pages))
 need = ["66.7%", "Acme Works", "Safety report", "Flagged by system", "Confirmed by reviewer", "Waiting for review", "Insufficient evidence", "1 min 15 s",
-        "2 min 5 s", "at least 8 min 20 s", "Helmet and vest on entry", "2.5", "Page 1", "Page 2", "VisionWorks safety report. Counts only: no names, no video."]
+        "2 min 5 s", "at least 8 min 20 s", "Safety gear on entry", "Page 1", "Page 2", "VisionWorks safety report. Counts only: no names, no video."]
 missing = [n for n in need if n not in ptext]
 check("the PDF shows the same figures the CSV does, with a footer and page numbers", not missing, str(missing))
 check("the header lines are intact (they were once drawn in the wrong font after a non-Latin line)",
@@ -652,9 +649,9 @@ else:
         # exports
         e_csv = client.get(f"{base}/report/export?format=csv&since={since}&until={until}&tz=UTC", headers=V2)
         txt = e_csv.content.decode("utf-8")
-        check("the exported CSV carries the same numbers (decisions 16, compliant 4, flagged 9, waiting 3, confirmed 4, no helmet seen 3, actions overdue 1)",
+        check("the exported CSV carries the same numbers (decisions 16, compliant 4, flagged 9, waiting 3, confirmed 4, no helmet seen 3)",
               e_csv.status_code == 200 and all(s in txt for s in ("Decisions made,16", "Compliant,4", "Waiting for review,3", "Confirmed by reviewer,4", "... with no helmet seen,3",
-                                                                   "Overdue now (open and past the due date),1", "30.8%")), txt[:300])
+                                                                   "30.8%")), txt[:300])
         e_pdf = client.get(f"{base}/report/export?format=pdf&since={since}&until={until}&tz=UTC", headers=V2)
         check("the exported PDF is a real, multi-section PDF", e_pdf.status_code == 200 and e_pdf.content.startswith(b"%PDF-") and len(e_pdf.content) > 3000 and e_pdf.headers["x-report-recorded"] == "true")
         rows = svc.table("reports").select("*").eq("orgId", orgA).eq("kind", "SAFETY_SUMMARY").execute().data

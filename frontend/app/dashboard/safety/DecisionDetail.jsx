@@ -3,24 +3,22 @@
 // frontend/app/dashboard/safety/DecisionDetail.jsx
 //
 // One decision in full: what was decided and why, the numbers behind it, the picture the system kept,
-// the worker's zone activity around that moment, the review controls, and any corrective actions.
+// the worker's zone activity around that moment, and the review controls.
 //
 // Used inside the review queue and the events list. A person with view-only access sees everything
 // except the controls and the picture (the picture needs a role that can see evidence, and every view
 // of it is audited). Wording stays non-accusing: a flag is a prompt to look, never a verdict.
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { ClipboardCheck, ListChecks, Loader2, Wrench } from 'lucide-react';
+import { ClipboardCheck, ListChecks, Loader2 } from 'lucide-react';
 import { getDecision, listEvents, reviewDecision } from '../../lib/safetyApi';
-import { listAssignees, listCorrectiveActions } from '../../lib/safety/management';
-import { createCorrectiveAction } from '../../lib/safety/actions';
 import { can } from '../../lib/permissions';
 import { describeZoneEvent } from '../../lib/zoneEvents';
 import { durationText } from '../../lib/safety/ruleTypes';
 import EvidencePicture from '../../components/EvidencePicture';
 import {
   BTN_PRIMARY, BTN_QUIET, INPUT, MoreInfo, Notice, ReviewChip, REVIEW_REASONS, SeverityChip, StatusChip,
-  fmtDate, fmtTime, reasonLabel, Skeleton
+  fmtTime, reasonLabel, Skeleton
 } from './common';
 
 const ITEM_NAMES = { helmet: 'Helmet', safety_vest: 'Safety vest' };
@@ -245,79 +243,13 @@ function ReviewForm({ decision, onDone, onStale }) {
   );
 }
 
-function ActionForm({ decision, onCreated }) {
-  const [open, setOpen] = useState(false);
-  const [people, setPeople] = useState([]);
-  const [form, setForm] = useState({ title: '', description: '', priority: decision.severity || 'WARNING', assignedToId: '', dueDate: '' });
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    if (!open || people.length) return;
-    listAssignees().then((r) => setPeople(r.people || []));
-  }, [open, people.length]);
-
-  async function submit(e) {
-    e.preventDefault();
-    setBusy(true); setError(null);
-    const r = await createCorrectiveAction({ decisionId: decision.id, ...form });
-    setBusy(false);
-    if (!r.ok) { setError(r.message); return; }
-    setOpen(false);
-    setForm({ title: '', description: '', priority: decision.severity || 'WARNING', assignedToId: '', dueDate: '' });
-    onCreated();
-  }
-
-  if (!open) {
-    return <button type="button" onClick={() => setOpen(true)} className={`${BTN_QUIET} self-start`}><Wrench className="w-3.5 h-3.5" aria-hidden="true" /> Create a corrective action</button>;
-  }
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-2 rounded-lg border border-line p-3" aria-label="New corrective action">
-      <label className="flex flex-col gap-1 text-xs text-ink-faint">
-        What will be done
-        <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} maxLength={200} required placeholder="For example: re-brief the shift on helmet use" className={INPUT} />
-      </label>
-      <label className="flex flex-col gap-1 text-xs text-ink-faint">
-        Details (optional)
-        <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={2000} rows={2} className={`${INPUT} resize-y`} />
-      </label>
-      <div className="flex flex-wrap gap-2">
-        <label className="flex flex-col gap-1 text-xs text-ink-faint">
-          Priority
-          <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className={INPUT}>
-            <option value="INFO">Info</option><option value="WARNING">Warning</option><option value="CRITICAL">Critical</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-ink-faint">
-          Assigned to
-          <select value={form.assignedToId} onChange={(e) => setForm({ ...form, assignedToId: e.target.value })} className={INPUT}>
-            <option value="">Nobody yet</option>
-            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-ink-faint">
-          Due
-          <input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} className={INPUT} />
-        </label>
-      </div>
-      {error && <Notice tone="error">{error}</Notice>}
-      <div className="flex gap-2">
-        <button type="submit" disabled={busy} className={BTN_PRIMARY}>{busy && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />} Save action</button>
-        <button type="button" onClick={() => setOpen(false)} className={BTN_QUIET}>Cancel</button>
-      </div>
-    </form>
-  );
-}
-
 export default function DecisionDetail({ decisionId, role, onChanged, split = false }) {
   const [state, setState] = useState({ loading: true, decision: null, error: null });
   const [events, setEvents] = useState(null);
-  const [actions, setActions] = useState([]);
   // Someone else reviewed this flag while it was open here (the API refused with 409); said above the form.
   const [stale, setStale] = useState(null);
   const canReview = can(role, 'safety.review');
   const canEvidence = can(role, 'safety.evidence.view');
-  const canActions = can(role, 'safety.actions.edit');
 
   const load = useCallback(async () => {
     const r = await getDecision(decisionId);
@@ -344,12 +276,6 @@ export default function DecisionDetail({ decisionId, role, onChanged, split = fa
     }).then((r) => { if (live) setEvents(r.ok ? r.data.events.slice().reverse() : []); });
     return () => { live = false; };
   }, [decision]);
-
-  const loadActions = useCallback(async () => {
-    const r = await listCorrectiveActions({ decisionId });
-    setActions(r.actions || []);
-  }, [decisionId]);
-  useEffect(() => { loadActions(); }, [loadActions]);
 
   if (state.loading) return <Skeleton rows={3} label="Loading the details" />;
   if (state.error) return <Notice tone="error">{state.error}</Notice>;
@@ -401,22 +327,6 @@ export default function DecisionDetail({ decisionId, role, onChanged, split = fa
       )}
       {flag && !canReview && <Notice>You have view-only access, so the review controls are not shown. {decision.reviewState === 'PENDING' ? 'An administrator or manager can review this.' : ''}</Notice>}
 
-      {(actions.length > 0 || (decision.reviewState === 'CONFIRMED' && canActions)) && (
-        <Section title="Corrective actions" icon={Wrench}>
-          {actions.length > 0 && (
-            <ul className="flex flex-col divide-y divide-line-soft text-[0.8125rem]">
-              {actions.map((a) => (
-                <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
-                  <span className="text-ink font-medium">{a.title}</span>
-                  <span className="text-ink-faint">{a.status.toLowerCase().replace('_', ' ')}</span>
-                  {a.dueDate && <span className="text-ink-faint">due {fmtDate(a.dueDate)}</span>}
-                </li>
-              ))}
-            </ul>
-          )}
-          {decision.reviewState === 'CONFIRMED' && canActions && <ActionForm decision={decision} onCreated={loadActions} />}
-        </Section>
-      )}
     </div>
   );
   if (!split) return column;

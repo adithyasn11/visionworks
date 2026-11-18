@@ -111,12 +111,12 @@ function UsageTile({ label, used, max, suffix, consumable = true, dark = false }
   const pct = unlimited || !max ? 0 : Math.min(100, Math.round((used / max) * 100));
 
   return (
-    <div className={`rounded-xl px-4 py-3.5 ${dark ? 'bg-white/[0.06] border border-white/10' : 'bg-surface-alt border border-line'}`}>
+    <div className={`rounded-xl px-4 py-4 flex flex-col justify-center ${dark ? 'bg-white/[0.06] border border-white/10' : 'bg-surface-alt border border-line'}`}>
       <dt className={`text-[0.625rem] font-black uppercase tracking-[0.12em] ${dark ? 'opacity-55' : 'text-ink-faint'}`}>
         {label}
       </dt>
       <dd className={`mt-1 flex items-baseline gap-1.5 ${dark ? 'text-white' : 'text-ink'}`}>
-        <span className="text-[1.1875rem] font-black tracking-tight">
+        <span className="text-2xl font-black tracking-tight">
           {used === null ? '—' : `${used}${suffix ?? ''}`}
         </span>
         {!unlimited && used !== null && (
@@ -244,9 +244,10 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
       />
 
       {/* ── HERO: the current subscription ──────────────────────────────── */}
-      <section className="card-dark rounded-2xl p-6 sm:p-8 relative overflow-hidden shadow-xl shadow-black/20 group">
-        <div className="relative z-10">
-          <div className="flex flex-wrap items-start justify-between gap-5 mb-7">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] gap-5">
+      <section className="card-dark rounded-2xl p-5 relative overflow-hidden shadow-xl shadow-black/20 group flex flex-col">
+        <div className="relative z-10 flex-1 flex flex-col">
+          <div className="flex flex-wrap items-start justify-between gap-5 mb-4">
             <div>
               <div className="flex items-center gap-2 mb-2.5">
                 <Sparkles className="w-3.5 h-3.5 text-accent" aria-hidden="true" />
@@ -254,7 +255,7 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
                   {orgName ? `${orgName} · current plan` : 'Current plan'}
                 </span>
               </div>
-              <h2 className="text-4xl sm:text-5xl font-black tracking-tight text-white leading-none">
+              <h2 className="text-4xl font-black tracking-tight text-white leading-none">
                 {planName(plan)}
               </h2>
             </div>
@@ -295,7 +296,7 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
           </div>
 
           {/* ── Term ── */}
-          <div className="rounded-xl bg-white/[0.06] border border-white/10 p-5 mb-5">
+          <div className="rounded-xl bg-white/[0.06] border border-white/10 px-5 py-4 flex-1 flex flex-col justify-center">
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
               <div className="flex items-center gap-2.5">
                 <Calendar className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
@@ -411,16 +412,20 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
               );
             })()}
           </div>
+        </div>
+      </section>
 
-          {/* ── Allowances ── */}
-          <dl className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <UsageTile dark label="Cameras" used={usage?.cameras.used ?? null} max={usage?.cameras.max ?? null} />
-            <UsageTile dark label="Sites"   used={usage?.sites.used ?? null}   max={usage?.sites.max ?? null} />
-            <UsageTile dark label="Members" used={usage?.seats.used ?? null}   max={usage?.seats.max ?? null} />
+      <section className="glass-panel p-5 flex flex-col gap-3">
+          <h2 className="flex items-center gap-2 text-[1rem] font-black tracking-tight text-ink">
+            <Sparkles className="w-4 h-4 text-accent" aria-hidden="true" /> What you’re using
+          </h2>
+          <dl className="grid grid-cols-2 gap-3 flex-1 content-stretch">
+            <UsageTile label="Cameras" used={usage?.cameras.used ?? null} max={usage?.cameras.max ?? null} />
+            <UsageTile label="Sites"   used={usage?.sites.used ?? null}   max={usage?.sites.max ?? null} />
+            <UsageTile label="Members" used={usage?.seats.used ?? null}   max={usage?.seats.max ?? null} />
             {/* Not consumable: a 90-day window on a 90-day tier is the setting
                 at its ceiling, not an allowance about to run out. */}
             <UsageTile
-              dark
               label="History"
               used={usage?.retention.used ?? null}
               max={usage?.retention.max ?? null}
@@ -430,26 +435,25 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
           </dl>
 
           {!usage && (
-            <div role="status" aria-busy="true" className="mt-4 flex flex-col gap-2">
+            <div role="status" aria-busy="true" className="flex flex-col gap-2">
               <span className="sr-only">Reading your usage…</span>
               <div className="skeleton h-2.5 w-2/3" aria-hidden="true" />
               <div className="skeleton h-2.5 w-1/2" aria-hidden="true" />
             </div>
           )}
-        </div>
       </section>
+      </div>
 
       {/* ── CHANGE PLAN ─────────────────────────────────────────────────── */}
-      <section className="glass-panel p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+      <section className="glass-panel p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
           <div>
             <h2 className="flex items-center gap-2 text-[1rem] font-black tracking-tight text-ink">
               <TrendingUp className="w-4 h-4 text-accent" aria-hidden="true" />
               {canManage ? 'Change plan' : 'All plans'}
             </h2>
-            <p className="text-[0.78125rem] text-ink-muted font-medium mt-1 leading-relaxed max-w-xl">
-              Every tier includes the full analysis pipeline and the same privacy guarantees.
-              Higher tiers raise the limits, not the capabilities.
+            <p className="text-[0.78125rem] text-ink-muted font-medium mt-1">
+              Every plan has the same features. Higher plans raise the limits.
             </p>
           </div>
 
@@ -497,7 +501,7 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
             return (
               <div
                 key={p.id}
-                className={`relative rounded-xl border p-5 flex flex-col transition-all duration-300 ${
+                className={`relative rounded-xl border p-4 flex flex-col transition-all duration-300 ${
                   active
                     ? 'border-[color:var(--accent)] bg-accent-soft'
                     : confirming
@@ -541,7 +545,7 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
                     )}
                   </div>
                 </div>
-                <p className="text-[0.71875rem] text-ink-faint font-bold mb-3">{p.tagline}</p>
+                <p className="text-[0.71875rem] text-ink-faint font-bold mb-2.5">{p.tagline}</p>
 
                 {/* Stated as the arithmetic rather than a vague "save more":
                     twelve months for the price of ten is checkable, and it
@@ -560,7 +564,7 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
                   );
                 })()}
 
-                <ul className="flex flex-col gap-2 flex-1">
+                <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 xl:grid-cols-2 gap-x-3 gap-y-1.5 flex-1 content-start">
                   {p.features.map((f) => (
                     <li key={f.text} className="flex items-start gap-2">
                       {f.included ? (
@@ -579,7 +583,7 @@ export default function PlanSection({ plan: planProp, orgName, canManage = false
                 </ul>
 
                 {canManage && (
-                  <div className="mt-5">
+                  <div className="mt-4">
                     {active ? (
                       <div className="w-full text-center py-2.5 rounded-lg border border-line text-[0.78125rem] font-bold text-ink-faint">
                         Your current plan

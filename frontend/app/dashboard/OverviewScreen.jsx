@@ -10,10 +10,10 @@
 import React, { useEffect, useState } from 'react';
 import {
   ArrowRight, Camera, CheckCircle2, Circle, ClipboardCheck, ListChecks, MapPin, PlayCircle, ShieldCheck, Sparkles,
-  TrendingUp, Users, Wrench, Clock,
+  TrendingUp, Users, ShieldAlert, Clock,
 } from 'lucide-react';
 import { getSummary, listRules, listDecisions } from '../lib/safetyApi';
-import { listSafetyZones, listCorrectiveActions } from '../lib/safety/management';
+import { listSafetyZones } from '../lib/safety/management';
 import { ruleTypeMeta } from '../lib/safety/ruleTypes';
 import { Notice, Skeleton } from './safety/common';
 import SafetyAlertsPanel from './SafetyAlertsPanel';
@@ -159,17 +159,13 @@ export default function OverviewScreen({
   }, [refreshKey, activeZones.length]);
   const zonesTotal = zoneCount ?? activeZones.length;
 
-  // The rules, and the follow-up work still open.
+  // The rules, and when the system last checked someone.
   const [rules, setRules] = useState(null);
-  const [acts, setActs] = useState(null);
   const [last, setLast] = useState(null);
   useEffect(() => {
     let live = true;
     listRules().then((r) => { if (live && r.ok) setRules(r.data.rules || []); });
     listDecisions({ limit: 1 }).then((r) => { if (live && r.ok) setLast((r.data.decisions || [])[0] || false); });
-    const day = new Date().toLocaleDateString('en-CA');
-    Promise.all([listCorrectiveActions({ status: 'ACTIVE' }), listCorrectiveActions({ overdue: true, today: day })])
-      .then(([all, late]) => { if (live && !all.error) setActs({ count: all.count, overdue: late.error ? 0 : late.count, list: all.actions.slice(0, 2) }); });
     return () => { live = false; };
   }, [refreshKey]);
   const rulesOn = rules ? rules.filter((r) => r.isEnabled !== false).length : null;
@@ -324,15 +320,15 @@ export default function OverviewScreen({
             </div>
           </div>
 
-          {/* Follow-up work on confirmed flags. */}
-          <button type="button" onClick={() => onNavigate('actions')}
+          {/* Flags a person agreed with, in the period. */}
+          <button type="button" onClick={() => onNavigate('events')}
             className={`${CARD} p-6 flex flex-col justify-between gap-6 text-left hover:border-[color:var(--accent)] transition-colors min-h-[10rem] min-w-0`}>
-            <Wrench className="w-7 h-7 text-accent" strokeWidth={2} aria-hidden="true" />
+            <ShieldAlert className="w-7 h-7 text-accent" strokeWidth={2} aria-hidden="true" />
             <span className="block">
-              <span className="block text-4xl font-black tracking-tight text-ink tabular-nums leading-none">{acts ? acts.count : '—'}</span>
-              <span className="block mt-2 text-[0.9375rem] font-black text-ink">Open actions</span>
-              <span className={`block ${EYEBROW} mt-1 ${acts && acts.overdue ? 'text-accent' : 'text-ink-faint'}`}>
-                {acts ? (acts.overdue ? `${acts.overdue} overdue` : 'none overdue') : '\u00a0'}
+              <span className="block text-4xl font-black tracking-tight text-ink tabular-nums leading-none">{d ? d.confirmed : '—'}</span>
+              <span className="block mt-2 text-[0.9375rem] font-black text-ink">Confirmed</span>
+              <span className={`block ${EYEBROW} mt-1 text-ink-faint`}>
+                {d ? `${d.dismissed} dismissed · ${rangeLabel}` : '\u00a0'}
               </span>
             </span>
           </button>

@@ -35,6 +35,15 @@ const FRAME_H = 360;
 
 const MIN_POINTS = 3;
 
+// One short line per zone type, for the key beside the zones.
+const TYPE_SHORT = {
+  RESTRICTED: 'the danger area; gear is checked on entry',
+  PPE_CHECKPOINT: 'where gear is checked before going in',
+  APPROACH: 'the walkway into the danger area',
+  EXIT: 'the way out people must use',
+  GENERAL: 'an ordinary area, nothing checked',
+};
+
 /* A zone's outline colour comes from its TYPE (see lib/zoneTypes.js), so the
    same zone is the same colour here and over the live feed. */
 
@@ -519,11 +528,12 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
   const backdropIsLive = Boolean(liveFrame) || liveActive;
 
   return (
-    <div className="glass-panel p-5 flex flex-col gap-4">
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_22rem] gap-5 items-stretch">
+    <div className="glass-panel p-5 flex flex-col gap-4 min-w-0">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 text-ink font-bold text-[0.9375rem] tracking-tight">
+        <div className="flex items-center gap-2 text-ink font-black text-[0.9375rem] tracking-tight">
           <Shapes className="w-4 h-4 text-accent" />
-          <span>Zone Mapping</span>
+          <span>Camera view</span>
         </div>
 
         {readOnly ? (
@@ -609,9 +619,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
           already recorded — and silently showing black taught them nothing. */}
       {!readOnly && (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-mono uppercase tracking-[0.12em] text-ink-faint">
-            backdrop
-          </span>
+          <span className="text-[0.75rem] font-bold text-ink-muted">Picture from</span>
           <input ref={fileRef} type="file" accept="video/*" className="hidden"
             onChange={(e) => { grabFromFile(e.target.files && e.target.files[0]); e.target.value = ''; }} />
           <select
@@ -689,15 +697,14 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
             what this did — tells somebody to click points on a frame they
             cannot see. */}
         {status === 'ready' && !backdrop && snapState !== 'loading' && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
+          <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-line bg-surface px-5 py-4 shadow-lg max-w-sm">
             <AlertCircle className="w-6 h-6 text-ink-faint" strokeWidth={1.8} />
-            <p className="text-[0.8125rem] text-ink-muted max-w-sm leading-relaxed">
-              <span className="text-ink font-semibold">No camera image.</span>{' '}
-              Zones are drawn onto the actual view, so there is nothing to aim
-              at yet. Connect a webcam, or pick an uploaded video from the
-              <span className="text-ink font-semibold"> backdrop</span> menu
-              above.
+            <p className="text-[0.875rem] text-ink-muted leading-relaxed">
+              <span className="block text-ink font-black text-[0.9375rem] mb-1">No picture yet</span>
+              Pick a camera or an uploaded video in “Picture from” above.
             </p>
+            </div>
           </div>
         )}
 
@@ -709,9 +716,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
             <div className="rounded-xl border border-line bg-surface px-4 py-3 shadow-lg max-w-[19rem]">
               <MousePointerClick className="w-6 h-6 text-accent mx-auto mb-1.5" strokeWidth={1.8} />
               <p className="text-[0.8125rem] text-ink-muted leading-relaxed">
-                <span className="text-ink font-bold">Click “Draw zone”</span>, then
-                click each corner of the area, then press Save to close the
-                shape.
+                <span className="text-ink font-bold">Draw zone</span>, click each corner, then Save.
               </p>
             </div>
           </div>
@@ -725,14 +730,31 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
         </div>
       )}
 
+    </div>
+
+    <aside className="flex flex-col gap-5 min-w-0">
+      <div className="glass-panel p-5 flex flex-col gap-4 xl:flex-1 min-h-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2 text-ink font-black text-[0.9375rem]"><Shapes className="w-4 h-4 text-accent" /> Zones</span>
+          <span className="text-[0.75rem] text-ink-faint tabular-nums">{zones.length} on {cameraId}</span>
+        </div>
+      {zones.length === 0 && status === 'ready' && (
+        <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 py-8">
+          <span className="w-12 h-12 rounded-2xl border border-line bg-surface-alt flex items-center justify-center">
+            <MousePointerClick className="w-5 h-5 text-ink-muted" strokeWidth={2} />
+          </span>
+          <p className="text-[0.9375rem] font-black text-ink">No zones yet</p>
+          <p className="text-[0.8125rem] text-ink-muted max-w-[15rem]">{readOnly ? 'An admin or manager draws them.' : 'Press Draw zone and click the corners of an area.'}</p>
+        </div>
+      )}
       {zones.length > 0 && (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-2 overflow-y-auto min-h-0 xl:max-h-[calc(100dvh-26rem)]">
           {zones.map((zone, index) => {
             const isEditing = editingZone === zone.zone_id;
             return (
             <li
               key={zone.zone_id}
-              className="flex items-center gap-2.5 rounded-lg bg-surface-alt border border-line px-3 py-2"
+              className="flex flex-wrap items-center gap-2.5 rounded-xl bg-surface-alt border border-line px-3 py-2.5 shrink-0"
             >
               <span
                 className="w-2.5 h-2.5 rounded-full shrink-0 border border-[color:var(--field)]"
@@ -783,7 +805,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
                 </>
               ) : (
                 <>
-                  <span className="text-[0.8125rem] font-semibold text-ink truncate flex-1">
+                  <span className="text-[0.875rem] font-bold text-ink truncate flex-1" title={zone.zone_name}>
                     {zone.zone_name}
                   </span>
                   {/* The kind is shown, not hidden in an edit form. A zone
@@ -791,16 +813,13 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
                       with nothing on screen explaining why. */}
                   <span
                     title={zoneTypeMeta(zone.zone_type).hint}
-                    className={`font-mono text-[0.65625rem] uppercase tracking-[0.1em] px-1.5 py-0.5 rounded whitespace-nowrap ${
+                    className={`text-[0.6875rem] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${
                       zoneTypeMeta(zone.zone_type).value === 'RESTRICTED'
                         ? 'bg-accent-soft text-accent'
-                        : 'bg-ground text-ink-faint'
+                        : 'bg-ground text-ink-muted border border-line'
                     }`}
                   >
-                    {zoneTypeMeta(zone.zone_type).badge}
-                  </span>
-                  <span className="font-mono text-[0.6875rem] text-ink-faint whitespace-nowrap">
-                    {zone.polygon_coordinates?.length ?? 0} pts
+                    {zoneTypeMeta(zone.zone_type).label}
                   </span>
                   {!readOnly && (
                     <>
@@ -827,7 +846,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
                       </button>
                       {confirmDelete === zone.zone_id && (
                         <span className="basis-full text-xs text-accent">
-                          Click the bin again to delete. Rules for this zone are deleted too.
+                          Click again to delete. Its rules go too.
                         </span>
                       )}
                     </>
@@ -839,6 +858,20 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
           })}
         </ul>
       )}
+      </div>
+
+      <div className="glass-panel p-5 flex flex-col gap-3">
+        <span className="text-ink font-black text-[0.9375rem]">Zone types</span>
+        <ul className="grid grid-cols-1 gap-2">
+          {ZONE_TYPES.map((t) => (
+            <li key={t.value} className="flex items-start gap-2.5 text-[0.8125rem] min-w-0" title={t.hint}>
+              <span className="mt-1 w-2.5 h-2.5 rounded-full shrink-0 border border-[color:var(--field)]" style={{ backgroundColor: t.color }} />
+              <span className="min-w-0"><b className="text-ink">{t.label}</b> <span className="text-ink-faint">· {TYPE_SHORT[t.value]}</span></span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </aside>
     </div>
   );
 };

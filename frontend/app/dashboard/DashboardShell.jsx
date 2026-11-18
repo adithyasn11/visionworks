@@ -14,8 +14,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, Video, Shapes, FileDown, ClipboardCheck, ListFilter, SlidersHorizontal, Wrench,
-  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard, FlaskConical, Camera,
+  LayoutDashboard, Video, Shapes, FileDown, ClipboardCheck, ListFilter, SlidersHorizontal,
+  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard, Camera,
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import { supabase } from '../lib/supabase/browser';
@@ -42,9 +42,7 @@ export const VIEWS = [
   { id: 'cameras',  label: 'Cameras',   icon: Camera },
   { id: 'zones',    label: 'Zones',     icon: Shapes },
   { id: 'rules',    label: 'Rules',     icon: SlidersHorizontal },
-  { id: 'actions',  label: 'Actions',   icon: Wrench },
   { id: 'reports',  label: 'Reports',   icon: FileDown },
-  { id: 'evaluation', label: 'Evaluation', icon: FlaskConical },
   { id: 'plan',     label: 'Plan',      icon: CreditCard, capability: 'org.settings' },
 ];
 
@@ -85,7 +83,7 @@ function NavItem({ view, active, onSelect, asLink = false, badge = 0 }) {
   const pill = badge > 0 ? (
     <span className="ml-auto shrink-0 min-w-[20px] px-1.5 py-0.5 rounded-md bg-accent text-white text-[0.6875rem] font-bold tabular-nums text-center">
       {badge > 99 ? '99+' : badge}
-      <span className="sr-only">{view.id === 'actions' ? ' overdue actions' : ' waiting for review'}</span>
+      <span className="sr-only"> waiting for review</span>
     </span>
   ) : null;
   const className = `group ${NAV_ROW} text-left ${
@@ -136,30 +134,26 @@ function NavItem({ view, active, onSelect, asLink = false, badge = 0 }) {
  * nothing is marked active. Passing it -> the dashboard itself, where the nav
  * switches view state in place.
  */
-export default function DashboardShell({ view, onViewChange, user, role, alertCount, overdueCount, children }) {
+export default function DashboardShell({ view, onViewChange, user, role, alertCount, children }) {
   const [open, setOpen] = useState(false);
   const routed = typeof onViewChange !== 'function';
   // The dashboard page passes the count it already polls. A routed page (settings) does not, so the
   // shell asks for it itself and the badge is the same on every screen.
   const [ownCount, setOwnCount] = useState(0);
-  const [ownOverdue, setOwnOverdue] = useState(0);
   useEffect(() => {
-    if (typeof alertCount === 'number' && typeof overdueCount === 'number') return undefined;
+    if (typeof alertCount === 'number') return undefined;
     let live = true;
     const load = () => {
-      // Both badges in one server call.
       getBadgeCounts(new Date().toLocaleDateString("en-CA")).then((r) => {
         if (!live || !r) return;
         if (!r.error) setOwnCount(r.count || 0);
-        setOwnOverdue(r.overdue || 0);
       }).catch(() => {});
     };
     load();
     const timer = setInterval(() => { if (!document.hidden) load(); }, 30000);
     return () => { live = false; clearInterval(timer); };
-  }, [alertCount, overdueCount]);
+  }, [alertCount]);
   const shownAlerts = typeof alertCount === 'number' ? alertCount : ownCount;
-  const shownOverdue = typeof overdueCount === 'number' ? overdueCount : ownOverdue;
   // Highlights whichever settings page is open, so the sidebar always shows
   // where you are — the same job the view marker does on the dashboard.
   const pathname = usePathname();
@@ -240,7 +234,7 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
             view={v}
             asLink={routed}
             active={!routed && view === v.id}
-            badge={v.id === 'review' ? shownAlerts : v.id === 'actions' ? shownOverdue : 0}
+            badge={v.id === 'review' ? shownAlerts : 0}
             onSelect={routed ? () => setOpen(false) : (id) => {
               // Same screen: nothing to animate. Another one: the top bar sweeps (RouteProgress) and the new
               // screen settles in (animate-view-in in page.jsx), and the page goes back to the top.

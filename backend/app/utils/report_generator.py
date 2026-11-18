@@ -202,14 +202,6 @@ def report_tables(report: dict) -> List[Table]:
         ["Over capacity (more people than allowed)", over["flagged"], over["confirmed"], over["dismissed"], over["pending"]],
     ], f"Could not verify: man-down {m['could_not_verify']}, head count {o['could_not_verify']}."))
 
-    a = r["actions"]
-    tables.append(("Corrective actions", ["Measure", "Value"], [
-        ["Opened in this period", a["opened"]],
-        ["Closed in this period", a["closed"]],
-        ["Average days to close (those closed in this period)", num(a["average_days_to_close"])],
-        ["Open now", a["open_now"]],
-        ["Overdue now (open and past the due date)", a["overdue_now"]],
-    ], "Opened counts every action created in the period, including any since cancelled. Open and overdue are as of the moment the report was made."))
     return tables
 
 

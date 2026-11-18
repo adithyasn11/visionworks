@@ -25,9 +25,7 @@ import OverviewScreen from './OverviewScreen';
 import ReviewQueue from './safety/ReviewQueue';
 import EventsScreen from './safety/EventsScreen';
 import RulesScreen from './safety/RulesScreen';
-import ActionsScreen from './safety/ActionsScreen';
 import ReportsScreen from './safety/ReportsScreen';
-import EvaluationScreen from './evaluation/EvaluationScreen';
 import PlanSection from './PlanSection';
 import PlanReminder from './PlanReminder';
 import { getPlanUsage } from './planActions';
@@ -208,9 +206,7 @@ function DashboardInner() {
   }, []);
 
   const alertsRequest = useRef(0);
-  const [overdue, setOverdue] = useState(0);
   const applyBadges = useCallback((r) => {
-    setOverdue(r?.overdue || 0);
     if (r?.error) {
       // Keep the last good count and list: one failed poll must not blank the badge.
       setAlerts((s) => ({ ...s, status: 'error', error: String(r.error) }));
@@ -402,7 +398,7 @@ function DashboardInner() {
   );
 
   return (
-    <DashboardShell view={view} onViewChange={setView} user={user} role={role} alertCount={alerts.count} overdueCount={overdue}>
+    <DashboardShell view={view} onViewChange={setView} user={user} role={role} alertCount={alerts.count}>
       {/* Payment reminder: last 7 days of a paid term, or after it ended. The Plan screen shows its own. */}
       {view !== 'plan' && role && (
         <div className="mb-5">
@@ -483,15 +479,8 @@ function DashboardInner() {
 
       {view === 'rules' && (
         <div className="space-y-6 animate-view-in">
-          <PageHeader eyebrow="Rules" title="What gets checked" subtitle="What is checked, where, and how serious it is." />
+          <PageHeader eyebrow="Rules" title="What gets checked" subtitle="Each rule says what to look for, where, and how serious it is." />
           <RulesScreen role={role} />
-        </div>
-      )}
-
-      {view === 'actions' && (
-        <div className="space-y-6 animate-view-in">
-          <PageHeader eyebrow="Actions" title="What was done about confirmed violations" subtitle="Who is doing what, by when, and whether it is overdue." />
-          <ActionsScreen role={role} onCountChange={loadAlerts} />
         </div>
       )}
 
@@ -518,11 +507,11 @@ function DashboardInner() {
         <div className="space-y-6 animate-view-in">
           <PageHeader
             eyebrow="Zones"
-            title="Define your zones"
+            title="Your zones"
             subtitle={
               can(role, 'zones.edit')
-                ? 'Draw the areas to monitor on this camera’s view.'
-                : 'The areas being monitored on this camera.'
+                ? 'Draw the areas to check on this camera’s picture.'
+                : 'The areas checked on this camera.'
             }
             action={cameraPicker}
           />
@@ -530,16 +519,13 @@ function DashboardInner() {
           {noCameraNotice}
           {!can(role, 'zones.edit') && role && <ReadOnlyNotice capability="zones.edit" />}
 
-          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-5 items-start">
-            <ZoneEditor
-              cameraId={cameraId}
-              cameras={cameras}
-              onCameraChange={setCameraId}
-              onZonesChanged={setActiveZones}
-              readOnly={!can(role, 'zones.edit')}
-            />
-            <FloorplanHeatmap />
-          </div>
+          <ZoneEditor
+            cameraId={cameraId}
+            cameras={cameras}
+            onCameraChange={setCameraId}
+            onZonesChanged={setActiveZones}
+            readOnly={!can(role, 'zones.edit')}
+          />
         </div>
       )}
 
@@ -554,7 +540,7 @@ function DashboardInner() {
           <PageHeader
             eyebrow="Plan"
             title="Your subscription"
-            subtitle="Your current subscription, what it includes, and how the tiers compare."
+            subtitle="Your plan, what you’re using, and the other plans."
           />
 
           {/* `plan` is null until getViewerRole resolves. Rendering the panel
@@ -586,20 +572,9 @@ function DashboardInner() {
           <PageHeader
             eyebrow="Plan"
             title="Your subscription"
-            subtitle="Your current subscription, what it includes, and how the tiers compare."
+            subtitle="Your plan, what you’re using, and the other plans."
           />
           <ReadOnlyNotice capability="org.settings" />
-        </div>
-      )}
-
-      {view === 'evaluation' && (
-        <div className="space-y-6 animate-view-in">
-          <PageHeader
-            eyebrow="Evaluation"
-            title="How well the system works, measured"
-            subtitle="The measured results: accuracy, scenarios, speed and your reviews."
-          />
-          <EvaluationScreen />
         </div>
       )}
 
@@ -608,7 +583,7 @@ function DashboardInner() {
           <PageHeader
             eyebrow="Reports"
             title="Safety reports"
-            subtitle="How the site did over a period, as a PDF or CSV."
+            subtitle="How the site did, and the PDF to share."
           />
           <ReportsScreen role={role} />
         </div>

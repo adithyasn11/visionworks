@@ -3,24 +3,20 @@
 // frontend/app/lib/safety/management.js
 //
 // What the safety screens read besides decisions (those come from the safety API): the organisation's
-// zones (for pickers), its corrective actions, and who an action can be assigned to. All through the
+// zones (for pickers). All through the
 // CALLER's own session, so Row Level Security scopes every query and no orgId filter is written here.
 
 import { createClient } from '../supabase/server';
 
 // Zones and memberships are also filtered on the caller's own organisation: RLS lets a platform operator read
 // every organisation's zones and members, so an operator who is also a member was offered other customers'
-// zones and people in these pickers. (Corrective actions are safety data, which operators cannot read.)
+// zones in these pickers.
 async function currentOrgId(supabase) {
   const { data } = await supabase.auth.getUser();
   if (!data?.user) return null;
   const { data: profile } = await supabase.from('profiles').select('currentOrgId').eq('id', data.user.id).maybeSingle();
   return profile?.currentOrgId ?? null;
 }
-
-const ACTION_LIMIT = 100;
-// "Today" is the viewer's own calendar day (the screens pass it); the UTC day is only a fallback.
-const today = (day) => (typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : new Date().toISOString().slice(0, 10));
 
 /** The organisation's live zones with their camera and safety type, for pickers. */
 export async function listSafetyZones() {
@@ -47,83 +43,3 @@ export async function listSafetyZones() {
   }
 }
 
-/**
- * Corrective actions, newest first. `status`: OPEN | IN_PROGRESS | CLOSED | CANCELLED | 'ACTIVE' (open or in
- * progress). `overdue`: only actions still active whose due date has passed.
- */
-export async function listCorrectiveActions({ status, overdue, decisionId, today: day } = {}) {
-  const supabase = createClient();
-  if (!supabase) return { actions: [], count: 0, error: 'You are not signed in, or the database is not configured.' };
-  try {
-    let q = supabase
-      .from('corrective_actions')
-      .select('id, decisionId, title, description, priority, status, assignedToId, dueDate, createdAt, closedAt, closingNote, decision:safety_decisions(reason, workerKey, observedAt, zone:zones(name))', { count: 'exact' })
-      .order('createdAt', { ascending: false })
-      .limit(ACTION_LIMIT);
-    if (status === 'ACTIVE') q = q.in('status', ['OPEN', 'IN_PROGRESS']);
-    else if (status) q = q.eq('status', status);
-    if (overdue) q = q.in('status', ['OPEN', 'IN_PROGRESS']).lt('dueDate', today(day));
-    if (decisionId) q = q.eq('decisionId', decisionId);
-    const { data, error, count } = await q;
-    if (error) throw new Error(error.message);
-    return {
-      count: count ?? (data || []).length,
-      actions: (data || []).map((a) => ({
-        id: a.id, decisionId: a.decisionId, title: a.title, description: a.description, priority: a.priority, status: a.status,
-        assignedToId: a.assignedToId, dueDate: a.dueDate, createdAt: a.createdAt, closedAt: a.closedAt, closingNote: a.closingNote,
-        reason: a.decision?.reason ?? null, workerKey: a.decision?.workerKey ?? null, observedAt: a.decision?.observedAt ?? null,
-        zone: a.decision?.zone?.name ?? null,
-      })),
-    };
-  } catch {
-    return { actions: [], count: 0, error: 'Could not load the corrective actions.' };
-  }
-}
-
-/**
- * The actions list and the people they can be assigned to, in ONE server call (the two reads run together).
- * Next.js queues a page's server actions, so two separate calls cost two waits in a row.
- */
-export async function listActionsAndAssignees(options = {}) {
-  const [actions, people] = await Promise.all([listCorrectiveActions(options), listAssignees()]);
-  return { ...actions, people: people.people || [] };
-}
-
-/** How many active actions are past their due date (for the navigation badge). */
-export async function countOverdueActions(day) {
-  const supabase = createClient();
-  if (!supabase) return 0;
-  try {
-    const { count } = await supabase
-      .from('corrective_actions')
-      .select('id', { count: 'exact', head: true })
-      .in('status', ['OPEN', 'IN_PROGRESS'])
-      .lt('dueDate', today(day));
-    return count || 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** The organisation's active members, for assigning an action (names only as far as the members page already shows them). */
-export async function listAssignees() {
-  const supabase = createClient();
-  if (!supabase) return { people: [] };
-  try {
-    const orgId = await currentOrgId(supabase);
-    if (!orgId) return { people: [] };
-    const { data, error } = await supabase
-      .from('memberships')
-      .select('profileId, role, profiles:profileId (fullName, email)')
-      .eq('orgId', orgId)
-      .eq('status', 'ACTIVE');
-    if (error) throw new Error(error.message);
-    return {
-      people: (data || []).filter((m) => m.profileId).map((m) => ({
-        id: m.profileId, role: m.role, name: m.profiles?.fullName || m.profiles?.email || 'Member',
-      })),
-    };
-  } catch {
-    return { people: [] };
-  }
-}

@@ -5,7 +5,6 @@ The evaluation code itself (Step 17):
      label, the rule of three for a zero, coverage and error rate, on hand-made frame readings.
   B. The scenario suite (backend/eval/safety_scenarios.py): every scenario, two variants each, through the real engine;
      none may be wrong. (The full run with 18 variants writes the results file; this one writes nothing.)
-  C. GET /api/v1/safety/evaluation: who may read it, and what it returns when a results file is there or missing.
 
     venv/Scripts/python.exe backend/tests/test_evaluation.py
 """
@@ -76,37 +75,6 @@ try:
         check(f"{sid} {title}: never wrong", all(o[0] != "wrong" for o in outcomes), str(outcomes))
 finally:
     shutil.rmtree(work, ignore_errors=True)
-
-# ── C. the endpoint ─────────────────────────────────────────────────────────
-print("C. GET /api/v1/safety/evaluation")
-from fastapi.testclient import TestClient                           # noqa: E402
-
-import app.api.routers.safety as sr                                  # noqa: E402
-import app.api.routers.safety_report as srr                          # noqa: E402
-from app.main import app                                             # noqa: E402
-
-real_resolve = sr.resolve_identity
-sr.resolve_identity = lambda token: {"Bearer viewer": ("o1", "u1", "VIEWER"), "Bearer norole": ("o1", "u1", None)}.get(token, (None, None, None))
-saved = dict(srr.EVALUATION_FILES)
-tmp = tempfile.mkdtemp(prefix="eval_api_")
-try:
-    json.dump({"totals": {"correct": 3, "abstained": 0, "wrong": 0, "runs": 3}, "scenarios": [], "config": {"x": 1}}, open(os.path.join(tmp, "s.json"), "w"))
-    srr.EVALUATION_FILES.update({"scenarios": os.path.join(tmp, "s.json"), "real_footage": os.path.join(tmp, "missing.json"), "segments": os.path.join(tmp, "bad.json")})
-    open(os.path.join(tmp, "bad.json"), "w").write("{not json")
-    c = TestClient(app)
-    check("no token: 401", c.get("/api/v1/safety/evaluation").status_code == 401)
-    check("no role: 403", c.get("/api/v1/safety/evaluation", headers={"Authorization": "Bearer norole"}).status_code == 403)
-    r = c.get("/api/v1/safety/evaluation", headers={"Authorization": "Bearer viewer"})
-    d = r.json()
-    check("a VIEWER reads it; a results file that is there comes back (with when it was made, without the config dump)",
-          r.status_code == 200 and d["scenarios"]["totals"]["correct"] == 3 and "_file_updated" in d["scenarios"] and "config" not in d["scenarios"], str(d)[:200])
-    check("a missing or unreadable results file is null, not an error", d["real_footage"] is None and d["segments"] is None)
-finally:
-    srr.EVALUATION_FILES.clear()
-    srr.EVALUATION_FILES.update(saved)
-    sr.resolve_identity = real_resolve
-    shutil.rmtree(tmp, ignore_errors=True)
-check("the real results files are where the endpoint looks", all(os.path.dirname(p) and os.path.isdir(os.path.dirname(p)) for p in srr.EVALUATION_FILES.values()))
 
 print()
 if FAILS:

@@ -10,19 +10,14 @@
 // (reviewState PENDING). There is no separate alert table.
 
 import { createClient } from '../supabase/server';
-import { countOverdueActions } from './management';
 
 const ALERT_LIMIT = 25;
 
 /**
- * The open alerts AND the overdue-actions count, in ONE server call.
- *
- * Next.js runs a page's server actions one at a time, so the badge poll used to be two calls queued behind
- * each other (and in front of whatever the screen itself was loading). Here the two reads run together.
+ * The badge count: the open alerts. (`day` is accepted for callers that still pass it.)
  */
-export async function getBadgeCounts(day) {
-  const [alerts, overdue] = await Promise.all([getOpenAlerts(), countOverdueActions(day).catch(() => 0)]);
-  return { ...alerts, overdue: overdue || 0 };
+export async function getBadgeCounts(day) { // eslint-disable-line no-unused-vars
+  return getOpenAlerts();
 }
 
 /**
