@@ -25,7 +25,7 @@ THE CONDITIONS
   OVER_CAPACITY  more than `max_people` seen, without a break for `grace_seconds`. `max_people` 0 is a no-entry
                  zone: anyone seen there for the grace is flagged.
   EMPTY_ZONE     nobody seen and nobody held as inside, without a break for `grace_seconds`, when the rule asks
-                 for at least one person and `flag_empty` is on (the default for `min_people` 1). Nobody to count
+                 for at least N people and `flag_empty` is on (the default whenever `min_people` is set). Nobody to count
                  means no crowding doubt, so this is never "could not be trusted"; a camera that stops sending
                  frames sends no empty frames either, so a dead camera is not read as an empty zone.
 
@@ -94,7 +94,7 @@ class OccupancyDetector:
         self.min_people: Optional[int] = None if p.get("min_people") is None else int(p["min_people"])
         self.max_people: Optional[int] = None if p.get("max_people") is None else int(p["max_people"])
         flag_empty = p.get("flag_empty")
-        self.flag_empty = (bool(flag_empty) if flag_empty is not None else self.min_people == 1) and self.min_people is not None
+        self.flag_empty = (bool(flag_empty) if flag_empty is not None else True) and self.min_people is not None
         self.grace = float(p.get("grace_seconds", self.config.occupancy_grace_s))
         self.window = float(p.get("window_seconds", self.config.occupancy_window_s))
         self._samples: Deque[Tuple[float, int, int, int]] = deque()   # (t, seen, seen + hidden, clear)

@@ -66,7 +66,7 @@ export const RULE_TYPES = [
   {
     value: 'OCCUPANCY',
     label: 'People in the zone (lone worker, crowding)',
-    blurb: 'Raises a flag for review when too few or too many people are seen in the zone for longer than the grace period. At most 0 makes it a no-entry zone; at least 1 means someone must always be there, and an empty zone is flagged. The count is smoothed, so one missed frame changes nothing, a second person who is just out of view counts as still there, and if the picture is too crowded to count reliably it says it could not tell.',
+    blurb: 'Raises a flag for review when too few or too many people are seen in the zone for longer than the grace period. At most 0 makes it a no-entry zone. With an “at least” number, a zone with nobody in it is flagged too (switch that off if the zone may stand empty). The count is smoothed, so one missed frame changes nothing, a second person who is just out of view counts as still there, and if the picture is too crowded to count reliably it says it could not tell.',
     zoneTypes: ['PPE_CHECKPOINT', 'APPROACH', 'RESTRICTED', 'EXIT'],
     enforced: () => true,
     defaults: { min_people: 2, grace_seconds: 10 },
@@ -75,7 +75,7 @@ export const RULE_TYPES = [
       { key: 'max_people', kind: 'number', label: 'At most this many people (0 = nobody may enter)', min: 0, max: 1000, step: 1 },
       { key: 'flag_empty', kind: 'toggle', label: 'Also flag when nobody is in the zone',
         when: (p) => p.min_people != null && p.min_people !== '',
-        auto: (p) => Number(p.min_people) === 1 },
+        auto: () => true },
       { key: 'grace_seconds', kind: 'number', label: 'How long before it is flagged (seconds)', min: 3, max: 120, step: 1 },
     ],
   },
@@ -216,7 +216,7 @@ export function ruleSummary(type, params, zoneName = () => null) {
       const after = durationText(p.grace_seconds ?? 10);
       if (hi === 0) return `Nobody may enter; flagged after ${after}`;
       const asks = [lo != null ? `at least ${lo}` : null, hi != null ? `at most ${hi}` : null].filter(Boolean).join(' and ');
-      const empty = lo != null && (p.flag_empty != null ? p.flag_empty : lo === 1) ? ', empty zone flagged too' : '';
+      const empty = lo != null && (p.flag_empty != null ? p.flag_empty : true) ? ', empty zone flagged too' : '';
       return `${asks ? `${asks.charAt(0).toUpperCase()}${asks.slice(1)} ${lo === 1 && hi == null ? 'person' : 'people'}` : 'People'} in the zone${empty}; flagged after ${after}`;
     }
     case 'MAN_DOWN':

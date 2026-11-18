@@ -136,9 +136,9 @@ def validate_params(rule_type: str, zone_id: Optional[str], params: Optional[dic
         empty = params.get("flag_empty")
         if empty is not None and not isinstance(empty, bool):
             raise RuleError(f"flag_empty must be true or false, got {empty!r}")
-        # Default: an empty zone is flagged when the rule asks for at least one person; a lone-worker rule
-        # (at least 2) is about nobody being ALONE, and by default says nothing about an empty zone.
-        out["flag_empty"] = bool(empty) if empty is not None else (lo == 1)
+        # Default: whenever the rule asks for at least N people, a zone with nobody in it is flagged too
+        # (fewer than N); it can be switched off for a zone that is allowed to stand empty.
+        out["flag_empty"] = bool(empty) if empty is not None else (lo is not None)
         if out["flag_empty"] and lo is None:
             raise RuleError("flag_empty needs min_people")
         out["grace_seconds"] = _number(params, "grace_seconds", 10.0, 3, 120)

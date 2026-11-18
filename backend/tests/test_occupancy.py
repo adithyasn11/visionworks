@@ -113,10 +113,13 @@ check("alone for 9 s (grace 10 s) and then joined: nothing", r.out == [])
 r = Run().feed(2, folk(2)).feed(11.5, folk(1))
 check("alone for 11.5 s: flagged", r.kinds() == [(POTENTIAL_VIOLATION, "LONE_WORKER")], str(r.kinds()))
 
+r = Run(rule(min_people=2, flag_empty=False)).feed(2, folk(2)).feed(3, folk(1)).feed(30, folk(0))
+check("the last person leaves so the zone is empty: never a LONE worker (with the empty flag off, nothing)", r.out == [])
 r = Run().feed(2, folk(2)).feed(3, folk(1)).feed(30, folk(0))
-check("the last person leaves so the zone is empty: nothing (an empty zone is not a lone worker)", r.out == [])
-r = Run().feed(30, folk(0))
-check("an empty zone for 30 s: nothing", r.out == [])
+check("... with the default (empty flag on): the empty zone is flagged once, as EMPTY_ZONE, not as a lone worker",
+      r.kinds() == [(POTENTIAL_VIOLATION, "EMPTY_ZONE")] and "at least 2 people" in r.out[0].reason, str(r.kinds()))
+r = Run(rule(min_people=2, flag_empty=False)).feed(30, folk(0))
+check("an empty zone for 30 s with the empty flag off: nothing", r.out == [])
 
 # at least 1: an empty zone is flagged (by default); at most 0: a no-entry zone
 r = Run(rule(min_people=1)).feed(3, folk(1)).feed(12, folk(0))
@@ -134,7 +137,7 @@ check("at least 1, empty for a minute: flagged once, not every frame", r.kinds()
 r = Run(rule(min_people=1, flag_empty=False)).feed(30, folk(0))
 check("at least 1 with the empty-zone flag switched off: nothing", r.out == [])
 r = Run(rule(min_people=2)).feed(30, folk(0))
-check("at least 2 (a lone-worker rule): an empty zone is still not flagged by default", r.out == [])
+check("at least 2: nobody there for 30 s is flagged by default (fewer than 2)", r.kinds() == [(POTENTIAL_VIOLATION, "EMPTY_ZONE")], str(r.kinds()))
 r = Run(rule(min_people=2, flag_empty=True)).feed(30, folk(0))
 check("... unless the empty-zone flag is switched on", r.kinds() == [(POTENTIAL_VIOLATION, "EMPTY_ZONE")], str(r.kinds()))
 r = Run(rule(max_people=0)).feed(12, folk(1))
@@ -151,8 +154,10 @@ for bad, why in [({"min_people": 0}, "at least 0"), ({"min_people": 1, "max_peop
         check(f"refused: {why}", False)
     except RuleError:
         check(f"refused: {why}", True)
-check("the saved parameters: at least 1 defaults the empty flag on, at least 2 off",
-      rule(min_people=1).params["flag_empty"] is True and rule(min_people=2).params["flag_empty"] is False)
+check("the saved parameters: any 'at least' defaults the empty flag on; a rule saved before the setting existed gets it too",
+      rule(min_people=1).params["flag_empty"] is True and rule(min_people=2).params["flag_empty"] is True
+      and OccupancyDetector(type("R", (), {"params": {"min_people": 2}, "zone_id": "press", "zone_name": "Press hall", "id": None,
+                                            "severity": "WARNING", "min_evidence_confidence": 0.6})(), CFG).flag_empty is True)
 
 n = {"i": 0}
 def dropout(t):
@@ -298,11 +303,11 @@ for i in range(160):
     out.extend(mon.update(i / FPS, [ent(1), edge], [det(1, [10, 10, 60, 160]), det(2, [200, 10, 250, 160])], wk, lambda z: 0))
 check("... where the tracker is not asked, the same edge person is missed (so the session must give it)", len(out) == 1, str(out))
 
-mon = OccupancyMonitor([rule(min_people=2)], CFG, {"press": "Press hall"})
+mon = OccupancyMonitor([rule(min_people=2, flag_empty=False)], CFG, {"press": "Press hall"})
 out = []
 for i in range(160):
     out.extend(mon.update(i / FPS, [ent(1, "dock"), ent(2, "dock")], [det(1, [10, 10, 60, 160]), det(2, [200, 10, 250, 160])], wk, lambda z: 0))
-check("people standing in another zone do not count for this zone: an empty press hall is nothing", out == [])
+check("people standing in another zone do not count for this zone: no lone worker in the press hall", out == [])
 
 # ── C: the real chain ───────────────────────────────────────────────────────
 print("C. The real chain")
@@ -393,7 +398,7 @@ got = rows(path)
 check("session: at most 0 and someone stays inside: ONE critical no-entry row",
       len(got) == 1 and got[0]["severity"] == "CRITICAL" and "nobody is allowed" in got[0]["reason"], str(got))
 
-s, path = session_for([rule(min_people=2)])
+s, path = session_for([rule(min_people=2, flag_empty=False)])
 asyncio.run(play(s, lambda t: [(1, "dock")], 200))
 check("session: a lone person in another zone is not this rule's business", rows(path) == [])
 
