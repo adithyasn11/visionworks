@@ -13,7 +13,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  AlertTriangle, Camera, Check, Footprints, HardHat, ListChecks, Loader2, LogOut, MapPin, Pencil, PersonStanding, Plus, Power,
+  AlertTriangle, Camera, Check, Footprints, HardHat, ListChecks, Loader2, MapPin, Pencil, PersonStanding, Plus, Power,
   ShieldCheck, SlidersHorizontal, Timer, Trash2, Users, X,
 } from 'lucide-react';
 import { createRule, deleteRule, listRules, updateRule, validateRule } from '../../lib/safetyApi';
@@ -25,12 +25,11 @@ import { can } from '../../lib/permissions';
 import { BTN_PRIMARY, BTN_QUIET, INPUT, Notice, Panel, SeverityChip, Skeleton } from './common';
 
 // An icon and one short line per kind of check, for the picker and the rule boxes.
-const TYPE_ICON = { PPE_ENTRY: HardHat, MAX_DWELL: Timer, PPE_CONTINUOUS: ShieldCheck, REQUIRED_EXIT: LogOut, OCCUPANCY: Users, MAN_DOWN: PersonStanding, WALK_ONLY: Footprints };
+const TYPE_ICON = { PPE_ENTRY: HardHat, MAX_DWELL: Timer, PPE_CONTINUOUS: ShieldCheck, OCCUPANCY: Users, MAN_DOWN: PersonStanding, WALK_ONLY: Footprints };
 const TYPE_HINT = {
   PPE_ENTRY: 'Helmet and vest when someone walks in.',
   MAX_DWELL: 'Flag anyone who stays too long.',
   PPE_CONTINUOUS: 'Gear must stay on the whole time.',
-  REQUIRED_EXIT: 'People must leave by a set exit.',
   OCCUPANCY: 'Too few or too many people.',
   MAN_DOWN: 'Someone lying still on the floor.',
   WALK_ONLY: 'No running in this area.',
@@ -181,7 +180,7 @@ function ParamField({ field, form, setParams, zones, cameras = [] }) {
   );
 }
 
-function RuleForm({ initial, zones, cameras = [], onSaved, onCancel, onGone, onZonesChanged, onListChanged }) {
+function RuleForm({ initial, zones, cameras = [], rules = [], onSaved, onCancel, onGone, onZonesChanged, onListChanged }) {
   const [form, setForm] = useState(initial);
   const [check, setCheck] = useState({ state: 'idle' });
   const [saving, setSaving] = useState(false);
@@ -207,12 +206,13 @@ function RuleForm({ initial, zones, cameras = [], onSaved, onCancel, onGone, onZ
   const whole = wholeCamera(form.zoneId);
   // Every saved camera, with its zones under it; zones whose camera is not in the list (none, or removed) last.
   const groups = useMemo(() => {
-    const fits = (z) => meta.zoneTypes.includes(z.safetyType) || z.safetyType === 'GENERAL';
+    // With nothing ticked (say, the only check was already set on this zone) every zone stays listed.
+    const fits = (z) => !form.types.length || meta.zoneTypes.includes(z.safetyType) || z.safetyType === 'GENERAL';
     const out = cameras.map((c) => ({ key: c.id, name: c.name, label: c.sourceType === 'UPLOAD' ? `${c.name} · uploaded videos` : c.name, zones: zones.filter((z) => z.cameraId === c.id && fits(z)) }));
     const rest = zones.filter((z) => !cameras.some((c) => c.id === z.cameraId) && fits(z));
     if (rest.length) out.push({ key: 'other', name: null, label: 'Other zones', zones: rest });
     return out;
-  }, [cameras, zones, meta]);
+  }, [cameras, zones, meta, form.types.length]);
   // The camera box: picked by hand, or worked out from the rule's zone (when editing, or once the lists arrive).
   const zoneCamKey = (zoneId) => {
     const w = wholeCamera(zoneId);
@@ -230,8 +230,23 @@ function RuleForm({ initial, zones, cameras = [], onSaved, onCancel, onGone, onZ
   // A new zone (or camera) clears what the checks' own zone settings (checkpoint, exit) pointed at.
   const setZone = (zoneId) => setForm((f) => ({ ...f, zoneId, paramsByType: Object.fromEntries(Object.entries(f.paramsByType).map(([t, p]) => [t, { ...p, ...(p.checkpoint_zone_id !== undefined ? { checkpoint_zone_id: '' } : {}), ...(p.exit_zone_id !== undefined ? { exit_zone_id: '' } : {}) }])) }));
   const chooseCamera = (key) => { setPickedCam(key); setZone(''); };
-  const many = form.types.length > 1;
   const labelOf = (t) => (ruleTypeMeta(t) || {}).label || t;
+  // The rules already set on the chosen zone (another rule of a kind that is already there would check it twice).
+  const existingHere = useMemo(() => {
+    if (!form.zoneId || whole) return [];
+    return rules.filter((r) => r.zoneId === form.zoneId && r.id !== form.id);
+  }, [rules, form.zoneId, form.id, whole]);
+  const takenTypes = useMemo(() => new Set(existingHere.map((r) => r.type)), [existingHere]);
+  const chosenZone = zones.find((z) => z.id === form.zoneId) || null;
+  // A zone that already has one of the checked kinds: that kind is unticked, and its tile says it is already set.
+  const [dropped, setDropped] = useState([]);
+  useEffect(() => {
+    if (editing) return;
+    const gone = form.types.filter((t) => takenTypes.has(t));
+    setDropped(gone);
+    if (gone.length) setForm((f) => ({ ...f, types: f.types.filter((t) => !takenTypes.has(t)) }));
+  }, [takenTypes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const many = form.types.length > 1;
   // One rule per checked kind; with several, each name says which check it is.
   const bodies = useMemo(() => form.types.map((t) => ruleBody({
     ...form, zoneId: wholeCamera(form.zoneId) ? '' : form.zoneId, type: t, params: form.paramsByType[t] || {}, name: many && form.name.trim() ? `${form.name.trim().slice(0, 157 - labelOf(t).length)} · ${labelOf(t)}` : form.name,
@@ -384,20 +399,27 @@ function RuleForm({ initial, zones, cameras = [], onSaved, onCancel, onGone, onZ
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {RULE_TYPES.filter((t) => t.enforced({})).map((t) => {
+                  const taken = takenTypes.has(t.value);
                   const on = form.types.includes(t.value);
                   const Icon = TYPE_ICON[t.value] || ShieldCheck;
+                  const already = taken ? existingHere.find((r) => r.type === t.value) : null;
                   return (
-                    <label key={t.value} title={t.blurb}
-                      className={`relative flex items-start gap-3 rounded-xl border-2 px-3.5 py-3 cursor-pointer transition-colors ${on ? 'border-[color:var(--accent)] bg-accent-soft' : 'border-line hover:border-field'}`}>
-                      <input type="checkbox" checked={on} onChange={(e) => toggleType(t.value, e.target.checked)} className="sr-only" />
-                      <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${on ? 'bg-accent text-white' : 'bg-surface-alt text-ink-muted'}`}>
-                        <Icon className="w-4 h-4" aria-hidden="true" />
+                    <label key={t.value} title={taken ? `Already set on this zone: ${already.name}` : t.blurb}
+                      className={`relative flex items-start gap-3 rounded-xl border-2 px-3.5 py-3 transition-colors ${taken ? 'border-line bg-surface-alt cursor-not-allowed' : on ? 'border-[color:var(--accent)] bg-accent-soft cursor-pointer' : 'border-line hover:border-field cursor-pointer'}`}>
+                      <input type="checkbox" checked={on || taken} disabled={taken} onChange={(e) => toggleType(t.value, e.target.checked)} className="sr-only" />
+                      <span style={taken ? { background: 'var(--ink)', color: 'var(--surface)' } : undefined}
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${taken ? '' : on ? 'bg-accent text-white' : 'bg-surface-alt text-ink-muted'}`}>
+                        {taken ? <Check className="w-4 h-4" aria-hidden="true" /> : <Icon className="w-4 h-4" aria-hidden="true" />}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-[0.875rem] font-black text-ink">{t.label}</span>
-                        <span className="block text-[0.75rem] text-ink-muted line-clamp-2">{TYPE_HINT[t.value] || ''}</span>
+                        <span className={`block text-[0.875rem] font-black ${taken ? 'text-ink-muted pr-20' : 'text-ink'}`}>{t.label}</span>
+                        <span className="block text-[0.75rem] text-ink-muted line-clamp-2">
+                          {taken ? `${already.name}${already.isEnabled ? '' : ' (switched off)'}` : TYPE_HINT[t.value] || ''}
+                        </span>
                       </span>
-                      {on && <Check className="absolute top-2.5 right-2.5 w-4 h-4 text-accent" aria-hidden="true" />}
+                      {taken
+                        ? <span style={{ background: 'var(--ink)', color: 'var(--surface)' }} className="absolute top-2 right-2 rounded-md px-1.5 py-0.5 text-[0.625rem] font-black uppercase tracking-wider">Already set</span>
+                        : on && <Check className="absolute top-2.5 right-2.5 w-4 h-4 text-accent" aria-hidden="true" />}
                     </label>
                   );
                 })}
@@ -426,6 +448,28 @@ function RuleForm({ initial, zones, cameras = [], onSaved, onCancel, onGone, onZ
               <p className="text-[0.75rem] text-ink-muted">{changes.map((c) => `"${c.zone.name}" becomes ${/^[AEIOU]/.test(ZONE_TYPE_LABELS[c.to]) ? 'an' : 'a'} ${ZONE_TYPE_LABELS[c.to]} zone`).join('; ')} when you save.</p>
             )}
             {whole && <p className="text-[0.75rem] text-ink-muted">A zone covering the whole picture of "{whole}" is added when you save.</p>}
+            {existingHere.length > 0 && (
+              <div className="rounded-xl border border-line bg-surface-alt px-4 py-3 flex flex-col gap-2">
+                <p className="text-[0.8125rem] font-black text-ink">Already checked in {chosenZone ? `"${chosenZone.name}"` : 'this zone'}</p>
+                <ul className="flex flex-wrap gap-2">
+                  {existingHere.map((r) => {
+                    const Icon = TYPE_ICON[r.type] || ShieldCheck;
+                    return (
+                      <li key={r.id} title={r.name} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-[0.75rem] font-bold text-ink">
+                        <Icon className="w-3.5 h-3.5 text-accent" aria-hidden="true" /> {labelOf(r.type)}
+                        {!r.isEnabled && <span className="text-ink-faint font-semibold">· off</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {!editing && dropped.length > 0 && (
+                  <p className="text-[0.75rem] text-ink-muted">Unticked {dropped.map(labelOf).join(', ')}: already set here. Edit that rule instead.</p>
+                )}
+                {!editing && form.types.length === 0 && (
+                  <p className="text-[0.75rem] text-ink-muted">Pick another check above to add it here.</p>
+                )}
+              </div>
+            )}
             {form.types.length > 0 && cameras.length === 0 && zoneChoices.length === 0 && generalZones.length === 0 && !meta.zoneOptional && (
               <Notice>No {meta.zoneTypes.map((t) => ZONE_TYPE_LABELS[t].toLowerCase()).join(' or ')} zone yet. Draw one on the Zones page first.</Notice>
             )}
@@ -712,7 +756,7 @@ export default function RulesScreen({ role }) {
       </div>
 
       {canEdit && editing && (
-        <RuleForm key={editing.id || 'new'} initial={editing} zones={zones} cameras={cameras} onZonesChanged={loadZones}
+        <RuleForm key={editing.id || 'new'} initial={editing} zones={zones} cameras={cameras} rules={rules} onZonesChanged={loadZones}
           onListChanged={load}
           onSaved={(n) => { setEditing(null); setMessage({ tone: 'ok', text: `${n > 1 ? `${n} rules saved` : 'Rule saved'}. ${n > 1 ? 'They apply' : 'It applies'} from the next run.` }); load(); }}
           onCancel={() => setEditing(null)} onGone={gone} />

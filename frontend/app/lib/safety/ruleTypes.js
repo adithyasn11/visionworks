@@ -6,8 +6,7 @@
 // which has the last word: the editor also asks the server to validate before saving.
 //
 // `enforced` says whether the safety engine acts on this kind of rule TODAY. Every type can be saved
-// and validated, but only helmet-and-vest at entry, helmet-and-vest while inside, the longest stay, the
-// required exit, a person lying still and the head count (lone worker, crowding) are evaluated so far; the screen says so plainly rather than letting someone
+// and validated, but only helmet-and-vest at entry, helmet-and-vest while inside, the longest stay, a person lying still and the head count (lone worker, crowding) are evaluated so far; the screen says so plainly rather than letting someone
 // believe a crowding limit is protecting a doorway. (The server also says, as `evaluated_by_engine`.)
 
 export const PPE_ITEMS = [
@@ -62,18 +61,6 @@ export const RULE_TYPES = [
     fields: [
       { key: 'required_ppe', kind: 'ppe', label: 'Items to look for' },
       { key: 'grace_seconds', kind: 'number', label: 'Grace period (seconds)', min: 1, max: 30, step: 1 },
-    ],
-  },
-  {
-    value: 'REQUIRED_EXIT',
-    label: 'Leave through the exit zone',
-    blurb: 'After someone leaves the restricted zone, checks that they reach the exit zone in time. Going into another restricted zone first, or still being in view without reaching the exit, is flagged; passing through an approach or checkpoint zone on the way is fine. If they are out of view, it says it could not tell.',
-    zoneTypes: ['RESTRICTED'],
-    enforced: () => true,
-    defaults: { max_seconds_to_exit: 30 },
-    fields: [
-      { key: 'exit_zone_id', kind: 'zone', label: 'Exit zone', zoneTypes: ['EXIT'], required: true },
-      { key: 'max_seconds_to_exit', kind: 'number', label: 'Time allowed to reach it (seconds)', min: 3, max: 600, step: 1 },
     ],
   },
   {
