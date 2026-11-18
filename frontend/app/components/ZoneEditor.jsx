@@ -662,7 +662,7 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
       )}
 
 
-      <div className="relative w-full rounded-xl bg-ground border border-line overflow-hidden">
+      <div className="relative w-full mx-auto rounded-xl bg-ground border border-line overflow-hidden lg:max-w-[calc((100dvh-24rem)*16/9)]">
         {/* The frame sits UNDER the canvas, at the same aspect ratio, so a
             click at (x, y) on screen lands on the same pixel in both. */}
         {backdrop && (
@@ -739,8 +739,8 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
           <span className="text-[0.75rem] text-ink-faint tabular-nums">{zones.length} on {cameraId}</span>
         </div>
       {zones.length === 0 && status === 'ready' && (
-        <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 py-8">
-          <span className="w-12 h-12 rounded-2xl border border-line bg-surface-alt flex items-center justify-center">
+        <div className="flex-1 flex flex-col items-center justify-center text-center gap-2.5 py-4">
+          <span className="w-11 h-11 rounded-2xl border border-line bg-surface-alt flex items-center justify-center">
             <MousePointerClick className="w-5 h-5 text-ink-muted" strokeWidth={2} />
           </span>
           <p className="text-[0.9375rem] font-black text-ink">No zones yet</p>
@@ -860,11 +860,11 @@ export const ZoneEditor = ({ cameraId = 'live_webcam', cameras = [], onCameraCha
       )}
       </div>
 
-      <div className="glass-panel p-5 flex flex-col gap-3">
-        <span className="text-ink font-black text-[0.9375rem]">Zone types</span>
-        <ul className="grid grid-cols-1 gap-2">
+      <div className="glass-panel p-4 flex flex-col gap-2.5">
+        <span className="text-ink font-black text-[0.875rem]">Zone types</span>
+        <ul className="grid grid-cols-1 gap-1.5">
           {ZONE_TYPES.map((t) => (
-            <li key={t.value} className="flex items-start gap-2.5 text-[0.8125rem] min-w-0" title={t.hint}>
+            <li key={t.value} className="flex items-start gap-2.5 text-[0.78125rem] leading-snug min-w-0" title={t.hint}>
               <span className="mt-1 w-2.5 h-2.5 rounded-full shrink-0 border border-[color:var(--field)]" style={{ backgroundColor: t.color }} />
               <span className="min-w-0"><b className="text-ink">{t.label}</b> <span className="text-ink-faint">· {TYPE_SHORT[t.value]}</span></span>
             </li>
