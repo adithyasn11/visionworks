@@ -20,6 +20,7 @@ import DecisionFeed from './DecisionFeed';
 import { addDecisions } from '../lib/decisions';
 import { addBanners, expireBanners } from '../lib/alerts';
 import AlertBanners from './AlertBanners';
+import { alarmFor } from '../lib/alarm';
 import CameraChecks from './CameraChecks';
 import { addZoneEvents } from '../lib/zoneEvents';
 
@@ -163,6 +164,7 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         const unseen = made.filter((d) => d && d.id && !bannerSeenRef.current.has(d.id));
         unseen.forEach((d) => bannerSeenRef.current.add(d.id));
         setBanners((list) => addBanners(list, unseen));
+        alarmFor(made);                                   // a new CRITICAL flag (a person down, say) sounds the alarm
       }
       if (typeof data.safety.open_count === 'number') setOpenCount(data.safety.open_count);
       const incoming = data.safety.events;

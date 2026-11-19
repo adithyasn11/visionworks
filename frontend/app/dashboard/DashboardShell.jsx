@@ -15,13 +15,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Video, Shapes, FileDown, ClipboardCheck, ListFilter, SlidersHorizontal,
-  Menu, X, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard, Camera, UserRound,
+  Menu, X, Bell, BellOff, LogOut, Loader2, ExternalLink, Users, Settings, CreditCard, Camera, UserRound,
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
 import { supabase } from '../lib/supabase/browser';
 import { sessionLost } from '../lib/backend';
 import { can } from '../lib/permissions';
-import { getBadgeCounts } from '../lib/safety/queries';
+import { getBadgeCounts, getOpenAlerts } from '../lib/safety/queries';
+import { alarmEnabled, alarmFor, playAlarm, setAlarmEnabled } from '../lib/alarm';
 
 // `plan` sits with the other views rather than down with the settings links,
 // because it is view state on this page like the rest of them — no navigation,
@@ -154,6 +155,31 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
     return () => { live = false; clearInterval(timer); };
   }, [alertCount]);
   const shownAlerts = typeof alertCount === 'number' ? alertCount : ownCount;
+
+  // The alarm: every 10 s, any new CRITICAL flag waiting for review sounds once, on whatever page is open
+  // (flags already waiting when the page opened are only remembered).
+  const [alarmOn, setAlarmOn] = useState(true);
+  useEffect(() => {
+    setAlarmOn(alarmEnabled());
+    const onChange = (e) => setAlarmOn(Boolean(e.detail));
+    window.addEventListener('vw-alarm-changed', onChange);
+    let live = true;
+    let first = true;
+    const check = () => getOpenAlerts().then((r) => {
+      if (!live || !r || r.error) return;
+      alarmFor(r.alerts, { prime: first });
+      first = false;
+    }).catch(() => {});
+    check();
+    const timer = setInterval(check, 10000);
+    return () => { live = false; clearInterval(timer); window.removeEventListener('vw-alarm-changed', onChange); };
+  }, []);
+  const toggleAlarm = () => {
+    const next = !alarmOn;
+    setAlarmEnabled(next);
+    setAlarmOn(next);
+    if (next) playAlarm(true);                          // switching it on plays it once, so you hear what it sounds like
+  };
   // Highlights whichever settings page is open, so the sidebar always shows
   // where you are — the same job the view marker does on the dashboard.
   const pathname = usePathname();
@@ -355,6 +381,16 @@ export default function DashboardShell({ view, onViewChange, user, role, alertCo
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
+          <button
+            type="button"
+            onClick={toggleAlarm}
+            aria-pressed={alarmOn}
+            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-colors ${alarmOn ? 'border-[color:var(--accent)] bg-accent-soft text-accent' : 'border-line bg-surface text-ink-muted hover:text-ink'}`}
+            aria-label={alarmOn ? 'Alarm sound on for critical flags (click to mute)' : 'Alarm sound off (click to turn on)'}
+            title={alarmOn ? 'Alarm on: a critical flag plays a sound. Click to mute.' : 'Alarm off. Click to turn on (plays it once).'}
+          >
+            {alarmOn ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+          </button>
           <Link
             href="/"
             className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-xl border border-line bg-surface text-[0.75rem] font-semibold text-ink-muted hover:text-ink hover:border-field transition-colors"
