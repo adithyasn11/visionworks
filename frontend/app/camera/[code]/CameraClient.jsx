@@ -96,6 +96,9 @@ export default function CameraClient({ code }) {
   // connecting | waiting | streaming | denied | error | expired | replaced
   const [message, setMessage] = useState('Connecting to your dashboard…');
   const [facing, setFacing] = useState('environment');
+  // Read inside sendFrame (which is created once), so it always sees the camera in use now.
+  const facingRef = useRef(facing);
+  facingRef.current = facing;
   const [framesSent, setFramesSent] = useState(0);
   const [isPortrait, setIsPortrait] = useState(false);
   const [online, setOnline] = useState(true);
@@ -145,7 +148,12 @@ export default function CameraClient({ code }) {
     const dh = video.videoHeight * fit;
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, SEND_W, SEND_HEIGHT);
+    // The front (selfie) camera is flipped left-right, like the webcam on the Live feed, so it reads like a mirror.
+    // The back camera already shows the scene the right way round and is sent as it is.
+    const flip = facingRef.current === 'user';
+    if (flip) ctx.setTransform(-1, 0, 0, 1, SEND_W, 0);
     ctx.drawImage(video, (SEND_W - dw) / 2, (SEND_HEIGHT - dh) / 2, dw, dh);
+    if (flip) ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     try {
       ws.send(JSON.stringify({
@@ -412,6 +420,7 @@ export default function CameraClient({ code }) {
           muted
           autoPlay
           className="absolute inset-0 w-full h-full object-contain"
+          style={facing === 'user' ? { transform: 'scaleX(-1)' } : undefined}
         />
         <canvas ref={canvasRef} className="hidden" />
 

@@ -420,7 +420,11 @@ export const VideoCanvasPlayer = ({ activeZones = [], onFrameData, readOnly = fa
         offCanvas.width = 640; // 640x360 for high-speed transmission
         offCanvas.height = 360;
         const offCtx = offCanvas.getContext('2d');
+        // A webcam's raw picture is the reverse of what a person sees in a mirror: flip it left-right before it
+        // is sent, so the analysed picture (and the zones drawn on it) look the way the room looks to them.
+        offCtx.setTransform(-1, 0, 0, 1, 640, 0);
         offCtx.drawImage(videoEl, 0, 0, 640, 360);
+        offCtx.setTransform(1, 0, 0, 1, 0, 0);
 
         const base64Img = offCanvas.toDataURL('image/jpeg', 0.65);
         wsRef.current.send(JSON.stringify({
